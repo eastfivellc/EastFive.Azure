@@ -610,15 +610,15 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\BlackBarLabs.Api\EastFive.Api.csproj">
+    <ProjectReference Include="..\EastFive.Api\EastFive.Api.csproj">
       <Project>{aaa1724b-0787-4ce1-bad5-e3c930db07c1}</Project>
       <Name>EastFive.Api</Name>
     </ProjectReference>
-    <ProjectReference Include="..\BlackBarLabs.Core\EastFive.Core.csproj">
+    <ProjectReference Include="..\EastFive.Core\EastFive.Core.csproj">
       <Project>{aec927ef-6aae-4533-bbf6-539643684002}</Project>
       <Name>EastFive.Core</Name>
     </ProjectReference>
-    <ProjectReference Include="..\BlackBarLabs.Web\EastFive.Web.csproj">
+    <ProjectReference Include="..\EastFive.Web\EastFive.Web.csproj">
       <Project>{5bb52391-2704-44c0-bc8a-dbbe31498814}</Project>
       <Name>EastFive.Web</Name>
     </ProjectReference>
