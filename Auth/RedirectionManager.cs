@@ -70,7 +70,7 @@ namespace EastFive.Azure.Auth
                 ApiSecurity apiSecurity,
                 AzureApplication application,
                 HttpRequestMessage request,
-            ContentTypeResponse<RedirectionManager> onContent,
+            ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure)
         {
