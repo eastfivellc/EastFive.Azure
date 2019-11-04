@@ -36,8 +36,8 @@ namespace EastFive.Azure.Monitoring
                             var client = new ApplicationInsightsDataClient(clientCred);
                             client.AppId = applicationId;
                             
-                            var asdf = await client.GetRequestEventAsync(eventId);
-                                //timespan: TimeSpan.FromMinutes(30.0),);
+                            var asdf = await client.GetExceptionEventsAsync(
+                                timespan: TimeSpan.FromMinutes(30.0));
                             // asdf.Body.Value[0].Request.
 
                             return new HttpResponseMessage();
