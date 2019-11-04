@@ -16,7 +16,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         private string accountName;
         private string accountKey;
 
-        public static AzureTableDriver FromSettings(string settingKey = EastFive.Azure.Persistence.AppSettings.Storage)
+        public static AzureTableDriver FromSettings(string settingKey = EastFive.Azure.AppSettings.ASTConnectionStringKey)
         {
             return EastFive.Web.Configuration.Settings.GetString(settingKey,
                 (storageString) => FromStorageString(storageString),

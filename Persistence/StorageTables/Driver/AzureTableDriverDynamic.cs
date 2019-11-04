@@ -52,7 +52,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
         }
 
-        public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.Persistence.AppSettings.Storage)
+        public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.ASTConnectionStringKey)
         {
             return EastFive.Web.Configuration.Settings.GetString(settingKey,
                 (storageString) => FromStorageString(storageString),
