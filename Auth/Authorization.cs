@@ -160,7 +160,7 @@ namespace EastFive.Azure.Auth
                     authorization.LocationAuthentication = await authentication.GetLoginUrlAsync(
                         application, urlHelper, authorizationId);
 
-                    throw new NotImplementedException();
+                    //throw new ArgumentNullException();
                     return await authorization.StorageCreateAsync(
                         createdId => onCreated(authorization),
                         () => onAlreadyExists());

@@ -9,6 +9,7 @@ using EastFive.Extensions;
 using EastFive.Web.Configuration;
 using Microsoft.Azure.ApplicationInsights;
 using Microsoft.Rest.Azure.Authentication;
+using Microsoft.Azure.ApplicationInsights.Models;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -21,7 +22,8 @@ namespace EastFive.Azure.Monitoring
     {
         [HttpGet]
         public static Task<HttpResponseMessage> GetAsync(
-                [QueryParameter]string eventId)
+                [QueryParameter]string eventId,
+                ContentTypeResponse<EventsExceptionResult[]> onResults)
         {
             return AppSettings.ApplicationInsights.ApplicationId.ConfigurationString(
                 applicationId =>
@@ -36,14 +38,66 @@ namespace EastFive.Azure.Monitoring
                             var client = new ApplicationInsightsDataClient(clientCred);
                             client.AppId = applicationId;
                             
-                            var asdf = await client.GetExceptionEventsAsync(
+                            var exceptionEvents = await client.GetExceptionEventsAsync(
+                                timespan: TimeSpan.FromMinutes(240.0),
+                                top: 10, 
+                                format:"application/json;odata.metadata=full");
+                            var requestEvents = await client.GetRequestEventsAsync(
                                 timespan: TimeSpan.FromMinutes(30.0));
-                            // asdf.Body.Value[0].Request.
 
-                            return new HttpResponseMessage();
+                            return onResults(exceptionEvents.Value.ToArray());
                         });
                 });
             
+        }
+
+        [HttpPost]
+        public static Task<HttpResponseMessage> WebhookAsync(
+                [Resource]object appInsightsCallback,
+                ContentTypeResponse<EventsExceptionResult[]> onResults)
+        {
+            return AppSettings.ApplicationInsights.ApplicationId.ConfigurationString(
+                applicationId =>
+                {
+                    return AppSettings.ApplicationInsights.ClientSecret.ConfigurationString(
+                        async token =>
+                        {
+                            // Authenticate with client secret (app key)
+                            var clientCred = new ApiKeyClientCredentials(token);
+
+                            // New up a client with credentials and AI application Id
+                            var client = new ApplicationInsightsDataClient(clientCred);
+                            client.AppId = applicationId;
+
+                            var exceptionEvents = await client.GetExceptionEventsAsync(
+                                timespan: TimeSpan.FromMinutes(240.0),
+                                top: 10,
+                                format: "application/json;odata.metadata=full");
+                            var requestEvents = await client.GetRequestEventsAsync(
+                                timespan: TimeSpan.FromMinutes(30.0));
+
+                            return onResults(exceptionEvents.Value.ToArray());
+                        });
+                });
+
+        }
+
+        public struct AppInsightsCallback
+        {
+            public struct Properties
+            {
+                public struct Property
+                {
+
+                }
+                public struct Context
+                {
+                    public struct ContextProperties
+                    {
+
+                    }
+                }
+            }
         }
     }
 }

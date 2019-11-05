@@ -134,6 +134,195 @@
   ]
 }</value>
   </data>
+  <data name="ExampleHook" xml:space="preserve">
+    <value>{
+	"$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+	"type": "AdaptiveCard",
+	"version": "1.0",
+	"body": [
+		{
+			"type": "ColumnSet",
+			"columns": [
+				{
+					"width": "32px",
+					"items": [
+						{
+							"type": "Image",
+							"width": "32px",
+							"horizontalAlignment": "center",
+							"url": "https://media.licdn.com/dms/image/C4E0BAQG-aWr51MCkgw/company-logo_200_200/0?e=2159024400&amp;v=beta&amp;t=x7Lkr0pb_hiach9ewQsIZaGkksiX69WTrfJfzVzAt0M",
+							"altText": "E5 FVC"
+						}
+					]
+				},
+				{
+					"width": "stretch",
+					"items": [
+						{
+							"type": "TextBlock",
+							"text": "EastFive FVC -&gt; MS Teams response tracking"
+						}
+					]
+				},
+				{
+					"width": "auto",
+					"verticalContentAlignment": "center",
+					"items": [
+						{
+							"type": "Image",
+							"width": "12px",
+							"url": "https://messagecardplayground.azurewebsites.net/assets/Close.png",
+							"altText": "Close"
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "ColumnSet",
+			"spacing": "large",
+			"separator": true,
+			"columns": [
+				{
+					"width": "32px",
+					"items": [
+						{
+							"type": "Image",
+							"width": "32px",
+							"style": "person",
+							"horizontalAlignment": "center",
+							"url": "https://s3.amazonaws.com/f6s-public/profiles/1245479_original.jpg",
+							"altText": "Affirm Health Shield Production"
+						}
+					]
+				},
+				{
+					"width": "stretch",
+					"items": [
+						{
+							"type": "TextBlock",
+							"text": "**GET** on **SearchResourceType**..**Create** shit the bed"
+						},
+						{
+							"type": "TextBlock",
+							"spacing": "none",
+							"isSubtle": true,
+							"text": "\"Could not cast X to Y\""
+						},
+						{
+							"type": "TextBlock",
+							"spacing": "small",
+							"isSubtle": true,
+							"text": "When: 12/12/2019 at 5:31pm"
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "Container",
+			"items": [
+				{
+					"type": "ColumnSet",
+					"columns": [
+						{
+							"width": "32px"
+						},
+						{
+							"width": "stretch",
+							"items": [
+								{
+									"type": "ActionSet",
+									"actions": [
+										{
+											"type": "Action.ShowCard",
+											"title": "Show request",
+											"card": {
+												"type": "AdaptiveCard",
+												"body": [
+													{
+														"type": "Input.Text",
+														"isMultiline": false,
+														"id": "textinputid",
+                                                        "title": "Headers",
+                                                        "value": "Authorization:XAJSD"
+													},
+                                                    {
+                                                        "type": "Input.Text",
+                                                        "isMultiline": true,
+                                                        "id": "textinputid",
+                                                        "title":"BODY",
+                                                        "value": "{ id: \"abc234\" }"
+                                                    },
+													{
+														"type": "ActionSet",
+														"spacing": "small",
+														"actions": [
+															{
+																"type": "Action.Http",
+																"method": "POST",
+																"body": "{}",
+																"title": "OK",
+																"url": "https://messagecardplaygroundfn.azurewebsites.net/api/HttpPost?code=zJaYHdG4dZdPK0GTymwYzpaCtcPAPec8fTvc2flJRvahwigYWg3p0A==&amp;message=The comment was added successfully"
+															}
+														]
+													}
+												]
+											}
+										},
+										{
+											"type": "Action.ShowCard",
+											"title": "Resolve",
+											"card": {
+												"type": "AdaptiveCard",
+												"body": [
+													{
+														"type": "Input.ChoiceSet",
+														"placeholder": "Pick a list",
+														"id": "choiceinputid",
+														"isRequired": true,
+														"choices": [
+															{
+																"title": "Download Postman",
+																"value": "List 1"
+															},
+															{
+																"title": "Create Bug Task in VSO",
+																"value": "List 2"
+															},
+                                                            {
+                                                                "title": "Replicate in Test",
+                                                                "value": "List 3"
+                                                            }
+														]
+													},
+													{
+														"type": "ActionSet",
+														"spacing": "small",
+														"actions": [
+															{
+																"type": "Action.Http",
+																"method": "POST",
+																"body": "{{choiceinputid.value}}",
+																"title": "OK",
+																"url": "https://messagecardplaygroundfn.azurewebsites.net/api/HttpPost?code=zJaYHdG4dZdPK0GTymwYzpaCtcPAPec8fTvc2flJRvahwigYWg3p0A==&amp;message=The card was moved to '{{choiceinputid.value}}' successfully"
+															}
+														]
+													}
+												]
+											}
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}</value>
+  </data>
   <data name="indexPage" xml:space="preserve">
     <value>&lt;!DOCTYPE html&gt;
 &lt;html&gt;
@@ -363,5 +552,106 @@
   </data>
   <data name="spahtml" xml:space="preserve">
     <value>&lt;!doctype html&gt;&lt;html lang="en" data.ie="isloading"&gt;&lt;head&gt;&lt;meta charset="utf-8"&gt;&lt;title&gt;Dash&lt;/title&gt;&lt;base href="/"&gt;&lt;meta name="viewport" content="width=device-width,initial-scale=1"&gt;&lt;link rel="icon" type="image/x-icon" href="favicon.ico"&gt;&lt;link href="styles.0bc98765f532baaa7699.bundle.css" rel="stylesheet"/&gt;&lt;/head&gt;&lt;body class="hold-transition sidebar-mini fixed"&gt;&lt;dash-root&gt;&lt;/dash-root&gt;&lt;script type="text/javascript" src="inline.54c1233f72172d979b96.bundle.js"&gt;&lt;/script&gt;&lt;script type="text/javascript" src="polyfills.d9faed5c4d2817543fd2.bundle.js"&gt;&lt;/script&gt;&lt;script type="text/javascript" src="scripts.02bf58f26e3bc6f16cdb.bundle.js"&gt;&lt;/script&gt;&lt;script type="text/javascript" src="main.6d7888cd63472334f6ce.bundle.js"&gt;&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;</value>
+  </data>
+  <data name="teamNotification" xml:space="preserve">
+    <value>{
+  "summary": "500 \"Error\"",
+  "themeColor": "0078D7",
+  "title": "SearchResourceType..CreateAsync: \"Could not assign X to Y\"",
+  "sections": [
+    {
+      "activityTitle": "Affirm Health - Production",
+      "activitySubtitle": "11/3/2019, 3:34pm",
+      "activityImage": "https://s3.amazonaws.com/f6s-public/profiles/1245479_original.jpg",
+      "facts": [
+        {
+          "name": "Resource:",
+          "value": "SearchResourceType"
+        },
+        {
+          "name": "Http Method:",
+          "value": "POST"
+        },
+        {
+          "name": "Method:",
+          "value": "CreateAsync"
+        },
+        {
+          "name": "URL:",
+          "value": "(none)"
+        }
+      ],
+      "text": "{ "id": "abc-132 }"
+    }
+  ],
+  "potentialAction": [
+    {
+      "@type": "ActionCard",
+      "name": "Create Bug in Teams",
+      "inputs": [
+        {
+          "@type": "DateInput",
+          "id": "dueDate",
+          "title": "Select a date"
+        }
+      ],
+      "actions": [
+        {
+          "@type": "HttpPOST",
+          "name": "OK",
+          "target": "https://..."
+        }
+      ]
+    },
+    {
+      "@type": "ActionCard",
+      "name": "Download Postman Request",
+      "inputs": [
+        {
+          "@type": "MultichoiceInput",
+          "id": "move",
+          "title": "Pick a list",
+          "choices": [
+            { "display": "List 1", "value": "l1" },
+            { "display": "List 2", "value": "l2" }
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "@type": "HttpPOST",
+          "name": "OK",
+          "target": "https://..."
+        }
+      ]
+    },
+    {
+      "@type": "ActionCard",
+      "name": "Run in Tests",
+      "inputs": [
+        {
+          "@type": "TextInput",
+          "id": "comment",
+          "isMultiline": true,
+          "title": "Enter your comment"
+        }
+      ],
+      "actions": [
+        {
+          "@type": "HttpPOST",
+          "name": "OK",
+          "target": "https://..."
+        }
+      ]
+    },
+    {
+      "@type": "OpenUri",
+      "name": "View in Application Insights",
+      "targets": [
+        { "os": "default", "uri": "https://..." }
+      ]
+    }
+  ]
+}</value>
   </data>
 </root>

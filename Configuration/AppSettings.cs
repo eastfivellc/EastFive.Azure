@@ -30,8 +30,15 @@ namespace EastFive.Azure
             [ConfigKey("Password for API access to Application Insights.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = true,
-                Location = "Home > Application Insights > {Resource Name} > API Access / + Create API Key")]
+                Location = "Home > Application Insights > {Resource Name} > API Access / + " +
+                "Create API Key")]
             public const string ClientSecret = "EastFive.Azure.ApplicationInsights.ClientSecret";
+
+            public const string TeamsHook = "EastFive.Azure.ApplicationInsights.TeamsHook";
+
+            public const string TeamsAppIdentification = "EastFive.Azure.ApplicationInsights.TeamsAppIdentification";
+
+            public const string TeamsAppImage = "EastFive.Azure.ApplicationInsights.TeamsAppImage";
         }
 
         public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";

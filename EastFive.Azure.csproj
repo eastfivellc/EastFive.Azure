@@ -343,6 +343,8 @@
     <Compile Include="Media\ContentExtensions.cs" />
     <Compile Include="Monitoring\ApplicationInsights.cs" />
     <Compile Include="Monitoring\ApplicationInsightsRouteHandlerAttribute.cs" />
+    <Compile Include="Monitoring\MessageCard.cs" />
+    <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Backups\Attributes\IBackupStorage.cs" />
