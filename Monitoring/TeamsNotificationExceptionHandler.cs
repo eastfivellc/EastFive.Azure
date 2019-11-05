@@ -71,9 +71,9 @@ namespace EastFive.Azure.Monitoring
                 {
                     new MessageCard.Section
                     {
-                        activityTitle = appName, //  "Affirm Health - Production",
-                        activitySubtitle = (DateTime.UtcNow + utcOffset).ToString("f"), //  "11/3/2019, 3:34pm",
-                        activityImage = appImage, // new Uri("https://s3.amazonaws.com/f6s-public/profiles/1245479_original.jpg"),
+                        activityTitle = appName,
+                        activitySubtitle = (DateTime.UtcNow + utcOffset).ToString("f"),
+                        activityImage = appImage,
                     },
                     new MessageCard.Section
                     {
