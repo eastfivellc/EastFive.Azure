@@ -84,6 +84,32 @@ namespace EastFive.Azure.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to {
+        ///	&quot;$schema&quot;: &quot;https://adaptivecards.io/schemas/adaptive-card.json&quot;,
+        ///	&quot;type&quot;: &quot;AdaptiveCard&quot;,
+        ///	&quot;version&quot;: &quot;1.0&quot;,
+        ///	&quot;body&quot;: [
+        ///		{
+        ///			&quot;type&quot;: &quot;ColumnSet&quot;,
+        ///			&quot;columns&quot;: [
+        ///				{
+        ///					&quot;width&quot;: &quot;32px&quot;,
+        ///					&quot;items&quot;: [
+        ///						{
+        ///							&quot;type&quot;: &quot;Image&quot;,
+        ///							&quot;width&quot;: &quot;32px&quot;,
+        ///							&quot;horizontalAlignment&quot;: &quot;center&quot;,
+        ///							&quot;url&quot;: &quot;https://media.licdn.com/dms/image/C4E0BAQG-aWr51MCkgw/company-logo_200_200/0?e=2159024400&amp;v=beta&amp;t=x7Lkr0pb_hiach9ewQsIZaGkksiX69WTrfJfzVzAt0M&quot;,
+        ///							&quot;altText&quot;: &quot;E5 FVC&quot;
+        /// [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string ExampleHook {
+            get {
+                return ResourceManager.GetString("ExampleHook", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to &lt;!DOCTYPE html&gt;
         ///&lt;html&gt;
         ///&lt;head id=&quot;head&quot;&gt;
@@ -139,6 +165,30 @@ namespace EastFive.Azure.Properties {
         internal static string spahtml {
             get {
                 return ResourceManager.GetString("spahtml", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to {
+        ///  &quot;summary&quot;: &quot;500 \&quot;Error\&quot;&quot;,
+        ///  &quot;themeColor&quot;: &quot;0078D7&quot;,
+        ///  &quot;title&quot;: &quot;SearchResourceType..CreateAsync: \&quot;Could not assign X to Y\&quot;&quot;,
+        ///  &quot;sections&quot;: [
+        ///    {
+        ///      &quot;activityTitle&quot;: &quot;Affirm Health - Production&quot;,
+        ///      &quot;activitySubtitle&quot;: &quot;11/3/2019, 3:34pm&quot;,
+        ///      &quot;activityImage&quot;: &quot;https://s3.amazonaws.com/f6s-public/profiles/1245479_original.jpg&quot;,
+        ///      &quot;facts&quot;: [
+        ///        {
+        ///          &quot;name&quot;: &quot;Resource:&quot;,
+        ///          &quot;value&quot;: &quot;SearchResourceType&quot;
+        ///        },
+        ///        {
+        ///          &quot;name&quot;: &quot;Http Method: [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string teamNotification {
+            get {
+                return ResourceManager.GetString("teamNotification", resourceCulture);
             }
         }
     }
