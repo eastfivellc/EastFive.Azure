@@ -42,8 +42,8 @@ namespace EastFive.Azure
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
 
-        public const string FunctionProcessorQueueTriggerName = "EastFive.Azure.Functions.QueueTriggerName";
-        public const string FunctionProcessorQueueTriggerNamePercent = "%EastFive.Azure.Functions.QueueTriggerName%";
+        public const string FunctionProcessorServiceBusTriggerName = "EastFive.Azure.Functions.ServiceBusTriggerName";
+        public const string FunctionProcessorServiceBusTriggerNamePercent = "%" + FunctionProcessorServiceBusTriggerName + "%";
 
         public const string CDNEndpointHostname = "EastFive.Azure.CDNEndpointHostname";
         public const string CDNApiRoutePrefix = "EastFive.Azure.CDNApiRoutePrefix";

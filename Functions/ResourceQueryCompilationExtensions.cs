@@ -34,11 +34,12 @@ namespace EastFive.Azure.Functions
                         return app;
                     }
                     var applicationValid = GetApplication();
+
                     return await EastFive.Web.Configuration.Settings.GetString(
-                        AppSettings.FunctionProcessorQueueTriggerName,
-                        async (queueTriggerName) =>
+                        AppSettings.FunctionProcessorServiceBusTriggerName,
+                        async (serviceBusTriggerName) =>
                         {
-                            await applicationValid.SendQueueMessageAsync(queueTriggerName, byteContent);
+                            await applicationValid.SendServiceBusMessageAsync(serviceBusTriggerName, byteContent);
                             return invocationMessage;
                         },
                         (why) => throw new Exception(why));

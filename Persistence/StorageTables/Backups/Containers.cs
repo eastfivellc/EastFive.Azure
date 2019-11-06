@@ -12,6 +12,7 @@ using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Api.Azure;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {
@@ -51,6 +52,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                                     };
                                 })
                             .Select(message => JsonConvert.SerializeObject(message))
+                            .Select(message => Encoding.UTF8.GetBytes(message))
                             .ToArray();
                         await application.SendServiceBusMessageAsync(serviceBusQueueName, backupMessages);
                         sw.Stop();
@@ -96,7 +98,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
 
         private static ContainerResourceInfo[] DiscoverAllContainers()
         {
-            return EastFive.Web.Configuration.Settings.GetString(BackupFunction.AssembliesContainingBackupResourcesKey,
+            return EastFive.Azure.Persistence.AppSettings.Backup.StorageResourceAssemblies.ConfigurationString(
                 (assemblyString) =>
                 {
                     var assemblyNames = assemblyString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);

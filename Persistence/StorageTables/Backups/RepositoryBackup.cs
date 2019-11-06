@@ -25,6 +25,8 @@ using EastFive.Analytics;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using System.Collections.Concurrent;
 using EastFive.Web.Configuration;
+using BlackBarLabs.Persistence.Azure.Attributes;
+using EastFive.Azure.Persistence.StorageTables.Backups;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -33,6 +35,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         Resource = typeof(RepositoryBackup),
         ContentType = "x-application/repository-backup",
         ContentTypeVersion = "0.1")]
+    [StorageResourceNoOp]
     [StorageTable]
     public struct RepositoryBackup : IReferenceable
     {
@@ -83,10 +86,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             MultipartResponseAsync<InvocationMessage> onQueued,
             AlreadyExistsResponse onAlreadyExists)
         {
-            logger.Trace($"Cleaning backup results");
-            var repo = AzureTableDriverDynamic.FromStorageString(storageSettingCopyTo);
-            await DeleteAllAsync(GetRepository(storageSettingCopyTo));
-
             CloudStorageAccount account = CloudStorageAccount
                     .Parse(storageSettingCopyFrom);
             CloudTableClient tableClient =
@@ -95,8 +94,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             return await await repositoryBackup.StorageCreateAsync(
                 (discard) =>
                 {
+                    var includedTables = BackupFunction.DiscoverStorageResources()
+                        .Where(x => x.message.Any())
+                        .Select(x => x.tableName)
+                        .ToArray();
                     var resourceInfoToProcess = tableClient
                         .ListTables()
+                        .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
                         .Distinct()
                         .Select(
                             async cloudTable =>
@@ -126,11 +130,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         #region Utility Functions
 
-        public static Task DeleteAllAsync(AzureTableDriverDynamic destRepo)
-        {
-            var cloudTable = destRepo.TableClient.GetTableReference(typeof(StorageTables.Backups.BackupFunction.Backup).Name);
-            return cloudTable.DeleteIfExistsAsync();
-        }
+        //public static Task DeleteAllAsync(AzureTableDriverDynamic destRepo)
+        //{
+        //    var cloudTable = destRepo.TableClient.GetTableReference(typeof(StorageTables.Backups.BackupFunction.Backup).Name);
+        //    return cloudTable.DeleteIfExistsAsync();
+        //}
 
         // Azure recommends static variables to reuse them across invokes
         // and reduce overall connection count

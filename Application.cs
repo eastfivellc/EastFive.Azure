@@ -174,18 +174,18 @@ namespace EastFive.Api.Azure
             }
         }
 
-        public virtual Task SendServiceBusMessageAsync(string queueName, string contents)
+        public virtual Task SendServiceBusMessageAsync(string queueName, byte[] bytes)
         {
-            return SendServiceBusMessageAsync(queueName, new[] { contents });
+            return SendServiceBusMessageAsync(queueName, new[] { bytes });
         }
 
-        public virtual async Task SendServiceBusMessageAsync(string queueName, IEnumerable<string> contents)
+        public virtual async Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes)
         {
             const int maxPayloadSize = 262_144;
             const int perMessageHeaderSize = 58;
             const int perMessageListSize = 8;
 
-            if (!contents.Any())
+            if (!listOfBytes.Any())
                 return;
 
             var client = EastFive.Web.Configuration.Settings.GetString(EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString,
@@ -205,13 +205,11 @@ namespace EastFive.Api.Azure
 
             try
             {
-                var messages = contents
-                    .Select(
-                        content =>
-                        {
-                            var bytes = Encoding.UTF8.GetBytes(content);
-                            return new Microsoft.Azure.ServiceBus.Message(bytes);
-                        })
+                var messages = listOfBytes
+                    .Select(bytes => new Microsoft.Azure.ServiceBus.Message(bytes)
+                    {
+                        ContentType = "application/octet-stream",
+                    })
                     .ToArray();
                 var maxMessageSize = messages.Select(x => x.Body.Length + perMessageHeaderSize + perMessageListSize).Max();
                 int numberInBatch = maxPayloadSize / maxMessageSize; 

@@ -150,33 +150,33 @@ namespace EastFive.Azure.Functions
 
 
 
-        public Task<CloudQueueMessage> SendToQueueAsync(AzureApplication application)
+        public Task SendToQueueAsync(AzureApplication application)
         {
             return InvocationMessage.SendToQueueAsync(this.invocationRef, application);
         }
 
-        public static Task<CloudQueueMessage> SendToQueueAsync(IRef<InvocationMessage> invocationMessageRef,
+        public static Task SendToQueueAsync(IRef<InvocationMessage> invocationMessageRef,
             AzureApplication azureApplication)
         {
             var byteContent = invocationMessageRef.id.ToByteArray();
             return EastFive.Web.Configuration.Settings.GetString(
-                AppSettings.FunctionProcessorQueueTriggerName,
-                (queueTriggerName) =>
+                AppSettings.FunctionProcessorServiceBusTriggerName,
+                (serviceBusTriggerName) =>
                 {
-                    return azureApplication.SendQueueMessageAsync(queueTriggerName, byteContent);
+                    return azureApplication.SendServiceBusMessageAsync(serviceBusTriggerName, byteContent);
                 },
                 (why) => throw new Exception(why));
         }
 
-        public static Task<CloudQueueMessage> SendToQueueAsync(IRefs<InvocationMessage> invocationMessageRef,
+        public static Task SendToQueueAsync(IRefs<InvocationMessage> invocationMessageRefs,
             AzureApplication azureApplication)
         {
-            var byteContent = invocationMessageRef.ids.Select(id => id.ToByteArray()).SelectMany().ToArray();
+            var byteContents = invocationMessageRefs.ids.Select(id => id.ToByteArray()).ToArray();
             return EastFive.Web.Configuration.Settings.GetString(
-                AppSettings.FunctionProcessorQueueTriggerName,
-                (queueTriggerName) =>
+                AppSettings.FunctionProcessorServiceBusTriggerName,
+                (serviceBusTriggerName) =>
                 {
-                    return azureApplication.SendQueueMessageAsync(queueTriggerName, byteContent);
+                    return azureApplication.SendServiceBusMessageAsync(serviceBusTriggerName, byteContents);
                 },
                 (why) => throw new Exception(why));
         }

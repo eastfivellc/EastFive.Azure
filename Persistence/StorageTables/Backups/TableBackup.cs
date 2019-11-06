@@ -9,10 +9,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
-using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence;
 using Newtonsoft.Json;
@@ -20,8 +18,9 @@ using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
 using System.Net.Http;
 using EastFive.Azure.Functions;
-using EastFive.Api.Azure;
 using EastFive.Analytics;
+using EastFive.Web.Configuration;
+using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -30,6 +29,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         Resource = typeof(TableBackup),
         ContentType = "x-application/table-backup",
         ContentTypeVersion = "0.1")]
+    [StorageResourceNoOp]
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
@@ -76,7 +76,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 [Property(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 [Property(Name = TableNamePropertyName)]string tableName,
-                [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
+                [Property(Name = BackupPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Resource]TableBackup tableBackup,
                 RequestMessage<TableBackup> requestQuery,
                 HttpRequestMessage request,
@@ -85,7 +85,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             AlreadyExistsResponse onAlreadyExists)
         {
             return await await tableBackup.StorageCreateAsync(
-                async (entity) =>
+                async (discard) =>
                 {
                     var invocationMessage = await requestQuery
                         .ById(tableBackupRef)
@@ -101,7 +101,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         [HttpPatch]
         public static async Task<HttpResponseMessage> UpdateAsync(
-                [UpdateId(Name = IdPropertyName)]IRef<TableBackup> documentSourceRef,
+                [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 RequestMessage<TableBackup> requestQuery,
                 HttpRequestMessage request,
                 EastFive.Analytics.ILogger logger,
@@ -109,27 +109,32 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             NoContentResponse onComplete,
             NotFoundResponse onNotFound)
         {
-            return await await documentSourceRef.StorageGetAsync(
+            return await await tableBackupRef.StorageGetAsync(
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        async repoBackup =>
+                        repoBackup =>
                         {
-                            var complete = await entity.Copy(
-                                repoBackup.storageSettingCopyFrom,
-                                repoBackup.storageSettingCopyTo,
-                                TimeSpan.FromSeconds(40),
-                                logger);
-                            if (complete)
-                                return onComplete();
+                            return EastFive.Azure.Persistence.AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
+                                async (seconds) =>
+                                {
+                                    var complete = await entity.Copy(
+                                        repoBackup.storageSettingCopyFrom,
+                                        repoBackup.storageSettingCopyTo,
+                                        TimeSpan.FromSeconds(seconds),
+                                        logger);
+                                    if (complete)
+                                        return onComplete();
 
-                            var invocationMessage = await requestQuery
-                                .ById(documentSourceRef)
-                                .HttpPatch(default)
-                                .CompileRequest(request)
-                                .FunctionAsync();
+                                    var invocationMessage = await requestQuery
+                                        .ById(tableBackupRef)
+                                        .HttpPatch(default)
+                                        .CompileRequest(request)
+                                        .FunctionAsync();
 
-                            return onContinued(invocationMessage);
+                                    return onContinued(invocationMessage);
+                                },
+                                (why) => onComplete().AsTask());
                         });
                 },
                 () => onNotFound().AsTask());

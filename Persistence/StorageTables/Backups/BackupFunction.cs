@@ -46,8 +46,6 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
 
     public static class BackupFunction
     {
-        public const string AssembliesContainingBackupResourcesKey = "AffirmHealth.Backup.Assemblies";
-
         // Azure recommends static variables to reuse them across invokes
         // and reduce overall connection count
         private static readonly ConcurrentDictionary<string, AzureTableDriverDynamic> repositories = new ConcurrentDictionary<string, AzureTableDriverDynamic>();
@@ -66,53 +64,51 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
         }
 
 
-        [StorageTable]
-        [StorageResourceNoOp]
-        public struct Backup : IReferenceable
-        {
-            [JsonIgnore]
-            public Guid id => backupRef.id;
+        //[StorageTable]
+        //[StorageResourceNoOp]
+        //public struct Backup : IReferenceable
+        //{
+        //    [JsonIgnore]
+        //    public Guid id => backupRef.id;
 
-            [RowKey]
-            [StandardParititionKey]
-            public IRef<Backup> backupRef;
+        //    [RowKey]
+        //    [StandardParititionKey]
+        //    public IRef<Backup> backupRef;
 
-            [Storage]
-            public string resource;
+        //    [Storage]
+        //    public string resource;
 
-            [Storage]
-            public string filter;
+        //    [Storage]
+        //    public string filter;
 
-            [Storage]
-            public int? count;
+        //    [Storage]
+        //    public int? count;
 
-            [Storage]
-            public double? seconds;
+        //    [Storage]
+        //    public double? seconds;
 
-            public static IRef<Backup> GetBackupRef(string resource, string filter)
-            {
-                return $"{resource}/{filter}".MD5HashGuid().AsRef<Backup>();
-            }
+        //    public static IRef<Backup> GetBackupRef(string resource, string filter)
+        //    {
+        //        return $"{resource}/{filter}".MD5HashGuid().AsRef<Backup>();
+        //    }
 
-            public static Task CreateOrUpdateAsync(AzureTableDriverDynamic destRepo, string resource, string filter, int? count = default, double? seconds = default)
-            {
-                var backupRef = GetBackupRef(resource, filter);
-                return destRepo.UpdateOrCreateAsync<Backup, Backup>(
-                        backupRef.StorageComputeRowKey(),
-                        backupRef.StorageComputePartitionKey(),
-                    async (created, storageToUpdate, saveAsync) =>
-                    {
-                        storageToUpdate.resource = resource;
-                        storageToUpdate.filter = filter;
-                        storageToUpdate.count = count;
-                        storageToUpdate.seconds = seconds;
-                        await saveAsync(storageToUpdate);
-                        return storageToUpdate;
-                    });
-            }
-
-            
-        }
+        //    public static Task CreateOrUpdateAsync(AzureTableDriverDynamic destRepo, string resource, string filter, int? count = default, double? seconds = default)
+        //    {
+        //        var backupRef = GetBackupRef(resource, filter);
+        //        return destRepo.UpdateOrCreateAsync<Backup, Backup>(
+        //                backupRef.StorageComputeRowKey(),
+        //                backupRef.StorageComputePartitionKey(),
+        //            async (created, storageToUpdate, saveAsync) =>
+        //            {
+        //                storageToUpdate.resource = resource;
+        //                storageToUpdate.filter = filter;
+        //                storageToUpdate.count = count;
+        //                storageToUpdate.seconds = seconds;
+        //                await saveAsync(storageToUpdate);
+        //                return storageToUpdate;
+        //            });
+        //    }
+        //}
 
         public static TResult GetBackupDestConnectionString<TResult>(
             Func<string, TResult> onSuccess,
@@ -124,43 +120,58 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                 if (now.Day == 1)
                 {
                     if ((1 == now.Month) || (4 == now.Month) || (7 == now.Month) || (10 == now.Month))
-                        return "Quarter";
+                        return EastFive.Azure.Persistence.AppSettings.Backup.QuarterDestination;
 
-                    return "Month";
+                    return EastFive.Azure.Persistence.AppSettings.Backup.MonthDestination;
                 }
-                return now.DayOfWeek.ToString();
+                switch(now.DayOfWeek.ToString())
+                {
+                    case "Sunday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.SundayDestination;
+                    case "Monday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.MondayDestination;
+                    case "Tuesday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.TuesdayDestination;
+                    case "Wednesday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.WednesdayDestination;
+                    case "Thursday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.ThursdayDestination;
+                    case "Friday":
+                        return EastFive.Azure.Persistence.AppSettings.Backup.FridayDestination;
+                    default: //Saturday
+                        return EastFive.Azure.Persistence.AppSettings.Backup.SaturdayDestination;
+                }
             }
 
-            return EastFive.Web.Configuration.Settings.GetString(
-                    $"AffirmHealth.Backup.{GetDestinationKey()}.ConnectionString",
+            return EastFive.Web.Configuration.Settings.GetString(GetDestinationKey(),
                 (connString) => onSuccess(connString),
                 (why) =>
                 {
-                    return "AffirmHealth.Backup.Default.ConnectionString".ConfigurationString(
+                    return EastFive.Azure.Persistence.AppSettings.Backup.DefaultDestination.ConfigurationString(
                         (connString) => onSuccess(connString),
                         onFailure);
                 });
         }
 
-        public static async Task ProcessBackupPartitionsAsync(TableMessage message, EastFive.Analytics.ILogger logger)
-        {
-            logger.Trace($"Starting backup for table {message.tableName}");
-            var sw = new Stopwatch();
-            sw.Start();
+        //public static async Task ProcessBackupPartitionsAsync(TableMessage message, EastFive.Analytics.ILogger logger)
+        //{
+        //    logger.Trace($"Starting backup for table {message.tableName}");
+        //    var sw = new Stopwatch();
+        //    sw.Start();
 
-            var table = message.tableName;
-            var sourceRepo = GetRepository(message.sourceConnectionString);
-            var destRepo = GetRepository(message.destConnectionString);
-            var filter = message.where.FormatWhereInformation()
-                .Join(" and ");
-            await Backup.CreateOrUpdateAsync(destRepo, table, filter);
-            var completedRows = await sourceRepo.Copy(filter, table, destRepo)
-                .ToArrayAsync();
-            sw.Stop();
+        //    var table = message.tableName;
+        //    var sourceRepo = GetRepository(message.sourceConnectionString);
+        //    var destRepo = GetRepository(message.destConnectionString);
+        //    var filter = message.where.FormatWhereInformation()
+        //        .Join(" and ");
+        //    await Backup.CreateOrUpdateAsync(destRepo, table, filter);
+        //    var completedRows = await sourceRepo.Copy(filter, table, destRepo)
+        //        .ToArrayAsync();
+        //    sw.Stop();
 
-            await Backup.CreateOrUpdateAsync(destRepo, table, filter, completedRows.Length, sw.Elapsed.TotalSeconds);
-            logger.Trace($"copied {completedRows.Length} rows in {sw.Elapsed.TotalSeconds} seconds for {filter}");
-        }
+        //    await Backup.CreateOrUpdateAsync(destRepo, table, filter, completedRows.Length, sw.Elapsed.TotalSeconds);
+        //    logger.Trace($"copied {completedRows.Length} rows in {sw.Elapsed.TotalSeconds} seconds for {filter}");
+        //}
 
         //public static async Task QueueUpBackupPartitions(string serviceBusQueueName, string sourceConnectionString, string destConnectionString,
         //    AzureApplication application, EastFive.Analytics.ILogger logger)
@@ -224,11 +235,9 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                 throw new Exception($"These tables in production not configured for backup! [{tablesMissingAttribute.Join(",")}]");
         }
 
-
-
-        private static IEnumerable<StorageResourceInfo> DiscoverAllStorageResources()
+        public static IEnumerable<StorageResourceInfo> DiscoverStorageResources()
         {
-            return AssembliesContainingBackupResourcesKey.ConfigurationString(
+            return EastFive.Azure.Persistence.AppSettings.Backup.StorageResourceAssemblies.ConfigurationString(
                 (assemblyString) =>
                 {
                     var assemblyNames = assemblyString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
@@ -271,8 +280,6 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                 },
                 (why) => throw new Exception(why));
         }
-
-
 
         private static string EnsureTableExistsInCode(TableInformation table)
         {
