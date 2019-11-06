@@ -512,10 +512,15 @@ namespace EastFive.Persistence.Azure.StorageTables
                     tableName: tableName);
         }
 
-        public IEnumerable<StorageResourceInfo> GetStorageResourceInfos(MemberInfo t)
+        public IEnumerable<StorageResourceInfo> GetStorageResourceInfos(MemberInfo memberInfo)
         {
-            // TODO: THis!!
-            yield break;
+            var tableName = GetLookupTableName(memberInfo);
+            yield return new StorageResourceInfo
+            {
+                tableName = tableName,
+                message = new [] { new WhereInformation() },
+                sortKey = tableName,
+            };
         }
 
         private class FaildModificationHandler<TResult> : IHandleFailedModifications<TResult>

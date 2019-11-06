@@ -28,6 +28,7 @@ using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
+using System.Threading;
 
 namespace EastFive.Api.Azure
 {
@@ -63,7 +64,7 @@ namespace EastFive.Api.Azure
                     var baseUri = new Uri(baseUriString);
                     var apiPath = request.RequestUri.AbsolutePath.Trim('/'.AsArray()).Split('/'.AsArray()).First();
                     var invokeFunction = new InvokeApplicationDirect(
-                        httpApp, baseUri, apiPath);
+                        httpApp, baseUri, apiPath, default(CancellationToken));
                     return onCreated(invokeFunction);
                 });
             
