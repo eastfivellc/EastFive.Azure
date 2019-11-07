@@ -180,7 +180,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                     var invocationMaybe = await entity.Copy(
                                         repoBackup.storageSettingCopyFrom,
                                         repoBackup.storageSettingCopyTo,
-                                        100000,
+                                        500000,
                                         continuationToken,
                                         requestQuery,
                                         request,
