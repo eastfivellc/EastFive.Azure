@@ -67,6 +67,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [Storage]
         public IRef<RepositoryBackup> backup;
 
+        [Storage]
+        [JsonIgnore]
+        public long rowsCopied;
+
         #endregion
 
         #region Http Methods
@@ -169,22 +173,34 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
             var timer = Stopwatch.StartNew();
 
-            var segmentFecthing = tableFrom.ExecuteQuerySegmentedAsync(query, token);
+            var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
             var resultsProcessing = new TableResult[] { }.AsTask();
             var backoff = TimeSpan.FromSeconds(1.0);
             while (true)
             {
                 try
                 {
-                    if (segmentFecthing.IsDefaultOrNull())
+                    if (segmentFetching.IsDefaultOrNull())
                     {
                         var savedResultsFinal = await resultsProcessing;
-                        logger.Trace($"Wrote {savedResultsFinal.Length} records");
+                        logger.Trace($"Wrote {savedResultsFinal.Length} records [{tableName}]");
+                        rowsCopied += savedResultsFinal.Length;
+
+                        var rowsCopiedClosure = rowsCopied;
+                        bool saved = await this.tableBackupRef.StorageUpdateAsync(
+                            async (backup, saveAsync) =>
+                            {
+                                backup.continuationToken = default;
+                                backup.rowsCopied = rowsCopiedClosure;
+                                await saveAsync(backup);
+                                return true;
+                            },
+                            () => false);
+                        logger.Trace($"Table complete: {rowsCopied} total records [{tableName}]");
                         return true;
                     }
-                    var segment = await segmentFecthing;
+                    var segment = await segmentFetching;
                     var priorResults = segment.Results.ToArray();
-                    logger.Trace($"Read {priorResults.Length} records.");
 
                     var resultsProcessingNext = CreateOrReplaceBatch(priorResults, tableTo);
 
@@ -192,9 +208,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     if (timer.Elapsed > limit)
                     {
                         var secondToLast = await resultsProcessing;
-                        logger.Trace($"Wrote {secondToLast.Length} records");
+                        logger.Trace($"Wrote {secondToLast.Length} records [{tableName}]");
+                        rowsCopied += secondToLast.Length;
+
                         var lastWrite = await resultsProcessingNext;
-                        logger.Trace($"Wrote {lastWrite.Length} records");
+                        logger.Trace($"Wrote {lastWrite.Length} records [{tableName}]");
+                        rowsCopied += lastWrite.Length;
 
                         var tokenToSave = string.Empty;
                         if (!token.IsDefaultOrNull())
@@ -208,29 +227,40 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 tokenToSave = writer.ToString();
                             }
                         }
+                        var rowsCopiedClosure = rowsCopied;
                         bool saved = await this.tableBackupRef.StorageUpdateAsync(
                             async (backup, saveAsync) =>
                             {
                                 backup.continuationToken = tokenToSave;
+                                backup.rowsCopied = rowsCopiedClosure;
                                 await saveAsync(backup);
                                 return true;
                             },
                             () => false);
                         logger.Trace($"Token Saved = {saved}, token = `{tokenToSave}`");
+
+                        logger.Trace($"Table will be continued: {rowsCopied} partial records [{tableName}]");
                         return false;
                     }
 
-                    segmentFecthing = token.IsDefaultOrNull() ?
+                    segmentFetching = token.IsDefaultOrNull() ?
                         default
                         :
                         tableFrom.ExecuteQuerySegmentedAsync(query, token);
                     
                     var saveResults = await resultsProcessing;
-                    logger.Trace($"Wrote {saveResults.Length} records");
+                    if (saveResults.Length != 0)
+                    {
+                        logger.Trace($"Wrote {saveResults.Length} records [{tableName}]");
+                        rowsCopied += saveResults.Length;
+                    }
 
                     resultsProcessing = resultsProcessingNext;
-                    backoff = TimeSpan.FromSeconds(1.0);
-                    logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds");
+                    if (backoff != TimeSpan.FromSeconds(1.0))
+                    {
+                        backoff = TimeSpan.FromSeconds(1.0);
+                        logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds");
+                    }
                     continue;
                 }
                 catch (StorageException storageEx)
@@ -240,19 +270,16 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         backoff = backoff + TimeSpan.FromSeconds(1.0);
                         logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds and pausing");
                         await Task.Delay(backoff);
-                        segmentFecthing = token.IsDefaultOrNull() ?
+                        segmentFetching = token.IsDefaultOrNull() ?
                             default
                             :
                             tableFrom.ExecuteQuerySegmentedAsync(query, token);
                         continue;
                     }
                 }
-                catch (AggregateException)
+                catch (Exception e)
                 {
-                    throw;
-                }
-                catch (Exception)
-                {
+                    logger.Warning(JsonConvert.SerializeObject(e));
                     throw;
                 };
             }
