@@ -74,12 +74,14 @@ namespace EastFive.Azure.Auth
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure)
         {
+            var twoMonthsAgo = DateTime.UtcNow.AddMonths(-2);
             Expression<Func<Authorization, bool>> allQuery =
-                (authorization) => true;
+                (authorization) => authorization.authorized == true;
             var redirections = await allQuery
                 .StorageQuery()
                 .Where(authorization => !authorization.Method.IsDefaultOrNull())
                 .Where(authorization => authorization.Method.id == methodRef.id)
+                .Where(authorization => authorization.lastModified > twoMonthsAgo)
                 .Select<Authorization, Task<RedirectionManager?>>(
                     async authorization =>
                     {
@@ -116,8 +118,7 @@ namespace EastFive.Azure.Auth
                             },
                             () => Failure("Method no longer supported").AsTask());
                     })
-                //Parallel()
-                .Throttle()
+                .Throttle(desiredRunCount: 4)
                 .SelectWhereHasValue()
                 .OrderByDescendingAsync(item => item.when);
             return onContent(redirections.ToArray());
