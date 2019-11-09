@@ -133,7 +133,16 @@ namespace EastFive.Azure.Monitoring
             var boundParameters = queryParameters.Where(
                 queryParameter => queryParameter.Key.ParameterType.ContainsAttributeInterface<IBindApiValue>());
             foreach (var queryParameter in queryParameters)
+            {
+                if (queryParameter.Key == null)
+                    continue;
+                if (queryParameter.Value.IsNull())
+                {
+                    telemetryEx.Properties.Add($"parameter[{queryParameter.Key.Name}]", "--null--");
+                    continue;
+                }
                 telemetryEx.Properties.Add($"parameter[{queryParameter.Key.Name}]", queryParameter.Value.ToString());
+            }
 
             if (!request.Content.IsDefaultOrNull())
             {
