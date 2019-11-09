@@ -101,7 +101,7 @@ namespace EastFive.Api.Azure.Resources
                 [QueryParameter(Name = Resources.ProcessStage.OwnerPropertyName)]Guid ownerId,
                 [QueryParameter(Name = Resources.ProcessStage.TypePropertyName)]Type resourceType,
                 [QueryParameter(Name = "processstage." + Resources.ProcessStage.ConfirmablePropertyName + "." + Resources.ProcessStage.ConfirmableResource.ProcessStageNextPropertyName)]
-                    EastFive.Api.Controllers.WebIdNone nextStage,
+                    IRefOptional<IReferenceable> nextStage,
                 AzureApplication application, EastFive.Api.Security security, UrlHelper url,
             MultipartAcceptArrayResponseAsync onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
