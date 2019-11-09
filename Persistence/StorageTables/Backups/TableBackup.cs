@@ -71,6 +71,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [JsonIgnore]
         public long rowsCopied;
 
+        [Storage]
+        [JsonIgnore]
+        public Guid etagsBlobId;
+
         #endregion
 
         #region Http Methods
@@ -199,6 +203,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         #endregion
 
         #region Copy Functions
+
 
         public async Task<InvocationMessage?> Copy(
             string storageSettingCopyFrom,

@@ -57,6 +57,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [Storage]
         public DateTime when;
 
+        public const string FrequencyPropertyName = "frequency";
+        [ApiProperty(PropertyName = FrequencyPropertyName)]
+        [JsonProperty(PropertyName = FrequencyPropertyName)]
+        [Storage]
+        public string frequency;
+
         public const string StorageSettingCopyFromPropertyName = "storage_setting_copy_from";
         [ApiProperty(PropertyName = StorageSettingCopyFromPropertyName)]
         [JsonProperty(PropertyName = StorageSettingCopyFromPropertyName)]
@@ -124,6 +130,76 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     return onQueued(resourceInfoToProcess);
                 },
                 () => onAlreadyExists().AsTask());
+        }
+
+        [HttpPatch]
+        public static async Task<HttpResponseMessage> QueueUpBackupPartitions(
+                [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
+                [Property(Name = WhenPropertyName)]DateTime when,
+                RequestMessage<TableBackup> requestQuery,
+                HttpRequestMessage request,
+                EastFive.Analytics.ILogger logger,
+            MultipartResponseAsync<InvocationMessage> onQueued,
+            NoContentResponse onTooEarly,
+            NotFoundResponse onNotFound)
+        {
+            return await repositoryBackupRef.StorageUpdateAsync(
+                async (repoBack, saveAsync) =>
+                {
+                    var needsToRun = NCrontab.CrontabSchedule.TryParse(repoBack.frequency,
+                        chronSchedule =>
+                        {
+                            var next = chronSchedule.GetNextOccurrence(repoBack.when);
+                            if (when > next)
+                                return true;
+                            return false;
+                        },
+                        ex =>
+                        {
+                            return false;
+                        });
+                    if (!needsToRun)
+                        return onTooEarly();
+
+                    var includedTables = BackupFunction.DiscoverStorageResources()
+                        .Where(x => x.message.Any())
+                        .Select(x => x.tableName)
+                        .ToArray();
+
+                    CloudStorageAccount account = CloudStorageAccount
+                        .Parse(repoBack.storageSettingCopyFrom);
+                    CloudTableClient tableClient =
+                        new CloudTableClient(account.TableEndpoint, account.Credentials);
+
+                    var resourceInfoToProcess = tableClient
+                        .ListTables()
+                        .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
+                        .Distinct()
+                        .Select(
+                            async cloudTable =>
+                            {
+                                var tableBackup = new TableBackup()
+                                {
+                                    tableBackupRef = Ref<TableBackup>.NewRef(),
+                                    backup = repositoryBackupRef,
+                                    tableName = cloudTable.Name,
+                                    when = DateTime.UtcNow,
+                                };
+                                var invocationMessage = await requestQuery
+                                    .HttpPost(tableBackup)
+                                    .CompileRequest(request)
+                                    .FunctionAsync();
+
+                                logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
+                                return invocationMessage;
+                            })
+                        .AsyncEnumerable();
+                    repoBack.when = when;
+                    await saveAsync(repoBack);
+
+                    return await onQueued(resourceInfoToProcess);
+                },
+                () => onNotFound());
         }
 
         #endregion
