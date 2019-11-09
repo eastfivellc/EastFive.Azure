@@ -9,10 +9,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
-using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence;
 using Newtonsoft.Json;
@@ -20,8 +18,9 @@ using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
 using System.Net.Http;
 using EastFive.Azure.Functions;
-using EastFive.Api.Azure;
 using EastFive.Analytics;
+using EastFive.Web.Configuration;
+using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -30,6 +29,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         Resource = typeof(TableBackup),
         ContentType = "x-application/table-backup",
         ContentTypeVersion = "0.1")]
+    [StorageResourceNoOp]
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
@@ -67,6 +67,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [Storage]
         public IRef<RepositoryBackup> backup;
 
+        [Storage]
+        [JsonIgnore]
+        public long rowsCopied;
+
         #endregion
 
         #region Http Methods
@@ -76,7 +80,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 [Property(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 [Property(Name = TableNamePropertyName)]string tableName,
-                [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
+                [Property(Name = BackupPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Resource]TableBackup tableBackup,
                 RequestMessage<TableBackup> requestQuery,
                 HttpRequestMessage request,
@@ -85,7 +89,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             AlreadyExistsResponse onAlreadyExists)
         {
             return await await tableBackup.StorageCreateAsync(
-                async (entity) =>
+                async (discard) =>
                 {
                     var invocationMessage = await requestQuery
                         .ById(tableBackupRef)
@@ -101,7 +105,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         [HttpPatch]
         public static async Task<HttpResponseMessage> UpdateAsync(
-                [UpdateId(Name = IdPropertyName)]IRef<TableBackup> documentSourceRef,
+                [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 RequestMessage<TableBackup> requestQuery,
                 HttpRequestMessage request,
                 EastFive.Analytics.ILogger logger,
@@ -109,41 +113,101 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             NoContentResponse onComplete,
             NotFoundResponse onNotFound)
         {
-            return await await documentSourceRef.StorageGetAsync(
+            return await await tableBackupRef.StorageGetAsync(
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        async repoBackup =>
+                        repoBackup =>
                         {
-                            var complete = await entity.Copy(
-                                repoBackup.storageSettingCopyFrom,
-                                repoBackup.storageSettingCopyTo,
-                                TimeSpan.FromSeconds(40),
-                                logger);
-                            if (complete)
-                                return onComplete();
+                            return EastFive.Azure.Persistence.AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
+                                async (seconds) =>
+                                {
+                                    var invocationMaybe = await entity.Copy(
+                                        repoBackup.storageSettingCopyFrom,
+                                        repoBackup.storageSettingCopyTo,
+                                        35000,
+                                        entity.continuationToken,
+                                        requestQuery,
+                                        request,
+                                        logger);
+                                    if (invocationMaybe.HasValue)
+                                        return onContinued(invocationMaybe.Value);
 
-                            var invocationMessage = await requestQuery
-                                .ById(documentSourceRef)
-                                .HttpPatch(default)
-                                .CompileRequest(request)
-                                .FunctionAsync();
+                                    return onComplete();
 
-                            return onContinued(invocationMessage);
+                                    //var complete = await entity.Copy(
+                                    //    repoBackup.storageSettingCopyFrom,
+                                    //    repoBackup.storageSettingCopyTo,
+                                    //    TimeSpan.FromSeconds(seconds),
+                                    //    logger);
+                                    //if (complete)
+                                    //    return onComplete();
+
+                                    //var invocationMessage = await requestQuery
+                                    //    .ById(tableBackupRef)
+                                    //    .HttpPatch(default)
+                                    //    .CompileRequest(request)
+                                    //    .FunctionAsync();
+
+                                    //return onContinued(invocationMessage);
+                                },
+                                (why) => onComplete().AsTask());
                         });
                 },
                 () => onNotFound().AsTask());
         }
 
+        //[HttpPatch]
+        //public static async Task<HttpResponseMessage> UpdateAsync(
+        //        [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
+        //        [Property]string continuationToken,
+        //        RequestMessage<TableBackup> requestQuery,
+        //        HttpRequestMessage request,
+        //        EastFive.Analytics.ILogger logger,
+        //    CreatedBodyResponse<InvocationMessage> onContinued,
+        //    NoContentResponse onComplete,
+        //    NotFoundResponse onNotFound)
+        //{
+        //    return await await tableBackupRef.StorageGetAsync(
+        //        async entity =>
+        //        {
+        //            return await await entity.backup.StorageGetAsync(
+        //                repoBackup =>
+        //                {
+        //                    return AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
+        //                        async (seconds) =>
+        //                        {
+        //                            var invocationMaybe = await entity.Copy(
+        //                                repoBackup.storageSettingCopyFrom,
+        //                                repoBackup.storageSettingCopyTo,
+        //                                500000,
+        //                                continuationToken,
+        //                                requestQuery,
+        //                                request,
+        //                                logger);
+        //                            if (invocationMaybe.HasValue)
+        //                                return onContinued(invocationMaybe.Value);
+
+        //                            return onComplete();
+        //                        },
+        //                        (why) => onComplete().AsTask());
+        //                });
+        //        },
+        //        () => onNotFound().AsTask());
+        //}
+
         #endregion
 
         #region Copy Functions
 
-        public async Task<bool> Copy(
+        public async Task<InvocationMessage?> Copy(
             string storageSettingCopyFrom,
             string storageSettingCopyTo,
-            TimeSpan limit,
-            EastFive.Analytics.ILogger logger)
+            int limit,
+            string continuationToken,
+            RequestMessage<TableBackup> requestQuery,
+            HttpRequestMessage request,
+            ILogger logger)
         {
             var cloudStorageFromAccount = CloudStorageAccount.Parse(storageSettingCopyFrom);
             var cloudStorageToAccount = CloudStorageAccount.Parse(storageSettingCopyTo);
@@ -162,96 +226,293 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 token.ReadXml(tokenReader);
             }
 
-            var timer = Stopwatch.StartNew();
-
-            var segmentFecthing = tableFrom.ExecuteQuerySegmentedAsync(query, token);
-            var resultsProcessing = new TableResult[] { }.AsTask();
+            var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
             var backoff = TimeSpan.FromSeconds(1.0);
-            while (true)
-            {
-                try
+
+            var completeMutex = new System.Threading.ManualResetEvent(false);
+            var listLock = new object();
+            var rowList = new List<GenericTableEntity>();
+
+            var readingData = ReadData(this);
+            var writingData = Task.Run(() =>  WriteData());
+            continuationToken = await readingData;
+            long aggr = await this.tableBackupRef.StorageUpdateAsync(
+                async (backup, saveAsync) =>
                 {
-                    if (segmentFecthing.IsDefaultOrNull())
+                    backup.continuationToken = continuationToken;
+                    backup.rowsCopied += rowList.Count;
+                    await saveAsync(backup);
+                    return backup.rowsCopied;
+                },
+                () => 0L);
+
+
+            var invoMsg = continuationToken.HasBlackSpace() ?
+                await requestQuery
+                    .ById(tableBackupRef)
+                    .HttpPatch(default)
+                    //.HttpPatch(
+                    //    new TableBackup
+                    //    {
+                    //        continuationToken = continuationToken,
+                    //    })
+                    .CompileRequest(request)
+                    .FunctionAsync()
+                :
+                default(InvocationMessage?);
+            completeMutex.Set();
+            await writingData;
+            if (invoMsg.IsDefault())
+                logger.Trace($"Table complete: {aggr} total records [{tableName}]");
+            else
+                logger.Trace($"Table will be continued: {aggr} partial records [{tableName}]");
+
+            return invoMsg;
+
+            async Task<string> ReadData(TableBackup tableBackup)
+            {
+                var readCount = 0;
+                while (true)
+                {
+                    try
                     {
-                        var savedResultsFinal = await resultsProcessing;
-                        logger.Trace($"Wrote {savedResultsFinal.Length} records");
-                        return true;
-                    }
-                    var segment = await segmentFecthing;
-                    var priorResults = segment.Results.ToArray();
-                    logger.Trace($"Read {priorResults.Length} records.");
+                        if (segmentFetching.IsDefaultOrNull())
+                            return default;
 
-                    var resultsProcessingNext = CreateOrReplaceBatch(priorResults, tableTo);
-
-                    token = segment.ContinuationToken;
-                    if (timer.Elapsed > limit)
-                    {
-                        var secondToLast = await resultsProcessing;
-                        logger.Trace($"Wrote {secondToLast.Length} records");
-                        var lastWrite = await resultsProcessingNext;
-                        logger.Trace($"Wrote {lastWrite.Length} records");
-
-                        var tokenToSave = string.Empty;
-                        if (!token.IsDefaultOrNull())
+                        var segment = await segmentFetching;
+                        lock (listLock)
                         {
+                            rowList.AddRange(segment.Results);
+                            readCount += segment.Results.Count;
+                        }
+
+                        token = segment.ContinuationToken;
+                        if (readCount >= limit)
+                        {
+                            if (token.IsDefaultOrNull())
+                                return default;
+
+                            logger.Trace($"{readCount} rows read [{tableBackup.tableName}]");
                             using (var writer = new StringWriter())
                             {
                                 using (var xmlWriter = XmlWriter.Create(writer))
                                 {
                                     token.WriteXml(xmlWriter);
                                 }
-                                tokenToSave = writer.ToString();
+                                return writer.ToString();
                             }
+
                         }
-                        bool saved = await this.tableBackupRef.StorageUpdateAsync(
-                            async (backup, saveAsync) =>
-                            {
-                                backup.continuationToken = tokenToSave;
-                                await saveAsync(backup);
-                                return true;
-                            },
-                            () => false);
-                        logger.Trace($"Token Saved = {saved}, token = `{tokenToSave}`");
-                        return false;
-                    }
 
-                    segmentFecthing = token.IsDefaultOrNull() ?
-                        default
-                        :
-                        tableFrom.ExecuteQuerySegmentedAsync(query, token);
-                    
-                    var saveResults = await resultsProcessing;
-                    logger.Trace($"Wrote {saveResults.Length} records");
-
-                    resultsProcessing = resultsProcessingNext;
-                    backoff = TimeSpan.FromSeconds(1.0);
-                    logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds");
-                    continue;
-                }
-                catch (StorageException storageEx)
-                {
-                    if (storageEx.IsProblemTimeout())
-                    {
-                        backoff = backoff + TimeSpan.FromSeconds(1.0);
-                        logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds and pausing");
-                        await Task.Delay(backoff);
-                        segmentFecthing = token.IsDefaultOrNull() ?
+                        segmentFetching = token.IsDefaultOrNull() ?
                             default
                             :
                             tableFrom.ExecuteQuerySegmentedAsync(query, token);
-                        continue;
+                    }
+                    catch (StorageException storageEx)
+                    {
+                        if (storageEx.IsProblemTimeout())
+                        {
+                            backoff = backoff + TimeSpan.FromSeconds(1.0);
+                            logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds and pausing");
+                            await Task.Delay(backoff);
+                            segmentFetching = token.IsDefaultOrNull() ?
+                                default
+                                :
+                                tableFrom.ExecuteQuerySegmentedAsync(query, token);
+                            continue;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Warning(JsonConvert.SerializeObject(e));
+                        throw;
                     }
                 }
-                catch (AggregateException)
+            }
+
+            async Task WriteData()
+            {
+                // TODO: Interleave writes to improve performance
+                while (true)
                 {
-                    throw;
+                    GenericTableEntity[] entities;
+                    //bool finished = completeMutex.WaitOne(TimeSpan.FromSeconds(0.1));
+                    bool finished = completeMutex.WaitOne();
+                    lock (listLock)
+                    {
+                        entities = rowList.ToArray();
+                        rowList.Clear();
+                    }
+                    if(entities.IsDefaultNullOrEmpty())
+                    {
+                        if (finished)
+                            return;
+                        continue;
+                    }
+                    try
+                    {
+                        TableResult[] resultsProcessingNext = await CreateOrReplaceBatch(entities, tableTo);
+                    }
+                    catch (StorageException storageEx)
+                    {
+                        if (storageEx.IsProblemTimeout())
+                        {
+                            backoff = backoff + TimeSpan.FromSeconds(1.0);
+                            logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds and pausing");
+                            await Task.Delay(backoff);
+                            segmentFetching = token.IsDefaultOrNull() ?
+                                default
+                                :
+                                tableFrom.ExecuteQuerySegmentedAsync(query, token);
+                            continue;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Warning(JsonConvert.SerializeObject(e));
+                        throw;
+                    };
                 }
-                catch (Exception)
-                {
-                    throw;
-                };
             }
         }
+
+        //public async Task<bool> Copy(
+        //    string storageSettingCopyFrom,
+        //    string storageSettingCopyTo,
+        //    TimeSpan limit,
+        //    EastFive.Analytics.ILogger logger)
+        //{
+        //    var cloudStorageFromAccount = CloudStorageAccount.Parse(storageSettingCopyFrom);
+        //    var cloudStorageToAccount = CloudStorageAccount.Parse(storageSettingCopyTo);
+        //    var cloudStorageFromClient = cloudStorageFromAccount.CreateCloudTableClient();
+        //    var cloudStorageToClient = cloudStorageToAccount.CreateCloudTableClient();
+
+        //    var tableFrom = cloudStorageFromClient.GetTableReference(tableName);
+        //    var tableTo = cloudStorageToClient.GetTableReference(tableName);
+        //    var query = new TableQuery<GenericTableEntity>();
+
+        //    var token = default(TableContinuationToken);
+        //    if (continuationToken.HasBlackSpace())
+        //    {
+        //        token = new TableContinuationToken();
+        //        var tokenReader = XmlReader.Create(new StringReader(continuationToken));
+        //        token.ReadXml(tokenReader);
+        //    }
+
+        //    var timer = Stopwatch.StartNew();
+
+        //    var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
+        //    var resultsProcessing = new TableResult[] { }.AsTask();
+        //    var backoff = TimeSpan.FromSeconds(1.0);
+        //    while (true)
+        //    {
+        //        try
+        //        {
+        //            if (segmentFetching.IsDefaultOrNull())
+        //            {
+        //                var savedResultsFinal = await resultsProcessing;
+        //                logger.Trace($"Wrote {savedResultsFinal.Length} records [{tableName}]");
+        //                rowsCopied += savedResultsFinal.Length;
+
+        //                var rowsCopiedClosure = rowsCopied;
+        //                bool saved = await this.tableBackupRef.StorageUpdateAsync(
+        //                    async (backup, saveAsync) =>
+        //                    {
+        //                        backup.continuationToken = default;
+        //                        backup.rowsCopied = rowsCopiedClosure;
+        //                        await saveAsync(backup);
+        //                        return true;
+        //                    },
+        //                    () => false);
+        //                logger.Trace($"Table complete: {rowsCopied} total records [{tableName}]");
+        //                return true;
+        //            }
+        //            var segment = await segmentFetching;
+        //            var priorResults = segment.Results.ToArray();
+
+        //            var resultsProcessingNext = CreateOrReplaceBatch(priorResults, tableTo);
+
+        //            token = segment.ContinuationToken;
+        //            if (timer.Elapsed > limit)
+        //            {
+        //                var secondToLast = await resultsProcessing;
+        //                logger.Trace($"Wrote {secondToLast.Length} records [{tableName}]");
+        //                rowsCopied += secondToLast.Length;
+
+        //                var lastWrite = await resultsProcessingNext;
+        //                logger.Trace($"Wrote {lastWrite.Length} records [{tableName}]");
+        //                rowsCopied += lastWrite.Length;
+
+        //                var tokenToSave = string.Empty;
+        //                if (!token.IsDefaultOrNull())
+        //                {
+        //                    using (var writer = new StringWriter())
+        //                    {
+        //                        using (var xmlWriter = XmlWriter.Create(writer))
+        //                        {
+        //                            token.WriteXml(xmlWriter);
+        //                        }
+        //                        tokenToSave = writer.ToString();
+        //                    }
+        //                }
+        //                var rowsCopiedClosure = rowsCopied;
+        //                bool saved = await this.tableBackupRef.StorageUpdateAsync(
+        //                    async (backup, saveAsync) =>
+        //                    {
+        //                        backup.continuationToken = tokenToSave;
+        //                        backup.rowsCopied = rowsCopiedClosure;
+        //                        await saveAsync(backup);
+        //                        return true;
+        //                    },
+        //                    () => false);
+        //                logger.Trace($"Token Saved = {saved}, token = `{tokenToSave}`");
+
+        //                logger.Trace($"Table will be continued: {rowsCopied} partial records [{tableName}]");
+        //                return false;
+        //            }
+
+        //            segmentFetching = token.IsDefaultOrNull() ?
+        //                default
+        //                :
+        //                tableFrom.ExecuteQuerySegmentedAsync(query, token);
+                    
+        //            var saveResults = await resultsProcessing;
+        //            if (saveResults.Length != 0)
+        //            {
+        //                logger.Trace($"Wrote {saveResults.Length} records [{tableName}]");
+        //                rowsCopied += saveResults.Length;
+        //            }
+
+        //            resultsProcessing = resultsProcessingNext;
+        //            if (backoff != TimeSpan.FromSeconds(1.0))
+        //            {
+        //                backoff = TimeSpan.FromSeconds(1.0);
+        //                logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds");
+        //            }
+        //            continue;
+        //        }
+        //        catch (StorageException storageEx)
+        //        {
+        //            if (storageEx.IsProblemTimeout())
+        //            {
+        //                backoff = backoff + TimeSpan.FromSeconds(1.0);
+        //                logger.Trace($"Adjusted backoff to {backoff.TotalSeconds} seconds and pausing");
+        //                await Task.Delay(backoff);
+        //                segmentFetching = token.IsDefaultOrNull() ?
+        //                    default
+        //                    :
+        //                    tableFrom.ExecuteQuerySegmentedAsync(query, token);
+        //                continue;
+        //            }
+        //        }
+        //        catch (Exception e)
+        //        {
+        //            logger.Warning(JsonConvert.SerializeObject(e));
+        //            throw;
+        //        };
+        //    }
+        //}
 
         private static async Task<TableResult[]> CreateOrReplaceBatch(GenericTableEntity[] entities,
                 CloudTable table)
