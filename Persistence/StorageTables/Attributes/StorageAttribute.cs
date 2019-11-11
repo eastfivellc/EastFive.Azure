@@ -905,6 +905,11 @@ namespace EastFive.Persistence
                 return onBound(default(TimeZoneInfo));
             }
 
+            if (typeof(DateTime) == type)
+            {
+                return onBound(default(DateTime));
+            }
+
             if (type.IsClass)
                 return onBound(null);
 
