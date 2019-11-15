@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EastFive.Azure.Persistence.StorageTables
 {
-    internal class GenericTableEntity : ITableEntity
+    public class GenericTableEntity : ITableEntity
     {
         public string PartitionKey { get; set; }
         public string RowKey { get; set; }
