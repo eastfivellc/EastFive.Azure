@@ -128,41 +128,34 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        repoBackup =>
+                        async (repoBackup) =>
                         {
-                            return EastFive.Azure.Persistence.AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-                                async (seconds) =>
-                                {
-                                    var invocationMaybe = await entity.Copy(
-                                        repoBackup.storageSettingCopyFrom,
-                                        repoBackup.storageSettingCopyTo,
-                                        100000,
-                                        default,
-                                        requestQuery,
-                                        request,
-                                        logger);
-                                    if (invocationMaybe.HasValue)
-                                        return onContinued(invocationMaybe.Value);
+                        var invocationMaybe = await entity.Copy(
+                            repoBackup.storageSettingCopyFrom,
+                            repoBackup.storageSettingCopyTo,
+                            requestQuery,
+                            request,
+                            logger);
+                        if (invocationMaybe.HasValue)
+                            return onContinued(invocationMaybe.Value);
 
-                                    return onComplete();
+                        return onComplete();
 
-                                    //var complete = await entity.Copy(
-                                    //    repoBackup.storageSettingCopyFrom,
-                                    //    repoBackup.storageSettingCopyTo,
-                                    //    TimeSpan.FromSeconds(seconds),
-                                    //    logger);
-                                    //if (complete)
-                                    //    return onComplete();
+                        //var complete = await entity.Copy(
+                        //    repoBackup.storageSettingCopyFrom,
+                        //    repoBackup.storageSettingCopyTo,
+                        //    TimeSpan.FromSeconds(seconds),
+                        //    logger);
+                        //if (complete)
+                        //    return onComplete();
 
-                                    //var invocationMessage = await requestQuery
-                                    //    .ById(tableBackupRef)
-                                    //    .HttpPatch(default)
-                                    //    .CompileRequest(request)
-                                    //    .FunctionAsync();
+                        //var invocationMessage = await requestQuery
+                        //    .ById(tableBackupRef)
+                        //    .HttpPatch(default)
+                        //    .CompileRequest(request)
+                        //    .FunctionAsync();
 
-                                    //return onContinued(invocationMessage);
-                                },
-                                (why) => onComplete().AsTask());
+                        //return onContinued(invocationMessage);
                         });
                 },
                 () => onNotFound().AsTask());
@@ -183,25 +176,18 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        repoBackup =>
+                        async (repoBackup) =>
                         {
-                            return AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-                                async (seconds) =>
-                                {
-                                    var invocationMaybe = await entity.Copy(
-                                        repoBackup.storageSettingCopyFrom,
-                                        repoBackup.storageSettingCopyTo,
-                                        500000,
-                                        continuationToken,
-                                        requestQuery,
-                                        request,
-                                        logger);
-                                    if (invocationMaybe.HasValue)
-                                        return onContinued(invocationMaybe.Value);
+                            var invocationMaybe = await entity.Copy(
+                                repoBackup.storageSettingCopyFrom,
+                                repoBackup.storageSettingCopyTo,
+                                requestQuery,
+                                request,
+                                logger);
+                            if (invocationMaybe.HasValue)
+                                return onContinued(invocationMaybe.Value);
 
-                                    return onComplete();
-                                },
-                                (why) => onComplete().AsTask());
+                            return onComplete();
                         });
                 },
                 () => onNotFound().AsTask());

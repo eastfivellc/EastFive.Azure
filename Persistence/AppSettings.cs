@@ -31,12 +31,6 @@ namespace EastFive.Azure.Persistence
                 PrivateRepositoryOnly = true)]
             public const string StorageResourceAssemblies = "EastFive.Azure.StorageTables.Backup.StorageResourceAssemblies";
 
-            [ConfigKey("The seconds given to copy rows from a source table to a destination table",
-                DeploymentOverrides.Suggested,
-                DeploymentSecurityConcern = false,
-                PrivateRepositoryOnly = true)]
-            public const string SecondsGivenToCopyRows = "EastFive.Azure.StorageTables.Backup.SecondsGivenToCopyRows";
-
             [ConfigKey("The default backup destination connection string",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = true,

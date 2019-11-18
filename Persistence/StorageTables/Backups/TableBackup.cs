@@ -33,6 +33,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
+        private static readonly TimeSpan maxDuration = TimeSpan.FromMinutes(4);
+        private static readonly TableQuery<GenericTableEntity> query = new TableQuery<GenericTableEntity>();
+
         #region Properties
 
         [JsonIgnore]
@@ -121,99 +124,37 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        repoBackup =>
+                        async (repoBackup) =>
                         {
-                            return EastFive.Azure.Persistence.AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-                                async (seconds) =>
-                                {
-                                    var invocationMaybe = await entity.Copy(
-                                        repoBackup.storageSettingCopyFrom,
-                                        repoBackup.storageSettingCopyTo,
-                                        35000,
-                                        entity.continuationToken,
-                                        requestQuery,
-                                        request,
-                                        logger);
-                                    if (invocationMaybe.HasValue)
-                                        return onContinued(invocationMaybe.Value);
+                            var invocationMaybe = await entity.Copy(
+                                repoBackup.storageSettingCopyFrom,
+                                repoBackup.storageSettingCopyTo,
+                                requestQuery,
+                                request,
+                                logger);
+                            if (invocationMaybe.HasValue)
+                                return onContinued(invocationMaybe.Value);
 
-                                    return onComplete();
-
-                                    //var complete = await entity.Copy(
-                                    //    repoBackup.storageSettingCopyFrom,
-                                    //    repoBackup.storageSettingCopyTo,
-                                    //    TimeSpan.FromSeconds(seconds),
-                                    //    logger);
-                                    //if (complete)
-                                    //    return onComplete();
-
-                                    //var invocationMessage = await requestQuery
-                                    //    .ById(tableBackupRef)
-                                    //    .HttpPatch(default)
-                                    //    .CompileRequest(request)
-                                    //    .FunctionAsync();
-
-                                    //return onContinued(invocationMessage);
-                                },
-                                (why) => onComplete().AsTask());
+                            return onComplete();
                         });
                 },
                 () => onNotFound().AsTask());
         }
 
-        //[HttpPatch]
-        //public static async Task<HttpResponseMessage> UpdateAsync(
-        //        [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
-        //        [Property]string continuationToken,
-        //        RequestMessage<TableBackup> requestQuery,
-        //        HttpRequestMessage request,
-        //        EastFive.Analytics.ILogger logger,
-        //    CreatedBodyResponse<InvocationMessage> onContinued,
-        //    NoContentResponse onComplete,
-        //    NotFoundResponse onNotFound)
-        //{
-        //    return await await tableBackupRef.StorageGetAsync(
-        //        async entity =>
-        //        {
-        //            return await await entity.backup.StorageGetAsync(
-        //                repoBackup =>
-        //                {
-        //                    return AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-        //                        async (seconds) =>
-        //                        {
-        //                            var invocationMaybe = await entity.Copy(
-        //                                repoBackup.storageSettingCopyFrom,
-        //                                repoBackup.storageSettingCopyTo,
-        //                                500000,
-        //                                continuationToken,
-        //                                requestQuery,
-        //                                request,
-        //                                logger);
-        //                            if (invocationMaybe.HasValue)
-        //                                return onContinued(invocationMaybe.Value);
-
-        //                            return onComplete();
-        //                        },
-        //                        (why) => onComplete().AsTask());
-        //                });
-        //        },
-        //        () => onNotFound().AsTask());
-        //}
-
         #endregion
 
         #region Copy Functions
 
-
         public async Task<InvocationMessage?> Copy(
             string storageSettingCopyFrom,
             string storageSettingCopyTo,
-            int limit,
-            string continuationToken,
             RequestMessage<TableBackup> requestQuery,
             HttpRequestMessage request,
             ILogger logger)
         {
+            var watch = new Stopwatch();
+            watch.Start();
+
             var cloudStorageFromAccount = CloudStorageAccount.Parse(storageSettingCopyFrom);
             var cloudStorageToAccount = CloudStorageAccount.Parse(storageSettingCopyTo);
             var cloudStorageFromClient = cloudStorageFromAccount.CreateCloudTableClient();
@@ -221,7 +162,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
             var tableFrom = cloudStorageFromClient.GetTableReference(tableName);
             var tableTo = cloudStorageToClient.GetTableReference(tableName);
-            var query = new TableQuery<GenericTableEntity>();
 
             var token = default(TableContinuationToken);
             if (continuationToken.HasBlackSpace())
@@ -241,10 +181,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var readingData = ReadData(this);
             var writingData = Task.Run(() =>  WriteData());
             continuationToken = await readingData;
+            var tokenClosure = continuationToken;
             long aggr = await this.tableBackupRef.StorageUpdateAsync(
                 async (backup, saveAsync) =>
                 {
-                    backup.continuationToken = continuationToken;
+                    backup.continuationToken = tokenClosure;
                     backup.rowsCopied += rowList.Count;
                     await saveAsync(backup);
                     return backup.rowsCopied;
@@ -256,11 +197,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 await requestQuery
                     .ById(tableBackupRef)
                     .HttpPatch(default)
-                    //.HttpPatch(
-                    //    new TableBackup
-                    //    {
-                    //        continuationToken = continuationToken,
-                    //    })
                     .CompileRequest(request)
                     .FunctionAsync()
                 :
@@ -292,7 +228,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         }
 
                         token = segment.ContinuationToken;
-                        if (readCount >= limit)
+                        if (watch.Elapsed >= maxDuration)
                         {
                             if (token.IsDefaultOrNull())
                                 return default;
@@ -306,7 +242,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 }
                                 return writer.ToString();
                             }
-
                         }
 
                         segmentFetching = token.IsDefaultOrNull() ?
