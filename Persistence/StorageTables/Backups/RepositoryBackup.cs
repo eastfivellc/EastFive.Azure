@@ -1,19 +1,11 @@
-﻿using EastFive.Azure.StorageTables.Driver;
-using EastFive.Extensions;
+﻿using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Xml;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence;
 using Newtonsoft.Json;
 using EastFive.Api;
@@ -24,7 +16,6 @@ using EastFive.Api.Azure;
 using EastFive.Analytics;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using System.Collections.Concurrent;
-using EastFive.Web.Configuration;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 
@@ -104,6 +95,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         .Where(x => x.message.Any())
                         .Select(x => x.tableName)
                         .ToArray();
+
                     var resourceInfoToProcess = tableClient
                         .ListTables()
                         .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))

@@ -21,6 +21,7 @@ using EastFive.Azure.Functions;
 using EastFive.Analytics;
 using EastFive.Web.Configuration;
 using BlackBarLabs.Persistence.Azure.Attributes;
+using System.Collections.Concurrent;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -33,6 +34,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
+        private static readonly TimeSpan maxDuration = TimeSpan.FromMinutes(2);
+        private static readonly TableQuery<GenericTableEntity> query = new TableQuery<GenericTableEntity>();
+
         #region Properties
 
         [JsonIgnore]
@@ -74,6 +78,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [Storage]
         [JsonIgnore]
         public Guid etagsBlobId;
+
+        private bool StillScanning => continuationToken.HasBlackSpace();
 
         #endregion
 
@@ -121,99 +127,37 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 async entity =>
                 {
                     return await await entity.backup.StorageGetAsync(
-                        repoBackup =>
+                        async (repoBackup) =>
                         {
-                            return EastFive.Azure.Persistence.AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-                                async (seconds) =>
-                                {
-                                    var invocationMaybe = await entity.Copy(
-                                        repoBackup.storageSettingCopyFrom,
-                                        repoBackup.storageSettingCopyTo,
-                                        35000,
-                                        entity.continuationToken,
-                                        requestQuery,
-                                        request,
-                                        logger);
-                                    if (invocationMaybe.HasValue)
-                                        return onContinued(invocationMaybe.Value);
+                            var invocationMaybe = await entity.Copy(
+                                repoBackup.storageSettingCopyFrom,
+                                repoBackup.storageSettingCopyTo,
+                                requestQuery,
+                                request,
+                                logger);
+                            if (invocationMaybe.HasValue)
+                                return onContinued(invocationMaybe.Value);
 
-                                    return onComplete();
-
-                                    //var complete = await entity.Copy(
-                                    //    repoBackup.storageSettingCopyFrom,
-                                    //    repoBackup.storageSettingCopyTo,
-                                    //    TimeSpan.FromSeconds(seconds),
-                                    //    logger);
-                                    //if (complete)
-                                    //    return onComplete();
-
-                                    //var invocationMessage = await requestQuery
-                                    //    .ById(tableBackupRef)
-                                    //    .HttpPatch(default)
-                                    //    .CompileRequest(request)
-                                    //    .FunctionAsync();
-
-                                    //return onContinued(invocationMessage);
-                                },
-                                (why) => onComplete().AsTask());
+                            return onComplete();
                         });
                 },
                 () => onNotFound().AsTask());
         }
 
-        //[HttpPatch]
-        //public static async Task<HttpResponseMessage> UpdateAsync(
-        //        [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
-        //        [Property]string continuationToken,
-        //        RequestMessage<TableBackup> requestQuery,
-        //        HttpRequestMessage request,
-        //        EastFive.Analytics.ILogger logger,
-        //    CreatedBodyResponse<InvocationMessage> onContinued,
-        //    NoContentResponse onComplete,
-        //    NotFoundResponse onNotFound)
-        //{
-        //    return await await tableBackupRef.StorageGetAsync(
-        //        async entity =>
-        //        {
-        //            return await await entity.backup.StorageGetAsync(
-        //                repoBackup =>
-        //                {
-        //                    return AppSettings.Backup.SecondsGivenToCopyRows.ConfigurationDouble(
-        //                        async (seconds) =>
-        //                        {
-        //                            var invocationMaybe = await entity.Copy(
-        //                                repoBackup.storageSettingCopyFrom,
-        //                                repoBackup.storageSettingCopyTo,
-        //                                500000,
-        //                                continuationToken,
-        //                                requestQuery,
-        //                                request,
-        //                                logger);
-        //                            if (invocationMaybe.HasValue)
-        //                                return onContinued(invocationMaybe.Value);
-
-        //                            return onComplete();
-        //                        },
-        //                        (why) => onComplete().AsTask());
-        //                });
-        //        },
-        //        () => onNotFound().AsTask());
-        //}
-
         #endregion
 
         #region Copy Functions
 
-
         public async Task<InvocationMessage?> Copy(
             string storageSettingCopyFrom,
             string storageSettingCopyTo,
-            int limit,
-            string continuationToken,
             RequestMessage<TableBackup> requestQuery,
             HttpRequestMessage request,
             ILogger logger)
         {
+            var watch = new Stopwatch();
+            watch.Start();
+
             var cloudStorageFromAccount = CloudStorageAccount.Parse(storageSettingCopyFrom);
             var cloudStorageToAccount = CloudStorageAccount.Parse(storageSettingCopyTo);
             var cloudStorageFromClient = cloudStorageFromAccount.CreateCloudTableClient();
@@ -221,10 +165,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
             var tableFrom = cloudStorageFromClient.GetTableReference(tableName);
             var tableTo = cloudStorageToClient.GetTableReference(tableName);
-            var query = new TableQuery<GenericTableEntity>();
 
             var token = default(TableContinuationToken);
-            if (continuationToken.HasBlackSpace())
+            if (StillScanning)
             {
                 token = new TableContinuationToken();
                 var tokenReader = XmlReader.Create(new StringReader(continuationToken));
@@ -235,38 +178,38 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var backoff = TimeSpan.FromSeconds(1.0);
 
             var completeMutex = new System.Threading.ManualResetEvent(false);
-            var listLock = new object();
-            var rowList = new List<GenericTableEntity>();
+            var rowList = new ConcurrentBag<GenericTableEntity>();
+            //var listLock = new object();
+            //var rowList = new List<GenericTableEntity>();
 
             var readingData = ReadData(this);
             var writingData = Task.Run(() =>  WriteData());
             continuationToken = await readingData;
+            var tokenClosure = continuationToken;
             long aggr = await this.tableBackupRef.StorageUpdateAsync(
                 async (backup, saveAsync) =>
                 {
-                    backup.continuationToken = continuationToken;
+                    backup.continuationToken = tokenClosure;
                     backup.rowsCopied += rowList.Count;
                     await saveAsync(backup);
+                    logger.Trace($"token saved [{backup.tableName}]");
                     return backup.rowsCopied;
                 },
                 () => 0L);
 
+            completeMutex.Set();
+            await writingData;
 
-            var invoMsg = continuationToken.HasBlackSpace() ?
+            // dispatch after write is finished so that the system doesn't get progressively more loaded
+            var invoMsg = StillScanning ?
                 await requestQuery
                     .ById(tableBackupRef)
                     .HttpPatch(default)
-                    //.HttpPatch(
-                    //    new TableBackup
-                    //    {
-                    //        continuationToken = continuationToken,
-                    //    })
                     .CompileRequest(request)
                     .FunctionAsync()
                 :
                 default(InvocationMessage?);
-            completeMutex.Set();
-            await writingData;
+
             if (invoMsg.IsDefault())
                 logger.Trace($"Table complete: {aggr} total records [{tableName}]");
             else
@@ -276,7 +219,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
             async Task<string> ReadData(TableBackup tableBackup)
             {
-                var readCount = 0;
                 while (true)
                 {
                     try
@@ -285,19 +227,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                             return default;
 
                         var segment = await segmentFetching;
-                        lock (listLock)
-                        {
-                            rowList.AddRange(segment.Results);
-                            readCount += segment.Results.Count;
-                        }
+                        foreach (var item in segment.Results)
+                            rowList.Add(item);
+
+                        //lock (listLock)
+                        //{
+                        //    rowList.AddRange(segment.Results);
+                        //    readCount += segment.Results.Count;
+                        //}
 
                         token = segment.ContinuationToken;
-                        if (readCount >= limit)
+                        if (watch.Elapsed >= maxDuration || rowList.Count >= 200_000) // some tables read quicker b/c they don't have as much data per row so sometimes we read more than can be written in a single function duration
                         {
                             if (token.IsDefaultOrNull())
                                 return default;
 
-                            logger.Trace($"{readCount} rows read [{tableBackup.tableName}]");
+                            logger.Trace($"{rowList.Count} rows read [{tableBackup.tableName}]");
                             using (var writer = new StringWriter())
                             {
                                 using (var xmlWriter = XmlWriter.Create(writer))
@@ -306,7 +251,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 }
                                 return writer.ToString();
                             }
-
                         }
 
                         segmentFetching = token.IsDefaultOrNull() ?
@@ -341,14 +285,18 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 // TODO: Interleave writes to improve performance
                 while (true)
                 {
-                    GenericTableEntity[] entities;
+                    var entities = new List<GenericTableEntity>();
                     //bool finished = completeMutex.WaitOne(TimeSpan.FromSeconds(0.1));
                     bool finished = completeMutex.WaitOne();
-                    lock (listLock)
-                    {
-                        entities = rowList.ToArray();
-                        rowList.Clear();
-                    }
+
+                    while (rowList.TryTake(out GenericTableEntity result))
+                        entities.Add(result);
+
+                    //lock (listLock)
+                    //{
+                    //    entities = rowList.ToArray();
+                    //    rowList.Clear();
+                    //}
                     if(entities.IsDefaultNullOrEmpty())
                     {
                         if (finished)
@@ -357,7 +305,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     }
                     try
                     {
-                        TableResult[] resultsProcessingNext = await CreateOrReplaceBatch(entities, tableTo);
+                        TableResult[] resultsProcessingNext = await CreateOrReplaceBatch(entities.ToArray(), tableTo);
                     }
                     catch (StorageException storageEx)
                     {
