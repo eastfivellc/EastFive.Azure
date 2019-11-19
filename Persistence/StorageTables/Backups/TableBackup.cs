@@ -237,7 +237,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         //}
 
                         token = segment.ContinuationToken;
-                        if (watch.Elapsed >= maxDuration)
+                        if (watch.Elapsed >= maxDuration || rowList.Count >= 200_000) // some tables read quicker b/c they don't have as much data per row so sometimes we read more than can be written in a single function duration
                         {
                             if (token.IsDefaultOrNull())
                                 return default;
