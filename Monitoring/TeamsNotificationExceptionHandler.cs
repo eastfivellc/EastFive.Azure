@@ -65,7 +65,7 @@ namespace EastFive.Azure.Monitoring
                         httpApp, request,
                         () => new MessageCard.Section
                         {
-                            title = "Request Information",
+                            title = "Request/Response Information",
                             facts = new MessageCard.Section.Fact[]
                         {
                             new MessageCard.Section.Fact
@@ -80,8 +80,13 @@ namespace EastFive.Azure.Monitoring
                             },
                             new MessageCard.Section.Fact
                             {
-                                name = "URL",
+                                name = "URL:",
                                 value = request.RequestUri.OriginalString,
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Status Code:",
+                                value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
                             }
                         }
                         });
