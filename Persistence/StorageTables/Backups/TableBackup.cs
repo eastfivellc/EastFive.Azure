@@ -34,7 +34,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
-        private static readonly TimeSpan maxDuration = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan maxDuration = TimeSpan.FromSeconds(90);
+        private static readonly int maxRows = 150_000;
         private static readonly TableQuery<GenericTableEntity> query = new TableQuery<GenericTableEntity>();
 
         #region Properties
@@ -237,7 +238,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         //}
 
                         token = segment.ContinuationToken;
-                        if (watch.Elapsed >= maxDuration || rowList.Count >= 200_000) // some tables read quicker b/c they don't have as much data per row so sometimes we read more than can be written in a single function duration
+                        if (watch.Elapsed >= maxDuration || rowList.Count >= maxRows) // some tables read quicker b/c they don't have as much data per row so sometimes we read more than can be written in a single function duration
                         {
                             if (token.IsDefaultOrNull())
                                 return default;

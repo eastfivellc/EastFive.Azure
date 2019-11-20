@@ -1182,9 +1182,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         var partitionKey = rowsToDeleteGrp.Key;
                         var deletions = rowsToDeleteGrp
                             .Batch()
-                            .Select(items => DeleteBatchAsync<TEntity>(partitionKey, items))
-                            .Await()
-                            .SelectMany();
+                            .Select(items =>
+                            {
+                                return items
+                                    .Split(index => 100)
+                                    .Select(grp => DeleteBatchAsync<TEntity>(partitionKey, grp.ToArray()))
+                                .Throttle()
+                                .SelectMany();
+                            })
+                            .SelectAsyncMany();
                         return deletions;
                     })
                .SelectAsyncMany();
