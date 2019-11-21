@@ -1143,6 +1143,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     diagnostics.Warning($"Duplicate rowkey `{row.RowKey}`.");
                     continue;
                 }
+                rowKeyHash.Add(row.RowKey);
                 batch.InsertOrReplace(row);
             }
 
@@ -1151,6 +1152,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             {
                 try
                 {
+                    diagnostics.Trace($"Saving {batch.Count} records.");
                     var resultList = await table.ExecuteBatchAsync(batch);
                     return resultList.ToArray();
                 }
@@ -1856,6 +1858,29 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .SelectAsyncMany();
         }
 
+        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerableAsync<TData> datas,
+                Func<ITableEntity, TableResult, TResult> perItemCallback,
+                string tableName = default(string),
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+            where TData : IReferenceable
+        {
+            return datas
+                .Select(data => GetEntity(data))
+                .Batch()
+                .Select(
+                    rows =>
+                    {
+                        return CreateOrReplaceBatch(rows, 
+                            row => row.RowKey,
+                            row => row.PartitionKey,
+                            perItemCallback, tableName,
+                            onTimeout:onTimeout,
+                            diagnostics:diagnostics);
+                    })
+                .SelectAsyncMany();
+        }
+
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
@@ -1900,7 +1925,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             .Split(index => 100)
                             .Select(set => set.ToArray().PairWithKey(grp.Key));
                     })
-                .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, table:table))
+                .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, table:table, diagnostics:diagnostics))
                 .AsyncEnumerable()
                 .OnComplete(
                     (resultss) =>
