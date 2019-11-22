@@ -192,15 +192,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public virtual string ETag { get; set; }
 
-            private IEnumerable<KeyValuePair<MemberInfo, IPersistInAzureStorageTables>> StorageProperties
-            {
-                get
-                {
-                    var type = typeof(EntityType);
-                    return type.StorageProperties();
-                }
-            }
-
             public void ReadEntity(
                 IDictionary<string, EntityProperty> properties, OperationContext operationContext)
             {
@@ -235,7 +226,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
             {
-                var valuesToStore = StorageProperties
+                var type = typeof(EntityType);
+                var valuesToStore = type
+                    .StorageProperties()
                     .SelectMany(
                         (propInfoAttribute) =>
                         {

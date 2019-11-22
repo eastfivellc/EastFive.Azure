@@ -349,6 +349,7 @@
     <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\StorageOverflowAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Backups\Attributes\IBackupStorage.cs" />
     <Compile Include="Persistence\StorageTables\Backups\BackupFunction.cs" />
     <Compile Include="Persistence\StorageTables\Backups\BlobBackup.cs" />
