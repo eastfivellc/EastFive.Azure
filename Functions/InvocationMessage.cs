@@ -105,6 +105,16 @@ namespace EastFive.Azure.Functions
             return await onRun(messages);
         }
 
+        [HttpAction("Enqueue")]
+        public static async Task<HttpResponseMessage> RunAsync(
+                [UpdateId]IRef<InvocationMessage> invocationMessageRef,
+                AzureApplication application,
+            NoContentResponse onNoContent)
+        {
+            await SendToQueueAsync(invocationMessageRef, application);
+            return onNoContent();           
+        }
+
         #endregion
 
         public static IEnumerableAsync<HttpResponseMessage> InvokeAsync(
