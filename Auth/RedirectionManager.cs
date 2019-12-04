@@ -64,10 +64,9 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         public async static Task<HttpResponseMessage> GetAllSecureAsync(
-                [QueryParameter(Name = "ApiKeySecurity")]string apiSecurityKey,
+                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
-                ApiSecurity apiSecurity,
                 AzureApplication application,
                 HttpRequestMessage request,
             ContentTypeResponse<RedirectionManager[]> onContent,
@@ -111,7 +110,7 @@ namespace EastFive.Azure.Auth
                                             authorization = authorization.authorizationRef.Optional(),
                                             redirection = new Uri(
                                                 request.RequestUri,
-                                                $"/api/RedirectionManager?ApiKeySecurity={apiSecurityKey}&authorization={authorization.id}"),
+                                                $"/api/RedirectionManager?ApiKeySecurity={apiSecurity.key}&authorization={authorization.id}"),
                                         };
                                     },
                                     (why) => Failure(why));
@@ -126,9 +125,8 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         public static Task<HttpResponseMessage> GetRedirection(
-                [QueryParameter(Name = "ApiKeySecurity")]string apiSecurityKey,
+                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
-                ApiSecurity apiSecurity,
                 AzureApplication application,
                 HttpRequestMessage request,
             RedirectResponse onRedirection,
@@ -192,9 +190,8 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         public static async Task<HttpResponseMessage> GetAllSecureAsync(
-                [QueryParameter(Name = "ApiKeySecurity")]string apiSecurityKey,
+                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
-                ApiSecurity apiSecurity,
                 AzureApplication application,
                 HttpRequestMessage request,
             MultipartResponseAsync<Authorization> onContent,
