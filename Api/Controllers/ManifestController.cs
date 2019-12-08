@@ -20,13 +20,17 @@ namespace EastFive.Api.Azure.Controllers
     public static class ManifestController
     {
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindAsync(
+        public static HttpResponseMessage FindAsync(
                 HttpApplication application, HttpRequestMessage request, UrlHelper url,
             ContentResponse onFound,
+            ContentTypeResponse<Api.Resources.Manifest> onContent,
             ViewFileResponse onHtml)
         {
             if (request.Headers.Accept.Where(accept => accept.MediaType.ToLower().Contains("html")).Any())
                 return HtmlContent(application, request, url, onHtml);
+
+            if (request.Headers.Accept.Where(accept => accept.MediaType.ToLower().Contains("manifest")).Any())
+                return ManifestContent(application, request, url, onContent);
 
             LocateControllers();
             var endpoints = ManifestController.lookup
@@ -44,16 +48,25 @@ namespace EastFive.Api.Azure.Controllers
                 Endpoints = endpoints,
             };
 
-            return request.CreateResponse(System.Net.HttpStatusCode.OK, manifest).AsTask();
+            return request.CreateResponse(System.Net.HttpStatusCode.OK, manifest);
         }
 
-        public static Task<HttpResponseMessage> HtmlContent(
+        public static HttpResponseMessage HtmlContent(
                 HttpApplication httpApp, HttpRequestMessage request, UrlHelper url,
             ViewFileResponse onHtml)
         {
             var lookups = httpApp.GetResources();
             var manifest = new EastFive.Api.Resources.Manifest(lookups, httpApp);
-            return onHtml("Manifest/Manifest.cshtml", manifest).AsTask();
+            return onHtml("Manifest/Manifest.cshtml", manifest);
+        }
+
+        public static HttpResponseMessage ManifestContent(
+                HttpApplication httpApp, HttpRequestMessage request, UrlHelper url,
+            ContentTypeResponse<Api.Resources.Manifest> onContent)
+        {
+            var lookups = httpApp.GetResources();
+            var manifest = new EastFive.Api.Resources.Manifest(lookups, httpApp);
+            return onContent(manifest);
         }
 
         public static string GetRouteHtml(string route, KeyValuePair<HttpMethod, MethodInfo[]>[] methods)
