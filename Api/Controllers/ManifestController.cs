@@ -29,9 +29,6 @@ namespace EastFive.Api.Azure.Controllers
             if (request.Headers.Accept.Where(accept => accept.MediaType.ToLower().Contains("html")).Any())
                 return HtmlContent(application, request, url, onHtml);
 
-            if (request.Headers.Accept.Where(accept => accept.MediaType.ToLower().Contains("manifest")).Any())
-                return ManifestContent(application, request, url, onContent);
-
             LocateControllers();
             var endpoints = ManifestController.lookup
                 .Select(

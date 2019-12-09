@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Runtime.Serialization;
+using Microsoft.WindowsAzure.Storage.Table;
 
-using BlackBarLabs;
-using BlackBarLabs.Collections.Async;
-using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Linq;
-using System.Collections.Generic;
-using Microsoft.WindowsAzure.Storage.Table;
-using System.Runtime.Serialization;
 using EastFive.Linq;
 using EastFive.Serialization;
 using BlackBarLabs.Persistence.Azure.Attributes;

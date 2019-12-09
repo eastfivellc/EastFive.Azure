@@ -2,18 +2,14 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using BlackBarLabs.Collections.Async;
+using System.Linq;
+using System.Collections.Generic;
+using System.Net.Http;
+
 using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Extensions;
 using BlackBarLabs.Persistence;
-using BlackBarLabs.Persistence.Azure.Extensions;
-using System.Linq;
-using BlackBarLabs.Linq;
-using BlackBarLabs;
-using System.Collections.Generic;
-using System.IdentityModel;
-using System.Net.Http;
 using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Serialization;
 

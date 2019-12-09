@@ -164,17 +164,6 @@ namespace EastFive.Security.SessionServer
             }
         }
 
-        private Accesses accesses;
-        public Accesses Accesses
-        {
-            get
-            {
-                if (default(Accesses) == accesses)
-                    accesses = new Accesses(this, this.DataContext);
-                return accesses;
-            }
-        }
-        
         private EastFive.Azure.Integrations integrations;
         public EastFive.Azure.Integrations Integrations
         {
