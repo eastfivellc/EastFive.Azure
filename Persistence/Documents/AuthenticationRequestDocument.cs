@@ -6,11 +6,7 @@ using System.Threading.Tasks;
 
 using Microsoft.WindowsAzure.Storage.Table;
 
-using BlackBarLabs;
-using BlackBarLabs.Collections.Async;
-using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
-using BlackBarLabs.Linq;
 using EastFive.Serialization;
 using EastFive.Azure;
 using BlackBarLabs.Persistence.Azure.Attributes;

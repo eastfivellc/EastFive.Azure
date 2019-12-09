@@ -2,10 +2,6 @@
 using System.Threading.Tasks;
 using System.Linq;
 
-using BlackBarLabs.Collections.Async;
-using BlackBarLabs.Extensions;
-using EastFive.Security.SessionServer.Persistence.Documents;
-
 namespace EastFive.Security.SessionServer
 {
     public class Claims
