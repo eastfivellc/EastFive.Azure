@@ -21,6 +21,7 @@ using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
+using Newtonsoft.Json;
 
 namespace EastFive.Api.Azure.Modules
 {
@@ -32,19 +33,27 @@ namespace EastFive.Api.Azure.Modules
             IApplication httpApp, HttpRequestMessage request, string routeName,
             RouteHandlingDelegate continueExecution)
         {
+            if (!request.Headers.Contains(HeaderKey))
+                return continueExecution(controllerType, httpApp, request, routeName);
             return EastFive.Azure.AppSettings.TableInformationToken.ConfigurationString(
                 async headerToken =>
                 {
-                    if (!request.Headers.Contains(HeaderKey))
-                        return await continueExecution(controllerType, httpApp, request, routeName);
-
                     if (request.Headers.GetValues(HeaderKey).First() != headerToken)
                         return request.CreateResponse(System.Net.HttpStatusCode.Unauthorized);
 
-                    if(request.Headers.Contains("Migrate"))
+                    if(request.Headers.Contains("X-StorageTableInformation-List"))
                     {
                         var tableData = await controllerType.StorageGetAll().ToArrayAsync();
-                        return request.CreateResponse(System.Net.HttpStatusCode.OK, tableData);
+
+                        var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
+                        var converter = new Serialization.ExtrudeConvert(httpApp as HttpApplication, request);
+                        var jsonObj = Newtonsoft.Json.JsonConvert.SerializeObject(tableData,
+                            new JsonSerializerSettings
+                            {
+                                Converters = new JsonConverter[] { converter }.ToList(),
+                            });
+                        response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
+                        return response;
                     }
 
                     var tableInformation = await controllerType.StorageTableInformationAsync();

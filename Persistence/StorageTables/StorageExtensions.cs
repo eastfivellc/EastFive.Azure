@@ -236,13 +236,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Expression<Func<TEntity, bool>> expr = e => true;
             return driver
                 .FindAll(expr)
-                .Select(
-                    doc =>
-                    {
-                        return driver.InsertOrReplaceAsync(doc,
-                            onUpdate:updated => doc.PairWithKey(updated));
-                    })
-                .Await()
                 .Select(doc => (object)doc);
         }
 

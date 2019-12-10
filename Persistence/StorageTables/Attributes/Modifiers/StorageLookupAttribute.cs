@@ -298,6 +298,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                     lookup.rowAndPartitionKeys = mutateCollection(rollbackRowAndPartitionKeys)
                         .Distinct(rpKey => rpKey.Key)
                         .ToArray();
+
+                    if (Unmodified(lookup.rowAndPartitionKeys, rollbackRowAndPartitionKeys))
+                        return () => true.AsTask();
+
                     await saveAsync(lookup);
                     Func<Task<bool>> rollback =
                         async () =>
@@ -313,26 +317,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.UpdateAsync<StorageLookupTable, bool>(rowKey, partitionKey,
                                 async (modifiedDoc, saveRollbackAsync) =>
                                 {
-                                    bool Modified()
-                                    {
-                                        if (rollbackRowAndPartitionKeys.Length != modifiedDoc.rowAndPartitionKeys.Length)
-                                            return true;
-
-                                        var matchKeys = rollbackRowAndPartitionKeys.SelectKeys().AsHashSet();
-                                        var matchValues = rollbackRowAndPartitionKeys.SelectKeys().AsHashSet();
-                                        var allValuesAccountedFor = modifiedDoc.rowAndPartitionKeys
-                                            .All(
-                                                rowAndPartitionKey =>
-                                                {
-                                                    if (!matchKeys.Contains(rowAndPartitionKey.Key))
-                                                        return false;
-                                                    if (!matchValues.Contains(rowAndPartitionKey.Value))
-                                                        return false;
-                                                    return true;
-                                                });
-                                        return !allValuesAccountedFor;
-                                    }
-                                    if (!Modified())
+                                    
+                                    if (Unmodified(rollbackRowAndPartitionKeys, modifiedDoc.rowAndPartitionKeys))
                                         return true;
                                     modifiedDoc.rowAndPartitionKeys = rollbackRowAndPartitionKeys;
                                     await saveRollbackAsync(modifiedDoc);
@@ -343,6 +329,34 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return rollback;
                 },
                 tableName: tableName);
+
+            bool Unmodified(KeyValuePair<string, string>[] rollbackRowAndPartitionKeys, KeyValuePair<string, string>[] modifiedDocRowAndPartitionKeys)
+            {
+                if (rollbackRowAndPartitionKeys == null)
+                    return modifiedDocRowAndPartitionKeys != null;
+
+                if (modifiedDocRowAndPartitionKeys == null)
+                    return rollbackRowAndPartitionKeys != null;
+
+                if (rollbackRowAndPartitionKeys.Length != modifiedDocRowAndPartitionKeys.Length)
+                    return false;
+
+                var matchKeys = rollbackRowAndPartitionKeys.ToDictionary();
+                var unmodified = modifiedDocRowAndPartitionKeys
+                    .All(
+                        rowAndPartitionKey =>
+                        {
+                            if (!matchKeys.ContainsKey(rowAndPartitionKey.Key))
+                                return false;
+                            
+                            var value = matchKeys[rowAndPartitionKey.Key];
+                            if (value != rowAndPartitionKey.Value)
+                                return false;
+
+                            return true;
+                        });
+                return unmodified;
+            }
         }
 
         public virtual Task<TResult> ExecuteCreateAsync<TEntity, TResult>(MemberInfo memberInfo,

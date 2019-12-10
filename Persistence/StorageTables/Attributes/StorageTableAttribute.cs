@@ -4,8 +4,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using BlackBarLabs;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -116,9 +114,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                 set
                 {
                     rawRowKey = value;
+                    if(this.Entity == null)
+                        this.Entity = Activator.CreateInstance<EntityType>();
                     this.Entity = SetRowKey(this.Entity, value);
                 }
             }
+
             private static EntityType SetRowKey(EntityType entity, string value)
             {
                 return GetMemberSupportingInterface<IModifyAzureStorageTableRowKey, EntityType>(
