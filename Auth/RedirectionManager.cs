@@ -11,12 +11,17 @@ using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Serialization;
+using EastFive.Web.Configuration;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
@@ -71,56 +76,133 @@ namespace EastFive.Azure.Auth
                 HttpRequestMessage request,
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
-            ConfigurationFailureResponse onConfigFailure)
+            ConfigurationFailureResponse onConfigFailure,
+            BadRequestResponse onBadRequest)
         {
+            // this is faster than the version commented out below
+            var methodMaybe = await Method.ById(methodRef, application, (m) => m, () => default(Method?));
+            if (methodMaybe.IsDefault())
+                return onBadRequest().AddReason("Method no longer supported");
+            var method = methodMaybe.Value;
+
             var twoMonthsAgo = DateTime.UtcNow.AddMonths(-2);
-            Expression<Func<Authorization, bool>> allQuery =
-                (authorization) => authorization.authorized == true;
-            var redirections = await allQuery
-                .StorageQuery()
-                .Where(authorization => !authorization.Method.IsDefaultOrNull())
-                .Where(authorization => authorization.Method.id == methodRef.id)
-                .Where(authorization => authorization.lastModified > twoMonthsAgo)
-                .Select<Authorization, Task<RedirectionManager?>>(
-                    async authorization =>
-                    {
-                        RedirectionManager? Failure(string why)
+            var query = new TableQuery<GenericTableEntity>().Where(
+            TableQuery.CombineFilters(
+                TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
+                TableOperators.And,
+                TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, twoMonthsAgo),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
+                    )
+                )
+            );
+            var table = EastFive.Azure.Persistence.AppSettings.Storage.ConfigurationString(
+                (conn) =>
+                {
+                    var account = CloudStorageAccount.Parse(conn);
+                    var client = account.CreateCloudTableClient();
+                    return client.GetTableReference("authorization");
+                },
+                (why) => throw new Exception(why));
+
+            var segment = default(TableQuerySegment<GenericTableEntity>);
+            var token = default(TableContinuationToken);
+            var redirections = new RedirectionManager[] { };
+            do
+            {
+                segment = await table.ExecuteQuerySegmentedAsync(query, token);
+                token = segment.ContinuationToken;
+                redirections = await segment.Results
+                    .Aggregate(
+                        redirections.AsTask(),
+                        async (aggr, entity) =>
                         {
-                            if (successOnly)
-                                return default(RedirectionManager?);
+                            var res = await aggr;
+                            var id = Guid.Parse(entity.RowKey);
+                            var when = entity.Timestamp.DateTime;
+                            var props = entity.WriteEntity(default);
+                            var paramKeys = props["parameters__keys"].BinaryValue.ToStringsFromUTF8ByteArray();
+                            var paramValues = props["parameters__values"].BinaryValue.ToStringsFromUTF8ByteArray();
+                            var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
 
-                            return new RedirectionManager
+                            RedirectionManager? Failure(string why)
                             {
-                                authorization = authorization.authorizationRef.Optional(),
-                                message = why,
-                                when = authorization.lastModified
-                            };
-                        }
+                                if (successOnly)
+                                    return default(RedirectionManager?);
 
-                        return await await Method.ById<Task<RedirectionManager?>>(authorization.Method, application,
-                            async method =>
-                            {
-                                return await method.ParseTokenAsync(authorization.parameters, application,
-                                    (externalId, loginProvider) =>
+                                return new RedirectionManager
+                                {
+                                    authorization = id.AsRef<Authorization>().Optional(),
+                                    message = why,
+                                    when = when,
+                                };
+                            }
+
+                            var item = await method.ParseTokenAsync(parameters, application,
+                                (externalId, loginProvider) =>
+                                {
+                                    return new RedirectionManager
                                     {
-                                        return new RedirectionManager
-                                        {
-                                            when = authorization.lastModified,
-                                            message = $"Ready:{externalId}",
-                                            authorization = authorization.authorizationRef.Optional(),
-                                            redirection = new Uri(
-                                                request.RequestUri,
-                                                $"/api/RedirectionManager?ApiKeySecurity={apiSecurity.key}&authorization={authorization.id}"),
-                                        };
-                                    },
-                                    (why) => Failure(why));
-                            },
-                            () => Failure("Method no longer supported").AsTask());
-                    })
-                .Throttle(desiredRunCount: 4)
-                .SelectWhereHasValue()
-                .OrderByDescendingAsync(item => item.when);
-            return onContent(redirections.ToArray());
+                                        when = when,
+                                        message = $"Ready:{externalId}",
+                                        authorization = id.AsRef<Authorization>().Optional(),
+                                        redirection = new Uri(
+                                            request.RequestUri,
+                                            $"/api/RedirectionManager?ApiKeySecurity={apiSecurity.key}&authorization={id}"),
+                                    };
+                                },
+                                (why) => Failure(why));
+                            if (item.IsDefault())
+                                return res;
+
+                            return res.Append(item.Value).ToArray();
+                        });
+            } while (token != null);
+            return onContent(redirections.OrderByDescending(x => x.when).ToArray());
+
+            //Expression<Func<Authorization, bool>> allQuery =
+            //    (authorization) => authorization.authorized == true;
+            //var results = await allQuery
+            //    .StorageQuery()
+            //    .Where(authorization => !authorization.Method.IsDefaultOrNull())
+            //    .Where(authorization => authorization.Method.id == methodRef.id)
+            //    .Where(authorization => authorization.lastModified > twoMonthsAgo)
+            //    .Select<Authorization, Task<RedirectionManager?>>(
+            //        async authorization =>
+            //        {
+            //            RedirectionManager? Failure(string why)
+            //            {
+            //                if (successOnly)
+            //                    return default(RedirectionManager?);
+
+            //                return new RedirectionManager
+            //                {
+            //                    authorization = authorization.authorizationRef.Optional(),
+            //                    message = why,
+            //                    when = authorization.lastModified
+            //                };
+            //            }
+
+            //            return await method.ParseTokenAsync(authorization.parameters, application,
+            //                (externalId, loginProvider) =>
+            //                {
+            //                    return new RedirectionManager
+            //                    {
+            //                        when = authorization.lastModified,
+            //                        message = $"Ready:{externalId}",
+            //                        authorization = authorization.authorizationRef.Optional(),
+            //                        redirection = new Uri(
+            //                            request.RequestUri,
+            //                            $"/api/RedirectionManager?ApiKeySecurity={apiSecurity.key}&authorization={authorization.id}"),
+            //                    };
+            //                },
+            //                (why) => Failure(why));
+            //        })
+            //    .Throttle(desiredRunCount: 4)
+            //    .SelectWhereHasValue()
+            //    .OrderByDescendingAsync(item => item.when);
+            //return onContent(results.ToArray());
         }
 
         [Api.HttpGet]
