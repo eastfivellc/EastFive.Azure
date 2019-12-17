@@ -145,19 +145,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return scoping.MutateReference(lookupKeyCurrent, kvp.Key, kvp.Value);
                     });
 
-            return repository
-                .FindByIdAsync<StorageLookupTable, IEnumerableAsync<IRefAst>>(lookupKey.RowKey, lookupKey.PartitionKey,
-                    (dictEntity) =>
+            var enumerableTask = repository
+                .FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(lookupKey.RowKey, lookupKey.PartitionKey,
+                    (dictEntity, etag) =>
                     {
                         var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                             .NullToEmpty()
-                            .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
-                            .AsAsync();
+                            .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value));
                         return rowAndParitionKeys;
                     },
-                    () => EnumerableAsync.Empty<IRefAst>(),
-                    tableName: tableName)
-                .FoldTask();
+                    () => Enumerable.Empty<IRefAst>(),
+                    tableName: tableName);
+            return enumerableTask.FoldTask();
         }
 
         [StorageTable]
@@ -169,6 +168,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             [ParititionKey]
             public string partitionKey;
+
+            [ETag]
+            public string eTag;
 
             [Storage]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
@@ -294,33 +296,58 @@ namespace EastFive.Persistence.Azure.StorageTables
             return await repository.UpdateOrCreateAsync<StorageLookupTable, Func<Task>>(rowKey, partitionKey,
                 async (created, lookup, saveAsync) =>
                 {
-                    var rollbackRowAndPartitionKeys = lookup.rowAndPartitionKeys; // store for rollback
-                    lookup.rowAndPartitionKeys = mutateCollection(rollbackRowAndPartitionKeys)
-                        .Distinct(rpKey => rpKey.Key)
-                        .ToArray();
+                    // store for rollback
+                    var orignalRowAndPartitionKeys = lookup.rowAndPartitionKeys.NullToEmpty().ToArray();
+                    var updatedRowAndPartitionKeys = mutateCollection(orignalRowAndPartitionKeys).ToArray();
 
-                    if (Unmodified(lookup.rowAndPartitionKeys, rollbackRowAndPartitionKeys))
+                    if (Unmodified(orignalRowAndPartitionKeys, updatedRowAndPartitionKeys))
                         return () => true.AsTask();
 
+                    lookup.rowAndPartitionKeys = updatedRowAndPartitionKeys;
                     await saveAsync(lookup);
+
                     Func<Task<bool>> rollback =
                         async () =>
                         {
-                            if (created)
-                            {
-                                return await repository.DeleteAsync<StorageLookupTable, bool>(rowKey, partitionKey,
-                                    () => true,
-                                    () => false,
-                                    tableName: tableName);
-                            }
+                            var keysRemoved = orignalRowAndPartitionKeys
+                                .Where(kvp => !updatedRowAndPartitionKeys
+                                    .Any(
+                                        kvp2 =>
+                                            kvp2.Key == kvp.Key &&
+                                            kvp2.Value == kvp.Value))
+                                .ToArray();
                             var table = repository.TableClient.GetTableReference(tableName);
                             return await repository.UpdateAsync<StorageLookupTable, bool>(rowKey, partitionKey,
                                 async (modifiedDoc, saveRollbackAsync) =>
                                 {
-                                    
-                                    if (Unmodified(rollbackRowAndPartitionKeys, modifiedDoc.rowAndPartitionKeys))
+                                    var currentRowAndPartitionKeys = modifiedDoc.rowAndPartitionKeys.ToDictionary();
+                                    var valuesToAddBack = keysRemoved
+                                        // If the item this update removed was added back, ignore it
+                                        .Where(kvp => !currentRowAndPartitionKeys.ContainsKey(kvp.Key))
+                                        .ToArray();
+                                    var rolledBackRowAndPartitionKeys = modifiedDoc.rowAndPartitionKeys
+                                        .Select(
+                                            kvp =>
+                                            {
+                                                // If this updated didn't create/update this value, or
+                                                // if the current value is not the value saved by this update:
+                                                // don't modify it
+                                                if (!updatedRowAndPartitionKeys.Contains(kvp))
+                                                    return kvp;
+
+                                                if (!orignalRowAndPartitionKeys.Contains(kvp))
+                                                    // Item as added by this update, delete it
+                                                    return default(KeyValuePair<string, string>?);
+
+                                                return kvp;
+                                            })
+                                        .SelectWhereHasValue()
+                                        .Concat(valuesToAddBack)
+                                        .Distinct(rpKey => rpKey.Key)
+                                        .ToArray();
+                                    if (Unmodified(rolledBackRowAndPartitionKeys, modifiedDoc.rowAndPartitionKeys.NullToEmpty().ToArray()))
                                         return true;
-                                    modifiedDoc.rowAndPartitionKeys = rollbackRowAndPartitionKeys;
+                                    modifiedDoc.rowAndPartitionKeys = rolledBackRowAndPartitionKeys;
                                     await saveRollbackAsync(modifiedDoc);
                                     return true;
                                 },
@@ -330,15 +357,20 @@ namespace EastFive.Persistence.Azure.StorageTables
                 },
                 tableName: tableName);
 
-            bool Unmodified(KeyValuePair<string, string>[] rollbackRowAndPartitionKeys, KeyValuePair<string, string>[] modifiedDocRowAndPartitionKeys)
+            bool Unmodified(
+                KeyValuePair<string, string>[] rollbackRowAndPartitionKeys,
+                KeyValuePair<string, string>[] modifiedDocRowAndPartitionKeys)
             {
-                if (rollbackRowAndPartitionKeys == null)
-                    return modifiedDocRowAndPartitionKeys != null;
+                bool LengthModified()
+                {
+                    if (rollbackRowAndPartitionKeys.Length != modifiedDocRowAndPartitionKeys.Length)
+                        return true;
 
-                if (modifiedDocRowAndPartitionKeys == null)
-                    return rollbackRowAndPartitionKeys != null;
+                    return false;
+                }
 
-                if (rollbackRowAndPartitionKeys.Length != modifiedDocRowAndPartitionKeys.Length)
+                var modifiedByLength = LengthModified();
+                if (LengthModified())
                     return false;
 
                 var matchKeys = rollbackRowAndPartitionKeys.ToDictionary();
@@ -389,7 +421,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     async astKey =>
                     {
                         var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
-                            (lookup) =>
+                            (lookup, etag) =>
                             {
                                 var rowAndParitionKeys = lookup.rowAndPartitionKeys;
                                 var rowKeyFound = rowAndParitionKeys

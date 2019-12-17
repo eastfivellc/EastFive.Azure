@@ -90,7 +90,7 @@ namespace EastFive.Azure.Auth
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
             Func<string, TResult> onFailure)
         {
-            if (!authorizationRefMaybe.HasValue)
+            if (!authorizationRefMaybe.HasValueNotNull())
                 return onClaims(new Dictionary<string, string>(), default(Guid?), false);
             var authorizationRef = authorizationRefMaybe.Ref;
 

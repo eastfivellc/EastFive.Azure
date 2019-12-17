@@ -11,7 +11,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     interface IProvideEntity
     {
-        IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity, string etag = "*");
+        IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity);
 
         TEntity CreateEntityInstance<TEntity>(string rowKey, string partitionKey, 
             IDictionary<string, EntityProperty> properties,

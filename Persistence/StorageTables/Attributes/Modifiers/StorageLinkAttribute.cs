@@ -53,7 +53,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onMissing: () => new RowKeyPrefixAttribute());
             return repository
                 .FindByIdAsync<StorageLookupTable, IEnumerableAsync<IRefAst>>(rowKey, partitionKey,
-                    (dictEntity) =>
+                    (dictEntity, etag) =>
                     {
                         var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                             .NullToEmpty()

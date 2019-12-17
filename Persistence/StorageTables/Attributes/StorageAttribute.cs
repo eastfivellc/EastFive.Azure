@@ -69,6 +69,13 @@ namespace EastFive.Persistence
         EntityType ParseLastModfied<EntityType>(EntityType entity, DateTimeOffset value, MemberInfo memberInfo);
     }
 
+    public interface IModifyAzureStorageTableETag
+    {
+        string GenerateETag(object value, MemberInfo memberInfo);
+
+        EntityType ParseETag<EntityType>(EntityType entity, string value, MemberInfo memberInfo);
+    }
+
     public interface IProvideTableQuery
     {
         string ProvideTableQuery<TEntity>(MemberInfo memberInfo, 

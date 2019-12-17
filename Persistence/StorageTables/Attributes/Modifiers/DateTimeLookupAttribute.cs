@@ -76,7 +76,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             var lookupPartitionKey = ComputeLookupKey(memberValue, TimeSpan.FromSeconds(this.Partition));
             return repository
                 .FindByIdAsync<DateTimeLookupTable, IEnumerableAsync<IRefAst>>(lookupRowKey, lookupPartitionKey,
-                    (dictEntity) =>
+                    (dictEntity, etag) =>
                     {
                         var rowAndParitionKeys = dictEntity.rows
                             .NullToEmpty()
@@ -269,7 +269,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             var tableName = GetLookupTableName(memberInfo);
 
             return repository.FindByIdAsync<DateTimeLookupTable, TResult>(existingRowKey, existingPartitionKey,
-                (lookup) =>
+                (lookup, etag) =>
                 {
                     var rowAndParitionKeys = lookup.rows
                         .NullToEmpty()

@@ -39,7 +39,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 memberInfo.SetValue(ref entity, dateTime);
                 return entity;
             }
-            var message = $"`{this.GetType().FullName}` Cannot determine row key from type `{memberType.FullName}` on `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}`";
+            var message = $"`{this.GetType().FullName}` Cannot determine last modified from type `{memberType.FullName}` on `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}`";
             throw new NotImplementedException(message);
         }
     }

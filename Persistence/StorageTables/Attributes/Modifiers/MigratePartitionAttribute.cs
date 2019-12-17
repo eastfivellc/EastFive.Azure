@@ -69,6 +69,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 (entity) => onSuccessWithRollback(
                     () => repository.DeleteAsync<TEntity, bool>(entity,
                         () => true,
+                        () => true,
                         () => true)),
                 () => onSuccessWithRollback(() => false.AsTask()));
         }
@@ -127,7 +128,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                             () => true);
                     }),
                 () => onSuccessWithRollback(
-                    () => 1.AsTask()));
+                    () => 1.AsTask()),
+                () => throw new Exception("Delete with ETAG = * failed due to modification."));
         }
     }
 }

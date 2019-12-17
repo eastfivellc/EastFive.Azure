@@ -20,11 +20,10 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public string TableName { get; set; }
 
-        public IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity, string etag = "*")
+        public IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
         {
             var creatableEntity = new TableEntity<TEntity>();
             creatableEntity.Entity = entity;
-            creatableEntity.ETag = etag;
             return creatableEntity;
         }
 
@@ -33,7 +32,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             string etag, DateTimeOffset lastUpdated)
         {
             return TableEntity<TEntity>.CreateEntityInstance(rowKey, partitionKey,
-                lastUpdated,
+                lastUpdated, etag,
                 properties);
         }
 
@@ -191,7 +190,36 @@ namespace EastFive.Persistence.Azure.StorageTables
                     });
             }
 
-            public virtual string ETag { get; set; }
+            public string ETag
+            {
+                get
+                {
+                    return GetMemberSupportingInterface<IModifyAzureStorageTableETag, string>(
+                        (eTagProperty, eTagGenerator) =>
+                        {
+                            var rowKeyValue = eTagGenerator.GenerateETag(this.Entity, eTagProperty);
+                            return rowKeyValue;
+                        },
+                        () => "*");
+                }
+                set
+                {
+                    this.Entity = SetETag(this.Entity, value);
+                }
+            }
+
+            private static EntityType SetETag(EntityType entity, string value)
+            {
+                return GetMemberSupportingInterface<IModifyAzureStorageTableETag, EntityType>(
+                    (eTagProperty, eTagGenerator) =>
+                    {
+                        return eTagGenerator.ParseETag(entity, value, eTagProperty);
+                    },
+                    () =>
+                    {
+                        return entity;
+                    });
+            }
 
             public void ReadEntity(
                 IDictionary<string, EntityProperty> properties, OperationContext operationContext)
@@ -201,13 +229,14 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
 
             public static EntityType CreateEntityInstance(string rowKey, string partitionKey,
-                    DateTimeOffset timestamp,
+                    DateTimeOffset timestamp, string eTag,
                 IDictionary<string, EntityProperty> properties)
             {
                 var entity = Activator.CreateInstance<EntityType>();
                 entity = SetRowKey(entity, rowKey);
                 entity = SetPartitionKey(entity, partitionKey);
                 entity = SetTimestamp(entity, timestamp);
+                entity = SetETag(entity, eTag);
                 entity = CreateEntityInstance(entity, properties);
                 return entity;
             }

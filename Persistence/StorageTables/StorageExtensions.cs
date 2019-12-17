@@ -264,8 +264,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
-                    onFound,
-                    onDoesNotExists);
+                    onFound:(TEntity entity, string eTag) => onFound(entity),
+                    onNotFound: onDoesNotExists);
         }
 
         [Obsolete]
@@ -281,8 +281,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
-                    onFound,
-                    onDoesNotExists);
+                    onFound: (TEntity entity, string eTag) => onFound(entity),
+                    onNotFound: onDoesNotExists);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
