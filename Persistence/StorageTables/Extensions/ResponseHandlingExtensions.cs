@@ -106,7 +106,12 @@ namespace EastFive.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
             return exception.ParseStorageException(
-                onEntityAlreadyExists: (msg) => onAlreadyExists().AsTask(),
+                onEntityAlreadyExists: (msg) =>
+                {
+                    if (!onAlreadyExists.IsDefaultOrNull())
+                        return onAlreadyExists().AsTask();
+                    throw new ExtendedErrorInformationException(ExtendedErrorInformationCodes.EntityAlreadyExists, msg);
+                },
                 onNotFound: async (msg) => // IsProblemTableDoesNotExist
                 {
                     try
@@ -140,7 +145,12 @@ namespace EastFive.Azure.StorageTables.Driver
                     throw exception;
                 },
                 onDefaultCallback:
-                    (error, msg) => onFailure(error, msg).AsTask());
+                (error, msg) =>
+                {
+                    if (!onFailure.IsDefaultOrNull())
+                        return onFailure(error, msg).AsTask();
+                    throw new ExtendedErrorInformationException(error, msg);
+                });
         }
 
         public static TResult ParseStorageException<TResult>(this StorageException storageException,
