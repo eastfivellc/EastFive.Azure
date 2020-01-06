@@ -67,7 +67,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         [ApiProperty(PropertyName = OperationSetPropertyName)]
         [JsonProperty(PropertyName = OperationSetPropertyName)]
         [Storage]
-        [StorageLookup]
+        [StringStandardPartitionLookup]
         public string operationSet;
 
         [Storage]

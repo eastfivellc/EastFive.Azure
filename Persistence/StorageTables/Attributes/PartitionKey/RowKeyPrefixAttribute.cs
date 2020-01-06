@@ -32,7 +32,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
-            return GetValue(rowKey);
+            return GetValue(rowKey, this.Characters);
         }
 
         public EntityType ParsePartitionKey<EntityType>(EntityType entity, string value, MemberInfo memberInfo)
@@ -43,14 +43,14 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string ComputePartitionKey(object refKey, MemberInfo memberInfo, string rowKey)
         {
-            return GetValue(rowKey);
+            return GetValue(rowKey, this.Characters);
         }
 
-        public string GetValue(string rowKey)
+        public static string GetValue(string rowKey, uint characters)
         {
             if (rowKey.IsNullOrWhiteSpace())
                 return null;
-            return rowKey.Substring(0, (int)this.Characters);
+            return rowKey.Substring(0, (int)characters);
         }
 
         public IEnumerable<string> GeneratePartitionKeys(Type type, int skip, int top)

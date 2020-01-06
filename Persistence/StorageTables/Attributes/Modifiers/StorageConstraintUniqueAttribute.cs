@@ -42,7 +42,17 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public string GetHashValue<TEntity>(MemberInfo memberInfo, TEntity value)
             {
-                return this.Scope;
+                var memberInfoType = memberInfo.GetMemberType();
+                if (memberInfoType.IsSubClassOfGeneric(typeof(IReferenceable)))
+                {
+                    var memberValue = memberInfo.GetValue(value);
+                    var refValue = (IReferenceable)memberValue;
+                    return refValue.id.ToString("N");
+                }
+                if(typeof(string).IsAssignableFrom(memberInfoType))
+                    return (string)memberInfo.GetValue(value);
+
+                throw new Exception($"No scoping override for {memberInfoType.FullName}");
             }
         }
 

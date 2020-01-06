@@ -26,6 +26,7 @@ namespace EastFive.Azure.Auth
         Resource = typeof(Whoami),
         ContentType = "x-application/auth-whoami",
         ContentTypeVersion = "0.1")]
+    [DisplayEntryPoint]
     public struct Whoami
     {
         public const string SessionPropertyName = "session";

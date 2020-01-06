@@ -1,34 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
-
-using EastFive.Linq;
-using BlackBarLabs.Api;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Api.Resources;
-using System.Web.Http.Routing;
-using EastFive.Security.SessionServer;
-using EastFive.Extensions;
-using EastFive.Api.Azure.Credentials.Attributes;
 using System.Web.Http;
+using System.Web.Http.Routing;
+
 using Microsoft.ApplicationInsights;
-using BlackBarLabs;
-using EastFive.Linq.Async;
-using BlackBarLabs.Linq.Async;
-using EastFive.Api.Controllers;
-using EastFive.Collections.Generic;
-using System.Linq.Expressions;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
+
+using BlackBarLabs;
+using BlackBarLabs.Api.Resources;
+using EastFive.Linq;
+using EastFive.Security.SessionServer;
+using EastFive.Extensions;
+using EastFive.Linq.Async;
+using EastFive.Collections.Generic;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
-using System.Threading;
 
 namespace EastFive.Api.Azure
 {
@@ -433,7 +427,7 @@ namespace EastFive.Api.Azure
                     var redirectUrl = SetRedirectParameters(requestId, authorization, redirectUriLandingPage);
                     return onSuccess(redirectUrl);
                 },
-                (why) => onFailure(why)).ToTask();
+                (why) => onFailure(why)).AsTask();
         }
 
         protected Uri SetRedirectParameters(Guid requestId, EastFive.Azure.Auth.Authorization authorization, Uri redirectUri)

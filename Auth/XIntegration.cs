@@ -60,9 +60,7 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = AccountPropertyName)]
         [JsonProperty(PropertyName = AccountPropertyName)]
         [Storage]
-        [StorageLookup(
-            RowKeyAttribute = typeof(RowKeyAttribute),
-            PartitionAttribute = typeof(StandardParititionKeyAttribute))]
+        [IdStandardPartitionLookup]
         public Guid accountId { get; set; }
         
         public const string AuthorizationPropertyName = "authorization";

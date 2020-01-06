@@ -348,7 +348,14 @@
     <Compile Include="Monitoring\MessageCard.cs" />
     <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
+    <Compile Include="Persistence\ICacheEntites.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\ETagAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IdLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IGenerateLookupKeys.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\ScopedLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\BinaryPartitionLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\BinaryLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\StorageOverflowAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Backups\Attributes\IBackupStorage.cs" />
@@ -359,6 +366,7 @@
     <Compile Include="Persistence\StorageTables\Backups\TableBackupOperation.cs" />
     <Compile Include="Persistence\StorageTables\Backups\TableBackup.cs" />
     <Compile Include="Persistence\StorageTables\Backups\WhereInformation.cs" />
+    <Compile Include="Persistence\StorageTables\Caching\MemoryCache.cs" />
     <Compile Include="Persistence\StorageTables\TableInformationAttribute.cs" />
     <Compile Include="Monitoring\Monitoring.cs" />
     <Compile Include="IProvideIntegration.cs" />
@@ -367,7 +375,7 @@
     <Compile Include="Persistence\StorageTables\Backups\Attributes\StorageResourceAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\MigratePartitionAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\StorageConstraintUniqueAttribute.cs" />
-    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\DateTimeLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\DateTimeLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\CascadeDeleteAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\RowKeyPrefixAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\StandardParititionKeyAttribute.cs" />
@@ -404,7 +412,7 @@
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\ParititionKeyAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\RowKeyAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\StorageLinkAttribute.cs" />
-    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\StorageLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\StorageLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\StorageAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\StorageTableAttribute.cs" />
     <Compile Include="Persistence\StorageTables\AzureStorageHelpers.cs" />

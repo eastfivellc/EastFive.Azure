@@ -254,7 +254,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default)
+            Func<TResult> onDoesNotExists = default,
+            ICacheEntites cache = default)
             where TEntity : IReferenceable
         {
             if (entityRef.IsDefaultOrNull())
@@ -265,7 +266,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
                     onFound:(TEntity entity, string eTag) => onFound(entity),
-                    onNotFound: onDoesNotExists);
+                    onNotFound: onDoesNotExists,
+                    cache:cache);
         }
 
         [Obsolete]
@@ -362,7 +364,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
             Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default)
+            Func<TResult> onDoesNotExists = default,
+            ICacheEntites cache = default)
             where TEntity : struct, IReferenceable
         {
             if (!entityRefMaybe.HasValueNotNull())
@@ -371,7 +374,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var entityRef = entityRefMaybe.Ref;
             return StorageGetAsync(entityRef,
                 onFound,
-                onDoesNotExists);
+                onDoesNotExists,
+                cache:cache);
         }
 
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs)
@@ -397,11 +401,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TEntity> StorageQuery<TEntity>(
-            this Expression<Func<TEntity, bool>> query)
+            this Expression<Func<TEntity, bool>> query,
+            ICacheEntites cache = default)
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindAll(query);
+                .FindAll(query, cache: cache);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetPartition<TEntity>(this string partition)
@@ -649,6 +654,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         rowKey,
                         entityRef.StorageComputePartitionKey(rowKey),
                     onSuccess,
+                    onNotFound);
+        }
+
+        public static Task<TResult> StorageDeleteIfAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+            Func<TEntity, Func<Task>, Task<TResult>> onFound,
+            Func<TResult> onNotFound = default)
+            where TEntity : IReferenceable
+        {
+            var rowKey = entityRef.StorageComputeRowKey();
+            var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteAsync<TEntity, TResult>(
+                        rowKey, partitionKey,
+                    (entity, deleteAsync) => onFound(entity, () => deleteAsync()),
                     onNotFound);
         }
 
