@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>EastFive.Azure</RootNamespace>
     <AssemblyName>EastFive.Azure</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
@@ -262,9 +262,6 @@
       <HintPath>..\packages\System.Security.SecureString.4.0.0\lib\net46\System.Security.SecureString.dll</HintPath>
     </Reference>
     <Reference Include="System.ServiceModel" />
-    <Reference Include="System.Spatial, Version=5.8.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Spatial.5.8.4\lib\net40\System.Spatial.dll</HintPath>
-    </Reference>
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.7\lib\net45\System.Web.Helpers.dll</HintPath>
@@ -349,6 +346,7 @@
     <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
     <Compile Include="Persistence\ICacheEntites.cs" />
+    <Compile Include="Persistence\Exceptions\ExtendedErrorInformationException.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\ETagAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IdLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IGenerateLookupKeys.cs" />

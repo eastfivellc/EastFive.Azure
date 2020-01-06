@@ -132,29 +132,57 @@ namespace EastFive.Azure.Synchronization
             var alreadyConnected = mutualConnections.Any();
             if (alreadyConnected)
             {
-                var connectorIdMutual = mutualConnections.First();
-                //SHIM, corrects when connector incorrectly created with same external/internal adatper ids
-                var connector = await Persistence.ConnectorDocument.ShimUpdateAsync(connectorIdMutual,
-                    async (internalconn, saveAsync) =>
-                    {
-                        if (internalconn.adapterExternalId == internalconn.adapterInternalId)
+                var connectorMaybe = await mutualConnections
+                    .Select(
+                        async (connectorId) =>
                         {
-                            internalconn.adapterInternalId = adapterInternal.adapter.adapterId;
-                            internalconn.adapterExternalId = adapterExternal.adapter.adapterId;
-                            await saveAsync(internalconn.adapterInternalId, internalconn.adapterExternalId);
-                        }
-                        return internalconn.AsOptional();
-                    },
-                    () => default(Connector?));
-
-                if (connector.HasValue)
+                            //SHIM, corrects when connector incorrectly created with same external/internal adapter ids
+                            var maybe = await Persistence.ConnectorDocument.ShimUpdateAsync(connectorId,
+                                async (internalconn, saveAsync) =>
+                                {
+                                    if (internalconn.adapterExternalId == internalconn.adapterInternalId)
+                                    {
+                                        internalconn.adapterInternalId = adapterInternal.adapter.adapterId;
+                                        internalconn.adapterExternalId = adapterExternal.adapter.adapterId;
+                                        await saveAsync(internalconn.adapterInternalId, internalconn.adapterExternalId);
+                                    }
+                                    return internalconn.AsOptional();
+                                },
+                                () => default(Connector?));
+                            // remove bad data so that this is more efficient the next time around
+                            if (maybe.IsDefault())
+                            {
+                                await adapterInternal.saveAsync(
+                                    (adapterInternalToUpdate) =>
+                                    {
+                                        adapterInternalToUpdate.connectorIds = adapterInternalToUpdate.connectorIds
+                                            .Where(id => id != connectorId)
+                                            .ToArray();
+                                        return adapterInternalToUpdate;
+                                    });
+                                await adapterExternal.saveAsync(
+                                    (adapterExternalToUpdate) =>
+                                    {
+                                        adapterExternalToUpdate.connectorIds = adapterExternalToUpdate.connectorIds
+                                            .Where(id => id != connectorId)
+                                            .ToArray();
+                                        return adapterExternalToUpdate;
+                                    });
+                            }
+                            return maybe;
+                        })
+                    .AsyncEnumerable()
+                    .SelectWhereHasValue()
+                    .FirstAsync(c => c, () => default(Connector?));
+                if (connectorMaybe.HasValue)
                 {
+                    var connector = connectorMaybe.Value;
                     if (adapterInternal.created)
                         await adapterInternal.saveAsync(
                             (adapterInternalToUpdate) =>
                             {
                                 adapterInternalToUpdate.connectorIds = adapterInternalToUpdate.connectorIds
-                                    .Append(connector.Value.connectorId)
+                                    .Append(connector.connectorId)
                                     .Distinct()
                                     .ToArray();
                                 return adapterInternalToUpdate;
@@ -164,16 +192,16 @@ namespace EastFive.Azure.Synchronization
                             (adapterExternalToUpdate) =>
                             {
                                 adapterExternalToUpdate.connectorIds = adapterExternalToUpdate.connectorIds
-                                    .Append(connector.Value.connectorId)
+                                    .Append(connector.connectorId)
                                     .Distinct()
                                     .ToArray();
                                 return adapterExternalToUpdate;
                             });
 
-                    return onSuccess(connector.Value);
+                    return onSuccess(connector);
                 }
             }
-                            
+
             while (true)
             {
                 try

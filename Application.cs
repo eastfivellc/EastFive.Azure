@@ -190,7 +190,7 @@ namespace EastFive.Api.Azure
                 },
                 (why) => throw new Exception(why));
 
-            // The padding was confirmed by this:
+            // The padding was estimated by this:
             //var bodyLen = 131_006;  // (131_006 + 58 + 8) * 2 messages = 262_144
             //var body = Enumerable.Range(0, bodyLen).Select(x => (byte)5).ToArray();
             //var msg1 = new Microsoft.Azure.ServiceBus.Message(body);
@@ -207,20 +207,26 @@ namespace EastFive.Api.Azure
                     })
                     .ToArray();
                 var maxMessageSize = messages.Select(x => x.Body.Length + perMessageHeaderSize + perMessageListSize).Max();
-                int numberInBatch = maxPayloadSize / maxMessageSize; 
-                var batches = await messages
-                    .Select((x, index) => new { x, index }) 
-                    .GroupBy(x => x.index / numberInBatch, y => y.x)
-                    .Select(
-                        async g =>
+                int numberInBatch = maxPayloadSize / maxMessageSize;
+                do
+                {
+                    var toBeSent = messages.Take(numberInBatch).ToArray();
+                    try
+                    {
+                        await client.SendAsync(toBeSent);
+                        messages = messages.Skip(toBeSent.Length).ToArray();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.Message.Contains("MessageSizeExceededException"))
                         {
-                            var items = g.ToList();
-                            await client.SendAsync(items);
-                            return items.Count;
-                        })
-                    .WhenAllAsync(5);
-
-                var sent = batches.Sum();
+                            numberInBatch -= 1;
+                            if (numberInBatch > 0)
+                                continue;
+                        }
+                        throw ex;
+                    }
+                } while (messages.Length > 0);
             }
             finally
             {
