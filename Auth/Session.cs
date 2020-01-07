@@ -216,7 +216,19 @@ namespace EastFive.Azure.Auth
                                                 (missingConfig) => onConfigurationFailure("Missing", missingConfig),
                                                 (configName, issue) => onConfigurationFailure(configName, issue));
                                         },
-                                        () => onAlreadyExists());
+                                        () =>
+                                        {
+                                            return BlackBarLabs.Security.Tokens.JwtTools.CreateToken(sessionId.id,
+                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
+                                                (tokenNew) =>
+                                                {
+                                                    session.token = tokenNew;
+                                                    return onCreated(session);
+                                                },
+                                                (missingConfig) => onConfigurationFailure("Missing", missingConfig),
+                                                (configName, issue) => onConfigurationFailure(configName, issue));
+                                            // onAlreadyExists()
+                                        });
                                 },
                                 (why) => onFailure(why).AsTask());
                         },
