@@ -2,25 +2,25 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
+
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Table;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Linq;
+using Microsoft.WindowsAzure.Storage.Blob;
+
 using EastFive;
 using EastFive.Linq;
 using EastFive.Extensions;
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Linq.Async;
-using BlackBarLabs.Linq.Async;
-using Microsoft.WindowsAzure.Storage.Blob;
-using System.IO;
 using EastFive.Analytics;
-using BlackBarLabs.Web;
 using EastFive.Azure.Persistence.StorageTables;
+using BlackBarLabs.Extensions;
+using BlackBarLabs.Web;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {

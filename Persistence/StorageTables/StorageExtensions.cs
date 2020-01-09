@@ -482,7 +482,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             var rowKey = entityRef.StorageComputeRowKey();
             var partitionKey = entityRef.StorageComputePartitionKey(rowKey);

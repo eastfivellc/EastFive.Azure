@@ -6,12 +6,8 @@ using System.Configuration;
 using System.Threading.Tasks;
 
 using EastFive;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Api;
-using BlackBarLabs.Linq.Async;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using BlackBarLabs;
 using System.Net;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -22,6 +18,7 @@ using EastFive.Linq.Async;
 using EastFive.Api.Azure.Credentials.Attributes;
 using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Api;
+using BlackBarLabs;
 
 namespace EastFive.Azure
 {
@@ -81,8 +78,8 @@ namespace EastFive.Azure
                                     }),
                                 onAlreadyExists),
                         onAlreadyExists.AsAsyncFunc()),
-                        why => onFailure(why).ToTask(),
-                        (param, why) => onFailure($"Invalid configuration for {param}:{why}").ToTask());
+                        why => onFailure(why).AsTask(),
+                        (param, why) => onFailure($"Invalid configuration for {param}:{why}").AsTask());
                 },
                 onCredentialSystemNotAvailable.AsAsyncFunc(),
                 onCredentialSystemNotInitialized.AsAsyncFunc());
@@ -179,10 +176,10 @@ namespace EastFive.Azure
                                         return onSuccess(authenticationRequest);
                                     });
                         },
-                        () => onFailure("The credential provider for this request is no longer enabled in this system").ToTask(),
-                        (why) => onFailure(why).ToTask());
+                        () => onFailure("The credential provider for this request is no longer enabled in this system").AsTask(),
+                        (why) => onFailure(why).AsTask());
                 },
-                ()=> onNotFound().ToTask());
+                ()=> onNotFound().AsTask());
         }
 
         public Task<TResult> GetByIdAsync<TResult>(Guid authenticationRequestId,
@@ -304,7 +301,7 @@ namespace EastFive.Azure
                                 });
                             
                         },
-                        () => default(Session?).ToTask()))
+                        () => default(Session?).AsTask()))
                 .WhenAllAsync()
                 .SelectWhereHasValueAsync()
                 .ToArrayAsync();
@@ -344,7 +341,7 @@ namespace EastFive.Azure
                         session.token = authRequest.token;
                         return await next(session);
                     },
-                    (IEnumerable<Session> sessions) => sessions.ToArray().ToTask());
+                    (IEnumerable<Session> sessions) => sessions.ToArray().AsTask());
             return onSuccess(integrations);
         }
 
@@ -371,7 +368,7 @@ namespace EastFive.Azure
                             (IEnumerable<KeyValuePair<Integration, T>> integrationsKvp) =>
                             {
                                 var integrationsKvpArray = integrationsKvp.ToArray();
-                                return integrationsKvpArray.ToTask();
+                                return integrationsKvpArray.AsTask();
                             }))
                 .WhenAllAsync()
                 .SelectManyAsync()
@@ -446,7 +443,7 @@ namespace EastFive.Azure
                         .ToArrayAsync();
                     return integration.PairWithValue(activities);
                 },
-                () => (new KeyValuePair<Integration, object[]> { }).ToTask());
+                () => (new KeyValuePair<Integration, object[]> { }).AsTask());
         }
 
         public async Task<TResult> GetAsync<TIntegration, TResult>(Guid actorId,
@@ -472,7 +469,7 @@ namespace EastFive.Azure
                         },
                         onNotFound);
                 },
-                ()=> onNotFound().ToTask());
+                ()=> onNotFound().AsTask());
         }
 
         public Task<TResult> UpdateAsync<TResult>(Guid authenticationRequestId,
@@ -566,7 +563,7 @@ namespace EastFive.Azure
                     await saveAsync(authorizationId, name, token, mergedExtraParams);
                     return onUpdated();
                 },
-                () => onFailure("Integration is no longer available for the system given").ToTask(),
+                () => onFailure("Integration is no longer available for the system given").AsTask(),
                 onFailure.AsAsyncFunc());
         }
 
@@ -615,7 +612,7 @@ namespace EastFive.Azure
                                 await deleteAsync();
                                 return onSuccess(response);
                             },
-                            () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).ToTask());
+                            () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
                     }
                     
                     return await dataContext.Integrations.DeleteAsync(integration.authorizationId.Value, integration.method,
@@ -627,7 +624,7 @@ namespace EastFive.Azure
                                     await deleteAsync();
                                     return onSuccess(response);
                                 },
-                                () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).ToTask());
+                                () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
                         },
                         onNotFound.AsAsyncFunc());
                 },
@@ -647,7 +644,7 @@ namespace EastFive.Azure
                                     })
                                 .WhenAllAsync();
                         },
-                        (why) => (new bool[] { }).ToTask());
+                        (why) => (new bool[] { }).AsTask());
                     return onSuccess(request.CreateResponse(HttpStatusCode.NoContent).AddReason("Access ID not found"));
                 });
         }

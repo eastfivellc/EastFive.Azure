@@ -1,21 +1,19 @@
-﻿using BlackBarLabs;
-using BlackBarLabs.Collections.Generic;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Linq.Async;
-using EastFive;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Linq.Async;
-using EastFive.Security.SessionServer;
-using EastFive.Text;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+
+using EastFive;
+using EastFive.Extensions;
+using BlackBarLabs;
+using EastFive.Collections.Generic;
+using EastFive.Linq;
+using EastFive.Linq.Async;
+using EastFive.Security.SessionServer;
+using EastFive.Text;
 
 namespace EastFive.Azure.Synchronization
 {
@@ -65,7 +63,7 @@ namespace EastFive.Azure.Synchronization
                         },
                         (synchronizationss) =>
                         {
-                            return onFound(synchronizationss.SelectMany().ToArray()).ToTask();
+                            return onFound(synchronizationss.SelectMany().ToArray()).AsTask();
                         });
                 });
         }
@@ -123,7 +121,7 @@ namespace EastFive.Azure.Synchronization
                                     onSuccess,
                                     onFailure);
                             },
-                            () => onFailure("No connection activities could delete the resource.").ToTask());
+                            () => onFailure("No connection activities could delete the resource.").AsTask());
                 },
                 onNotFound.AsAsyncFunc());
             
