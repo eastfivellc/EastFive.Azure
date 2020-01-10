@@ -47,7 +47,7 @@ namespace EastFive.Azure.Functions
         public IRef<InvocationMessage> invocationRef;
 
         [LastModified]
-        [DateTimeLookup(Partition = 3600.0, Row = 60.0)]
+        [DateTimeLookup(Partition = 3600.0*24, Row = 3600.0)]
         public DateTimeOffset lastModified;
 
         [JsonProperty]
@@ -70,6 +70,7 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = LastExecutedPropertyName)]
         [ApiProperty(PropertyName = LastExecutedPropertyName)]
         [Storage]
+        [DateTimeLookup(Partition = 3600.0 * 24, Row = 3600.0)]
         public DateTime? lastExecuted;
 
         #endregion

@@ -33,6 +33,16 @@ namespace EastFive.Persistence.Azure.StorageTables
         /// </summary>
         public double Partition { get; set; }
 
+        private bool ignoreDefault = true;
+        public bool IgnoreDefault
+        {
+            get => ignoreDefault;
+            set
+            {
+                ignoreDefault = value;
+            }
+        }
+
         public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
         {
             return decoratedMember.AsEnumerable();
@@ -46,10 +56,39 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             var lookupMemberValueKvp = lookupValues.Single();
             var lookupMemberInfo = lookupMemberValueKvp.Key;
-            if (!typeof(DateTime).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
-                throw new ArgumentException();
 
-            var lookupValue = (DateTime)lookupMemberValueKvp.Value;
+            DateTime? GetDateTime()
+            {
+                if (typeof(DateTime?).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
+                    return (DateTime?)lookupMemberValueKvp.Value;
+
+                if (typeof(DateTime).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
+                    return (DateTime)lookupMemberValueKvp.Value;
+
+                if (typeof(DateTimeOffset?).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
+                {
+                    var dtoMaybe = (DateTimeOffset?)lookupMemberValueKvp.Value;
+                    if (!dtoMaybe.HasValue)
+                        return default(DateTime?);
+                    var dto = dtoMaybe.Value;
+                    return dto.DateTime;
+                }
+
+                if (typeof(DateTimeOffset).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
+                {
+                    var dto = (DateTimeOffset)lookupMemberValueKvp.Value;
+                    return dto.DateTime;
+                }
+
+                throw new ArgumentException();
+            }
+            var lookupValueMaybe = GetDateTime();
+            if (!lookupValueMaybe.HasValue)
+                return Enumerable.Empty<IRefAst>();
+            var lookupValue = lookupValueMaybe.Value;
+            if(ignoreDefault && lookupValue.IsDefault())
+                return Enumerable.Empty<IRefAst>();
+
             var lookupRowKey = ComputeLookupKey(lookupValue, TimeSpan.FromSeconds(this.Row));
             var lookupPartitionKey = ComputeLookupKey(lookupValue, TimeSpan.FromSeconds(this.Partition));
 
