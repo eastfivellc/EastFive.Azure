@@ -17,7 +17,6 @@ using BlackBarLabs.Persistence.Azure;
 using Microsoft.WindowsAzure.Storage.Table;
 using EastFive.Persistence.Azure;
 using EastFive.Azure.StorageTables.Driver;
-using BlackBarLabs.Extensions;
 using System.Reflection;
 using System.IO;
 using EastFive.Persistence.Azure.StorageTables;
