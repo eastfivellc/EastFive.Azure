@@ -348,6 +348,7 @@
     <Compile Include="Persistence\ICacheEntites.cs" />
     <Compile Include="Persistence\Exceptions\ExtendedErrorInformationException.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\ETagAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Interfaces\IProvideQueryValues.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IdLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\IGenerateLookupKeys.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\ScopedLookupAttribute.cs" />
@@ -355,6 +356,7 @@
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\BinaryLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Modifiers\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\Scoped\ScopedPartitionAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\StorageOverflowAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Backups\Attributes\IBackupStorage.cs" />
     <Compile Include="Persistence\StorageTables\Backups\BackupFunction.cs" />

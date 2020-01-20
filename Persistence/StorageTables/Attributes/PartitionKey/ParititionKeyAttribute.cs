@@ -139,9 +139,50 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                             return $"{current}___{nextPartitionScope}";
                         });
-                return ExpressionType.Equal.WhereExpression("Partition", partitionValue);
+                return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
             }
             return filter.ResolveFilter<TEntity>(out postFilter);
+        }
+
+        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Assignment[] assignments,
+            out Func<TEntity, bool> postFilter)
+        {
+            postFilter = (e) => true;
+
+            var filterAssignments = assignments
+                .Select(assignment => assignment.member.PairWithValue(assignment.value));
+
+            return TableQuery(memberInfo, filterAssignments);
+        }
+
+        private string TableQuery(MemberInfo memberInfo,
+            IEnumerable<KeyValuePair<MemberInfo, object>> filterAssignments)
+        {
+            var scopedMembers = memberInfo.DeclaringType
+                .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                .Where(member => member.ContainsAttributeInterface<IModifyPartitionScope>())
+                .ToDictionary(member => member.Name);
+
+            var partitionValue = filterAssignments
+                .OrderBy(kvp => kvp.Key.Name)
+                .Aggregate(string.Empty,
+                    (current, filterAssignment) =>
+                    {
+                        if (!scopedMembers.ContainsKey(filterAssignment.Key.Name))
+                            throw new ArgumentException();
+
+                        var memberPartitionScoping = scopedMembers[filterAssignment.Key.Name];
+                        var partitionScoping = memberPartitionScoping.GetAttributeInterface<IModifyPartitionScope>();
+                        var nextPartitionScope = partitionScoping
+                            .GenerateScopedPartitionKey(memberPartitionScoping, filterAssignment.Value);
+
+                        if (current.IsNullOrWhiteSpace())
+                            return nextPartitionScope;
+
+                        return $"{current}___{nextPartitionScope}";
+                    });
+            return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
         }
 
         public string GenerateScopedPartitionKey(MemberInfo memberInfo, object memberValue)

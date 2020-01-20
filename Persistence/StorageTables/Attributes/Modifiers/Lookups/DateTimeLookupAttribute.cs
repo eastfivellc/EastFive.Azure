@@ -23,6 +23,13 @@ namespace EastFive.Persistence.Azure.StorageTables
     public class DateTimeLookupAttribute : StorageLookupAttribute,
         IModifyAzureStorageTableSave, IProvideFindBy
     {
+        public const double seconds = 1.0;
+        public const double minutes = 60.0;
+        public const double minutesPerHour = 60;
+        public const double hours = minutes * minutesPerHour;
+        public const double hoursPerDay = 24;
+        public const double days = hours * hoursPerDay;
+
         /// <summary>
         /// Total seconds
         /// </summary>
@@ -94,25 +101,27 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
 
-            string ComputeLookupKey(DateTime memberValue, TimeSpan timeSpan)
-            {
-                var key = $"{memberValue.Year}";
-                if (timeSpan.TotalDays >= 28)
-                    return key;
-                key = $"{key}{memberValue.Month.ToString("D2")}";
-                if (timeSpan.TotalDays >= 1.0)
-                    return key;
-                key = $"{key}{memberValue.Day.ToString("D2")}";
-                if (timeSpan.TotalHours >= 1.0)
-                    return key;
-                key = $"{key}{memberValue.Hour.ToString("D2")}";
-                if (timeSpan.TotalMinutes >= 60.0)
-                    return key;
-                key = $"{key}{memberValue.Minute.ToString("D2")}";
-                if (timeSpan.Seconds >= 60.0)
-                    return key;
-                return $"{key}{memberValue.Second.ToString("D2")}";
-            }
+            
+        }
+
+        internal static string ComputeLookupKey(DateTime memberValue, TimeSpan timeSpan)
+        {
+            var key = $"{memberValue.Year}";
+            if (timeSpan.TotalDays >= 28)
+                return key;
+            key = $"{key}{memberValue.Month.ToString("D2")}";
+            if (timeSpan.TotalDays >= 1.0)
+                return key;
+            key = $"{key}{memberValue.Day.ToString("D2")}";
+            if (timeSpan.TotalHours >= 1.0)
+                return key;
+            key = $"{key}{memberValue.Hour.ToString("D2")}";
+            if (timeSpan.TotalMinutes >= 60.0)
+                return key;
+            key = $"{key}{memberValue.Minute.ToString("D2")}";
+            if (timeSpan.Seconds >= 60.0)
+                return key;
+            return $"{key}{memberValue.Second.ToString("D2")}";
         }
     }
 }

@@ -25,7 +25,7 @@ namespace EastFive.Azure.Functions
                 headers = request.Headers
                     .Select(hdr => hdr.Key.PairWithValue(hdr.Value.First()))
                     .ToDictionary(),
-                requestUri = request.RequestUri,
+                requestUri = new Uri(System.Web.HttpUtility.UrlDecode(request.RequestUri.OriginalString)),
                 content = request.Content.IsDefaultOrNull() ?
                     default(byte[])
                     :
