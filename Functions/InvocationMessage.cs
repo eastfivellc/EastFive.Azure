@@ -163,8 +163,6 @@ namespace EastFive.Azure.Functions
                 () => throw new Exception());
         }
 
-
-
         public Task SendToQueueAsync(AzureApplication application)
         {
             return InvocationMessage.SendToQueueAsync(this.invocationRef, application);
