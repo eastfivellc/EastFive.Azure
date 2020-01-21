@@ -55,8 +55,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return null;
                     return referenceableOptional.id.Value.ToString("N");
                 }
-                var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                    $"Please override GetRowKeys on `{this.GetType().FullName}`.";
+                var exMsg = $"{this.GetType().Name} is not a valid decorator for type `{propertyValueType.FullName}`. " +
+                    $"Please decorate `{decoratedMember.DeclaringType.FullName}.{decoratedMember.Name}` with a different lookup attribute.";
                 throw new NotImplementedException(exMsg);
             }
         }
