@@ -349,6 +349,7 @@
     <Compile Include="Persistence\Exceptions\ExtendedErrorInformationException.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\ETagAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Interfaces\IProvideQueryValues.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Interfaces\IScopeKeys.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\IdLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\IGenerateLookupKeys.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\ScopedLookupAttribute.cs" />
@@ -356,7 +357,12 @@
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\BinaryLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
-    <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\Scoped\ScopedPartitionAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\ScopedPartitionAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeStringAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeIdPrefixAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Scoping\ExternalIntegration.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeIdAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeDateTimeAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\StorageOverflowAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Backups\Attributes\IBackupStorage.cs" />
     <Compile Include="Persistence\StorageTables\Backups\BackupFunction.cs" />

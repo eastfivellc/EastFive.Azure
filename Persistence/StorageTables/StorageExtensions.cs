@@ -624,7 +624,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FromSettings()
                 .UpdateOrCreateAsync(rowKey, partitionKey,
                     onCreated,
-                    default);
+                    onModificationFailures: onModificationFailures);
         }
 
         [Obsolete]

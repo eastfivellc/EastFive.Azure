@@ -88,9 +88,9 @@ namespace EastFive.Azure.Functions
             InvokeApplicationDirect invokeApplication,
             MultipartResponseAsync<InvocationMessage> onRun)
         {
-            Expression<Func<InvocationMessage, bool>> expr = (im) => true;
+            Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
 
-            var messages = expr
+            var messages = allQuery
                 .StorageQuery()
                 .Where(msg => DateTime.UtcNow - msg.lastModified < TimeSpan.FromDays(3.0));
             return onRun(messages);

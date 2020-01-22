@@ -10,11 +10,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class IdLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -31,8 +26,6 @@ namespace EastFive.Persistence.Azure.StorageTables
             var partitionKey = GetPartitionKey(rowKey);
             var astRef = new RefAst(rowKey, partitionKey);
             return astRef.AsEnumerable();
-
-            
         }
 
         internal static string RowKey(Type thisType, Type propertyValueType, object rowKeyValue)
@@ -100,11 +93,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     public abstract class IdsLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {

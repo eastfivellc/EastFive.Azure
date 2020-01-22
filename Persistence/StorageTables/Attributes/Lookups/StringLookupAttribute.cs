@@ -11,11 +11,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class StringLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -34,6 +29,19 @@ namespace EastFive.Persistence.Azure.StorageTables
             var rowKey = (string)rowKeyValue;
             var partitionKey = GetPartitionKey(rowKey);
             return new RefAst(rowKey, partitionKey).AsEnumerable();
+        }
+
+        internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType)
+        {
+            var propertyValueType = memberInfo.GetMemberType();
+            if (!typeof(string).IsAssignableFrom(propertyValueType))
+            {
+                var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                    $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
+                throw new NotImplementedException(exMsg);
+            }
+            var stringValue = (string)memberValue;
+            return stringValue;
         }
 
         public abstract string GetPartitionKey(string rowKey);

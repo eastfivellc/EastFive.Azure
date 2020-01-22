@@ -359,7 +359,6 @@ namespace EastFive.Azure.Synchronization
                 onLocalAdapterNotFound.AsAsyncFunc());
         }
 
-        
         public static async Task<TResult> CreateOrUpdateAdapterConnectorByKeyAsync<TResult>(string localResourceKey, Guid localIntegrationId, string localResourceType,
                 Guid remoteIntegrationId,
             Func<bool, Connector, Adapter, Func<DateTime, string, Task>, Task<TResult>> onUpdate)
