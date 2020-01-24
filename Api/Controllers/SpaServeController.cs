@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Web.Http;
-using BlackBarLabs.Api;
 using System.Web.Mvc;
 using System.Net.Http;
-using BlackBarLabs.Extensions;
 using System.Net;
 using HtmlAgilityPack;
 using System.IO;
@@ -12,6 +10,7 @@ using System.Collections.Generic;
 using EastFive.Security.SessionServer.Exceptions;
 using System.Linq;
 using EastFive.Extensions;
+using BlackBarLabs.Api;
 
 namespace EastFive.Api.Azure.Controllers
 {
