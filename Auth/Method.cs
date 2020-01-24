@@ -188,7 +188,8 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = "session")]IRef<Session> sessionRef,
                 Api.Azure.AzureApplication application,
             MultipartResponseAsync<Method> onContent,
-            ReferencedDocumentNotFoundResponse<Session> onIntegrationNotFound)
+            ReferencedDocumentNotFoundResponse<Session> onSessionNotFound,
+            UnauthorizedResponse onHacked)
         {
             return await await sessionRef.StorageGetAsync(
                 session =>
@@ -215,7 +216,8 @@ namespace EastFive.Azure.Auth
                             });
                     return onContent(integrationProviders);
                 },
-                () => onIntegrationNotFound().AsTask());
+                //() => onSessionNotFound().AsTask());
+                () => onHacked().AsTask());
         }
 
         public static Task<TResult> ById<TResult>(IRef<Method> method, Api.Azure.AzureApplication application,
