@@ -937,6 +937,11 @@ namespace EastFive.Persistence
                 return onBound(default(DateTime));
             }
 
+            if (typeof(TimeSpan) == type)
+            {
+                return onBound(default(TimeSpan));
+            }
+
             if (type.IsClass)
                 return onBound(null);
 

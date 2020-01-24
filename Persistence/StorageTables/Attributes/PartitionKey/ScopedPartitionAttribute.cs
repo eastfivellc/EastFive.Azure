@@ -95,6 +95,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             bool allIgnored = false;
             var r = declaringType
                 .GetPropertyOrFieldMembers()
+                .Where(mi => mi.ContainsAttributeInterface<IScopeKeys>())
                 .Select(filter)
                 .SelectWhereHasValue()
                 .OrderBy(memberKvp => memberKvp.Value.Order)
