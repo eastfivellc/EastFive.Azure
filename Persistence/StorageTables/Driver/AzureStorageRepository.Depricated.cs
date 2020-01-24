@@ -5,13 +5,13 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
-using BlackBarLabs.Linq.Async;
-using BlackBarLabs.Persistence.Azure.StorageTables.RelationshipDocuments;
+
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
+
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {

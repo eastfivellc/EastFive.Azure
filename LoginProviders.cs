@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 
 using BlackBarLabs.Extensions;
 using BlackBarLabs.Api;
-using BlackBarLabs.Linq.Async;
 using BlackBarLabs.Collections.Generic;
 using System.Security.Claims;
 using System.Security.Cryptography;

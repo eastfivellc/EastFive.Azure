@@ -51,7 +51,7 @@ namespace EastFive.Persistence
     public interface IComputeAzureStorageTablePartitionKey
     {
         string ComputePartitionKey(object memberValue, MemberInfo memberInfo,
-            string rowKey);
+            string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues);
 
         IEnumerable<string> GeneratePartitionKeys(Type type, int skip, int top);
     }
@@ -81,6 +81,10 @@ namespace EastFive.Persistence
         string ProvideTableQuery<TEntity>(MemberInfo memberInfo, 
             Expression<Func<TEntity, bool>> filter,
             out Func<TEntity, bool> postFilter);
+
+        string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Assignment [] assignments,
+            out Func<TEntity, bool> postFilter);
     }
 
     public class StorageQueryAttribute : Attribute, IProvideTableQuery
@@ -91,6 +95,22 @@ namespace EastFive.Persistence
         {
             var query = filter.ResolveFilter(out postFilter);
             return query;
+        }
+
+        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo, 
+            Assignment[] assignments,
+            out Func<TEntity, bool> postFilter)
+        {
+            postFilter = (e) => true;
+            return assignments.Aggregate("",
+                (current, assignment) =>
+                {
+                    var assignmentName = assignment.member.GetTablePropertyName();
+                    var next = assignment.type.WhereExpression(assignmentName, assignment.value);
+                    if (current.IsNullOrWhiteSpace())
+                        return next;
+                    return TableQuery.CombineFilters(current, "AND", next);
+                });
         }
     }
 
@@ -915,6 +935,11 @@ namespace EastFive.Persistence
             if (typeof(DateTime) == type)
             {
                 return onBound(default(DateTime));
+            }
+
+            if (typeof(TimeSpan) == type)
+            {
+                return onBound(default(TimeSpan));
             }
 
             if (type.IsClass)

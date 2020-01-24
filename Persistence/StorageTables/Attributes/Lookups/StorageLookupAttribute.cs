@@ -394,9 +394,14 @@ namespace EastFive.Persistence.Azure.StorageTables
             };
         }
 
-        public abstract IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember, IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues);
+        public virtual IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
+        {
+            return decoratedMember.AsEnumerable();
+        }
 
-        public abstract IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember);
+        public abstract IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember, 
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues);
+
     }
 
 }

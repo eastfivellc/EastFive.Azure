@@ -19,10 +19,15 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
+            return ComputePartitionKey(rowKey, value, memberInfo);
+        }
+
+        public static string ComputePartitionKey(string rowKey, object value, MemberInfo memberInfo)
+        {
             var dateTimeValueObj = memberInfo.GetValue(value);
             if (dateTimeValueObj.IsDefaultOrNull())
                 return "1_1";
-            if(dateTimeValueObj.GetType().IsNullable())
+            if (dateTimeValueObj.GetType().IsNullable())
             {
                 if (!dateTimeValueObj.NullableHasValue())
                     return "1_1";
@@ -66,7 +71,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     // TODO: if(memberInAssignmentInfo != memberInfo)?
                     if (expressionType == ExpressionType.Equal)
-                        return ExpressionType.Equal.WhereExpression("Partition", partitionValue);
+                        return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
 
                     throw new ArgumentException();
                 },
@@ -77,7 +82,22 @@ namespace EastFive.Persistence.Azure.StorageTables
             postFilter = cacheFilter;
             return result;
         }
-        
+
+        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Assignment[] assignments,
+            out Func<TEntity, bool> postFilter)
+        {
+            postFilter = (e) => true;
+            return assignments.Aggregate("",
+                (current, assignment) =>
+                {
+                    if (assignment.type == ExpressionType.Equal)
+                        return ExpressionType.Equal.WhereExpression("PartitionKey", assignment.value);
+
+                    throw new ArgumentException();
+                });
+        }
+
     }
 
 }

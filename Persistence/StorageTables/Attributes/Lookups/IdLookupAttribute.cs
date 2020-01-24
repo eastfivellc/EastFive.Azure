@@ -10,11 +10,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class IdLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -25,14 +20,17 @@ namespace EastFive.Persistence.Azure.StorageTables
             var rowKeyValue = lookupValue.Value;
             var propertyValueType = lookupValue.Key.GetMemberType();
 
-            var rowKey = RowKey();
+            var rowKey = RowKey(this.GetType(), propertyValueType, rowKeyValue);
             if (rowKey.IsDefaultNullOrEmpty())
                 return Enumerable.Empty<IRefAst>();
             var partitionKey = GetPartitionKey(rowKey);
             var astRef = new RefAst(rowKey, partitionKey);
             return astRef.AsEnumerable();
+        }
 
-            string RowKey()
+        internal static string RowKey(Type thisType, Type propertyValueType, object rowKeyValue)
+        {
+            if (typeof(Guid).IsAssignableFrom(propertyValueType))
             {
                 if (typeof(Guid).IsAssignableFrom(propertyValueType))
                 {
@@ -55,10 +53,26 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return null;
                     return referenceableOptional.id.Value.ToString("N");
                 }
-                var exMsg = $"{this.GetType().Name} is not a valid decorator for type `{propertyValueType.FullName}`. " +
-                    $"Please decorate `{decoratedMember.DeclaringType.FullName}.{decoratedMember.Name}` with a different lookup attribute.";
-                throw new NotImplementedException(exMsg);
             }
+            if (typeof(IReferenceable).IsAssignableFrom(propertyValueType))
+            {
+                var refValue = (IReferenceable)rowKeyValue;
+                if (refValue.IsDefaultOrNull())
+                    return null;
+                return refValue.id.ToString("N");
+            }
+            if (typeof(IReferenceableOptional).IsAssignableFrom(propertyValueType))
+            {
+                var referenceableOptional = (IReferenceableOptional)rowKeyValue;
+                if (referenceableOptional.IsDefaultOrNull())
+                    return null;
+                if (!referenceableOptional.HasValue)
+                    return null;
+                return referenceableOptional.id.Value.ToString("N");
+            }
+            var exMsg = $"{thisType.Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                $"Please override GetRowKeys on `{thisType.FullName}`.";
+            throw new NotImplementedException(exMsg);
         }
 
         public abstract string GetPartitionKey(string rowKey);
@@ -98,11 +112,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     public abstract class IdsLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {

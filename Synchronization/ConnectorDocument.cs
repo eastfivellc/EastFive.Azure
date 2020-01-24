@@ -5,19 +5,17 @@ using System.Collections.Generic;
 
 using Microsoft.WindowsAzure.Storage.Table;
 
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Linq;
 using BlackBarLabs;
 using EastFive.Collections.Generic;
-
 using BlackBarLabs.Persistence;
 using BlackBarLabs.Extensions;
 using EastFive.Serialization;
 using BlackBarLabs.Persistence.Azure;
-using EastFive.Extensions;
-using EastFive;
-using EastFive.Linq;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
-using BlackBarLabs.Linq.Async;
 using EastFive.Linq.Async;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;

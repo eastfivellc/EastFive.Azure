@@ -47,7 +47,9 @@ namespace EastFive.Azure.Functions
         public IRef<InvocationMessage> invocationRef;
 
         [LastModified]
-        [DateTimeLookup(Partition = 3600.0, Row = 60.0)]
+        [DateTimeLookup(
+            Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
+            Row = DateTimeLookupAttribute.hours)]
         public DateTimeOffset lastModified;
 
         [JsonProperty]
@@ -70,6 +72,9 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = LastExecutedPropertyName)]
         [ApiProperty(PropertyName = LastExecutedPropertyName)]
         [Storage]
+        [DateTimeLookup(
+            Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
+            Row = DateTimeLookupAttribute.hours)]
         public DateTime? lastExecuted;
 
         #endregion
@@ -83,9 +88,9 @@ namespace EastFive.Azure.Functions
             InvokeApplicationDirect invokeApplication,
             MultipartResponseAsync<InvocationMessage> onRun)
         {
-            Expression<Func<InvocationMessage, bool>> expr = (im) => true;
+            Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
 
-            var messages = expr
+            var messages = allQuery
                 .StorageQuery()
                 .Where(msg => DateTime.UtcNow - msg.lastModified < TimeSpan.FromDays(3.0));
             return onRun(messages);
@@ -157,8 +162,6 @@ namespace EastFive.Azure.Functions
                 },
                 () => throw new Exception());
         }
-
-
 
         public Task SendToQueueAsync(AzureApplication application)
         {

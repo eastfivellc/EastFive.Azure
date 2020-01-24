@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Table;
-using BlackBarLabs.Persistence.Azure.StorageTables;
-using BlackBarLabs.Extensions;
 using System.Collections.Generic;
-using BlackBarLabs.Collections.Generic;
-using BlackBarLabs.Linq;
+using System.Threading.Tasks;
+
+using Microsoft.WindowsAzure.Storage.Table;
+
+using EastFive;
 using EastFive.Linq;
-using BlackBarLabs.Linq.Async;
 using EastFive.Collections.Generic;
 using EastFive.Linq.Async;
-using EastFive;
+using BlackBarLabs.Persistence.Azure.StorageTables;
+using BlackBarLabs.Extensions;
 
 namespace BlackBarLabs.Persistence
 {

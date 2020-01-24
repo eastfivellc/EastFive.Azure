@@ -79,19 +79,6 @@ namespace EastFive.Persistence.Azure.StorageTables
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
         }
 
-        private string GetPartitionKey(IRef<IReferenceable> refKey, string rowKey, MemberInfo memberInfo)
-        {
-            var partitionKeyAttributeType = this.PartitionAttribute.IsDefaultOrNull() ?
-                  typeof(StandardParititionKeyAttribute)
-                  :
-                  this.PartitionAttribute;
-            if (!partitionKeyAttributeType.IsSubClassOfGeneric(typeof(IComputeAzureStorageTablePartitionKey)))
-                throw new Exception($"{memberInfo.DeclaringType.FullName}..{memberInfo.Name} defines partition type as {partitionKeyAttributeType.FullName} which does not implement {typeof(IModifyAzureStorageTablePartitionKey).FullName}.");
-            var partitionKeyAttribute = Activator.CreateInstance(partitionKeyAttributeType) as IComputeAzureStorageTablePartitionKey;
-            var partitionKey = partitionKeyAttribute.ComputePartitionKey(refKey, memberInfo, rowKey);
-            return partitionKey;
-        }
-
         public virtual async Task<TResult> ExecuteAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,

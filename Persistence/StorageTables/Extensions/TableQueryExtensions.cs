@@ -291,7 +291,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             return whereQuery;
         }
 
-        public static object ResolveQuery<TEntity>(this Expression<Func<TEntity, bool>> filter, out Func<TEntity, bool> postFilter)
+        public static object ResolveQuery<TEntity>(this Expression<Func<TEntity, bool>> filter,
+            out Func<TEntity, bool> postFilter)
         {
             if (filter.Body is UnaryExpression)
                 return ResolveUnaryExpression(filter.Body as UnaryExpression, out postFilter);
@@ -309,7 +310,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new ArgumentException($"{filter.Body.GetType().FullName} is not a supported TableQuery expression type.");
         }
 
-        public static string ResolveFilter<TEntity>(this Expression<Func<TEntity, bool>> filter, out Func<TEntity, bool> postFilter)
+        public static string ResolveFilter<TEntity>(this Expression<Func<TEntity, bool>> filter, 
+            out Func<TEntity, bool> postFilter)
         {
             if (filter.Body is UnaryExpression)
             {

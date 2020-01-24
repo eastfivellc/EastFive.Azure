@@ -43,11 +43,6 @@ namespace EastFive.Persistence.Azure.StorageTables
             return "BinaryLookupAttribute";
         }
 
-        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
-        {
-            return decoratedMember.AsEnumerable();
-        }
-
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
