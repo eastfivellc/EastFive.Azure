@@ -58,7 +58,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             () => Enumerable.Empty<IRefAst>(),
                             tableName: tableName);
                     })
-                .AsyncEnumerable(lookupRefs.Length)
+                .AsyncEnumerable(true)
                 .SelectMany();
         }
 
