@@ -42,23 +42,22 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var tableName = GetLookupTableName(memberInfo);
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
-            var lookupRefs = lookupGeneratorAttr
+            return lookupGeneratorAttr
                 .GetLookupKeys(memberInfo, queries)
-                .ToArray();
-            return lookupRefs
                 .Select(
                     lookupRef =>
                     {
-                        return repository.FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(
+                        return repository.FindByIdAsync<StorageLookupTable, IRefAst[]>(
                                 lookupRef.RowKey, lookupRef.PartitionKey,
                             (dictEntity, etag) =>
                             {
                                 var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                                     .NullToEmpty()
-                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value));
+                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
+                                    .ToArray();
                                 return rowAndParitionKeys;
                             },
-                            () => Enumerable.Empty<IRefAst>(),
+                            () => new IRefAst[] { },
                             tableName: tableName);
                     })
                 .AsyncEnumerable() // lookupRefs.Length)
