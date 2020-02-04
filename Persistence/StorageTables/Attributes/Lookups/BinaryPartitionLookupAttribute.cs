@@ -1,5 +1,6 @@
 ﻿using BlackBarLabs;
 using BlackBarLabs.Extensions;
+using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Collections.Generic;
@@ -35,7 +36,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public IEnumerableAsync<IRefAst> GetKeys(object memberValue,
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries)
+            KeyValuePair<MemberInfo, object>[] queries,
+            ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;

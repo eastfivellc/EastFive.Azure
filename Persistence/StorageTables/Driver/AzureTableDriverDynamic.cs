@@ -484,10 +484,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindBy<TProperty, TEntity>(TProperty propertyValue,
                 Expression<Func<TEntity, TProperty>> propertyExpr,
                 Expression<Func<TEntity, bool>> query1 = default,
-                Expression<Func<TEntity, bool>> query2 = default)
+                Expression<Func<TEntity, bool>> query2 = default,
+                ILogger logger = default)
             where TEntity : IReferenceable
         {
-            return FindByInternal(propertyValue, propertyExpr, query1, query2);
+            return FindByInternal(propertyValue, propertyExpr, logger: logger, query1, query2);
         }
 
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
@@ -501,10 +502,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindBy<TEntity>(Guid entityId,
                 Expression<Func<TEntity, Guid>> by,
                 Expression<Func<TEntity, bool>> query1 = default,
-                Expression<Func<TEntity, bool>> query2 = default)
+                Expression<Func<TEntity, bool>> query2 = default,
+                ILogger logger = default)
             where TEntity : IReferenceable
         {
-            return FindByInternal(entityId, by, query1, query2);
+            return FindByInternal(entityId, by, logger:logger, query1, query2);
         }
 
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
@@ -525,6 +527,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         private IEnumerableAsync<TEntity> FindByInternal<TMatch, TEntity>(object findByValue,
                 Expression<Func<TEntity, TMatch>> by,
+                ILogger logger = default,
                 params Expression<Func<TEntity, bool>>[] queries)
             where TEntity : IReferenceable
         {
@@ -547,16 +550,22 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     .Append(findByValue.PairWithKey(memberCandidate))
                                     .ToArray();
 
-                                return attr.GetKeys(findByValue, memberCandidate, this, memberAssignments)
+                                return attr.GetKeys(findByValue, memberCandidate, this, memberAssignments, logger:logger)
                                     .Select(
-                                        rowParitionKeyKvp =>
+                                        async rowParitionKeyKvp =>
                                         {
                                             var rowKey = rowParitionKeyKvp.RowKey;
                                             var partitionKey = rowParitionKeyKvp.PartitionKey;
-                                            return this.FindByIdAsync(rowKey, partitionKey,
+                                            var kvp = await this.FindByIdAsync(rowKey, partitionKey,
                                                     (TEntity entity, string eTag) => entity.PairWithKey(true),
                                                     () => default(TEntity).PairWithKey(false),
                                                     onFailure: (code, msg) => default(TEntity).PairWithKey(false));
+                                            if (kvp.Key)
+                                                logger.Trace($"Lookup {partitionKey}/{rowKey} was found.");
+                                            else
+                                                logger.Trace($"Lookup {partitionKey}/{rowKey} failed.");
+
+                                            return kvp;
                                         })
                                     .Await()
                                     .Where(kvp => kvp.Key)

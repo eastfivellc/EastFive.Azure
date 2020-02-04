@@ -1,5 +1,6 @@
 ﻿using BlackBarLabs.Extensions;
 using BlackBarLabs.Persistence.Azure.StorageTables;
+using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -40,7 +41,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public IEnumerableAsync<IRefAst> GetKeys(object memberValue,
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries)
+            KeyValuePair<MemberInfo, object>[] queries,
+            ILogger logger = default)
         {
             if (!queries.IsDefaultNullOrEmpty())
                 throw new ArgumentException("Exactly one query param is valid for StorageLinkAttribute.");

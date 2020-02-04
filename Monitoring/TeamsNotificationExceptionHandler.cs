@@ -25,17 +25,7 @@ namespace EastFive.Azure.Monitoring
                 async teamsHookUrl =>
                 {
                     var message = await CreateMessageCardAsync(ex, method, httpApp, request);
-
-                    using (var client = new HttpClient())
-                    {
-                        var teamsRequest = new HttpRequestMessage(HttpMethod.Post, teamsHookUrl);
-                        var messageString = JsonConvert.SerializeObject(message);
-                        teamsRequest.Content = new StringContent(messageString);
-                        teamsRequest.Content.Headers.ContentType =
-                            new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-                        var response = await client.SendAsync(teamsRequest);
-                        var responseMessage = await response.Content.ReadAsStringAsync();
-                    }
+                    string response = await message.SendAsync(teamsHookUrl);
                     return await continueExecution(ex, method, queryParameters,
                         httpApp, request);
                 },
@@ -43,19 +33,31 @@ namespace EastFive.Azure.Monitoring
                         httpApp, request));
         }
 
-        public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType, 
+        public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
             IApplication httpApp, HttpRequestMessage request, string routeName,
             RouteHandlingDelegate continueExecution)
         {
-            if (!request.Headers.Contains("X-Teams-Notify"))
-                return continueExecution(controllerType, httpApp, request, routeName);
+            if (request.Headers.Contains("X-Teams-Notify"))
+            {
+                var teamsNotifyParams = request.Headers.GetValues("X-Teams-Notify");
+                if (teamsNotifyParams.Any())
+                {
+                    var teamsNotifyParam = teamsNotifyParams.First();
 
-            var teamsNotifyParams = request.Headers.GetValues("X-Teams-Notify");
-            if (!teamsNotifyParams.Any())
-                return continueExecution(controllerType, httpApp, request, routeName);
+                    return TeamsNotifyAsync(teamsNotifyParam, controllerType,
+                        httpApp, request, routeName,
+                        continueExecution);
+                }
+            }
 
-            var teamsNotifyParam = teamsNotifyParams.First();
+            return continueExecution(controllerType, httpApp, request, routeName);
+        }
 
+        public Task<HttpResponseMessage> TeamsNotifyAsync(string teamsNotifyParam,
+            Type controllerType,
+            IApplication httpApp, HttpRequestMessage request, string routeName,
+            RouteHandlingDelegate continueExecution)
+        {
             return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
                 async teamsHookUrl =>
                 {
@@ -67,40 +69,31 @@ namespace EastFive.Azure.Monitoring
                         {
                             title = "Request/Response Information",
                             facts = new MessageCard.Section.Fact[]
-                        {
-                            new MessageCard.Section.Fact
                             {
-                                name = "Route Name:",
-                                value = routeName,
-                            },
-                            new MessageCard.Section.Fact
-                            {
-                                name = "Http Method:",
-                                value = request.Method.Method,
-                            },
-                            new MessageCard.Section.Fact
-                            {
-                                name = "URL:",
-                                value = request.RequestUri.OriginalString,
-                            },
-                            new MessageCard.Section.Fact
-                            {
-                                name = "Status Code:",
-                                value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Route Name:",
+                                    value = routeName,
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Http Method:",
+                                    value = request.Method.Method,
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "URL:",
+                                    value = request.RequestUri.OriginalString,
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Status Code:",
+                                    value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                                },
                             }
-                        }
                         });
 
-                    using (var client = new HttpClient())
-                    {
-                        var teamsRequest = new HttpRequestMessage(HttpMethod.Post, teamsHookUrl);
-                        var messageString = JsonConvert.SerializeObject(message);
-                        teamsRequest.Content = new StringContent(messageString);
-                        teamsRequest.Content.Headers.ContentType =
-                            new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-                        var teamsResponse = await client.SendAsync(teamsRequest);
-                        var responseMessage = await teamsResponse.Content.ReadAsStringAsync();
-                    }
+                    string responseMessage = await message.SendAsync(teamsHookUrl);
                     return response;
                 },
                 (why) => continueExecution(controllerType, httpApp, request, routeName));
@@ -249,22 +242,18 @@ namespace EastFive.Azure.Monitoring
             var utcOffset = TimeZoneInfo
                 .FindSystemTimeZoneById("Central Standard Time")
                 .GetUtcOffset(DateTime.UtcNow);
-            var message = new MessageCard
+
+            var sections = new MessageCard.Section[]
             {
-                summary = summary,
-                themeColor = "F00807",
-                title = title,
-                sections = new MessageCard.Section[]
+                new MessageCard.Section
                 {
-                    new MessageCard.Section
-                    {
                         activityTitle = appName,
                         activitySubtitle = (DateTime.UtcNow + utcOffset).ToString("f"),
                         activityImage = appImage,
-                    },
-                    getRequestInformation(),
-                    new MessageCard.Section
-                    {
+                },
+                getRequestInformation(),
+                new MessageCard.Section
+                {
                         title = "Headers",
                         facts =  request.Headers
                             .Select(
@@ -274,13 +263,33 @@ namespace EastFive.Azure.Monitoring
                                     value = header.Value.Join(","),
                                 })
                             .ToArray(),
-                    },
-                    new MessageCard.Section
-                    {
-                        title = "Content",
-                        text = $"<blockquote>{content}</blockquote>",
-                    },
                 },
+                new MessageCard.Section
+                {
+                    title = "Content",
+                    text = $"<blockquote>{content}</blockquote>",
+                }
+            };
+
+            if (request.Properties.ContainsKey(HttpApplication.DiagnosticsLogProperty))
+            {
+                var diagnosticsLogs = (string[])request.Properties[HttpApplication.DiagnosticsLogProperty];
+                sections = sections
+                    .Append(
+                        new MessageCard.Section
+                        {
+                            title = "Log",
+                            text = $"<blockquote>{diagnosticsLogs.Join("<br />")}</blockquote>",
+                        })
+                    .ToArray();
+            }
+
+            var message = new MessageCard
+            {
+                summary = summary,
+                themeColor = "F00807",
+                title = title,
+                sections = sections,
                 potentialAction = new MessageCard.ActionCard[]
                 {
                     new MessageCard.ActionCard
