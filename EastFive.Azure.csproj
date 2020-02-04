@@ -358,7 +358,6 @@
     <Compile Include="Monitoring\ApplicationInsights.cs" />
     <Compile Include="Monitoring\ApplicationInsightsRouteHandlerAttribute.cs" />
     <Compile Include="Monitoring\MessageCard.cs" />
-    <Compile Include="Monitoring\TeamsTraceHandler.cs" />
     <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
     <Compile Include="Persistence\ICacheEntites.cs" />
