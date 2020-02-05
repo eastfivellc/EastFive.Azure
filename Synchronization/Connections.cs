@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using BlackBarLabs;
 using BlackBarLabs.Extensions;
 using EastFive;
+using EastFive.Analytics;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -875,8 +876,7 @@ namespace EastFive.Azure.Synchronization
                                     return next();
                                 },
                                 onConnectionNotFound);
-                        },
-                        onConnectionNotFound);
+                        });
                 },
                 onConnectionNotFound.AsAsyncFunc());
         }
@@ -893,48 +893,63 @@ namespace EastFive.Azure.Synchronization
         /// <returns></returns>
         public static Task<TResult> FindResourceKeyByInternalIdAsync<TResult>(Guid keyGuid, Guid integrationId, string resourceType,
             Func<string, TResult> onFound,
-            Func<TResult> onConnectionNotFound)
+            Func<TResult> onConnectionNotFound,
+            ILogger logger = default)
         {
             var key = keyGuid.ToString("N");
-            return FindResourceKeyByInternalKeyAsync<TResult>(key, integrationId, resourceType, onFound, onConnectionNotFound);
+            return FindResourceKeyByInternalKeyAsync<TResult>(key, integrationId, resourceType,
+                onFound,
+                onConnectionNotFound,
+                    logger: logger);
         }
 
         public static async Task<TResult> FindResourceKeyByInternalKeyAsync<TResult>(string keyInternal,
                 Guid integrationId, string resourceType,
             Func<string, TResult> onFound,
-            Func<TResult> onConnectionNotFound)
+            Func<TResult> onConnectionNotFound,
+            ILogger logger = default)
         {
+            var scopedLogger = logger.CreateScope($"{integrationId}/{resourceType}/{keyInternal}");
+            scopedLogger.Trace($"Looking up...");
             return await await FindResourceKeysByInternalKeyAsync(keyInternal, resourceType,
                 integrationIdResourceKeys =>
                 {
+                    scopedLogger.Trace($"...Returned Keys");
                     return integrationIdResourceKeys
                         .Where(
                             integrationIdResourceKey =>
                             {
                                 var externalAdapter = integrationIdResourceKey.Value;
                                 var isAdapterInDesiredIntegration = externalAdapter.integrationId == integrationId;
-                                var doesAdapterHaveKeyValue = !externalAdapter.key.IsNullOrWhiteSpace();
+                                scopedLogger.Trace($"{externalAdapter.integrationId} == {integrationId} + `{externalAdapter.key}`.HasBlackSpace()");
+                                var doesAdapterHaveKeyValue = externalAdapter.key.HasBlackSpace();
                                 var useThisAdapter = isAdapterInDesiredIntegration && doesAdapterHaveKeyValue;
                                 return useThisAdapter;
                             })
                         .FirstAsync(
                             (integrationIdResourceKey) => onFound(integrationIdResourceKey.Value.key),
                             () => onConnectionNotFound());
-                        //.FirstAsyncMatchAsync(
-                        //    async (integrationIdResourceKey, next) =>
-                        //    {
-                        //        var externalAdapter = integrationIdResourceKey.Value;
-                        //        var isAdapterInDesiredIntegration = externalAdapter.integrationId == integrationId;
-                        //        var doesAdapterHaveKeyValue = !externalAdapter.key.IsNullOrWhiteSpace();
-                        //        var useThisAdapter = isAdapterInDesiredIntegration && doesAdapterHaveKeyValue;
-                        //        if (useThisAdapter)
-                        //            return onFound(externalAdapter.key);
+                    //.FirstAsyncMatchAsync(
+                    //    async (integrationIdResourceKey, next) =>
+                    //    {
+                    //        var externalAdapter = integrationIdResourceKey.Value;
+                    //        var isAdapterInDesiredIntegration = externalAdapter.integrationId == integrationId;
+                    //        var doesAdapterHaveKeyValue = !externalAdapter.key.IsNullOrWhiteSpace();
+                    //        var useThisAdapter = isAdapterInDesiredIntegration && doesAdapterHaveKeyValue;
+                    //        if (useThisAdapter)
+                    //            return onFound(externalAdapter.key);
 
-                        //        return await next();
-                        //    },
-                        //    () => onConnectionNotFound());
+                    //        return await next();
+                    //    },
+                    //    () => onConnectionNotFound());
                 },
-                onConnectionNotFound.AsAsyncFunc());
+                () =>
+                {
+                    scopedLogger.Trace($"... FAILURE, no connection available.");
+                    return onConnectionNotFound().AsTask();
+                },
+                logger: scopedLogger);
+                
         }
 
         public static Task<TResult> FindResourceKeysByInternalIdAsync<TResult>(Guid keyGuid, string resourceType,
@@ -947,25 +962,33 @@ namespace EastFive.Azure.Synchronization
 
         public static Task<TResult> FindResourceKeysByInternalKeyAsync<TResult>(string keyInternal, string resourceType,
             Func<IEnumerableAsync<KeyValuePair<Connector, Adapter>>, TResult> onFound,
-            Func<TResult> onAdapterNotFound)
+            Func<TResult> onAdapterNotFound,
+            ILogger logger = default)
         {
             return Persistence.AdapterDocument.FindByKeyAsync<TResult>(keyInternal, defaultInternalIntegrationId, resourceType,
                 adapterInternal =>
                 {
+                    var scopedLogger = logger.CreateScope($"{adapterInternal.adapterId}");
+                    scopedLogger.Trace($"has {adapterInternal.connectorIds.Length} connection ids");
                     var connectorAdapterKvps = adapterInternal.connectorIds
                         .SelectAsyncOptional<Guid, KeyValuePair<Connector, Adapter>>(
                             (connectorId, select, skip) =>
                             {
+                                scopedLogger.Trace($"Processing connectorID {connectorId}");
                                 return Persistence.ConnectorDocument.FindByIdWithAdapterRemoteAsync(connectorId, adapterInternal,
                                     (connector, adapter) =>
                                     {
+                                        scopedLogger.Trace($"Found connector ID={connectorId}");
                                         return select(connector.PairWithValue(adapter));
                                     },
                                     () =>
                                     {
+                                        scopedLogger.Trace($"FAILURE to find connector ID={connectorId}, skipping");
                                         return skip();
-                                    });
-                            });
+                                    },
+                                    logger:scopedLogger);
+                            },
+                            logger:scopedLogger);
                     return onFound(connectorAdapterKvps);
                 },
                 () =>

@@ -1,4 +1,5 @@
-﻿using EastFive.Azure.Persistence.StorageTables;
+﻿using EastFive.Analytics;
+using EastFive.Azure.Persistence.StorageTables;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Table;
 using System;
@@ -134,7 +135,8 @@ namespace EastFive.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
             RetryDelegate onTimeout =
-                default(RetryDelegate))
+                default(RetryDelegate),
+            ILogger logger = default)
             where TEntity : class, ITableEntity;
     }
 }
