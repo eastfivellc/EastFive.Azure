@@ -908,19 +908,31 @@ namespace EastFive.Azure.Synchronization
                 integrationIdResourceKeys =>
                 {
                     return integrationIdResourceKeys
-                        .FirstAsyncMatchAsync(
-                            async (integrationIdResourceKey, next) =>
+                        .Where(
+                            integrationIdResourceKey =>
                             {
                                 var externalAdapter = integrationIdResourceKey.Value;
                                 var isAdapterInDesiredIntegration = externalAdapter.integrationId == integrationId;
                                 var doesAdapterHaveKeyValue = !externalAdapter.key.IsNullOrWhiteSpace();
                                 var useThisAdapter = isAdapterInDesiredIntegration && doesAdapterHaveKeyValue;
-                                if (useThisAdapter)
-                                    return onFound(externalAdapter.key);
-
-                                return await next();
-                            },
+                                return useThisAdapter;
+                            })
+                        .FirstAsync(
+                            (integrationIdResourceKey) => onFound(integrationIdResourceKey.Value.key),
                             () => onConnectionNotFound());
+                        //.FirstAsyncMatchAsync(
+                        //    async (integrationIdResourceKey, next) =>
+                        //    {
+                        //        var externalAdapter = integrationIdResourceKey.Value;
+                        //        var isAdapterInDesiredIntegration = externalAdapter.integrationId == integrationId;
+                        //        var doesAdapterHaveKeyValue = !externalAdapter.key.IsNullOrWhiteSpace();
+                        //        var useThisAdapter = isAdapterInDesiredIntegration && doesAdapterHaveKeyValue;
+                        //        if (useThisAdapter)
+                        //            return onFound(externalAdapter.key);
+
+                        //        return await next();
+                        //    },
+                        //    () => onConnectionNotFound());
                 },
                 onConnectionNotFound.AsAsyncFunc());
         }
