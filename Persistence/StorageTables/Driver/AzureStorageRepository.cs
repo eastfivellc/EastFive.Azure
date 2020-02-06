@@ -800,8 +800,9 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         scopedLogger.Trace($"Keys = {operation.Entity.PartitionKey}/{operation.Entity.PartitionKey} of {operation.Entity.ETag} at {operation.Entity.Timestamp}");
                     return onNotFound();
                 }
-                scopedLogger.Trace($"Retrieved");
-                return onSuccess((TEntity)result.Result);
+                var entity = (TEntity)result.Result;
+                scopedLogger.Trace($"Retrieved {entity.Timestamp} / {entity.ETag}");
+                return onSuccess(entity);
             }
             catch (StorageException se)
             {

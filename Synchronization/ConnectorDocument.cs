@@ -457,8 +457,7 @@ namespace EastFive.Azure.Synchronization.Persistence
         }
 
         internal static Task<TResult> FindByAdapterWithConnectionAsync<TResult>(Adapter adapter,
-            Func<KeyValuePair<Connector, Adapter>[], TResult> onFound,
-            Func<TResult> onAdapterNotFound)
+            Func<KeyValuePair<Connector, Adapter>[], TResult> onFound)
         {
             return AzureStorageRepository.Connection(
                 async azureStorageRepository =>
