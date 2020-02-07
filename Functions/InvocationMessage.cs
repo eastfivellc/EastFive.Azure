@@ -46,6 +46,7 @@ namespace EastFive.Azure.Functions
         [StandardParititionKey]
         public IRef<InvocationMessage> invocationRef;
 
+        public const string LastModifiedPropertyName = "last_modified";
         [LastModified]
         [DateTimeLookup(
             Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
@@ -83,7 +84,7 @@ namespace EastFive.Azure.Functions
 
         [Api.HttpGet]
         public static Task<HttpResponseMessage> ListAsync(
-            [QueryParameter(Name = "last_modified")]DateTime day,
+            [QueryParameter(Name = LastModifiedPropertyName)]DateTime day,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
             InvokeApplicationDirect invokeApplication,
             MultipartResponseAsync<InvocationMessage> onRun)

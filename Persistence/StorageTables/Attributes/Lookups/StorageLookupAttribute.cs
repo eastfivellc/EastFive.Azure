@@ -90,7 +90,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             [ETag]
             public string eTag;
 
-            [Storage]
+            [StorageOverflow]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
         }
 
