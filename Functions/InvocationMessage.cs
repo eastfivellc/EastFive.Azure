@@ -219,6 +219,7 @@ namespace EastFive.Azure.Functions
                     }
 
                     invocationMessage.lastExecuted = DateTime.UtcNow;
+                    logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
                     var result = await invokeApplication.SendAsync(httpRequest);
                     await saveAsync(invocationMessage);
                     return result;
