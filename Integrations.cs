@@ -41,49 +41,49 @@ namespace EastFive.Azure
             this.context = context;
         }
         
-        public async Task<TResult> CreateLinkAsync<TResult>(Guid integrationId, 
-                Uri callbackLocation,
-                string method, Uri redirectUrl,
-                Guid authenticationId, Guid actorId, System.Security.Claims.Claim[] claims,
-                Func<Type, Uri> typeToUrl,
-            Func<Session, TResult> onSuccess,
-            Func<TResult> onAlreadyExists,
-            Func<string, TResult> onUnauthorized,
-            Func<TResult> onCredentialSystemNotAvailable,
-            Func<string, TResult> onCredentialSystemNotInitialized,
-            Func<string, TResult> onFailure)
-        {
-            if (!await Library.configurationManager.CanAdministerCredentialAsync(authenticationId, actorId, claims))
-                return onUnauthorized($"Provided token does not permit access to link {authenticationId} to a login");
-            return await Context.GetLoginProvider<Task<TResult>>(method,
-                async (provider) =>
-                {
-                    var sessionId = SecureGuid.Generate();
-                    return await BlackBarLabs.Security.Tokens.JwtTools.CreateToken<Task<TResult>>(sessionId, callbackLocation, TimeSpan.FromMinutes(30),
-                        async (token) => await await this.dataContext.AuthenticationRequests.CreateAsync<Task<TResult>>(integrationId,
-                                method, AuthenticationActions.access, authenticationId, token, redirectUrl, redirectUrl,
-                            () => dataContext.Integrations.CreateUnauthenticatedAsync(integrationId, authenticationId, method,
-                                () => onSuccess(
-                                    new Session()
-                                    {
-                                        id = integrationId,
-                                        //method = method,
-                                        name = method.ToString(),
-                                        action = AuthenticationActions.access,
-                                        loginUrl = provider.GetLoginUrl(integrationId, callbackLocation, typeToUrl),
-                                        logoutUrl = provider.GetLogoutUrl(integrationId, callbackLocation, typeToUrl),
-                                        redirectUrl = redirectUrl,
-                                        authorizationId = authenticationId,
-                                        token = token,
-                                    }),
-                                onAlreadyExists),
-                        onAlreadyExists.AsAsyncFunc()),
-                        why => onFailure(why).AsTask(),
-                        (param, why) => onFailure($"Invalid configuration for {param}:{why}").AsTask());
-                },
-                onCredentialSystemNotAvailable.AsAsyncFunc(),
-                onCredentialSystemNotInitialized.AsAsyncFunc());
-        }
+        //public async Task<TResult> CreateLinkAsync<TResult>(Guid integrationId, 
+        //        Uri callbackLocation,
+        //        string method, Uri redirectUrl,
+        //        Guid authenticationId, Guid actorId, System.Security.Claims.Claim[] claims,
+        //        Func<Type, Uri> typeToUrl,
+        //    Func<Session, TResult> onSuccess,
+        //    Func<TResult> onAlreadyExists,
+        //    Func<string, TResult> onUnauthorized,
+        //    Func<TResult> onCredentialSystemNotAvailable,
+        //    Func<string, TResult> onCredentialSystemNotInitialized,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    if (!await Library.configurationManager.CanAdministerCredentialAsync(authenticationId, actorId, claims))
+        //        return onUnauthorized($"Provided token does not permit access to link {authenticationId} to a login");
+        //    return await Context.GetLoginProvider<Task<TResult>>(method,
+        //        async (provider) =>
+        //        {
+        //            var sessionId = SecureGuid.Generate();
+        //            return await EastFive.Api.Auth.JwtTools.CreateToken<Task<TResult>>(sessionId, callbackLocation, TimeSpan.FromMinutes(30),
+        //                async (token) => await await this.dataContext.AuthenticationRequests.CreateAsync<Task<TResult>>(integrationId,
+        //                        method, AuthenticationActions.access, authenticationId, token, redirectUrl, redirectUrl,
+        //                    () => dataContext.Integrations.CreateUnauthenticatedAsync(integrationId, authenticationId, method,
+        //                        () => onSuccess(
+        //                            new Session()
+        //                            {
+        //                                id = integrationId,
+        //                                //method = method,
+        //                                name = method.ToString(),
+        //                                action = AuthenticationActions.access,
+        //                                loginUrl = provider.GetLoginUrl(integrationId, callbackLocation, typeToUrl),
+        //                                logoutUrl = provider.GetLogoutUrl(integrationId, callbackLocation, typeToUrl),
+        //                                redirectUrl = redirectUrl,
+        //                                authorizationId = authenticationId,
+        //                                token = token,
+        //                            }),
+        //                        onAlreadyExists),
+        //                onAlreadyExists.AsAsyncFunc()),
+        //                why => onFailure(why).AsTask(),
+        //                (param, why) => onFailure($"Invalid configuration for {param}:{why}").AsTask());
+        //        },
+        //        onCredentialSystemNotAvailable.AsAsyncFunc(),
+        //        onCredentialSystemNotInitialized.AsAsyncFunc());
+        //}
 
         public async Task<TResult> CreateOrUpdateParamsByActorAsync<TResult>(Guid actorId, string method,
             Func<
@@ -114,115 +114,115 @@ namespace EastFive.Azure
                 });
         }
 
-        [Obsolete("Use method string instead.")]
-        public async Task<TResult> CreateOrUpdateAuthenticatedIntegrationAsync<TResult>(Guid actorId, Api.Azure.Credentials.CredentialValidationMethodTypes method,
-           Func<
-               Guid?,
-               IDictionary<string, string>,
-               Func<IDictionary<string, string>, Task<Guid>>,
-               Task<TResult>> onCreatedOrFound)
-        {
-            var methodName = Enum.GetName(typeof(Api.Azure.Credentials.CredentialValidationMethodTypes), method);
-            return await this.dataContext.Integrations.CreateOrUpdateAsync(actorId, methodName,
-                (integrationIdMaybe, paramsCurrent, updateAsync) =>
-                {
-                    return onCreatedOrFound(integrationIdMaybe, paramsCurrent, updateAsync);
-                });
-        }
+        //[Obsolete("Use method string instead.")]
+        //public async Task<TResult> CreateOrUpdateAuthenticatedIntegrationAsync<TResult>(Guid actorId, Api.Azure.Credentials.CredentialValidationMethodTypes method,
+        //   Func<
+        //       Guid?,
+        //       IDictionary<string, string>,
+        //       Func<IDictionary<string, string>, Task<Guid>>,
+        //       Task<TResult>> onCreatedOrFound)
+        //{
+        //    var methodName = Enum.GetName(typeof(Api.Azure.Credentials.CredentialValidationMethodTypes), method);
+        //    return await this.dataContext.Integrations.CreateOrUpdateAsync(actorId, methodName,
+        //        (integrationIdMaybe, paramsCurrent, updateAsync) =>
+        //        {
+        //            return onCreatedOrFound(integrationIdMaybe, paramsCurrent, updateAsync);
+        //        });
+        //}
 
-        public async Task<TResult> CreateOrUpdateAuthenticatedIntegrationAsync<TResult>(Guid actorId, string method,
-           Func<
-               Guid?,
-               IDictionary<string, string>,
-               Func<IDictionary<string, string>, Task<Guid>>,
-               Task<TResult>> onCreatedOrFound)
-        {
-            return await this.dataContext.Integrations.CreateOrUpdateAsync(actorId, method,
-                (integrationIdMaybe, paramsCurrent, updateAsync) =>
-                {
-                    return onCreatedOrFound(integrationIdMaybe, paramsCurrent, updateAsync);
-                });
-        }
+        //public async Task<TResult> CreateOrUpdateAuthenticatedIntegrationAsync<TResult>(Guid actorId, string method,
+        //   Func<
+        //       Guid?,
+        //       IDictionary<string, string>,
+        //       Func<IDictionary<string, string>, Task<Guid>>,
+        //       Task<TResult>> onCreatedOrFound)
+        //{
+        //    return await this.dataContext.Integrations.CreateOrUpdateAsync(actorId, method,
+        //        (integrationIdMaybe, paramsCurrent, updateAsync) =>
+        //        {
+        //            return onCreatedOrFound(integrationIdMaybe, paramsCurrent, updateAsync);
+        //        });
+        //}
 
-        public static Task<TResult> UpdateAsync<TResult>(Guid integrationId,
-            Func<Integration, Func<Integration, Task<string>>, Task<TResult>> onFound,
-            Func<TResult> onNotFound)
-        {
-            return AuthenticationRequestDocument.UpdateAsync(integrationId, onFound, onNotFound);
-        }
+        //public static Task<TResult> UpdateAsync<TResult>(Guid integrationId,
+        //    Func<Integration, Func<Integration, Task<string>>, Task<TResult>> onFound,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return AuthenticationRequestDocument.UpdateAsync(integrationId, onFound, onNotFound);
+        //}
 
-        internal async Task<TResult> GetAsync<TResult>(Guid authenticationRequestId, Func<Type, Uri> callbackUrlFunc,
-            Func<Session, TResult> onSuccess,
-            Func<TResult> onNotFound,
-            Func<string, TResult> onFailure)
-        {
-            return await await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
-                async (authenticationRequestStorage) =>
-                {
-                    return await Context.GetLoginProvider(authenticationRequestStorage.method,
-                        async (provider) =>
-                        {
-                            if (!(provider is EastFive.Azure.Auth.IProvideIntegration))
-                                return onFailure("provider is not of type EastFive.Azure.Auth.IProvideIntegration");
+        //internal async Task<TResult> GetAsync<TResult>(Guid authenticationRequestId, Func<Type, Uri> callbackUrlFunc,
+        //    Func<Session, TResult> onSuccess,
+        //    Func<TResult> onNotFound,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    return await await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
+        //        async (authenticationRequestStorage) =>
+        //        {
+        //            return await Context.GetLoginProvider(authenticationRequestStorage.method,
+        //                async (provider) =>
+        //                {
+        //                    if (!(provider is EastFive.Azure.Auth.IProvideIntegration))
+        //                        return onFailure("provider is not of type EastFive.Azure.Auth.IProvideIntegration");
 
-                            var extraParams = authenticationRequestStorage.extraParams;
-                            return await await (provider as EastFive.Azure.Auth.IProvideIntegration)
-                                .UserParametersAsync(authenticationRequestStorage.authorizationId.Value, null, extraParams,
-                                    async (labels, types, descriptions) =>
-                                    {
-                                        var callbackUrl = callbackUrlFunc(provider.CallbackController);
-                                        var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
-                                        var authenticationRequest = await Convert(authenticationRequestStorage, provider, loginUrl, extraParams, labels, types, descriptions);
-                                        return onSuccess(authenticationRequest);
-                                    });
-                        },
-                        () => onFailure("The credential provider for this request is no longer enabled in this system").AsTask(),
-                        (why) => onFailure(why).AsTask());
-                },
-                ()=> onNotFound().AsTask());
-        }
+        //                    var extraParams = authenticationRequestStorage.extraParams;
+        //                    return await await (provider as EastFive.Azure.Auth.IProvideIntegration)
+        //                        .UserParametersAsync(authenticationRequestStorage.authorizationId.Value, null, extraParams,
+        //                            async (labels, types, descriptions) =>
+        //                            {
+        //                                var callbackUrl = callbackUrlFunc(provider.CallbackController);
+        //                                var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
+        //                                var authenticationRequest = await Convert(authenticationRequestStorage, provider, loginUrl, extraParams, labels, types, descriptions);
+        //                                return onSuccess(authenticationRequest);
+        //                            });
+        //                },
+        //                () => onFailure("The credential provider for this request is no longer enabled in this system").AsTask(),
+        //                (why) => onFailure(why).AsTask());
+        //        },
+        //        ()=> onNotFound().AsTask());
+        //}
 
-        public Task<TResult> GetByIdAsync<TResult>(Guid authenticationRequestId,
-            Func<Guid?, string, TResult> onSuccess,
-            Func<TResult> onNotFound)
-        {
-            return this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
-                (authenticationRequestStorage) => onSuccess(authenticationRequestStorage.authorizationId, authenticationRequestStorage.method),
-                () => onNotFound());
-        }
+        //public Task<TResult> GetByIdAsync<TResult>(Guid authenticationRequestId,
+        //    Func<Guid?, string, TResult> onSuccess,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
+        //        (authenticationRequestStorage) => onSuccess(authenticationRequestStorage.authorizationId, authenticationRequestStorage.method),
+        //        () => onNotFound());
+        //}
 
-        public async Task<TResult> GetAuthenticatedByIdAsync<TResult>(Guid authenticationRequestId,
-            Func<Uri,   // redirect 
-                Integration, 
-                TResult> onSuccess,
-            Func<TResult> onNotFound)
-        {
-            return await this.dataContext.AzureStorageRepository.UpdateAsync<AuthenticationRequestDocument, TResult>(authenticationRequestId,
-                async (authenticationRequestStorage, saveAsync) =>
-                {
-                    if (!authenticationRequestStorage.LinkedAuthenticationId.HasValue)
-                        return onNotFound();
+        //public async Task<TResult> GetAuthenticatedByIdAsync<TResult>(Guid authenticationRequestId,
+        //    Func<Uri,   // redirect 
+        //        Integration, 
+        //        TResult> onSuccess,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return await this.dataContext.AzureStorageRepository.UpdateAsync<AuthenticationRequestDocument, TResult>(authenticationRequestId,
+        //        async (authenticationRequestStorage, saveAsync) =>
+        //        {
+        //            if (!authenticationRequestStorage.LinkedAuthenticationId.HasValue)
+        //                return onNotFound();
 
-                    if (!Uri.TryCreate(authenticationRequestStorage.RedirectUrl, UriKind.Absolute, out Uri discard))
-                    {
-                        authenticationRequestStorage.RedirectUrl = "https://shield.affirmhealth.com/profile#integrations";
-                        await saveAsync(authenticationRequestStorage);
-                    }
+        //            if (!Uri.TryCreate(authenticationRequestStorage.RedirectUrl, UriKind.Absolute, out Uri discard))
+        //            {
+        //                authenticationRequestStorage.RedirectUrl = "https://shield.affirmhealth.com/profile#integrations";
+        //                await saveAsync(authenticationRequestStorage);
+        //            }
 
-                    return onSuccess(new Uri(authenticationRequestStorage.RedirectUrl),
-                        new Integration
-                        {
-                            authorizationId = authenticationRequestStorage.LinkedAuthenticationId.Value,
-                            integrationId = authenticationRequestId,
-                            method = authenticationRequestStorage.Method,
-                            parameters = authenticationRequestStorage.GetExtraParams(),
-                        });
-                },
-                () =>
-                {
-                    return onNotFound();
-                });
-        }
+        //            return onSuccess(new Uri(authenticationRequestStorage.RedirectUrl),
+        //                new Integration
+        //                {
+        //                    authorizationId = authenticationRequestStorage.LinkedAuthenticationId.Value,
+        //                    integrationId = authenticationRequestId,
+        //                    method = authenticationRequestStorage.Method,
+        //                    parameters = authenticationRequestStorage.GetExtraParams(),
+        //                });
+        //        },
+        //        () =>
+        //        {
+        //            return onNotFound();
+        //        });
+        //}
 
         public Task<TResult> GetAuthenticatedByIdAsync<TResult>(Guid authenticationRequestId,
            Func<Integration,

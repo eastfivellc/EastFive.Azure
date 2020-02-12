@@ -149,7 +149,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QueryByIntegrationAsync(
+        public static async Task<HttpResponseMessage> QueryByIntegrationAccountAsync(
             [QueryParameter(Name = "integration_account")]Guid accountId,
             Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
             MultipartResponseAsync<Method> onContent,

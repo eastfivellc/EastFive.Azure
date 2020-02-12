@@ -29,6 +29,8 @@ namespace EastFive.Azure.Login
     [Html(Title = "Login")]
     public struct Authentication : IReferenceable
     {
+        #region Properties
+
         [JsonIgnore]
         public Guid id => authenticationRef.id;
 
@@ -86,6 +88,10 @@ namespace EastFive.Azure.Login
         //[HtmlLink(Label = "Create new account")]
         //[JsonIgnore]
         //public IRefOptional<Account> account;
+
+        #endregion
+
+        #region HTTP Methods
 
         [Api.HttpGet]
         public static async Task<HttpResponseMessage> GetAsync(
@@ -183,5 +189,7 @@ namespace EastFive.Azure.Login
                 },
                 () => onNotFound().AsTask());
         }
+
+        #endregion
     }
 }

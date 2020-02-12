@@ -27,35 +27,6 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public bool IgnoreDefault { get; set; } = true;
 
-        public interface IScope
-        {
-            string GetHashValue<TEntity>(MemberInfo memberInfo, TEntity value);
-        }
-
-        public class Scoping : Attribute, IScope
-        {
-            public string Scope { get; set; }
-            public Scoping(string scope)
-            {
-                this.Scope = scope;
-            }
-
-            public string GetHashValue<TEntity>(MemberInfo memberInfo, TEntity value)
-            {
-                var memberInfoType = memberInfo.GetMemberType();
-                if (memberInfoType.IsSubClassOfGeneric(typeof(IReferenceable)))
-                {
-                    var memberValue = memberInfo.GetValue(value);
-                    var refValue = (IReferenceable)memberValue;
-                    return refValue.id.ToString("N");
-                }
-                if(typeof(string).IsAssignableFrom(memberInfoType))
-                    return (string)memberInfo.GetValue(value);
-
-                throw new Exception($"No scoping override for {memberInfoType.FullName}");
-            }
-        }
-
         public string Scope { get; set; }
 
         public string LookupTableName { get; set; }
@@ -81,7 +52,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             public string partitionKey;
 
             [Storage]
-            public string [] hashvalues;
+            public string rawHash;
 
             [Storage]
             public string rowKeyRef;
@@ -130,24 +101,38 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new NotImplementedException(exMsg);
         }
 
-        protected string GetHashRowKey<TEntity>(MemberInfo memberInfo, TEntity value, out string [] hashKeys)
+        protected string GetHashRowKey<TEntity>(MemberInfo memberInfo, TEntity value, out string hashRaw)
         {
             var baseKey = GetHashKey(memberInfo, value);
             if (Scope.IsNullOrWhiteSpace())
             {
-                hashKeys = baseKey.AsArray();
+                hashRaw = string.Empty;
                 return baseKey.MD5HashGuid().ToString("N");
             }
-            var scopedKeys = typeof(TEntity)
+            //var scopedKeys = typeof(TEntity)
+            //    .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+            //    .Where(member => member.ContainsAttributeInterface<IScope>())
+            //    .Select(member =>
+            //        member
+            //            .GetAttributesInterface<IScope>()
+            //            .First()
+            //            .GetHashValue(member, value));
+            bool ignore = false;
+            hashRaw = typeof(TEntity)
                 .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                .Where(member => member.ContainsAttributeInterface<IScope>())
-                .Select(member =>
-                    member
-                        .GetAttributesInterface<IScope>()
-                        .First()
-                        .GetHashValue(member, value));
-            hashKeys = baseKey.AsArray().Concat(scopedKeys).ToArray();
-            return hashKeys.Join("|").MD5HashGuid().ToString("N");
+                .Where(member => member.ContainsAttributeInterface<IScopeKeys>())
+                .Aggregate(baseKey,
+                    (currentKey, member) =>
+                    {
+                        if (ignore)
+                            return currentKey;
+                        var memberValue = member.GetValue(value);
+                        return member
+                            .GetAttributesInterface<IScopeKeys>()
+                            .First()
+                            .MutateKey(currentKey, member, memberValue, out ignore);
+                    });
+            return hashRaw.MD5HashGuid().ToString("N");
         }
 
         private bool IsIgnored<TEntity>(MemberInfo memberInfo, TEntity entity)
@@ -175,7 +160,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             if (IsIgnored(memberInfo, value))
                 return onSuccessWithRollback(() => true.AsTask());
-            var hashRowKey = GetHashRowKey(memberInfo, value, out string[] hashKeys);
+            var hashRowKey = GetHashRowKey(memberInfo, value, out string hashKeys);
             var hashPartitionKey = memberInfo.DeclaringType.Name;
             var tableName = GetLookupTableName(memberInfo);
             return await repository.UpdateOrCreateAsync<StorageLookupTable, TResult>(
@@ -187,7 +172,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                     lookup.rowKeyRef = rowKeyRef;
                     lookup.partitionKeyRef = partitionKeyRef;
-                    lookup.hashvalues = hashKeys;
+                    lookup.rawHash = hashKeys;
                     await saveAsync(lookup);
                     Func<Task<bool>> rollback =
                         async () =>
@@ -211,7 +196,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             if (IsIgnored(memberInfo, value))
                 return onSuccessWithRollback(() => true.AsTask());
-            var hashRowKey = GetHashRowKey(memberInfo, value, out string[] hashKeys);
+            var hashRowKey = GetHashRowKey(memberInfo, value, out string hashKeys);
             var hashPartitionKey = memberInfo.DeclaringType.Name;
             var tableName = GetLookupTableName(memberInfo);
             return await repository.UpdateOrCreateAsync<StorageLookupTable, TResult>(
@@ -237,7 +222,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                     lookup.rowKeyRef = rowKeyRef;
                     lookup.partitionKeyRef = partitionKeyRef;
-                    lookup.hashvalues = hashKeys;
+                    lookup.rawHash = hashKeys;
                     await saveAsync(lookup);
                     Func<Task<bool>> rollback =
                         async () =>
@@ -275,7 +260,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return onSuccessWithRollback(rollbackMaybeTask);
             }
 
-            var hashRowKey = GetHashRowKey(memberInfo, valueUpdated, out string[] hashKeys);
+            var hashRowKey = GetHashRowKey(memberInfo, valueUpdated, out string hashKeys);
             var hashPartitionKey = memberInfo.DeclaringType.Name;
             var tableName = GetLookupTableName(memberInfo);
             return await repository.UpdateOrCreateAsync<StorageLookupTable, TResult>(
@@ -297,7 +282,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     }
 
                     var rollbackMaybeTask = RollbackMaybeAsync();
-                    lookup.hashvalues = hashKeys; // TODO: Why is this necessary?
+                    lookup.rawHash = hashKeys; // Store raw hash to make the table easier to debug
                     await saveAsync(lookup);
                     var rollbackMaybe = await rollbackMaybeTask;
 
@@ -326,7 +311,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (IsIgnored(memberInfo, value))
                 return onSuccessWithRollback(() => true.AsTask());
 
-            var hashRowKey = GetHashRowKey(memberInfo, value, out string[] discard);
+            var hashRowKey = GetHashRowKey(memberInfo, value, out string discard);
             var hashPartitionKey = memberInfo.DeclaringType.Name;
             var tableName = GetLookupTableName(memberInfo);
             return await repository.DeleteAsync<StorageLookupTable, TResult>(

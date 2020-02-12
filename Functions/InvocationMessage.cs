@@ -22,6 +22,9 @@ using EastFive.Linq.Async;
 using EastFive.Linq;
 using EastFive.Analytics;
 using System.Linq.Expressions;
+using EastFive.Api.Auth;
+using EastFive.Azure.Auth;
+using System.Net.Http.Headers;
 
 namespace EastFive.Azure.Functions
 {
@@ -50,6 +53,7 @@ namespace EastFive.Azure.Functions
         [DateTimeLookup(
             Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
             Row = DateTimeLookupAttribute.hours)]
+        [JsonProperty]
         public DateTimeOffset lastModified;
 
         [JsonProperty]
@@ -82,8 +86,10 @@ namespace EastFive.Azure.Functions
         #region Http Methods
 
         [Api.HttpGet]
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> ListAsync(
-            [QueryParameter(Name = "last_modified")]DateTime day,
+            [QueryParameter(Name = "start_time")]DateTime startTime,
+            [QueryParameter(Name = "end_time")]DateTime endTime,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
             InvokeApplicationDirect invokeApplication,
             MultipartResponseAsync<InvocationMessage> onRun)
@@ -92,12 +98,14 @@ namespace EastFive.Azure.Functions
 
             var messages = allQuery
                 .StorageQuery()
-                .Where(msg => DateTime.UtcNow - msg.lastModified < TimeSpan.FromDays(3.0));
+                .Where(msg => msg.lastModified >= startTime)
+                .Where(msg => msg.lastModified <= endTime);
             return onRun(messages);
         }
 
         [HttpAction("Invoke")]
-        public static async Task<HttpResponseMessage> RunAsync(
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static async Task<HttpResponseMessage> InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
                 [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
                 InvokeApplicationDirect invokeApplication,
@@ -111,7 +119,8 @@ namespace EastFive.Azure.Functions
         }
 
         [HttpAction("Enqueue")]
-        public static async Task<HttpResponseMessage> RunAsync(
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static async Task<HttpResponseMessage> EnqueueAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
                 AzureApplication application,
             NoContentResponse onNoContent)
@@ -198,10 +207,12 @@ namespace EastFive.Azure.Functions
             IInvokeApplication invokeApplication,
             ILogger logging = default)
         {
-            logging.Trace($"Processing message [{invocationMessageRef.id}].");
+            var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
+            scopedLogger.Trace($"Loading message from storage.");
             return invocationMessageRef.StorageUpdateAsync(
                 async (invocationMessage, saveAsync) =>
                 {
+                    scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
                     var httpRequest = new HttpRequestMessage(
                         new HttpMethod(invocationMessage.method),
                         invocationMessage.requestUri);
@@ -213,8 +224,10 @@ namespace EastFive.Azure.Functions
 
                     if (!invocationMessage.content.IsDefaultOrNull())
                     {
+                        var contentJson = System.Text.Encoding.UTF8.GetString(invocationMessage.content);
+                        scopedLogger.Trace(contentJson);
                         httpRequest.Content = new ByteArrayContent(invocationMessage.content);
-                        httpRequest.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+                        httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
                     }
 
                     invocationMessage.lastExecuted = DateTime.UtcNow;

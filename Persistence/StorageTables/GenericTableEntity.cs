@@ -15,7 +15,7 @@ namespace EastFive.Azure.Persistence.StorageTables
         public DateTimeOffset Timestamp { get; set; }
         public string ETag { get; set; }
 
-        private IDictionary<string, EntityProperty> properties;
+        public IDictionary<string, EntityProperty> properties;
 
         public void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
         {
