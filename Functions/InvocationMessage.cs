@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using EastFive.Api.Controllers;
 using EastFive.Api.Azure;
-using BlackBarLabs.Extensions;
 using EastFive.Collections.Generic;
 using Microsoft.WindowsAzure.Storage.Queue;
 using EastFive.Linq.Async;
@@ -49,6 +48,7 @@ namespace EastFive.Azure.Functions
         [StandardParititionKey]
         public IRef<InvocationMessage> invocationRef;
 
+        public const string LastModifiedPropertyName = "last_modified";
         [LastModified]
         [DateTimeLookup(
             Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
@@ -231,6 +231,7 @@ namespace EastFive.Azure.Functions
                     }
 
                     invocationMessage.lastExecuted = DateTime.UtcNow;
+                    logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
                     var result = await invokeApplication.SendAsync(httpRequest);
                     await saveAsync(invocationMessage);
                     return result;

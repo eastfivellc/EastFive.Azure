@@ -783,19 +783,30 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             Func<TEntity, TResult> onSuccess, Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
-            RetryDelegate onTimeout = default(RetryDelegate))
+            RetryDelegate onTimeout = default,
+            ILogger logger = default)
         {
             var table = GetTable<TEntity>();
+            var scopedLogger = logger.CreateScope($"{partitionKey}/{rowKey}");
+            scopedLogger.Trace($"Retrieving ....");
             var operation = TableOperation.Retrieve<TEntity>(partitionKey, rowKey);
             try
             {
                 var result = await table.ExecuteAsync(operation);
                 if (404 == result.HttpStatusCode)
+                {
+                    scopedLogger.Trace($"FAILURE retrieving Table = `{table.Name}`; result = {result.Result}; OperationType = {operation.OperationType}");
+                    if(!operation.Entity.IsNull())
+                        scopedLogger.Trace($"Keys = {operation.Entity.PartitionKey}/{operation.Entity.PartitionKey} of {operation.Entity.ETag} at {operation.Entity.Timestamp}");
                     return onNotFound();
-                return onSuccess((TEntity)result.Result);
+                }
+                var entity = (TEntity)result.Result;
+                scopedLogger.Trace($"Retrieved {entity.Timestamp} / {entity.ETag}");
+                return onSuccess(entity);
             }
             catch (StorageException se)
             {
+                scopedLogger.Trace($"FAILURE:{se.Message}");
                 if (se.IsProblemTableDoesNotExist())
                     return onNotFound();
                 if (se.IsProblemTimeout())
@@ -1080,14 +1091,15 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
             RetryDelegate onTimeout = default(RetryDelegate),
-            Func<string, string> mutatePartition = default(Func<string, string>))
+            Func<string, string> mutatePartition = default(Func<string, string>),
+            ILogger logger = default)
                    where TEntity : class, ITableEntity
         {
             var rowKey = documentId.AsRowKey();
             var partitionKey = rowKey.GeneratePartitionKey();
             if (!mutatePartition.IsDefaultOrNull())
                 partitionKey = mutatePartition(partitionKey);
-            return await FindByIdAsync(rowKey, partitionKey, onSuccess, onNotFound, onFailure, onTimeout);
+            return await FindByIdAsync(rowKey, partitionKey, onSuccess, onNotFound, onFailure, onTimeout, logger:logger);
         }
 
         public async Task<TResult> FindByIdWithPartitionKeyAsync<TEntity, TResult>(Guid documentId, string partitionKey,

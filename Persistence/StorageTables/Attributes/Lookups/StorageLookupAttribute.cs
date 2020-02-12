@@ -1,5 +1,6 @@
 ﻿using BlackBarLabs;
 using BlackBarLabs.Extensions;
+using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Collections.Generic;
@@ -38,31 +39,42 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public IEnumerableAsync<IRefAst> GetKeys(object memberValue,
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries)
+            KeyValuePair<MemberInfo, object>[] queries,
+            ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
+            var scopedLogger = logger.CreateScope("GetKeys");
             var lookupRefs = lookupGeneratorAttr
                 .GetLookupKeys(memberInfo, queries)
                 .ToArray();
+            scopedLogger.Trace($"Found {lookupRefs.Length} lookupRefs [{lookupRefs.Select(lr => $"{lr.PartitionKey}/{lr.RowKey}").Join(",")}]");
             return lookupRefs
                 .Select(
                     lookupRef =>
                     {
-                        return repository.FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(
+                        scopedLogger.Trace($"Fetching... {lookupRef.PartitionKey}/{lookupRef.RowKey}");
+                        return repository.FindByIdAsync<StorageLookupTable, IRefAst[]>(
                                 lookupRef.RowKey, lookupRef.PartitionKey,
                             (dictEntity, etag) =>
                             {
+                                scopedLogger.Trace($"Fetched {lookupRef.PartitionKey}/{lookupRef.RowKey}");
                                 var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                                     .NullToEmpty()
-                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value));
+                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
+                                    .ToArray();
+                                scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndParitionKeys.Length} lookups");
                                 return rowAndParitionKeys;
                             },
-                            () => Enumerable.Empty<IRefAst>(),
+                            () =>
+                            {
+                                scopedLogger.Trace($"Fetch FAILED for {lookupRef.PartitionKey}/{lookupRef.RowKey}");
+                                return new IRefAst[] { };
+                            },
                             tableName: tableName);
                     })
-                .AsyncEnumerable(lookupRefs.Length)
-                .SelectMany();
+                .AsyncEnumerable() // lookupRefs.Length)
+                .SelectMany(logger: scopedLogger);
         }
 
         [StorageTable]
@@ -78,7 +90,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             [ETag]
             public string eTag;
 
-            [Storage]
+            [StorageOverflow]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
         }
 

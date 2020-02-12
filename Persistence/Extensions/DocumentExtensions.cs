@@ -11,6 +11,8 @@ using EastFive.Collections.Generic;
 using EastFive.Linq.Async;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Extensions;
+using EastFive.Analytics;
+using EastFive.Extensions;
 
 namespace BlackBarLabs.Persistence
 {
@@ -84,21 +86,34 @@ namespace BlackBarLabs.Persistence
             Func<TParentDoc, Guid> getLinkedId,
             Func<TParentDoc, TLinkedDoc, TResult> found,
             Func<TResult> parentDocNotFound,
-            Func<TParentDoc, TResult> linkedDocNotFound)
+            Func<TParentDoc, TResult> linkedDocNotFound,
+            ILogger logger = default)
             where TParentDoc : class, ITableEntity
             where TLinkedDoc : class, ITableEntity
         {
-            var result = await await repo.FindByIdAsync(parentDocId,
+            return await await repo.FindByIdAsync(parentDocId,
                 async (TParentDoc document) =>
                 {
+                    logger.Trace("Found parent doc");
                     var linkedDocId = getLinkedId(document);
                     return await repo.FindByIdAsync(linkedDocId,
-                        (TLinkedDoc priceSheetDocument) => found(document, priceSheetDocument),
-                        () => linkedDocNotFound(document));
+                        (TLinkedDoc linkedDoc) =>
+                        {
+                            logger.Trace("Found linked doc");
+                            return found(document, linkedDoc);
+                        },
+                        () =>
+                        {
+                            logger.Trace($"Failed to find linked doc {linkedDocId}");
+                            return linkedDocNotFound(document);
+                        });
                 },
-                () => parentDocNotFound().ToTask());
-
-            return result;
+                () =>
+                {
+                    logger.Trace($"Failed to find parent doc {parentDocId}");
+                    return parentDocNotFound().AsTask();
+                },
+                logger: logger);
         }
         
         public static async Task<TResult> FindLinkedDocumentsAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,

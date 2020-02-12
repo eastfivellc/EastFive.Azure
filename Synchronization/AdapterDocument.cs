@@ -191,11 +191,11 @@ namespace EastFive.Azure.Synchronization.Persistence
             var adapterId = GetId(key, integrationId, resourceType);
             return AzureStorageRepository.Connection(
                 azureStorageRepository => azureStorageRepository.FindByIdAsync(adapterId,
-                (AdapterDocument adapterDoc) =>
-                {
-                    return onFound(Convert(adapterDoc));
-                },
-                onNotFound));
+                    (AdapterDocument adapterDoc) =>
+                    {
+                        return onFound(Convert(adapterDoc));
+                    },
+                    onNotFound));
         }
 
         public static IEnumerableAsync<Adapter> FindAll(Guid integrationId, string resourceType)

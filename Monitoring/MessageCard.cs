@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -84,5 +85,20 @@ namespace EastFive.Azure.Monitoring
         }
 
         public ActionCard[] potentialAction;
+
+        public async Task<string> SendAsync(Uri teamsHookUrl)
+        {
+            using (var client = new HttpClient())
+            {
+                var teamsRequest = new HttpRequestMessage(HttpMethod.Post, teamsHookUrl);
+                var messageString = JsonConvert.SerializeObject(this);
+                teamsRequest.Content = new StringContent(messageString);
+                teamsRequest.Content.Headers.ContentType =
+                    new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+                var response = await client.SendAsync(teamsRequest);
+                var responseMessage = await response.Content.ReadAsStringAsync();
+                return responseMessage;
+            }
+        }
     }
 }

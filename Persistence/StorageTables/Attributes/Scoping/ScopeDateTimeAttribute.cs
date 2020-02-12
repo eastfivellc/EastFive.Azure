@@ -53,19 +53,18 @@ namespace EastFive.Persistence.Azure.StorageTables
         internal static string ComputeLookupKey(DateTime memberValue, int spanLength, TimeSpanUnits spanUnits,
             DateTime? weeksEpochMaybe = default)
         {
+            if (spanUnits == TimeSpanUnits.weeks)
+            {
+                var weeksEpoch = weeksEpochMaybe ?? new DateTime(2017, 1, 1);
+                var weeks = (int)((memberValue - weeksEpoch).TotalDays / 7);
+                return $"{weeks}";
+            }
             var key = $"{memberValue.Year}";
             if (spanUnits == TimeSpanUnits.years)
                 return key;
             key = $"{key}{memberValue.Month.ToString("D2")}";
             if (spanUnits == TimeSpanUnits.months)
                 return key;
-            if (spanUnits == TimeSpanUnits.weeks)
-            {
-                var weeksEpoch = weeksEpochMaybe ?? new DateTime(2017, 1, 1);
-                var weeks = (int)((memberValue - weeksEpoch).TotalDays / 7);
-                key = $"{key}{weeks}";
-                return key;
-            }
             key = $"{key}{memberValue.Day.ToString("D2")}";
             if (spanUnits == TimeSpanUnits.days)
                 return key;

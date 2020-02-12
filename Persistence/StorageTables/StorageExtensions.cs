@@ -21,6 +21,7 @@ using System.Reflection;
 using System.IO;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
+using EastFive.Analytics;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -433,12 +434,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<TEntity> StorageGetBy<TProperty, TEntity>(this TProperty propertyValue,
                 Expression<Func<TEntity, TProperty>> propertyExpr,
                 Expression<Func<TEntity, bool>> query1 = default,
-                Expression<Func<TEntity, bool>> query2 = default)
+                Expression<Func<TEntity, bool>> query2 = default,
+                ILogger logger = default)
             where TEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy(propertyValue, propertyExpr, query1, query2);
+                .FindBy(propertyValue, propertyExpr, query1, query2, logger:logger);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,

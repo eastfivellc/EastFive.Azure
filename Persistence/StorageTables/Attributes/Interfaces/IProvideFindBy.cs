@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
+using EastFive.Analytics;
 using EastFive.Linq.Async;
 
 namespace EastFive.Persistence.Azure.StorageTables
@@ -14,7 +14,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         IEnumerableAsync<IRefAst> GetKeys(object memberValue,
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries);
+            KeyValuePair<MemberInfo, object>[] queries,
+            ILogger logger = default);
     }
 
     public interface IProvideFindByAsync

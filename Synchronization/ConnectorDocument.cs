@@ -19,6 +19,7 @@ using System.Runtime.Serialization;
 using EastFive.Linq.Async;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;
+using EastFive.Analytics;
 
 namespace EastFive.Azure.Synchronization.Persistence
 {
@@ -456,8 +457,7 @@ namespace EastFive.Azure.Synchronization.Persistence
         }
 
         internal static Task<TResult> FindByAdapterWithConnectionAsync<TResult>(Adapter adapter,
-            Func<KeyValuePair<Connector, Adapter>[], TResult> onFound,
-            Func<TResult> onAdapterNotFound)
+            Func<KeyValuePair<Connector, Adapter>[], TResult> onFound)
         {
             return AzureStorageRepository.Connection(
                 async azureStorageRepository =>
@@ -483,7 +483,8 @@ namespace EastFive.Azure.Synchronization.Persistence
 
         internal static Task<TResult> FindByIdWithAdapterRemoteAsync<TResult>(Guid connectorId, Adapter sourceAdapter,
             Func<Connector, Adapter, TResult> onFound,
-            Func<TResult> onNotFound)
+            Func<TResult> onNotFound,
+            ILogger logger = default)
         {
             return AzureStorageRepository.Connection(
                 azureStorageRepository =>
@@ -502,7 +503,8 @@ namespace EastFive.Azure.Synchronization.Persistence
                             return onFound(connector, AdapterDocument.Convert(remoteAdapterDoc));
                         },
                         onNotFound,
-                        (parentDoc) => onNotFound()));
+                        (parentDoc) => onNotFound(),
+                            logger:logger));
         }
 
         internal static Task<TResult> UpdateSynchronizationWithAdapterRemoteAsync<TResult>(Guid connectorId, Adapter sourceAdapter,
