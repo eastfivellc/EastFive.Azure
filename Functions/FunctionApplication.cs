@@ -7,6 +7,11 @@ using EastFive.Analytics;
 
 namespace EastFive.Azure.Functions
 {
+    public interface IFunctionApplication
+    {
+        IRef<InvocationMessage> InvocationMessageRef { get; }
+    }
+
     public class FunctionApplication : Api.Azure.AzureApplication
     {
         public ILogger logger;

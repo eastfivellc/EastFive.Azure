@@ -26,13 +26,34 @@ namespace EastFive.Azure.Functions
                     .Select(hdr => hdr.Key.PairWithValue(hdr.Value.First()))
                     .ToDictionary(),
                 requestUri = new Uri(System.Web.HttpUtility.UrlDecode(request.RequestUri.OriginalString)),
+                referrer = request.Headers.Referrer.IsDefaultOrNull()?
+                    default
+                    :
+                    new Uri(System.Web.HttpUtility.UrlDecode(request.Headers.Referrer.OriginalString)),
                 content = request.Content.IsDefaultOrNull() ?
                     default(byte[])
                     :
                     await request.Content.ReadAsByteArrayAsync(),
+                invocationMessageSource = GetInvocationMessageSource(),
                 method = request.Method.Method,
             };
             return invocationMessage;
+
+            IRefOptional<InvocationMessage> GetInvocationMessageSource()
+            {
+                if(!request.Headers.TryGetValues(InvocationMessage.InvocationMessageSourceHeaderKey, out IEnumerable<string> invocationMessageSourceStrs))
+                    return RefOptional<InvocationMessage>.Empty();
+
+                if(!invocationMessageSourceStrs.Any())
+                    return RefOptional<InvocationMessage>.Empty();
+
+                var invocationMessageSourceStr = invocationMessageSourceStrs.First();
+
+                if (!Guid.TryParse(invocationMessageSourceStr, out Guid invocationMessageSource))
+                    return RefOptional<InvocationMessage>.Empty();
+
+                return invocationMessageSource.AsRefOptional<InvocationMessage>();
+            }
         }
 
         public static async Task<InvocationMessage> InvocationMessageCreateAsync(
@@ -47,25 +68,21 @@ namespace EastFive.Azure.Functions
                 });
         }
 
-        public static async Task<InvocationMessage> SendAsync<TResource>(this Task<InvocationMessage> invocationMessageTask,
-            AzureApplication application = default)
+        public static async Task<InvocationMessage> SendAsync(this Task<InvocationMessage> invocationMessageTask)
         {
             var invocationMessage = await invocationMessageTask;
+            return await invocationMessage.SendAsync();
+        }
+
+        public static async Task<InvocationMessage> SendAsync(this InvocationMessage invocationMessage)
+        {
             var byteContent = invocationMessage.invocationRef.id.ToByteArray();
-            AzureApplication GetApplication()
-            {
-                if (!application.IsDefaultOrNull())
-                    return application;
-                var app = new AzureApplication();
-                app.ApplicationStart();
-                return app;
-            }
-            var applicationValid = GetApplication();
             return await EastFive.Web.Configuration.Settings.GetString(
                 AppSettings.FunctionProcessorServiceBusTriggerName,
                 async (serviceBusTriggerName) =>
                 {
-                    await applicationValid.SendServiceBusMessageAsync(serviceBusTriggerName, byteContent);
+                    await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName,
+                        byteContent.AsEnumerable());
                     return invocationMessage;
                 },
                 (why) => throw new Exception(why));

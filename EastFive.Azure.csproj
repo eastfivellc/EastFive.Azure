@@ -327,6 +327,7 @@
     <Compile Include="Auth\XIntegration.cs" />
     <Compile Include="Auth\Whoami.cs" />
     <Compile Include="Functions\FunctionApplication.cs" />
+    <Compile Include="Functions\FunctionInstigatorAttribute.cs" />
     <Compile Include="Functions\InvocationMessage.cs" />
     <Compile Include="Functions\InvokeFunction.cs" />
     <Compile Include="Functions\LinkedTokenSource.cs" />

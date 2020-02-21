@@ -23,6 +23,7 @@ using EastFive.Linq.Async;
 using EastFive.Collections.Generic;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Api.Azure
 {
@@ -61,7 +62,7 @@ namespace EastFive.Api.Azure
                         httpApp, baseUri, apiPath, default(CancellationToken));
                     return onCreated(invokeFunction);
                 });
-            
+
         }
 
         public virtual async Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security)
@@ -131,7 +132,7 @@ namespace EastFive.Api.Azure
                 routeTemplate: "apple-app-site-association",
                 defaults: new { controller = "AppleAppSiteAssociation", id = RouteParameter.Optional });
         }
-        
+
         public IDictionaryAsync<string, IProvideAuthorization> AuthorizationProviders
         {
             get
@@ -174,7 +175,12 @@ namespace EastFive.Api.Azure
             return SendServiceBusMessageAsync(queueName, new[] { bytes });
         }
 
-        public virtual async Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes)
+        public virtual Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes)
+        {
+            return AzureApplication.SendServiceBusMessageStaticAsync(queueName, listOfBytes);
+        }
+
+        public static async Task SendServiceBusMessageStaticAsync(string queueName, IEnumerable<byte[]> listOfBytes)
         {
             const int maxPayloadSize = 262_144;
             const int perMessageHeaderSize = 58;
@@ -183,7 +189,7 @@ namespace EastFive.Api.Azure
             if (!listOfBytes.Any())
                 return;
 
-            var client = EastFive.Web.Configuration.Settings.GetString(EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString,
+            var client = EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString.ConfigurationString(
                 (connectionString) =>
                 {
                     return new Microsoft.Azure.ServiceBus.QueueClient(connectionString, queueName);
@@ -236,7 +242,7 @@ namespace EastFive.Api.Azure
 
         public virtual async Task<CloudQueueMessage> SendQueueMessageAsync(string queueName, byte[] byteContent)
         {
-            var appQueue = EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
+            var appQueue = EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
                 (connString) =>
                 {
                     var storageAccount = CloudStorageAccount.Parse(connString);
