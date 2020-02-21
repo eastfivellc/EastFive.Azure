@@ -74,7 +74,7 @@ namespace EastFive.Security.SessionServer
                     var methodName = method;
                     var result = await this.dataContext.AuthenticationRequests.CreateAsync(authenticationRequestId,
                             methodName, AuthenticationActions.signin, redirectUrl, redirectLogoutUrl,
-                        () => BlackBarLabs.Security.Tokens.JwtTools.CreateToken(sessionId, callbackLocation, TimeSpan.FromMinutes(30),
+                        () => EastFive.Api.Auth.JwtTools.CreateToken(sessionId, callbackLocation, TimeSpan.FromMinutes(30),
                             (token) =>
                             {
                                 var session = new Session()
@@ -477,7 +477,7 @@ namespace EastFive.Security.SessionServer
                             var result = Web.Configuration.Settings.GetUri(AppSettings.TokenScope,
                                 (scope) =>
                                 {
-                                    var jwtToken = BlackBarLabs.Security.Tokens.JwtTools.CreateToken(
+                                    var jwtToken = EastFive.Api.Auth.JwtTools.CreateToken(
                                         sessionId, scope,
                                         TimeSpan.FromMinutes(tokenExpirationInMinutes),
                                         claims,

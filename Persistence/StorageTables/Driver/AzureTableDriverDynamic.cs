@@ -202,8 +202,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     :
                     GetTable<TEntity>();
 
-            var tableQuery = TableQueryExtensions.GetTableQuery<TEntity>(
-                selectColumns:new List<string> { "PartitionKey" });
+            var tableQuery = TableQueryExtensions.GetTableQuery<TEntity>();
+                //selectColumns:new List<string> { "PartitionKey" });
             var tableEntityTypes = tableQuery.GetType().GetGenericArguments();
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
                 .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
@@ -212,11 +212,24 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
 
+            var propertiesLookup = typeof(TEntity)
+                .StorageProperties()
+                .Select(
+                    propInfoAttribute =>
+                    {
+                        var propInfo = propInfoAttribute.Key;
+                        var name = propInfo.GetTablePropertyName();
+                        var memberType = propInfo.GetMemberType();
+                        return name.PairWithValue(memberType);
+                    })
+                .ToDictionary();
+
             var tableInformationPartitions = await findAllCasted
                 .AggregateAsync(
                     new TableInformation()
                     {
-                        partitions = new Dictionary<string, long>(),
+                        partitions = new Dictionary<string, PartitionSummary>(),
+                        properties = new Dictionary<string, IDictionary<object, long>>(),
                     },
                     (tableInformation, resource) =>
                     {
@@ -226,16 +239,81 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         if(partitionKey != resource.PartitionKey)
                             tableInformation.mismatchedPartitionKeys++;
                         tableInformation.partitions = tableInformation.partitions.AddIfMissing(partitionKey,
-                            (addValue) => addValue(1),
-                            (currrent, dict, wasAdded) =>
+                            (addValue) =>
                             {
-                                if (!wasAdded)
-                                    dict[partitionKey] = currrent + 1;
+                                var partitionSummary = new PartitionSummary
+                                {
+                                    total = 0,
+                                    properties = new Dictionary<string, IDictionary<object, long>>(),
+                                };
+                                return addValue(partitionSummary);
+                            },
+                            (summary, dict, wasAdded) =>
+                            {
+                                summary.total = summary.total + 1;
+                                summary.properties = resource.RawProperties.Aggregate(
+                                    summary.properties,
+                                    (summaryPropertiesCurrent, rawProperty) =>
+                                    {
+                                        return summaryPropertiesCurrent.AddIfMissing(rawProperty.Key,
+                                            (addSummaryProp) =>
+                                            {
+                                                return addSummaryProp(new Dictionary<object, long>());
+                                            },
+                                            (summaryProp, summaryPropertiesCurrentNext, didAddSummaryProp) =>
+                                            {
+                                                if (!propertiesLookup.ContainsKey(rawProperty.Key))
+                                                    return summaryPropertiesCurrentNext;
+                                                var propType = propertiesLookup[rawProperty.Key];
+                                                return rawProperty.Value.Bind(propType,
+                                                    propValue =>
+                                                    {
+                                                        return summaryProp.AddIfMissing(propValue,
+                                                            (addSummaryPropValue) => addSummaryPropValue(0),
+                                                            (summaryPropValue, summaryPropNext, didAddSummaryPropValue) =>
+                                                            {
+                                                                summaryPropNext[propValue] = summaryPropValue + 1;
+                                                                return summaryPropertiesCurrentNext;
+                                                            });
+                                                    },
+                                                    () => summaryPropertiesCurrentNext);
+                                            });
+                                    });
                                 return dict;
+                            });
+                        tableInformation.properties = resource.RawProperties.Aggregate(
+                            tableInformation.properties,
+                            (summaryPropertiesCurrent, rawProperty) =>
+                            {
+                                        return summaryPropertiesCurrent.AddIfMissing(rawProperty.Key,
+                                            (addSummaryProp) =>
+                                            {
+                                                return addSummaryProp(new Dictionary<object, long>());
+                                            },
+                                            (summaryProp, summaryPropertiesCurrentNext, didAddSummaryProp) =>
+                                            {
+                                                if (!propertiesLookup.ContainsKey(rawProperty.Key))
+                                                    return summaryPropertiesCurrentNext;
+                                                var propType = propertiesLookup[rawProperty.Key];
+                                                return rawProperty.Value.Bind(propType,
+                                                    propValue =>
+                                                    {
+                                                        return summaryProp.AddIfMissing(propValue,
+                                                            (addSummaryPropValue) => addSummaryPropValue(0),
+                                                            (summaryPropValue, summaryPropNext, didAddSummaryPropValue) =>
+                                                            {
+                                                                summaryPropNext[propValue] = summaryPropValue + 1;
+                                                                return summaryPropertiesCurrentNext;
+                                                            });
+                                                    },
+                                                    () => summaryPropertiesCurrentNext);
+                                            });
                             });
                         return tableInformation;
                     });
-            tableInformationPartitions.total = tableInformationPartitions.partitions.SelectValues().Sum();
+            tableInformationPartitions.total = tableInformationPartitions.partitions
+                .Select(partition => partition.Value.total)
+                .Sum();
             return tableInformationPartitions;
         }
 
@@ -1593,6 +1671,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
             Func<TEntity, bool> postFilter = (e) => true;
             var filter = assignments
+                .Distinct(assignment => assignment.member.Name)
                 .Where(assignment => assignment.member.ContainsAttributeInterface<IProvideTableQuery>())
                 .Aggregate(string.Empty,
                     (queryCurrent, assignment) =>
@@ -1605,7 +1684,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
                         if (queryCurrent.IsNullOrWhiteSpace())
                             return newFilter;
-                        var combinedFilter = TableQuery.CombineFilters(queryCurrent, "AND", newFilter);
+                        var combinedFilter = TableQuery.CombineFilters(queryCurrent, TableOperators.And, newFilter);
                         return combinedFilter;
                     });
 

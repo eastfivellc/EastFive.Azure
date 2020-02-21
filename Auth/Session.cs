@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System.Web.Http.Routing;
+
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -26,6 +27,8 @@ namespace EastFive.Azure.Auth
     [StorageTable]
     public struct Session : IReferenceable
     {
+        #region Properties
+
         public Guid id => sessionId.id;
 
         public const string SessionIdPropertyName = "id";
@@ -85,6 +88,8 @@ namespace EastFive.Azure.Auth
         [Storage(Name = RefreshTokenPropertyName)]
         public string refreshToken;
 
+        #endregion
+
         private static async Task<TResult> GetClaimsAsync<TResult>(
             Api.Azure.AzureApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
@@ -110,6 +115,8 @@ namespace EastFive.Azure.Auth
                 },
                 (why) => onClaims(new Dictionary<string, string>(), default(Guid?), false).AsTask());
         }
+
+        #region Http Methods
 
         [Api.HttpGet]
         public static async Task<HttpResponseMessage> GetAsync(
@@ -138,7 +145,7 @@ namespace EastFive.Azure.Auth
                                         {
                                             session.account = accountIdMaybe;
                                             session.authorized = authorized;
-                                            return BlackBarLabs.Security.Tokens.JwtTools.CreateToken(session.id,
+                                            return Api.Auth.JwtTools.CreateToken(session.id,
                                                     scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
                                                 (tokenNew) =>
                                                 {
@@ -161,7 +168,7 @@ namespace EastFive.Azure.Auth
         public static Task<HttpResponseMessage> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
-                EastFive.Api.SessionToken security,
+                //EastFive.Api.SessionToken security,
                 Api.Azure.AzureApplication application, UrlHelper urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
@@ -178,7 +185,7 @@ namespace EastFive.Azure.Auth
                 onFailure);
         }
 
-        [HttpPost] //(MatchAllBodyParameters = false)]
+        [HttpPost]
         public async static Task<HttpResponseMessage> CreateAsync(
                 [Property(Name = SessionIdPropertyName)]IRef<Session> sessionId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
@@ -206,7 +213,7 @@ namespace EastFive.Azure.Auth
                                     return session.StorageCreateAsync(
                                         (sessionIdCreated) =>
                                         {
-                                            return BlackBarLabs.Security.Tokens.JwtTools.CreateToken(sessionId.id,
+                                            return Api.Auth.JwtTools.CreateToken(sessionId.id,
                                                 scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
                                                 (tokenNew) =>
                                                 {
@@ -218,7 +225,7 @@ namespace EastFive.Azure.Auth
                                         },
                                         () =>
                                         {
-                                            return BlackBarLabs.Security.Tokens.JwtTools.CreateToken(sessionId.id,
+                                            return Api.Auth.JwtTools.CreateToken(sessionId.id,
                                                 scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
                                                 (tokenNew) =>
                                                 {
@@ -235,7 +242,6 @@ namespace EastFive.Azure.Auth
                         (why) => onConfigurationFailure("Missing", why).AsTask());
                 },
                 (why) => onConfigurationFailure("Missing", why).AsTask());
-                
         }
 
         [HttpPatch]
@@ -264,7 +270,7 @@ namespace EastFive.Azure.Auth
                                             sessionStorage.authorization = authorizationRefMaybe;
                                             sessionStorage.authorized = authorized;
                                             sessionStorage.account = accountIdMaybe;
-                                            return await BlackBarLabs.Security.Tokens.JwtTools.CreateToken(sessionRef.id,
+                                            return await Api.Auth.JwtTools.CreateToken(sessionRef.id,
                                                     scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
                                                 async (tokenNew) =>
                                                 {
@@ -298,6 +304,8 @@ namespace EastFive.Azure.Auth
                 },
                 onNotFound: () => onNotFound());
         }
+
+        #endregion
 
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
                 Api.Azure.AzureApplication application,

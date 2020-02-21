@@ -84,6 +84,9 @@
     <Reference Include="Microsoft.Data.Edm, Version=5.8.4.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Data.Edm.5.8.4\lib\net40\Microsoft.Data.Edm.dll</HintPath>
     </Reference>
+    <Reference Include="microsoft.identitymodel, Version=3.5.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.IdentityModel.7.0.0\lib\net35\microsoft.identitymodel.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.IdentityModel.Clients.ActiveDirectory, Version=4.4.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.IdentityModel.Clients.ActiveDirectory.4.4.0\lib\net45\Microsoft.IdentityModel.Clients.ActiveDirectory.dll</HintPath>
     </Reference>
@@ -324,6 +327,9 @@
     <Compile Include="Api\Resources\Monitoring.cs" />
     <Compile Include="Api\Resources\Queries\MonitoringQuery.cs" />
     <Compile Include="Attributes\ASTFVCPropertyAttribute.cs" />
+    <Compile Include="Auth\Login.cs" />
+    <Compile Include="Auth\Claim.cs" />
+    <Compile Include="Auth\Token.cs" />
     <Compile Include="Auth\XIntegration.cs" />
     <Compile Include="Auth\Whoami.cs" />
     <Compile Include="Functions\FunctionApplication.cs" />
@@ -361,8 +367,11 @@
     <Compile Include="Monitoring\MessageCard.cs" />
     <Compile Include="Monitoring\TeamsNotificationExceptionHandler.cs" />
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
+    <Compile Include="Persistence\Api\StorageRow.cs" />
+    <Compile Include="Persistence\Api\StorageProperty.cs" />
     <Compile Include="Persistence\ICacheEntites.cs" />
     <Compile Include="Persistence\Exceptions\ExtendedErrorInformationException.cs" />
+    <Compile Include="Persistence\Api\StorageTable.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\ETagAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Interfaces\IProvideQueryValues.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Interfaces\IScopeKeys.cs" />

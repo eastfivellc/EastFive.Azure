@@ -129,7 +129,7 @@ namespace EastFive.Api.Controllers
                 Name = adapter.name,
                 Keys = adapter.identifiers.NullToEmpty().SelectKeys().ToArray(),
                 Values = adapter.identifiers.NullToEmpty().SelectValues().ToArray(),
-                Integration = url.GetWebId<IntegrationController>(adapter.integrationId),
+                Integration = url.GetWebId<AdapterController>(adapter.integrationId),
                 Connectors = adapter.connectorIds.NullToEmpty().Select(connectionId => url.GetWebId<ConnectorController>(connectionId)).ToArray(),
             };
             return resource;

@@ -44,7 +44,7 @@ namespace EastFive.Azure.Monitoring
                 claimsEnumerable => claimsEnumerable.ToArray(),
                 () => new Claim[] { },
                 (why) => new Claim[] { });
-            var sessionIdClaimType = BlackBarLabs.Security.ClaimIds.Session;
+            var sessionIdClaimType = Api.Auth.ClaimEnableSessionAttribute.Type;
             var sessionIdMaybe = SessionToken.GetClaimIdMaybe(claims, sessionIdClaimType);
             if (sessionIdMaybe.HasValue)
                 telemetry.Context.Session.Id = sessionIdMaybe.Value.ToString().ToUpper();
