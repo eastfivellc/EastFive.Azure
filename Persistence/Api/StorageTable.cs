@@ -99,6 +99,7 @@ namespace EastFive.Azure.Persistence
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
                 HttpRequestMessage request,
+            MultipartResponseAsync<StorageRow> onFound,
             NotFoundResponse onNotFound)
         {
             var limitedAssemblyQuery = httpApp.GetType()
@@ -119,11 +120,11 @@ namespace EastFive.Azure.Persistence
             return await DiscoverStorageResources(shouldCheckAssembly)
                 .Where(table => table.name == name)
                 .First(
-                    async (storageTable, next) =>
+                    (storageTable, next) =>
                     {
                         var table = storageTable.cloudTable;
                         var query = new TableQuery<GenericTableEntity>();
-                        var allRows = await AzureTableDriverDynamic
+                        var allRows = AzureTableDriverDynamic
                             .FindAllInternal(query, table)
                             .Select(
                                 tableRow =>
@@ -136,44 +137,63 @@ namespace EastFive.Azure.Persistence
                                             .Select(
                                                 property =>
                                                 {
-                                                    var epValue = property.Value;
-                                                    object GetValue()
-                                                    {
-                                                        if (epValue.PropertyType == EdmType.String)
-                                                            return epValue.StringValue;
-                                                        if (epValue.PropertyType == EdmType.DateTime)
-                                                            return epValue.DateTime;
-                                                        if (epValue.PropertyType == EdmType.Binary)
-                                                            return epValue.BinaryValue;
-                                                        if (epValue.PropertyType == EdmType.Boolean)
-                                                            return epValue.BooleanValue;
-                                                        if (epValue.PropertyType == EdmType.Double)
-                                                            return epValue.DoubleValue;
-                                                        if (epValue.PropertyType == EdmType.Guid)
-                                                            return epValue.GuidValue;
-                                                        if (epValue.PropertyType == EdmType.Int32)
-                                                            return epValue.Int32Value;
-                                                        if (epValue.PropertyType == EdmType.Int64)
-                                                            return epValue.Int64Value;
-                                                        return null;
-                                                    }
+                                                    var epValue = property.Value
+                                                        .GetPropertyAsObject(out bool hasValue);
+                                                    
                                                     return property.Key
-                                                        .PairWithValue(GetValue());
+                                                        .PairWithValue(epValue);
                                                 })
                                             .ToDictionary(),
                                     };
-                                })
-                            .ToArrayAsync();
+                                });
+                        return onFound(allRows);
+                        //var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
+                        //var converter = new ExtrudeConvert(httpApp as HttpApplication, request);
+                        //var jsonObj = JsonConvert.SerializeObject(allRows,
+                        //    new JsonSerializerSettings
+                        //    {
+                        //        Converters = new JsonConverter[] { converter }.ToList(),
+                        //    });
+                        //response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
+                        //return response;
+                    },
+                    () => onNotFound().AsTask());
+        }
 
-                        var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
-                        var converter = new ExtrudeConvert(httpApp as HttpApplication, request);
-                        var jsonObj = JsonConvert.SerializeObject(allRows,
-                            new JsonSerializerSettings
+        [Api.HttpAction("Information")]
+        [RequiredClaim(
+            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimValues.Roles.SuperAdmin)]
+        public static async Task<HttpResponseMessage> Information(
+                [QueryParameter(Name = NamePropertyName)]string name,
+                HttpApplication httpApp,
+            ContentTypeResponse<TableInformation> onFound,
+            NotFoundResponse onNotFound)
+        {
+            var limitedAssemblyQuery = httpApp.GetType()
+                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
+            Func<Assembly, bool> shouldCheckAssembly =
+                (assembly) =>
+                {
+                    return limitedAssemblyQuery
+                        .First(
+                            (limitedAssembly, next) =>
                             {
-                                Converters = new JsonConverter[] { converter }.ToList(),
-                            });
-                        response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
-                        return response;
+                                if (limitedAssembly.ShouldCheckAssembly(assembly))
+                                    return true;
+                                return next();
+                            },
+                            () => false);
+                };
+            var driver = AzureTableDriverDynamic.FromSettings();
+            return await DiscoverStorageResources(shouldCheckAssembly)
+                .Where(table => table.name == name)
+                .First(
+                    async (storageTable, next) =>
+                    {
+                        var information = await storageTable.type
+                            .StorageTableInformationAsync(storageTable.cloudTable);
+                        return onFound(information);
                     },
                     () => onNotFound().AsTask());
         }

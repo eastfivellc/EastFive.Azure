@@ -10,6 +10,7 @@ using System.Web.Http.Routing;
 using BlackBarLabs.Api;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
+using EastFive.Api.Auth;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -49,6 +50,7 @@ namespace EastFive.Azure.Auth
         public IRef<Authorization> authorizationRef;
 
         [LastModified]
+        [StorageQuery]
         public DateTime lastModified;
         
         public const string MethodPropertyName = "method";
@@ -109,7 +111,7 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         public static Task<HttpResponseMessage> GetAsync(
-                [QueryParameter(CheckFileName = true, Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
+                [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 Api.Azure.AzureApplication application, UrlHelper urlHelper,
                 EastFive.Api.SessionToken? securityMaybe,
             ContentTypeResponse<Authorization> onFound,
@@ -166,6 +168,34 @@ namespace EastFive.Azure.Auth
                         () => onAlreadyExists());
                 },
                 () => onAuthenticationDoesNotExist().AsTask());
+        }
+
+        [Api.HttpPost]
+        public async static Task<HttpResponseMessage> CreateAuthorizedAsync(
+                [Property(Name = AuthorizationIdPropertyName)]Guid authorizationId,
+                [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
+                [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
+                [Resource]Authorization authorization,
+                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                HttpRequestMessage request,
+            CreatedResponse onCreated,
+            AlreadyExistsResponse onAlreadyExists,
+            ForbiddenResponse onAuthorizationFailed,
+            ServiceUnavailableResponse onServericeUnavailable,
+            ForbiddenResponse onInvalidMethod)
+        {
+            return await await Auth.Method.ById(methodRef, application,
+                (method) =>
+                {
+                    return EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method,
+                        parameters,
+                        application, request, urlHelper,
+                        (redirect) => onCreated(),
+                        why => onAuthorizationFailed().AddReason(why), // Bad credentials
+                        why => onServericeUnavailable().AddReason(why),
+                        why => onAuthorizationFailed().AddReason(why));
+                },
+                () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }
 
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]

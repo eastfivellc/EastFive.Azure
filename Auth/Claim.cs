@@ -40,7 +40,7 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = IdPropertyName)]
         [RowKey]
         [StandardParititionKey]
-        public IRef<Session> claimRef;
+        public IRef<Claim> claimRef;
 
         public const string ActorPropertyName = "actor";
         [ApiProperty(PropertyName = ActorPropertyName)]

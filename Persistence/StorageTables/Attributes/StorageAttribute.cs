@@ -109,7 +109,7 @@ namespace EastFive.Persistence
                     var next = assignment.type.WhereExpression(assignmentName, assignment.value);
                     if (current.IsNullOrWhiteSpace())
                         return next;
-                    return TableQuery.CombineFilters(current, "AND", next);
+                    return TableQuery.CombineFilters(current, TableOperators.And, next);
                 });
         }
     }

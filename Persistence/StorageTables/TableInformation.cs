@@ -4,13 +4,24 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using EastFive.Api;
+
 namespace EastFive.Azure.Persistence.StorageTables
 {
-    public struct TableInformation
+    [JsonSerializationDictionarySafeProvider]
+    public class TableInformation
     {
         public long total;
         public long mismatchedRowKeys;
         public long mismatchedPartitionKeys;
-        public IDictionary<string, long> partitions;
+        public IDictionary<string, IDictionary<object, long>> properties;
+        public IDictionary<string, PartitionSummary> partitions;
+    }
+
+    [JsonSerializationDictionarySafeProvider]
+    public class PartitionSummary
+    {
+        public long total;
+        public IDictionary<string, IDictionary<object, long>> properties;
     }
 }

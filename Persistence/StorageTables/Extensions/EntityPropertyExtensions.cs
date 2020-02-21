@@ -322,8 +322,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
             if (typeof(int) == type)
             {
-                var intValue = value.Int32Value;
-                return onBound(intValue);
+                if (value.PropertyType == EdmType.Int32
+                    || value.PropertyType == EdmType.Int64
+                    || value.PropertyType == EdmType.Double)
+                {
+                    var intValue = value.Int32Value;
+                    return onBound(intValue);
+                }
             }
             if (typeof(float) == type)
             {
@@ -540,6 +545,52 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return onFailedToBind();
                 },
                 () => onFailedToBind());
+        }
+
+        public static object GetPropertyAsObject(this EntityProperty epValue, out bool hasValue)
+        {
+            if (epValue.PropertyType == EdmType.String)
+            {
+                hasValue = true;
+                return epValue.StringValue;
+            }
+            if (epValue.PropertyType == EdmType.DateTime)
+            {
+                hasValue = epValue.DateTime.HasValue;
+                return epValue.DateTime;
+            }
+            if (epValue.PropertyType == EdmType.Binary)
+            {
+                hasValue = epValue.BinaryValue.IsDefaultOrNull();
+                return epValue.BinaryValue;
+            }
+            if (epValue.PropertyType == EdmType.Boolean)
+            {
+                hasValue = epValue.BooleanValue.HasValue;
+                return epValue.BooleanValue;
+            }
+            if (epValue.PropertyType == EdmType.Double)
+            {
+                hasValue = epValue.DoubleValue.HasValue;
+                return epValue.DoubleValue;
+            }
+            if (epValue.PropertyType == EdmType.Guid)
+            {
+                hasValue = epValue.GuidValue.HasValue;
+                return epValue.GuidValue;
+            }
+            if (epValue.PropertyType == EdmType.Int32)
+            {
+                hasValue = epValue.Int32Value.HasValue;
+                return epValue.Int32Value;
+            }
+            if (epValue.PropertyType == EdmType.Int64)
+            {
+                hasValue = epValue.Int64Value.HasValue;
+                return epValue.Int64Value;
+            }
+            hasValue = true;
+            return epValue.PropertyAsObject;
         }
 
         public static TResult CastSingleValueToArray<TResult>(this object value, Type arrayType, 

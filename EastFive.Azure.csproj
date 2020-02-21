@@ -327,6 +327,7 @@
     <Compile Include="Api\Resources\Monitoring.cs" />
     <Compile Include="Api\Resources\Queries\MonitoringQuery.cs" />
     <Compile Include="Attributes\ASTFVCPropertyAttribute.cs" />
+    <Compile Include="Auth\Login.cs" />
     <Compile Include="Auth\Claim.cs" />
     <Compile Include="Auth\Token.cs" />
     <Compile Include="Auth\XIntegration.cs" />
