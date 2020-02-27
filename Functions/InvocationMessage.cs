@@ -60,6 +60,7 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
+        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery)]
         public Uri requestUri;
 
         [JsonProperty]
@@ -68,6 +69,7 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
+        [UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
         public Uri referrer;
 
         public const string InvocationMessageSourcePropertyName = "InvocationMessageSource";
@@ -111,6 +113,17 @@ namespace EastFive.Azure.Functions
                 .StorageQuery()
                 .Where(msg => msg.lastModified >= startTime)
                 .Where(msg => msg.lastModified <= endTime);
+            return onRun(messages);
+        }
+
+        [Api.HttpGet]
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<HttpResponseMessage> ListByRequerUrlAsync(
+            [QueryParameter(Name = "request_uri")]Uri requestUri,
+            MultipartResponseAsync<InvocationMessage> onRun)
+        {
+            var messages = requestUri.StorageGetBy(
+                (InvocationMessage ent) => ent.requestUri);
             return onRun(messages);
         }
 

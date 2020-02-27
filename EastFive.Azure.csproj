@@ -380,6 +380,7 @@
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\ScopedLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\BinaryPartitionLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\BinaryLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Lookups\UrlLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\ScopedPartitionAttribute.cs" />

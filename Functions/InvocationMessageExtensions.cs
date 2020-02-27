@@ -31,7 +31,7 @@ namespace EastFive.Azure.Functions
                     :
                     new Uri(System.Web.HttpUtility.UrlDecode(request.Headers.Referrer.OriginalString)),
                 content = request.Content.IsDefaultOrNull() ?
-                    default(byte[])
+                    default
                     :
                     await request.Content.ReadAsByteArrayAsync(),
                 invocationMessageSource = GetInvocationMessageSource(),

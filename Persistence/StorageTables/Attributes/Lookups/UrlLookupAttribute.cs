@@ -2,15 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-
+using System.Text;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Serialization;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
-    public abstract class StringLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
+    public abstract class UrlLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
+        public UriComponents Components { get; set; }
+
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -19,37 +21,52 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
-            var propertyValueType = lookupValue.Key.GetMemberType();
-
-            if (typeof(string).IsAssignableFrom(propertyValueType))
-            {
-                var rowKey = (string)rowKeyValue;
-                var partitionKey = GetPartitionKey(rowKey);
-                return new RefAst(rowKey, partitionKey).AsEnumerable();
-            }
-
-            var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                $"Please override GetRowKeys on `{this.GetType().FullName}`.";
-            throw new NotImplementedException(exMsg);
+            var rowKey = GetStringValue(decoratedMember, rowKeyValue, this.GetType(), this.Components);
+            if (rowKey.IsNullOrWhiteSpace())
+                return Enumerable.Empty<IRefAst>();
+            var partitionKey = GetPartitionKey(rowKey);
+            return new RefAst(rowKey, partitionKey).AsEnumerable();
         }
 
-        internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType)
+        internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType, UriComponents components)
         {
             var propertyValueType = memberInfo.GetMemberType();
-            if (typeof(string).IsAssignableFrom(propertyValueType))
+            if (typeof(Uri).IsAssignableFrom(propertyValueType))
             {
-                var stringValue = (string)memberValue;
+                var url = (Uri)memberValue;
+                if (url.IsDefaultOrNull())
+                    return null;
+                var rowKeyUnsanitized = GetUnsanitized(url);
+                var rowKeyBytes = rowKeyUnsanitized.GetBytes(System.Text.Encoding.UTF8);
+                var stringValue = Convert.ToBase64String(rowKeyBytes);
                 return stringValue;
             }
             var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
                 $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
             throw new NotImplementedException(exMsg);
+
+            string GetUnsanitized(Uri url)
+            {
+                if (url.IsAbsoluteUri)
+                    return url.GetComponents(components, UriFormat.Unescaped);
+
+                return url.OriginalString;
+                //var sb = new StringBuilder();
+                //if ((components | UriComponents.Path) != 0)
+                //    sb.Append(url.LocalPath);
+                //if ((components | UriComponents.Query) != 0)
+                //    sb.Append(url.Query);
+                //if ((components | UriComponents.Fragment) != 0)
+                //    sb.Append(url.Fragment);
+
+                //return sb.ToString();
+            }
         }
 
         public abstract string GetPartitionKey(string rowKey);
     }
 
-    public class StringMD5LookupAttribute : StringLookupAttribute
+    public class UrlMD5LookupAttribute : UrlLookupAttribute
     {
         private uint? charactersMaybe;
         public uint Characters
@@ -70,15 +87,6 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var hash = rowKey.MD5HashHex();
             return RowKeyPrefixAttribute.GetValue(hash, this.Characters);
-        }
-
-    }
-
-    public class StringStandardPartitionLookupAttribute : StringLookupAttribute
-    {
-        public override string GetPartitionKey(string rowKey)
-        {
-            return StandardParititionKeyAttribute.GetValue(rowKey);
         }
 
     }
