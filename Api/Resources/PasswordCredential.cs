@@ -9,6 +9,7 @@ using BlackBarLabs.Api.Resources;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Auth;
 using EastFive.Extensions;
 using Newtonsoft.Json;
 
@@ -81,7 +82,7 @@ namespace EastFive.Security.SessionServer.Api.Resources
             ServiceUnavailableResponse onServiceUnavailable,
             GeneralConflictResponse onFailure)
         {
-            var callbackUrl = url.GetLocation<EastFive.Api.Azure.Credentials.Controllers.OpenIdResponseController>();
+            var callbackUrl = url.GetLocation<OpenIdResponse>();
 
             return context.PasswordCredentials.CreatePasswordCredentialsAsync(
                     credentialId, actorId,

@@ -43,8 +43,6 @@ namespace EastFive.Azure
 
         public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
 
-        
-
         public const string SpaSiteLocation = "EastFive.Azure.SpaSiteLocation";
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
@@ -86,6 +84,53 @@ namespace EastFive.Azure
                 DeploymentSecurityConcern = false)]
             public const string SAMLLoginIdAttributeName = "EastFive.Security.CredentialProvider.SAML.LoginIdAttributeName";
         }
+
+        [Config]
+        public static class AzureADB2C
+        {
+            [ConfigKey("Identifies this Tenant to AADB2C",
+                DeploymentOverrides.Mandatory,
+                DeploymentSecurityConcern = false,
+                Location = "Azure Portal | Azure Active Directory B2C | [*].onmicrosoft.com",
+                PrivateRepositoryOnly = false)]
+            public const string Tenant = "EastFive.Azure.AzureADB2C.Tenant";
+
+            [ConfigKey("Identifies this application (multiple applications per tenant) to an AADB2C application",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false,
+                Location = "Azure Portal | Azure Active Directory | App Registrations | Application ID",
+                PrivateRepositoryOnly = false)]
+            public const string ApplicationId = "EastFive.Azure.AzureADB2C.ApplicationId";
+            
+            [ConfigKey("The audience used for token validation.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false,
+                Location = "Capture a valid response JWT and check",
+                PrivateRepositoryOnly = false)]
+            public const string Audience = "EastFive.Azure.AzureADB2C.Audience";
+
+            [ConfigKey("The name of the flow for user sign in.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                PrivateRepositoryOnly = false,
+                Location = "Azure Portal | Azure Active Directory B2C | UserFlows")]
+            public const string SigninFlow = "EastFive.Azure.AzureADB2C.SigninFlow";
+
+            [ConfigKey("The name of the flow for user sign up.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                PrivateRepositoryOnly = false,
+                Location = "Azure Portal | Azure Active Directory B2C | UserFlows")]
+            public const string SignupFlow = "EastFive.Azure.AzureADB2C.SignupFlow";
+
+            [ConfigKey("ID of the client", DeploymentOverrides.Mandatory)]
+            public const string ClientId = "EastFive.Azure.AzureADB2C.ClientId";
+
+            [ConfigKey("ID of the client", DeploymentOverrides.Mandatory,
+                Location = "AD UI -> App Registrations -> [APP] -> All Settings -> Keys -> [New Key]",
+                MoreInfo = "This can only be accessed when the Key is created")]
+            public const string ClientSecret = "EastFive.Azure.AzureADB2C.ClientSecret";
+        }
     }
 }
 
@@ -97,15 +142,6 @@ namespace EastFive.Security.SessionServer.Configuration
         //public const string Storage = "EastFive.Security.SessionServer.Storage";
         public const string TokenExpirationInMinutes = "EastFive.Security.SessionServer.tokenExpirationInMinutes";
         public const string LoginIdClaimType = "EastFive.Security.SessionServer.LoginProvider.LoginIdClaimType";
-
-        [ConfigKey("Identifies this application to an AADB2C application",
-            DeploymentOverrides.Suggested,
-            DeploymentSecurityConcern = false,
-            Location = "Azure Portal | Azure Active Directory | App Registrations | Application ID",
-            PrivateRepositoryOnly = false)]
-        public const string AADB2CAudience = "EastFive.Security.LoginProvider.AzureADB2C.Audience";
-        public const string AADB2CSigninConfiguration = "EastFive.Security.LoginProvider.AzureADB2C.SigninEndpoint";
-        public const string AADB2CSignupConfiguration = "EastFive.Security.LoginProvider.AzureADB2C.SignupEndpoint";
 
         public const string PingIdentityAthenaRestApiKey = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestApiKey";
         public const string PingIdentityAthenaRestAuthUsername = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestAuthUsername";

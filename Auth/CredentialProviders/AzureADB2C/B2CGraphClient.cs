@@ -1,6 +1,7 @@
 ﻿using BlackBarLabs.Extensions;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Web.Configuration;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Newtonsoft.Json;
 using System;
@@ -228,18 +229,18 @@ namespace EastFive.AzureADB2C
             Func<string, TResult> onConfigurationNotAvailable)
         {
             // The client_id, client_secret, and tenant are pulled in from the App.config file
-            return Web.Configuration.Settings.GetString(AppSettings.ClientId,
+            return Azure.AppSettings.AzureADB2C.ClientId.ConfigurationString(
                    (clientId) =>
                    {
-                       return Web.Configuration.Settings.GetString(AppSettings.ClientSecret,
-                           (signinConfiguration) =>
+                       return Azure.AppSettings.AzureADB2C.ClientSecret.ConfigurationString(
+                           (clientSecret) =>
                            {
-                               return Web.Configuration.Settings.GetString(AppSettings.Tenant,
-                                   (signupConfiguration) =>
+                               return Azure.AppSettings.AzureADB2C.Tenant.ConfigurationString(
+                                   (tenant) =>
                                    {
                                        try
                                        {
-                                           var client = new B2CGraphClient(clientId, signinConfiguration, signupConfiguration);
+                                           var client = new B2CGraphClient(clientId, clientSecret, tenant);
                                            return onSuccess(client);
                                        } catch(Exception ex)
                                        {

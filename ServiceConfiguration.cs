@@ -61,9 +61,7 @@ namespace EastFive.Security.SessionServer
         {
             Library.configurationManager = configurationManager;
             
-            
-            
-            AddExternalControllers<OpenIdResponseController>(config);
+            //AddExternalControllers<Azure.Auth.OpenIdResponse>(config);
             //config.Routes.MapHttpRoute(name: "apple-app-links",
             //    routeTemplate: "apple-app-site-association",
             //    defaults: new { controller = "AppleAppSiteAssociation", id = RouteParameter.Optional });

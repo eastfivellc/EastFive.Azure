@@ -284,7 +284,6 @@ namespace EastFive.Api.Azure
                 () => appQueue.DeleteMessageAsync(message));
         }
 
-
         protected override async Task<Initialized> InitializeAsync()
         {
             return await base.InitializeAsync();
