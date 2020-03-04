@@ -130,6 +130,9 @@ namespace EastFive.Api.Azure
             config.Routes.MapHttpRoute(name: "apple-app-links",
                 routeTemplate: "apple-app-site-association",
                 defaults: new { controller = "AppleAppSiteAssociation", id = RouteParameter.Optional });
+            config.Routes.MapHttpRoute(name: "apple-developer-domain-association",
+                routeTemplate: ".well-known/apple-developer-domain-association.txt",
+                defaults: new { controller = "AppleDeveloperDomainAssociation", id = RouteParameter.Optional });
         }
         
         public IDictionaryAsync<string, IProvideAuthorization> AuthorizationProviders
@@ -354,7 +357,7 @@ namespace EastFive.Api.Azure
             return EastFive.Security.SessionServer.Library.configurationManager.GetActorNameDetailsAsync(actorId, onActorFound, onActorNotFound);
         }
 
-        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(Guid requestId,
+        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
                 EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
                 Uri baseUri,
@@ -364,7 +367,7 @@ namespace EastFive.Api.Azure
             Func<string, TResult> onFailure)
         {
             if(!(authorizationProvider is Credentials.IProvideRedirection))
-                return await ComputeRedirectAsync(requestId, accountIdMaybe, authParams, 
+                return await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization,
                         baseUri, authorizationProvider,
                     onSuccess,
@@ -378,10 +381,10 @@ namespace EastFive.Api.Azure
                     async (redirectUri) =>
                     {
                         var fullUri = await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
-                        var redirectDecorated = this.SetRedirectParameters(requestId, authorization, fullUri);
+                        var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
                         return onSuccess(redirectDecorated);
                     },
-                    () => ComputeRedirectAsync(requestId, accountIdMaybe, authParams,
+                    () => ComputeRedirectAsync(accountIdMaybe, authParams,
                             method, authorization,
                             baseUri, authorizationProvider,
                         onSuccess,
@@ -398,7 +401,7 @@ namespace EastFive.Api.Azure
             return fullUri.AsTask();
         }
 
-        private async Task<TResult> ComputeRedirectAsync<TResult>(Guid requestId,
+        private async Task<TResult> ComputeRedirectAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
                 EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
                 Uri baseUri,
@@ -411,7 +414,7 @@ namespace EastFive.Api.Azure
             {
                 if (authorization.LocationAuthenticationReturn.IsAbsoluteUri)
                 {
-                    var redirectUrl = SetRedirectParameters(requestId, authorization, authorization.LocationAuthenticationReturn);
+                    var redirectUrl = SetRedirectParameters(authorization, authorization.LocationAuthenticationReturn);
                     return onSuccess(redirectUrl);
                 }
             }
@@ -422,7 +425,7 @@ namespace EastFive.Api.Azure
                 var redirectUriString = authParams[EastFive.Security.SessionServer.Configuration.AuthorizationParameters.RedirectUri];
                 if (!Uri.TryCreate(redirectUriString, UriKind.Absolute, out redirectUri))
                     return onInvalidParameter("REDIRECT", $"BAD URL in redirect call:{redirectUriString}");
-                var redirectUrl = SetRedirectParameters(requestId, authorization, redirectUri);
+                var redirectUrl = SetRedirectParameters(authorization, redirectUri);
                 return onSuccess(redirectUrl);
             }
 
@@ -430,13 +433,13 @@ namespace EastFive.Api.Azure
                 EastFive.Security.SessionServer.Configuration.AppSettings.LandingPage,
                 (redirectUriLandingPage) =>
                 {
-                    var redirectUrl = SetRedirectParameters(requestId, authorization, redirectUriLandingPage);
+                    var redirectUrl = SetRedirectParameters(authorization, redirectUriLandingPage);
                     return onSuccess(redirectUrl);
                 },
                 (why) => onFailure(why)).AsTask();
         }
 
-        protected Uri SetRedirectParameters(Guid requestId, EastFive.Azure.Auth.Authorization authorization, Uri redirectUri)
+        protected Uri SetRedirectParameters(EastFive.Azure.Auth.Authorization authorization, Uri redirectUri)
         {
             var redirectUrl = redirectUri
                 //.SetQueryParam(parameterAuthorizationId, authorizationId.Value.ToString("N"))

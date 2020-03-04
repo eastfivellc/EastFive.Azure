@@ -172,7 +172,7 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpPost]
         public async static Task<HttpResponseMessage> CreateAuthorizedAsync(
-                [Property(Name = AuthorizationIdPropertyName)]Guid authorizationId,
+                [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
                 [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
                 [Resource]Authorization authorization,
@@ -187,11 +187,15 @@ namespace EastFive.Azure.Auth
             return await await Auth.Method.ById(methodRef, application,
                 (method) =>
                 {
-                    return EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method,
+                    var authorizationRequestManager = application.AuthorizationRequestManager;
+                    return Redirection.AuthenticationAsync(
+                        method,
                         parameters,
-                        application, request, urlHelper,
+                        request.RequestUri,
+                        application,
+                        authorizationRef.Optional(),
                         (redirect) => onCreated(),
-                        why => onAuthorizationFailed().AddReason(why), // Bad credentials
+                        () => onAuthorizationFailed().AddReason("Authorization was not found"), // Bad credentials
                         why => onServericeUnavailable().AddReason(why),
                         why => onAuthorizationFailed().AddReason(why));
                 },

@@ -240,7 +240,7 @@ namespace EastFive.Azure.Auth
                                                     return Auth.Redirection.ProcessAsync(authorization, 
                                                             updatedAuth => 1.AsTask(),
                                                             method, externalId, requestParams,
-                                                            Guid.NewGuid(), request.RequestUri, application, loginProvider,
+                                                            request.RequestUri, application, loginProvider,
                                                         (uri) =>
                                                         {
                                                             return uri;
@@ -295,7 +295,7 @@ namespace EastFive.Azure.Auth
                                             {
 
                                             }, method, externalId, authorization.parameters,
-                                            Guid.NewGuid(), request.RequestUri, application, loginProvider,
+                                            request.RequestUri, application, loginProvider,
                                         (uri) => onSuccess(uri),
                                         (why) => onFailure().AddReason(why),
                                         application.Telemetry);

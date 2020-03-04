@@ -86,6 +86,16 @@ namespace EastFive.Azure
                 DeploymentSecurityConcern = false)]
             public const string SAMLLoginIdAttributeName = "EastFive.Security.CredentialProvider.SAML.LoginIdAttributeName";
         }
+
+        [Config]
+        public static class Apple
+        {
+            [ConfigKey("Used to prove ownership of this domain to Apple.",
+                DeploymentOverrides.Optional,
+                Location = "Apple developer portal -> Login with apple",
+                DeploymentSecurityConcern = false)]
+            public const string DeveloperSiteAssociation = "EastFive.Azure.Apple.DeveloperSiteAssociation";
+        }
     }
 }
 
