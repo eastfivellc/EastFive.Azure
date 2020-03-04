@@ -86,6 +86,15 @@ namespace EastFive.Azure
         }
 
         [Config]
+        public static class Apple
+        {
+            [ConfigKey("Used to prove ownership of this domain to Apple.",
+                DeploymentOverrides.Optional,
+                Location = "Apple developer portal -> Login with apple",
+                DeploymentSecurityConcern = false)]
+            public const string DeveloperSiteAssociation = "EastFive.Azure.Apple.DeveloperSiteAssociation";
+	}
+
         public static class AzureADB2C
         {
             [ConfigKey("Identifies this Tenant to AADB2C",

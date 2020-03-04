@@ -323,6 +323,7 @@
     <Compile Include="Api\Actions\TokenCredentialActions.cs" />
     <Compile Include="Api\Actions\InviteCredentialActions.cs" />
     <Compile Include="Api\Constants.cs" />
+    <Compile Include="Api\Controllers\AppleDeveloperDomainAssociation.cs" />
     <Compile Include="Api\Controllers\MonitoringController.cs" />
     <Compile Include="Api\Resources\Monitoring.cs" />
     <Compile Include="Api\Resources\Queries\MonitoringQuery.cs" />
@@ -645,6 +646,7 @@
     <Compile Include="Synchronization\ConnectorSynchronization.cs" />
     <Compile Include="Synchronization\IntegrationAdapterLookupDocument.cs" />
     <Compile Include="Synchronization\Synchronizations.cs" />
+    <Compile Include="UI\Blazor\Application.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Api\Views\ActAsUser\Index.cshtml" />
