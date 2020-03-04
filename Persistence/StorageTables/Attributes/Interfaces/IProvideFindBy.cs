@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using EastFive.Analytics;
+using EastFive.Azure.Persistence;
 using EastFive.Linq.Async;
 
 namespace EastFive.Persistence.Azure.StorageTables
@@ -17,7 +18,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             KeyValuePair<MemberInfo, object>[] queries,
             ILogger logger = default);
 
-        Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+        Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo);
     }
 

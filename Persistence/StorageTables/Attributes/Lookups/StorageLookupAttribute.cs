@@ -1,6 +1,7 @@
 ﻿using BlackBarLabs;
 using BlackBarLabs.Extensions;
 using EastFive.Analytics;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Collections.Generic;
@@ -77,7 +78,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .SelectMany(logger: scopedLogger);
         }
 
-        public async Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+        public async Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo)
         {
             var tableName = GetLookupTableName(memberInfo);
@@ -100,15 +101,18 @@ namespace EastFive.Persistence.Azure.StorageTables
             return propertyLookupInformations;
         }
 
-        protected virtual EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation GetInfo(
+        protected virtual PropertyLookupInformation GetInfo(
             StorageLookupTable slt)
         {
-            return new EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation
+            return new PropertyLookupInformation
             {
                 count = slt.rowAndPartitionKeys.Length,
                 partitionKey = slt.partitionKey,
                 rowKey = slt.rowKey,
                 value = slt.rowKey,
+                keys = slt.rowAndPartitionKeys
+                    .Select(kvp => $"{kvp.Value}/{kvp.Key}")
+                    .ToArray(),
             };
         }
 

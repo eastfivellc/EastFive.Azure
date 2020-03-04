@@ -21,7 +21,9 @@ namespace EastFive.Azure.Functions
 
         private AzureApplication azureApplication;
 
-        public InvokeFunction(AzureApplication application, Uri serverUrl, string apiRouteName)
+        private int executionLimit = 1;
+
+        public InvokeFunction(AzureApplication application, Uri serverUrl, string apiRouteName, int executionLimit = 1)
             : base(serverUrl, apiRouteName)
         {
             AzureApplication GetApplication()
@@ -33,11 +35,12 @@ namespace EastFive.Azure.Functions
                 return newApp;
             }
             this.azureApplication = GetApplication();
+            this.executionLimit = executionLimit;
         }
 
         public override Task<HttpResponseMessage> SendAsync(HttpRequestMessage httpRequest)
         {
-            return InvocationMessage.CreateAsync(httpRequest);
+            return InvocationMessage.CreateAsync(httpRequest, executionLimit:executionLimit);
         }
     }
 }

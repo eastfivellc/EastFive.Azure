@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-
+using EastFive.Azure.Persistence;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 
@@ -155,6 +155,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         protected abstract string GetPartitionKey(string rowKey);
+
     }
 
     public class IdsPrefixLookupAttribute : IdsLookupAttribute

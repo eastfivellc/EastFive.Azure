@@ -370,6 +370,7 @@
     <Compile Include="Monitoring\TelemetryExtensions.cs" />
     <Compile Include="Persistence\Api\StorageRow.cs" />
     <Compile Include="Persistence\Api\StorageProperty.cs" />
+    <Compile Include="Persistence\Api\PropertyLookupInformation.cs" />
     <Compile Include="Persistence\ICacheEntites.cs" />
     <Compile Include="Persistence\Exceptions\ExtendedErrorInformationException.cs" />
     <Compile Include="Persistence\Api\StorageTable.cs" />

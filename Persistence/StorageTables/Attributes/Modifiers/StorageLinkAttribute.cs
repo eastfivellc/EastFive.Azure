@@ -1,6 +1,7 @@
 ﻿using BlackBarLabs.Extensions;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Analytics;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -71,7 +72,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .FoldTask();
         }
 
-        public async Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+        public Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo)
         {
             throw new NotImplementedException();

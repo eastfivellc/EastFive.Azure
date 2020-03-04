@@ -16,7 +16,8 @@ namespace EastFive.Azure.Functions
 {
     public static class InvocationMessageExtensions
     {
-        public static async Task<InvocationMessage> InvocationMessageAsync(this HttpRequestMessage request)
+        public static async Task<InvocationMessage> InvocationMessageAsync(this HttpRequestMessage request,
+            int executionLimit = 1)
         {
             var invocationMessageRef = Ref<InvocationMessage>.SecureRef();
             var invocationMessage = new InvocationMessage
@@ -26,7 +27,7 @@ namespace EastFive.Azure.Functions
                     .Select(hdr => hdr.Key.PairWithValue(hdr.Value.First()))
                     .ToDictionary(),
                 requestUri = new Uri(System.Web.HttpUtility.UrlDecode(request.RequestUri.OriginalString)),
-                referrer = request.Headers.Referrer.IsDefaultOrNull()?
+                referrer = request.Headers.Referrer.IsDefaultOrNull() ?
                     default
                     :
                     new Uri(System.Web.HttpUtility.UrlDecode(request.Headers.Referrer.OriginalString)),
@@ -36,6 +37,8 @@ namespace EastFive.Azure.Functions
                     await request.Content.ReadAsByteArrayAsync(),
                 invocationMessageSource = GetInvocationMessageSource(),
                 method = request.Method.Method,
+                executionHistory = new KeyValuePair<DateTime, int>[] { },
+                executionLimit = executionLimit,
             };
             return invocationMessage;
 

@@ -17,6 +17,7 @@ using EastFive.Linq.Expressions;
 using EastFive.Collections.Generic;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables.Driver;
+using EastFive.Azure.Persistence;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -117,6 +118,53 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (timeSpan.Seconds >= 60.0)
                 return key;
             return $"{key}{memberValue.Second.ToString("D2")}";
+        }
+
+        protected override PropertyLookupInformation GetInfo(StorageLookupTable slt)
+        {
+            var info = base.GetInfo(slt);
+            var value = (string)info.value;
+            var timeSpan = TimeSpan.FromSeconds(this.Row);
+            info.value = GetValue();
+            return info;
+
+            object GetValue()
+            {
+                var yearStr = value.Substring(0, 4);
+                if (!int.TryParse(yearStr, out int year))
+                    return value;
+                if (timeSpan.TotalDays >= 28)
+                    return new DateTime(year, 0, 0);
+
+                var monthStr = value.Substring(4, 2);
+                if (!int.TryParse(monthStr, out int month))
+                    return new DateTime(year, 0, 0);
+                if (timeSpan.TotalDays >= 1.0)
+                    return new DateTime(year, month, 0);
+
+                var dayStr = value.Substring(6, 2);
+                if (!int.TryParse(dayStr, out int day))
+                    return new DateTime(year, month, 0);
+                if (timeSpan.TotalHours >= 1.0)
+                    return new DateTime(year, month, day);
+
+                var hourStr = value.Substring(8, 2);
+                if (!int.TryParse(hourStr, out int hour))
+                    return new DateTime(year, month, day);
+                if (timeSpan.TotalMinutes >= 1.0)
+                    return new DateTime(year, month, day, hour, 0, 0);
+
+                var minStr = value.Substring(10, 2);
+                if (!int.TryParse(minStr, out int min))
+                    return new DateTime(year, month, day, hour, 0, 0);
+                if (timeSpan.Seconds >= 1.0)
+                    return new DateTime(year, month, day, hour, min, 0);
+
+                var secondsStr = value.Substring(12, 2);
+                if (!int.TryParse(secondsStr, out int seconds))
+                    return new DateTime(year, month, day, hour, min, 0);
+                return new DateTime(year, month, day, hour, min, seconds);
+            }
         }
     }
 }

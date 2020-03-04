@@ -95,9 +95,31 @@ namespace EastFive.Azure.Functions
             Row = DateTimeLookupAttribute.hours)]
         public DateTime? lastExecuted;
 
+        public const string ExecutionHistoryPropertyName = "execution_history";
+        [JsonProperty(PropertyName = ExecutionHistoryPropertyName)]
+        [ApiProperty(PropertyName = ExecutionHistoryPropertyName)]
+        [Storage]
+        public KeyValuePair<DateTime, int>[] executionHistory;
+
+        public const string ExecutionLimitPropertyName = "execution_limit";
+        [JsonProperty(PropertyName = ExecutionLimitPropertyName)]
+        [ApiProperty(PropertyName = ExecutionLimitPropertyName)]
+        [Storage]
+        public long? executionLimit;
+
         #endregion
 
         #region Http Methods
+
+        [Api.HttpGet]
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<HttpResponseMessage> ListByRequerUrlAsync(
+            [QueryId]IRef<InvocationMessage> invocationMessageRef,
+            ContentTypeResponse<InvocationMessage> onFound)
+        {
+            return invocationMessageRef.StorageGetAsync(
+                (InvocationMessage ent) => onFound(ent));
+        }
 
         [Api.HttpGet]
         [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
@@ -174,9 +196,9 @@ namespace EastFive.Azure.Functions
         }
 
         internal static async Task<HttpResponseMessage> CreateAsync(
-            HttpRequestMessage httpRequest)
+            HttpRequestMessage httpRequest, int executionLimit = 1)
         {
-            var invocationMessage = await httpRequest.InvocationMessageAsync();
+            var invocationMessage = await httpRequest.InvocationMessageAsync(executionLimit: executionLimit);
             return await invocationMessage.StorageCreateAsync(
                 (created) =>
                 {
@@ -226,15 +248,34 @@ namespace EastFive.Azure.Functions
                 (why) => throw new Exception(why));
         }
 
-        public static Task<HttpResponseMessage> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
+        public static async Task<HttpResponseMessage> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
             IInvokeApplication invokeApplication,
             ILogger logging = default)
         {
             var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
             scopedLogger.Trace($"Loading message from storage.");
-            return invocationMessageRef.StorageUpdateAsync(
-                async (invocationMessage, saveAsync) =>
+            return await await invocationMessageRef.StorageGetAsync(
+                async (invocationMessage) =>
                 {
+                    var lastExecuted = DateTime.UtcNow;
+
+                    if (ShortCircuit(out DateTime? latestExecutionSS))
+                    {
+                        logging.Trace($"The message {invocationMessage.id} was already executed on {latestExecutionSS}.");
+                        var responseShortCurcuit = new HttpResponseMessage(System.Net.HttpStatusCode.ExpectationFailed);
+                        return await invocationMessageRef.StorageUpdateAsync(
+                            async (invocationMessageShortCircuit, saveAsync) =>
+                            {
+                                invocationMessageShortCircuit.executionHistory = invocationMessageShortCircuit
+                                    .executionHistory
+                                    .Append(lastExecuted.PairWithValue((int)responseShortCurcuit.StatusCode))
+                                    .ToArray();
+                                await saveAsync(invocationMessageShortCircuit);
+                                return responseShortCurcuit;
+                            },
+                            () => responseShortCurcuit);
+                    }
+
                     scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
                     var httpRequest = new HttpRequestMessage(
                         new HttpMethod(invocationMessage.method),
@@ -263,13 +304,68 @@ namespace EastFive.Azure.Functions
                         httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
                     }
 
-                    invocationMessage.lastExecuted = DateTime.UtcNow;
+                    bool updated = await invocationMessageRef.StorageUpdateAsync(
+                        async (invocationMessageToUpdate, saveAsync) =>
+                        {
+                            invocationMessageToUpdate.executionHistory = invocationMessageToUpdate
+                                .executionHistory
+                                .Append(lastExecuted.PairWithValue(0))
+                                .ToArray();
+                            await saveAsync(invocationMessageToUpdate);
+                            return true;
+                        },
+                        () => false);
+
                     logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
                     var result = await invokeApplication.SendAsync(httpRequest);
-                    await saveAsync(invocationMessage);
-                    return result;
+
+                    return await invocationMessageRef.StorageUpdateAsync(
+                        async (invocationMessageToUpdate, saveAsync) =>
+                        {
+                            invocationMessage.lastExecuted = lastExecuted;
+                            invocationMessage.executionHistory = invocationMessage.executionHistory
+                                .Select(
+                                    exHi =>
+                                    {
+                                        if((exHi.Key - lastExecuted).TotalSeconds < 1.0)
+                                        {
+                                            return lastExecuted.PairWithValue((int)result.StatusCode);
+                                        }
+                                        return exHi;
+                                    })
+                                .ToArray();
+                            await saveAsync(invocationMessageToUpdate);
+                            return result;
+                        },
+                        () => result);
+
+                    bool ShortCircuit(out DateTime? latestExecution)
+                    {
+                        latestExecution = invocationMessage.executionHistory
+                            .NullToEmpty()
+                            .Aggregate(default(DateTime?),
+                                (dt, exec) =>
+                                {
+                                    if (!dt.HasValue)
+                                        return exec.Key;
+                                    return dt.Value > exec.Key ? dt.Value : exec.Key;
+                                });
+
+                        var hasExecutionHistory = latestExecution.HasValue;
+                        if (!hasExecutionHistory)
+                            return false;
+
+                        if (!invocationMessage.executionLimit.HasValue)
+                            return true;
+
+                        var executionLimit = invocationMessage.executionLimit.Value;
+                        if (executionLimit <= invocationMessage.executionHistory.Length)
+                            return true;
+
+                        return false;
+                    }
                 },
-                ResourceNotFoundException.StorageGetAsync<HttpResponseMessage>);
+                ResourceNotFoundException.StorageGetAsync<Task<HttpResponseMessage>>);
         }
     }
 }

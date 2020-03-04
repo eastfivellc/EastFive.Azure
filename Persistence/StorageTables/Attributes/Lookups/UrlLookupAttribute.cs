@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
