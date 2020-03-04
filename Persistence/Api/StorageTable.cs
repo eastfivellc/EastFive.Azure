@@ -68,26 +68,11 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             Microsoft.IdentityModel.Claims.ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> All(
+        public static HttpResponseMessage All(
             HttpApplication httpApp,
             ContentTypeResponse<StorageTable[]> onFound)
         {
-            var limitedAssemblyQuery = httpApp.GetType()
-                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
-            Func<Assembly, bool> shouldCheckAssembly =
-                (assembly) =>
-                {
-                    return limitedAssemblyQuery
-                        .First(
-                            (limitedAssembly, next) =>
-                            {
-                                if (limitedAssembly.ShouldCheckAssembly(assembly))
-                                    return true;
-                                return next();
-                            },
-                            () => false);
-                };
-            var tables = DiscoverStorageResources(shouldCheckAssembly).ToArray();
+            var tables = DiscoverStorageResources(httpApp.GetType()).ToArray();
             return onFound(tables);
         }
 
@@ -98,26 +83,10 @@ namespace EastFive.Azure.Persistence
         public static async Task<HttpResponseMessage> List(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
-                HttpRequestMessage request,
             MultipartResponseAsync<StorageRow> onFound,
             NotFoundResponse onNotFound)
         {
-            var limitedAssemblyQuery = httpApp.GetType()
-                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
-            Func<Assembly, bool> shouldCheckAssembly =
-                (assembly) =>
-                {
-                    return limitedAssemblyQuery
-                        .First(
-                            (limitedAssembly, next) =>
-                            {
-                                if (limitedAssembly.ShouldCheckAssembly(assembly))
-                                    return true;
-                                return next();
-                            },
-                            () => false);
-                };
-            return await DiscoverStorageResources(shouldCheckAssembly)
+            return await DiscoverStorageResources(httpApp.GetType())
                 .Where(table => table.name == name)
                 .First(
                     (storageTable, next) =>
@@ -147,15 +116,6 @@ namespace EastFive.Azure.Persistence
                                     };
                                 });
                         return onFound(allRows);
-                        //var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
-                        //var converter = new ExtrudeConvert(httpApp as HttpApplication, request);
-                        //var jsonObj = JsonConvert.SerializeObject(allRows,
-                        //    new JsonSerializerSettings
-                        //    {
-                        //        Converters = new JsonConverter[] { converter }.ToList(),
-                        //    });
-                        //response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
-                        //return response;
                     },
                     () => onNotFound().AsTask());
         }
@@ -170,23 +130,7 @@ namespace EastFive.Azure.Persistence
             ContentTypeResponse<TableInformation> onFound,
             NotFoundResponse onNotFound)
         {
-            var limitedAssemblyQuery = httpApp.GetType()
-                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
-            Func<Assembly, bool> shouldCheckAssembly =
-                (assembly) =>
-                {
-                    return limitedAssemblyQuery
-                        .First(
-                            (limitedAssembly, next) =>
-                            {
-                                if (limitedAssembly.ShouldCheckAssembly(assembly))
-                                    return true;
-                                return next();
-                            },
-                            () => false);
-                };
-            var driver = AzureTableDriverDynamic.FromSettings();
-            return await DiscoverStorageResources(shouldCheckAssembly)
+            return await DiscoverStorageResources(httpApp.GetType())
                 .Where(table => table.name == name)
                 .First(
                     async (storageTable, next) =>
@@ -194,6 +138,42 @@ namespace EastFive.Azure.Persistence
                         var information = await storageTable.type
                             .StorageTableInformationAsync(storageTable.cloudTable);
                         return onFound(information);
+                    },
+                    () => onNotFound().AsTask());
+        }
+
+        [Api.HttpAction("PropertyInformation")]
+        [RequiredClaim(
+            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimValues.Roles.SuperAdmin)]
+        public static async Task<HttpResponseMessage> PropertyInformation(
+                [QueryParameter(Name = "table")]string tableName,
+                [QueryParameter(Name = "property")]string propertyName,
+                HttpApplication httpApp,
+            ContentTypeResponse<PropertyLookupInformation[]> onFound,
+            NotFoundResponse onNotFound,
+            BadRequestResponse onPropertyDoesNotSupportFindBy)
+        {
+            return await DiscoverStorageResources(httpApp.GetType())
+                .Where(table => table.name == tableName)
+                .First(
+                    (storageTable, next) =>
+                    {
+                        return storageTable.properties
+                            .Where(prop => prop.name == propertyName)
+                            .First(
+                                async (prop, next2) =>
+                                {
+                                    if (!prop.member.ContainsAttributeInterface<IProvideFindBy>())
+                                        return onPropertyDoesNotSupportFindBy();
+                                    var findBy = prop.member.GetAttributeInterface<IProvideFindBy>();
+                                    var information = await findBy.GetInfoAsync(prop.member);
+                                    return onFound(information);
+                                },
+                                () =>
+                                {
+                                    return onNotFound().AsTask();
+                                });
                     },
                     () => onNotFound().AsTask());
         }
@@ -208,22 +188,7 @@ namespace EastFive.Azure.Persistence
                 HttpRequestMessage request,
             NotFoundResponse onNotFound)
         {
-            var limitedAssemblyQuery = httpApp.GetType()
-                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
-            Func<Assembly, bool> shouldCheckAssembly =
-                (assembly) =>
-                {
-                    return limitedAssemblyQuery
-                        .First(
-                            (limitedAssembly, next) =>
-                            {
-                                if (limitedAssembly.ShouldCheckAssembly(assembly))
-                                    return true;
-                                return next();
-                            },
-                            () => false);
-                };
-            return await DiscoverStorageResources(shouldCheckAssembly)
+            return await DiscoverStorageResources(httpApp.GetType())
                 .Where(table => table.name == name)
                 .First(
                     async (storageTable, next) =>
@@ -245,8 +210,24 @@ namespace EastFive.Azure.Persistence
 
         #endregion
 
-        public static IEnumerable<StorageTable> DiscoverStorageResources(Func<Assembly, bool> shouldCheckAssembly)
+        public static IEnumerable<StorageTable> DiscoverStorageResources(Type appType)
         {
+            var limitedAssemblyQuery = appType
+                .GetAttributesInterface<IApiResources>(inherit: true, multiple: true);
+            Func<Assembly, bool> shouldCheckAssembly =
+                (assembly) =>
+                {
+                    return limitedAssemblyQuery
+                        .First(
+                            (limitedAssembly, next) =>
+                            {
+                                if (limitedAssembly.ShouldCheckAssembly(assembly))
+                                    return true;
+                                return next();
+                            },
+                            () => false);
+                };
+
             var driver = AzureTableDriverDynamic.FromSettings();
             return AppDomain.CurrentDomain.GetAssemblies()
                 .Where(shouldCheckAssembly)
@@ -282,6 +263,7 @@ namespace EastFive.Azure.Persistence
                                                 {
                                                     name = name,
                                                     type = memberType,
+                                                    member = propInfo,
                                                 };
                                             })
                                         .ToArray();

@@ -34,7 +34,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
         }
 
-        public IEnumerableAsync<IRefAst> GetKeys(object memberValue,
+        public IEnumerableAsync<IRefAst> GetKeys(
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
             KeyValuePair<MemberInfo, object>[] queries,
             ILogger logger = default)
@@ -62,6 +62,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                     })
                 .AsyncEnumerable(true)
                 .SelectMany();
+        }
+
+        public async Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+            MemberInfo memberInfo)
+        {
+            throw new NotImplementedException();
         }
 
         [StorageTable]

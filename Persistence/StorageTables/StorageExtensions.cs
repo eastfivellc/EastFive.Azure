@@ -335,20 +335,20 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region QUERY / GET
 
-        public static IEnumerableAsync<object> StorageGetAll(this Type type)
+        public static IEnumerableAsync<object> StorageGetAll(this Type type, string tableName = default)
         {
             var findAllMethod = typeof(StorageExtensions)
                 .GetMethod("StorageGetAllInternal", BindingFlags.Public | BindingFlags.Static);
             var findAllCast = findAllMethod.MakeGenericMethod(type.AsArray());
-            return (IEnumerableAsync<object>)findAllCast.Invoke(null, new object[] { });
+            return (IEnumerableAsync<object>)findAllCast.Invoke(null, new object[] { tableName });
         }
 
-        public static IEnumerableAsync<object> StorageGetAllInternal<TEntity>()
+        public static IEnumerableAsync<object> StorageGetAllInternal<TEntity>(string tableName = default)
         {
             var driver = AzureTableDriverDynamic.FromSettings();
             Expression<Func<TEntity, bool>> expr = e => true;
             return driver
-                .FindAll(expr)
+                .FindAll(expr, tableName: tableName)
                 .Select(doc => (object)doc);
         }
 

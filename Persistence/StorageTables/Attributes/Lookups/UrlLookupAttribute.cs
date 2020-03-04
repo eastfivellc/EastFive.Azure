@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Serialization;
@@ -61,6 +62,15 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                 //return sb.ToString();
             }
+        }
+
+        protected override PropertyLookupInformation GetInfo(StorageLookupTable slt)
+        {
+            var propInfo = base.GetInfo(slt);
+            var rowKeyBytes = Convert.FromBase64String(slt.rowKey);
+            var stringValue = rowKeyBytes.GetString(System.Text.Encoding.UTF8);
+            propInfo.value = stringValue;
+            return propInfo;
         }
 
         public abstract string GetPartitionKey(string rowKey);
