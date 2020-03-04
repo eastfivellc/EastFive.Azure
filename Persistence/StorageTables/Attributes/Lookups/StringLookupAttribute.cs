@@ -20,28 +20,30 @@ namespace EastFive.Persistence.Azure.StorageTables
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
             var propertyValueType = lookupValue.Key.GetMemberType();
-            if (!typeof(string).IsAssignableFrom(propertyValueType))
+
+            if (typeof(string).IsAssignableFrom(propertyValueType))
             {
-                var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                    $"Please override GetRowKeys on `{this.GetType().FullName}`.";
-                throw new NotImplementedException(exMsg);
+                var rowKey = (string)rowKeyValue;
+                var partitionKey = GetPartitionKey(rowKey);
+                return new RefAst(rowKey, partitionKey).AsEnumerable();
             }
-            var rowKey = (string)rowKeyValue;
-            var partitionKey = GetPartitionKey(rowKey);
-            return new RefAst(rowKey, partitionKey).AsEnumerable();
+
+            var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                $"Please override GetRowKeys on `{this.GetType().FullName}`.";
+            throw new NotImplementedException(exMsg);
         }
 
         internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType)
         {
             var propertyValueType = memberInfo.GetMemberType();
-            if (!typeof(string).IsAssignableFrom(propertyValueType))
+            if (typeof(string).IsAssignableFrom(propertyValueType))
             {
-                var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                    $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
-                throw new NotImplementedException(exMsg);
+                var stringValue = (string)memberValue;
+                return stringValue;
             }
-            var stringValue = (string)memberValue;
-            return stringValue;
+            var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
+            throw new NotImplementedException(exMsg);
         }
 
         public abstract string GetPartitionKey(string rowKey);

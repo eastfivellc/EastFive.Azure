@@ -36,6 +36,8 @@ namespace EastFive.Azure.Functions
     [StorageTable]
     public struct InvocationMessage : IReferenceable
     {
+        public const string InvocationMessageSourceHeaderKey = "X-InvocationMessageSource";
+
         #region Properties
 
         [JsonIgnore]
@@ -58,11 +60,23 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
+        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery)]
         public Uri requestUri;
 
         [JsonProperty]
         [Storage]
         public string method;
+
+        [JsonProperty]
+        [Storage]
+        [UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
+        public Uri referrer;
+
+        public const string InvocationMessageSourcePropertyName = "InvocationMessageSource";
+        [JsonProperty]
+        [Storage]
+        [IdPrefixLookup(Characters = 4)]
+        public IRefOptional<InvocationMessage> invocationMessageSource;
 
         [JsonProperty]
         [Storage]
@@ -91,7 +105,6 @@ namespace EastFive.Azure.Functions
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
-            InvokeApplicationDirect invokeApplication,
             MultipartResponseAsync<InvocationMessage> onRun)
         {
             Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
@@ -100,6 +113,17 @@ namespace EastFive.Azure.Functions
                 .StorageQuery()
                 .Where(msg => msg.lastModified >= startTime)
                 .Where(msg => msg.lastModified <= endTime);
+            return onRun(messages);
+        }
+
+        [Api.HttpGet]
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<HttpResponseMessage> ListByRequerUrlAsync(
+            [QueryParameter(Name = "request_uri")]Uri requestUri,
+            MultipartResponseAsync<InvocationMessage> onRun)
+        {
+            var messages = requestUri.StorageGetBy(
+                (InvocationMessage ent) => ent.requestUri);
             return onRun(messages);
         }
 
@@ -133,7 +157,6 @@ namespace EastFive.Azure.Functions
 
         public static IEnumerableAsync<HttpResponseMessage> InvokeAsync(
                 byte [] invocationMessageIdsBytes,
-            IApplication application,
             IInvokeApplication invokeApplication,
             EastFive.Analytics.ILogger analyticsLog = default)
         {
@@ -219,8 +242,18 @@ namespace EastFive.Azure.Functions
                     var config = new HttpConfiguration();
                     httpRequest.SetConfiguration(config);
 
-                    foreach (var headerKVP in invocationMessage.headers)
+                    logging.Trace($"Message origin:[{invocationMessage.referrer}].");
+                    if(invocationMessage.headers.ContainsKey(InvocationMessageSourceHeaderKey))
+                    {
+                        var sourceInvocationMessageIdStr = invocationMessage.headers[InvocationMessageSourceHeaderKey];
+                        if (Guid.TryParse(sourceInvocationMessageIdStr, out Guid sourceInvocationMessageId))
+                            logging.Trace($"Function origin:[{sourceInvocationMessageId}].");
+                    }
+                    foreach (var headerKVP in invocationMessage.headers
+                        .Where(headerKvp => headerKvp.Key != InvocationMessageSourceHeaderKey))
                         httpRequest.Headers.Add(headerKVP.Key, headerKVP.Value);
+                    httpRequest.Headers.Add(InvocationMessageSourceHeaderKey, 
+                        invocationMessageRef.id.ToString());
 
                     if (!invocationMessage.content.IsDefaultOrNull())
                     {

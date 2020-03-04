@@ -9,6 +9,8 @@ namespace EastFive.AzureADB2C.Resources
 {
     public class ConfigurationResource
     {
+        public const string ConfigurationEndpoint = "https://{0}.b2clogin.com/{0}.onmicrosoft.com/v2.0/.well-known/openid-configuration?p={1}";
+
         [JsonProperty(PropertyName = "issuer")]
         public string Issuer { get; set; }
 

@@ -12,10 +12,13 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public interface IProvideFindBy
     {
-        IEnumerableAsync<IRefAst> GetKeys(object memberValue,
+        IEnumerableAsync<IRefAst> GetKeys(
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
             KeyValuePair<MemberInfo, object>[] queries,
             ILogger logger = default);
+
+        Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+            MemberInfo memberInfo);
     }
 
     public interface IProvideFindByAsync

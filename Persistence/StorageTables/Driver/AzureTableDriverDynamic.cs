@@ -194,7 +194,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             CloudTable table = default(CloudTable),
             string tableName = default,
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
-            where TEntity : IReferenceable
+            //where TEntity : IReferenceable
         {
             if(table.IsDefaultOrNull())
                 table = tableName.HasBlackSpace() ?
@@ -628,7 +628,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     .Append(findByValue.PairWithKey(memberCandidate))
                                     .ToArray();
 
-                                return attr.GetKeys(findByValue, memberCandidate, this, memberAssignments, logger:logger)
+                                return attr.GetKeys(memberCandidate, this, memberAssignments, logger:logger)
                                     .Select(
                                         async rowParitionKeyKvp =>
                                         {
@@ -1275,7 +1275,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry) 
             where TEntity : IReferenceable
         {
-            var finds = FindAll(filter, table, numberOfTimesToRetry);
+            var finds = FindAll(filter, table:table, numberOfTimesToRetry:numberOfTimesToRetry);
             var deleted = finds
                 .Select(entity => GetEntity(entity))
                 .GroupBy(doc => doc.PartitionKey)
@@ -1590,9 +1590,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindAll<TEntity>(
             Expression<Func<TEntity, bool>> filter,
             CloudTable table = default,
+            string tableName = default,
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
             ICacheEntites cache = default)
         {
+            if(table.IsDefaultOrNull())
+                if(tableName.HasBlackSpace())
+                    table = this.TableClient.GetTableReference(tableName);
             Func<TEntity, bool> postFilter = (e) => true;
             var whereFilter = typeof(TEntity)
                 .GetMembers(BindingFlags.Public | BindingFlags.Instance)

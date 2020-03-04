@@ -37,7 +37,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
         }
 
-        public IEnumerableAsync<IRefAst> GetKeys(object memberValue,
+        public IEnumerableAsync<IRefAst> GetKeys(
             MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
             KeyValuePair<MemberInfo, object>[] queries,
             ILogger logger = default)
@@ -77,10 +77,44 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .SelectMany(logger: scopedLogger);
         }
 
+        public async Task<EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation[]> GetInfoAsync(
+            MemberInfo memberInfo)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            var storageTableLookups = await typeof(StorageLookupTable)
+                .StorageGetAll(tableName)
+                .Select(slt => GetInfo((StorageLookupTable)slt))
+                .ToArrayAsync();
+            var propertyLookupInformations = storageTableLookups
+                .GroupBy(slt => slt.rowKey + slt.partitionKey)
+                .Select(
+                    propLookInfosGrp =>
+                    {
+                        var propLookInfos = propLookInfosGrp.ToArray();
+                        var total = propLookInfos.Sum(propLookInfo => propLookInfo.count);
+                        var value = propLookInfos.First();
+                        value.count = total;
+                        return value;
+                    })
+                .ToArray();
+            return propertyLookupInformations;
+        }
+
+        protected virtual EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation GetInfo(
+            StorageLookupTable slt)
+        {
+            return new EastFive.Azure.Persistence.StorageTables.PropertyLookupInformation
+            {
+                count = slt.rowAndPartitionKeys.Length,
+                partitionKey = slt.partitionKey,
+                rowKey = slt.rowKey,
+                value = slt.rowKey,
+            };
+        }
+
         [StorageTable]
         public struct StorageLookupTable
         {
-
             [RowKey]
             public string rowKey;
 

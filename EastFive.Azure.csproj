@@ -333,7 +333,9 @@
     <Compile Include="Auth\Token.cs" />
     <Compile Include="Auth\XIntegration.cs" />
     <Compile Include="Auth\Whoami.cs" />
+    <Compile Include="Configuration.cs" />
     <Compile Include="Functions\FunctionApplication.cs" />
+    <Compile Include="Functions\FunctionInstigatorAttribute.cs" />
     <Compile Include="Functions\InvocationMessage.cs" />
     <Compile Include="Functions\InvokeFunction.cs" />
     <Compile Include="Functions\LinkedTokenSource.cs" />
@@ -380,6 +382,7 @@
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\ScopedLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\BinaryPartitionLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\BinaryLookupAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\Lookups\UrlLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\ScopedPartitionAttribute.cs" />
@@ -590,7 +593,7 @@
     <Compile Include="Net\Http\CacheProviderAzureStorageTables.cs" />
     <Compile Include="PasswordCredentials.cs" />
     <Compile Include="Credentials.cs" />
-    <Compile Include="Auth\CredentialProviders\AzureADB2CProvider.cs" />
+    <Compile Include="Auth\CredentialProviders\AzureADB2C\AzureADB2CProvider.cs" />
     <Compile Include="Library.cs" />
     <Compile Include="Api\Controllers\Credentials\OpenIdResponseController.cs" />
     <Compile Include="Auth\CredentialProviders\FacebookCredentialProvider.cs" />

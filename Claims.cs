@@ -55,31 +55,5 @@ namespace EastFive.Security.SessionServer
             return result;
         }
 
-
-
-            //throw new NotImplementedException();
-            ////return await this.dataContext.Authorizations.UpdateClaims(authorizationId,
-            ////    (claimsStored, addClaim) =>
-            ////    {
-            ////        var claims = EnumerableAsync.YieldAsync<Func<Guid, Guid, Uri, string, Task>>(
-            ////            async (yieldAsync) =>
-            ////            {
-            ////                foreach (var claim in claimsStored)
-            ////                {
-            ////                    if (default(Uri) == type ||
-            ////                        String.Compare(type.AbsoluteUri, claim.type.AbsoluteUri) == 0)
-            ////                    {
-            ////                        await yieldAsync(claim.claimId, authorizationId, claim.type, claim.value);
-            ////                    }
-            ////                }
-            ////            });
-            ////        return Task.FromResult(found(claims));
-            ////    },
-            ////    // TODO: Create and use dataContext.Authorizations.FindClaims since next two methods are mute since addClaim is never invoked
-            ////    () => true,
-            ////    () => false,
-            ////    () => authorizationNotFound(),
-            ////    (whyFailed) => failure(whyFailed));
-
     }
 }

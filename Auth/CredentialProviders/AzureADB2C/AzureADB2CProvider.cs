@@ -15,11 +15,13 @@ using EastFive.Collections.Generic;
 using EastFive.Serialization;
 using EastFive.Azure.Auth;
 using EastFive.Extensions;
+using EastFive.Web.Configuration;
+using EastFive.AzureADB2C;
 
 namespace EastFive.Api.Azure.Credentials
 {
     [IntegrationName(IntegrationName)]
-    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession, IDisposable
+    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession
     {
         public const string IntegrationName = "Password";
         public string Method => IntegrationName;
@@ -29,96 +31,86 @@ namespace EastFive.Api.Azure.Credentials
         internal const string StateKey = "state";
         internal const string IdTokenKey = "id_token";
         
-        EastFive.AzureADB2C.B2CGraphClient client;
+        private static EastFive.AzureADB2C.B2CGraphClient client
+        {
+            get
+            {
+                return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
+                    client => client,
+                    (why) =>
+                    {
+                        throw new ConfigurationException(why, typeof(string), why);
+                    });
+            }
+        }
+
         private TokenValidationParameters validationParameters;
-        internal string audience;
-        private Uri signinConfiguration;
-        private Uri signupConfiguration;
+        internal string clientId;
         private string loginEndpoint;
         private string signupEndpoint;
         private string logoutEndpoint;
 
-        private AzureADB2CProvider(string audience, Uri signinConfiguration, Uri signupConfiguration, EastFive.AzureADB2C.B2CGraphClient client)
+        public AzureADB2CProvider(string clientId,
+            string signupEndpoint, string signinEndpoint, string logoutEndpoint,
+            TokenValidationParameters validationParams)
         {
-            this.audience = audience;
-            this.signinConfiguration = signinConfiguration;
-            this.signupConfiguration = signupConfiguration;
-            this.client = client;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (client != null)
-                {
-                    client.Dispose();
-                    client = null;
-                }
-            }
-        }
-
-        ~AzureADB2CProvider()
-        {
-            Dispose(false);
-        }
-
-        public static TResult LoadFromConfig<TResult>(
-            Func<AzureADB2CProvider, TResult> onLoaded,
-            Func<string, TResult> onConfigurationNotAvailable)
-        {
-            return Web.Configuration.Settings.GetString(EastFive.Security.SessionServer.Configuration.AppSettings.AADB2CAudience,
-                (audience) =>
-                {
-                    return Web.Configuration.Settings.GetUri(EastFive.Security.SessionServer.Configuration.AppSettings.AADB2CSigninConfiguration,
-                        (signinConfiguration) =>
-                        {
-                            return Web.Configuration.Settings.GetUri(EastFive.Security.SessionServer.Configuration.AppSettings.AADB2CSignupConfiguration,
-                                (signupConfiguration) =>
-                                {
-                                    return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
-                                        client =>
-                                        {
-                                            var provider = new AzureADB2CProvider(
-                                                audience, signinConfiguration, signupConfiguration, client);
-                                            return onLoaded(provider);
-                                        },
-                                        onConfigurationNotAvailable);
-                                },
-                                onConfigurationNotAvailable);
-                        },
-                        onConfigurationNotAvailable);
-                },
-                onConfigurationNotAvailable);
+            this.clientId = clientId;
+            this.signupEndpoint = signupEndpoint;
+            this.loginEndpoint = signinEndpoint;
+            this.logoutEndpoint = logoutEndpoint;
+            this.validationParameters = validationParams;
         }
 
         [IntegrationName(IntegrationName)]
-        public static async Task<TResult> InitializeAsync<TResult>(
+        public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return await LoadFromConfig(
-                (provider) => EastFive.AzureADB2C.Libary.InitializeAsync(provider.signupConfiguration, provider.signinConfiguration, provider.audience,
-                    (signupEndpoint, signinEndpoint, logoutEndpoint, validationParams) =>
-                    {
-                        provider.signupEndpoint = signupEndpoint;
-                        provider.loginEndpoint = signinEndpoint;
-                        provider.logoutEndpoint = logoutEndpoint;
-                        provider.validationParameters = validationParams;
-                        return onProvideAuthorization(provider);
-                    },
-                    (why) =>
-                    {
-                        return onFailure(why);
-                    }),
-                onProvideNothing.AsAsyncFunc<TResult, string>());
+            return EastFive.Azure.AppSettings.AzureADB2C.ApplicationId.ConfigurationString(
+                (applicationId) =>
+                {
+                    return EastFive.Azure.AppSettings.AzureADB2C.Tenant.ConfigurationString(
+                        (tenant) =>
+                        {
+                            return EastFive.Azure.AppSettings.AzureADB2C.SigninFlow.ConfigurationString(
+                                (signInFlow) =>
+                                {
+                                    return EastFive.Azure.AppSettings.AzureADB2C.SignupFlow.ConfigurationString(
+                                        (signUpFlow) =>
+                                        {
+                                            return EastFive.Azure.AppSettings.AzureADB2C.Audience.ConfigurationString(
+                                                (audience) =>
+                                                {
+                                                    return EastFive.AzureADB2C.Libary.InitializeAsync(tenant,
+                                                            signUpFlow, signInFlow,
+                                                            audience,
+                                                        (signupEndpoint, signinEndpoint, logoutEndpoint, validationParams) =>
+                                                        {
+                                                            return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
+                                                                client =>
+                                                                {
+                                                                    var provider = new AzureADB2CProvider(applicationId,
+                                                                        signupEndpoint, signinEndpoint, logoutEndpoint,
+                                                                        validationParams);
+                                                                    return onProvideAuthorization(provider);
+                                                                },
+                                                                (why) =>
+                                                                {
+                                                                    return onFailure(why);
+                                                                });
+                                                        },
+                                                        onFailure);
+                                                },
+                                                onFailure.AsAsyncFunc());
+                                        },
+                                        onFailure.AsAsyncFunc());
+                                },
+                                onFailure.AsAsyncFunc());
+                        },
+                        onFailure.AsAsyncFunc());
+                },
+                onFailure.AsAsyncFunc());
         }
 
         #endregion
@@ -230,7 +222,7 @@ namespace EastFive.Api.Azure.Credentials
 
         public Guid Id =>  System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        public Type CallbackController => typeof(EastFive.Azure.Auth.CredentialProviders.AzureADB2C.OpenIdRedirection);
+        public Type CallbackController => typeof(EastFive.Azure.Auth.OpenIdResponse);
 
         //typeof(SessionServer.Api.Controllers.AADB2CResponseController);
 
@@ -255,7 +247,7 @@ namespace EastFive.Api.Azure.Credentials
         {
             var uriBuilder = new UriBuilder(longurl);
             var query = HttpUtility.ParseQueryString(uriBuilder.Query);
-            query["client_id"] = this.audience;
+            query["client_id"] = this.clientId;
             query["response_type"] = AzureADB2CProvider.IdTokenKey;
             query["redirect_uri"] = callbackLocation.AbsoluteUri;
             query["response_mode"] = "form_post";
@@ -264,7 +256,6 @@ namespace EastFive.Api.Azure.Credentials
             query[StateKey] = stateGuid.ToString("N"); //  redirect_uri.Base64(System.Text.Encoding.ASCII);
 
             query["nonce"] = Guid.NewGuid().ToString("N");
-            // query["p"] = "B2C_1_signin1";
             uriBuilder.Query = query.ToString();
             var redirect = uriBuilder.Uri; // .ToString();
             return redirect;

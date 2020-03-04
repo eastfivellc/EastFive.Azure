@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,54 +13,57 @@ namespace EastFive.AzureADB2C
 {
     public static class Libary
     {
+
+
         public static async Task<TResult> InitializeAsync<TResult>(
-            Uri signupConfiguration, Uri signinConfiguration, string audience,
+                string tenant, string signupFlow, string signinFlow,
+                string audience,
             Func<string, string, string, TokenValidationParameters, TResult> onSuccess,
             Func<string, TResult> onFailed)
         {
-            var requestSignup = WebRequest.CreateHttp(signupConfiguration);
-            var signupEndpointDiscriminatedTask = requestSignup.GetResponseJsonAsync<
-                    Resources.ConfigurationResource, BlackBarLabs.DiscriminatedDelegate<string, TResult>>(
-                (config) =>
+            var signupFlowUrlStr = String.Format(Resources.ConfigurationResource.ConfigurationEndpoint,
+                tenant, signupFlow);
+            var signinFlowUrlStr = String.Format(Resources.ConfigurationResource.ConfigurationEndpoint,
+                tenant, signinFlow);
+            using(var httpClient = new HttpClient())
+            {
+                return await await GetResourceAsync(httpClient, signupFlowUrlStr,
+                    async signupFlowConfig =>
+                    {
+                        return await await  GetResourceAsync(httpClient, signinFlowUrlStr,
+                            signinFlowConfig =>
+                            {
+                                var signinEndpoint = signinFlowConfig.AuthorizationEndpoint;
+                                var logoutEndpoint = signinFlowConfig.EndSessionEndpoint;
+                                var signupEndpoint = signupFlowConfig.AuthorizationEndpoint;
+                                return GetValidator(audience, signinFlowConfig,
+                                    (validator) =>
+                                    {
+                                        return onSuccess(signupEndpoint, signinEndpoint, logoutEndpoint, validator);
+                                    },
+                                    (why) => onFailed(why));
+                            },
+                            onFailed.AsAsyncFunc());
+                    },
+                    onFailed.AsAsyncFunc());
+            }
+
+            async Task<TResult> GetResourceAsync<TResult>(HttpClient httpClient, string urlStr,
+                Func<Resources.ConfigurationResource, TResult> onGotConfig,
+                Func<string, TResult> onFailedToGetConfig)
+            {
+                try
                 {
-                    return (callback) => callback(config.AuthorizationEndpoint);
-                },
-                (code, why) =>
+                    var response = await httpClient.GetAsync(urlStr);
+                    var configStr = await response.Content.ReadAsStringAsync();
+                    var configRes = Newtonsoft.Json.JsonConvert.DeserializeObject<Resources.ConfigurationResource>(configStr);
+                    return onGotConfig(configRes);
+                }
+                catch (Exception ex)
                 {
-                    return (callback) => onFailed(why);
-                },
-                (why) =>
-                {
-                    return (callback) => onFailed(why);
-                });
-            
-            var request = WebRequest.CreateHttp(signinConfiguration);
-            var result = await await request.GetResponseJsonAsync(
-                async (Resources.ConfigurationResource config) =>
-                {
-                    var signinEndpoint = config.AuthorizationEndpoint;
-                    var logoutEndpoint = config.EndSessionEndpoint;
-                    return await await GetValidator(audience, config,
-                        async (validator) =>
-                        {
-                            var signupEndpointDiscriminated = await signupEndpointDiscriminatedTask;
-                            return signupEndpointDiscriminated(
-                                (signupEndpoint) =>
-                                {
-                                    return onSuccess(signupEndpoint, signinEndpoint, logoutEndpoint, validator);
-                                });
-                        },
-                        (why) => onFailed(why).ToTask());
-                },
-                (code, why) =>
-                {
-                    return onFailed(why).ToTask();
-                },
-                (why) =>
-                {
-                    return onFailed(why).ToTask();
-                });
-            return result;
+                    return onFailedToGetConfig(ex.Message);
+                }
+            }
         }
 
         private static async Task<TResult> GetValidator<TResult>(string audience, Resources.ConfigurationResource config,

@@ -24,4 +24,13 @@ namespace EastFive.Azure.Persistence.StorageTables
         public long total;
         public IDictionary<string, IDictionary<object, long>> properties;
     }
+
+    [JsonSerializationDictionarySafeProvider]
+    public class PropertyLookupInformation
+    {
+        public string rowKey;
+        public string partitionKey;
+        public string value;
+        public long count;
+    }
 }

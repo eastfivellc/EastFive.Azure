@@ -12,6 +12,7 @@ using BlackBarLabs;
 using BlackBarLabs.Extensions;
 using EastFive.Api.Services;
 using EastFive.Security.SessionServer;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Api.Azure.Credentials.Controllers
 {
@@ -54,8 +55,8 @@ namespace EastFive.Api.Azure.Credentials.Controllers
             var response = await Context.GetLoginProvider(method,
                 async (loginProvider) =>
                 {
-                    var callbackUrl = this.Url.GetLocation<OpenIdResponseController>(
-                        typeof(OpenIdResponseController)
+                    var callbackUrl = this.Url.GetLocation<OpenIdResponse>(
+                        typeof(OpenIdResponse)
                             .GetCustomAttributes<RoutePrefixAttribute>()
                             .Select(routePrefix => routePrefix.Prefix)
                             .First());
