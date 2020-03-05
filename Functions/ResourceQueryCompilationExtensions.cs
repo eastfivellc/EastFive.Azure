@@ -23,9 +23,10 @@ namespace EastFive.Azure.Functions
             return await invocationMessage.SendToFunctionsAsync();
         }
 
-        public static async Task<InvocationMessage> CreateInvocationMessageAsync(this HttpRequestMessage request)
+        public static async Task<InvocationMessage> CreateInvocationMessageAsync(this HttpRequestMessage request,
+            int executionLimit = 1)
         {
-            var invocationMessage = await request.InvocationMessageAsync();
+            var invocationMessage = await request.InvocationMessageAsync(executionLimit: executionLimit);
             var invocationMessageRef = invocationMessage.invocationRef;
             return await invocationMessage.StorageCreateAsync(
                 (created) =>

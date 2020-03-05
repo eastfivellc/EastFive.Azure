@@ -40,7 +40,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return null;
                 var rowKeyUnsanitized = GetUnsanitized(url);
                 var rowKeyBytes = rowKeyUnsanitized.GetBytes(System.Text.Encoding.UTF8);
-                var stringValue = Convert.ToBase64String(rowKeyBytes);
+                var stringValue = Convert
+                    .ToBase64String(rowKeyBytes, Base64FormattingOptions.None)
+                    .Replace('/', '_');
                 return stringValue;
             }
             var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
@@ -68,7 +70,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         protected override PropertyLookupInformation GetInfo(StorageLookupTable slt)
         {
             var propInfo = base.GetInfo(slt);
-            var rowKeyBytes = Convert.FromBase64String(slt.rowKey);
+            var rowKeyBytes = Convert.FromBase64String(slt.rowKey.Replace('_', '/'));
             var stringValue = rowKeyBytes.GetString(System.Text.Encoding.UTF8);
             propInfo.value = stringValue;
             return propInfo;

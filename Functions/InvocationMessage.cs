@@ -115,10 +115,12 @@ namespace EastFive.Azure.Functions
         [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> ListByRequerUrlAsync(
             [QueryId]IRef<InvocationMessage> invocationMessageRef,
-            ContentTypeResponse<InvocationMessage> onFound)
+            ContentTypeResponse<InvocationMessage> onFound,
+            NotFoundResponse onNotFound)
         {
             return invocationMessageRef.StorageGetAsync(
-                (InvocationMessage ent) => onFound(ent));
+                (InvocationMessage ent) => onFound(ent),
+                () => onNotFound());
         }
 
         [Api.HttpGet]
