@@ -111,9 +111,11 @@ namespace EastFive.Azure.Functions
 
         #region Http Methods
 
+        #region GET
+
         [Api.HttpGet]
         [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> ListByRequerUrlAsync(
+        public static Task<HttpResponseMessage> GetByIdAsync(
             [QueryId]IRef<InvocationMessage> invocationMessageRef,
             ContentTypeResponse<InvocationMessage> onFound,
             NotFoundResponse onNotFound)
@@ -151,6 +153,10 @@ namespace EastFive.Azure.Functions
             return onRun(messages);
         }
 
+        #endregion
+
+        #region Actions
+
         [HttpAction("Invoke")]
         [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> InvokeAsync(
@@ -176,6 +182,31 @@ namespace EastFive.Azure.Functions
             await SendToQueueAsync(invocationMessageRef, application);
             return onNoContent();           
         }
+
+        #endregion
+
+        #region Update
+
+        [Api.HttpPatch]
+        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<HttpResponseMessage> UpdateByIdAsync(
+                [UpdateId]IRef<InvocationMessage> invocationMessageRef,
+                [Property(Name = ExecutionLimitPropertyName)]int executionLimit,
+                // [Resource]InvocationMessage invocationMessage,
+            ContentTypeResponse<InvocationMessage> onFound,
+            NotFoundResponse onNotFound)
+        {
+            return invocationMessageRef.StorageUpdateAsync(
+                async (invocationMessage, saveAsync) =>
+                {
+                    invocationMessage.executionLimit = executionLimit;
+                    await saveAsync(invocationMessage);
+                    return onFound(invocationMessage);
+                },
+                () => onNotFound());
+        }
+
+        #endregion
 
         #endregion
 
