@@ -24,32 +24,18 @@ namespace EastFive.Persistence.Azure.StorageTables
     public class DateTimeLookupAttribute : StorageLookupAttribute,
         IModifyAzureStorageTableSave, IProvideFindBy
     {
-        public const double seconds = 1.0;
-        public const double minutes = 60.0;
-        public const double minutesPerHour = 60;
-        public const double hours = minutes * minutesPerHour;
-        public const double hoursPerDay = 24;
-        public const double days = hours * hoursPerDay;
+        //public const double seconds = 1.0;
+        //public const double minutes = 60.0;
+        //public const double minutesPerHour = 60;
+        //public const double hours = minutes * minutesPerHour;
+        //public const double hoursPerDay = 24;
+        //public const double days = hours * hoursPerDay;
 
-        /// <summary>
-        /// Total seconds
-        /// </summary>
-        public double Row { get; set; }
+        public TimeSpanUnits Row { get; set; }
 
-        /// <summary>
-        /// Total seconds
-        /// </summary>
-        public double Partition { get; set; }
+        public TimeSpanUnits Partition { get; set; }
 
-        private bool ignoreDefault = true;
-        public bool IgnoreDefault
-        {
-            get => ignoreDefault;
-            set
-            {
-                ignoreDefault = value;
-            }
-        }
+        public bool IgnoreDefault { get; set; } = true;
 
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
@@ -89,42 +75,25 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (!lookupValueMaybe.HasValue)
                 return Enumerable.Empty<IRefAst>();
             var lookupValue = lookupValueMaybe.Value;
-            if(ignoreDefault && lookupValue.IsDefault())
+            if(IgnoreDefault && lookupValue.IsDefault())
                 return Enumerable.Empty<IRefAst>();
 
-            var lookupRowKey = ComputeLookupKey(lookupValue, TimeSpan.FromSeconds(this.Row));
-            var lookupPartitionKey = ComputeLookupKey(lookupValue, TimeSpan.FromSeconds(this.Partition));
+            var lookupRowKey = ComputeLookupKey(lookupValue, this.Row);
+            var lookupPartitionKey = ComputeLookupKey(lookupValue, this.Partition);
 
             return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
-
-            
         }
 
-        internal static string ComputeLookupKey(DateTime memberValue, TimeSpan timeSpan)
+        internal static string ComputeLookupKey(DateTime memberValue, TimeSpanUnits timeSpan)
         {
-            var key = $"{memberValue.Year}";
-            if (timeSpan.TotalDays >= 28)
-                return key;
-            key = $"{key}{memberValue.Month.ToString("D2")}";
-            if (timeSpan.TotalDays >= 1.0)
-                return key;
-            key = $"{key}{memberValue.Day.ToString("D2")}";
-            if (timeSpan.TotalHours >= 1.0)
-                return key;
-            key = $"{key}{memberValue.Hour.ToString("D2")}";
-            if (timeSpan.TotalMinutes >= 60.0)
-                return key;
-            key = $"{key}{memberValue.Minute.ToString("D2")}";
-            if (timeSpan.Seconds >= 60.0)
-                return key;
-            return $"{key}{memberValue.Second.ToString("D2")}";
+            return ScopeDateTimeAttribute.ComputeLookupKey(memberValue, 1, timeSpan);
         }
 
         protected override PropertyLookupInformation GetInfo(StorageLookupTable slt)
         {
             var info = base.GetInfo(slt);
             var value = (string)info.value;
-            var timeSpan = TimeSpan.FromSeconds(this.Row);
+            var timeSpan = this.Row;
             info.value = GetValue();
             return info;
 
@@ -133,31 +102,31 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var yearStr = value.Substring(0, 4);
                 if (!int.TryParse(yearStr, out int year))
                     return value;
-                if (timeSpan.TotalDays >= 28)
+                if (timeSpan == TimeSpanUnits.years)
                     return new DateTime(year, 0, 0);
 
                 var monthStr = value.Substring(4, 2);
                 if (!int.TryParse(monthStr, out int month))
                     return new DateTime(year, 0, 0);
-                if (timeSpan.TotalDays >= 1.0)
+                if (timeSpan == TimeSpanUnits.months)
                     return new DateTime(year, month, 0);
 
                 var dayStr = value.Substring(6, 2);
                 if (!int.TryParse(dayStr, out int day))
                     return new DateTime(year, month, 0);
-                if (timeSpan.TotalHours >= 1.0)
+                if (timeSpan == TimeSpanUnits.days)
                     return new DateTime(year, month, day);
 
                 var hourStr = value.Substring(8, 2);
                 if (!int.TryParse(hourStr, out int hour))
                     return new DateTime(year, month, day);
-                if (timeSpan.TotalMinutes >= 1.0)
+                if (timeSpan == TimeSpanUnits.hours)
                     return new DateTime(year, month, day, hour, 0, 0);
 
                 var minStr = value.Substring(10, 2);
                 if (!int.TryParse(minStr, out int min))
                     return new DateTime(year, month, day, hour, 0, 0);
-                if (timeSpan.Seconds >= 1.0)
+                if (timeSpan == TimeSpanUnits.minutes)
                     return new DateTime(year, month, day, hour, min, 0);
 
                 var secondsStr = value.Substring(12, 2);

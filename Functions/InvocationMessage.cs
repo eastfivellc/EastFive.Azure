@@ -24,6 +24,8 @@ using System.Linq.Expressions;
 using EastFive.Api.Auth;
 using EastFive.Azure.Auth;
 using System.Net.Http.Headers;
+using EastFive.Azure.Persistence.StorageTables;
+using System.Threading;
 
 namespace EastFive.Azure.Functions
 {
@@ -53,8 +55,8 @@ namespace EastFive.Azure.Functions
         public const string LastModifiedPropertyName = "last_modified";
         [LastModified]
         [DateTimeLookup(
-            Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
-            Row = DateTimeLookupAttribute.hours)]
+            Partition = TimeSpanUnits.days,
+            Row = TimeSpanUnits.hours)]
         [JsonProperty]
         public DateTimeOffset lastModified;
 
@@ -91,8 +93,8 @@ namespace EastFive.Azure.Functions
         [ApiProperty(PropertyName = LastExecutedPropertyName)]
         [Storage]
         [DateTimeLookup(
-            Partition = DateTimeLookupAttribute.hours * DateTimeLookupAttribute.hoursPerDay,
-            Row = DateTimeLookupAttribute.hours)]
+            Partition = TimeSpanUnits.days,
+            Row = TimeSpanUnits.hours)]
         public DateTime? lastExecuted;
 
         public const string ExecutionHistoryPropertyName = "execution_history";
@@ -161,12 +163,16 @@ namespace EastFive.Azure.Functions
         [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
-                [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
+                [HeaderLog]ILogger analyticsLog,
                 InvokeApplicationDirect invokeApplication,
+                CancellationToken cancellationToken,
                 MultipartResponseAsync onRun)
         {
             var messages = await invocationMessageRefs.refs
-                .Select(invocationMessageRef => InvokeAsync(invocationMessageRef, invokeApplication, logging: analyticsLog))
+                .Select(
+                    invocationMessageRef => InvokeAsync(invocationMessageRef, invokeApplication,
+                        logging:new EventLogger(analyticsLog),
+                        cancellationToken: cancellationToken))
                 .AsyncEnumerable()
                 .ToArrayAsync();
             return await onRun(messages);
@@ -213,7 +219,8 @@ namespace EastFive.Azure.Functions
         public static IEnumerableAsync<HttpResponseMessage> InvokeAsync(
                 byte [] invocationMessageIdsBytes,
             IInvokeApplication invokeApplication,
-            EastFive.Analytics.ILogger analyticsLog = default)
+            EastFive.Analytics.ILoggerWithEvents analyticsLog = default,
+            CancellationToken cancellationToken = default)
         {
             return invocationMessageIdsBytes
                 .Split(index => 16)
@@ -223,7 +230,7 @@ namespace EastFive.Azure.Functions
                         var idBytes = invocationMessageIdBytes.ToArray();
                         var invocationMessageId = new Guid(idBytes);
                         var invocationMessageRef = invocationMessageId.AsRef<InvocationMessage>();
-                        return InvokeAsync(invocationMessageRef, invokeApplication, analyticsLog);
+                        return InvokeAsync(invocationMessageRef, invokeApplication, analyticsLog, cancellationToken);
                     })
                 .Parallel();
         }
@@ -283,9 +290,12 @@ namespace EastFive.Azure.Functions
 
         public static async Task<HttpResponseMessage> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
             IInvokeApplication invokeApplication,
-            ILogger logging = default)
+            ILoggerWithEvents logging = default,
+            CancellationToken cancellationToken = default)
         {
             var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
+            var executionResultRef = Ref<ExecutionResult>.SecureRef();
+            var messageWriter = new MessageWriter(logging, executionResultRef.id, cancellationToken);
             scopedLogger.Trace($"Loading message from storage.");
             return await await invocationMessageRef.StorageGetAsync(
                 async (invocationMessage) =>
@@ -299,6 +309,7 @@ namespace EastFive.Azure.Functions
                         return await invocationMessageRef.StorageUpdateAsync(
                             async (invocationMessageShortCircuit, saveAsync) =>
                             {
+                                invocationMessageShortCircuit.lastExecuted = lastExecuted;
                                 invocationMessageShortCircuit.executionHistory = invocationMessageShortCircuit
                                     .executionHistory
                                     .Append(lastExecuted.PairWithValue((int)responseShortCurcuit.StatusCode))
@@ -337,40 +348,65 @@ namespace EastFive.Azure.Functions
                         httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
                     }
 
-                    bool updated = await invocationMessageRef.StorageUpdateAsync(
-                        async (invocationMessageToUpdate, saveAsync) =>
+                    var executionResult = new ExecutionResult
+                    {
+                        executionResultRef = executionResultRef,
+                        invocationMessage = invocationMessageRef,
+                        started = lastExecuted,
+                        traceBlobId = Guid.NewGuid(),
+                    };
+                    return await await executionResult.StorageCreateAsync(
+                        async (discard) =>
                         {
-                            invocationMessageToUpdate.executionHistory = invocationMessageToUpdate
-                                .executionHistory
-                                .Append(lastExecuted.PairWithValue(0))
-                                .ToArray();
-                            await saveAsync(invocationMessageToUpdate);
-                            return true;
-                        },
-                        () => false);
-
-                    logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
-                    var result = await invokeApplication.SendAsync(httpRequest);
-
-                    return await invocationMessageRef.StorageUpdateAsync(
-                        async (invocationMessageToUpdate, saveAsync) =>
-                        {
-                            invocationMessage.lastExecuted = lastExecuted;
-                            invocationMessage.executionHistory = invocationMessage.executionHistory
-                                .Select(
-                                    exHi =>
-                                    {
-                                        if((exHi.Key - lastExecuted).TotalSeconds < 1.0)
+                            logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
+                            
+                            var result = await invokeApplication.SendAsync(httpRequest);
+                            bool saved = await invocationMessageRef.StorageUpdateAsync(
+                                async (invocationMessageToSave, saveInvocationMessage) =>
+                                {
+                                    invocationMessage.lastExecuted = lastExecuted;
+                                    invocationMessage.executionHistory = invocationMessage.executionHistory
+                                        .Select(
+                                            exHi =>
+                                            {
+                                                if ((exHi.Key - lastExecuted).TotalSeconds < 1.0)
+                                                {
+                                                    return lastExecuted.PairWithValue((int)result.StatusCode);
+                                                }
+                                                return exHi;
+                                            })
+                                        .ToArray();
+                                    await saveInvocationMessage(invocationMessage);
+                                    return true;
+                                });
+                            return await await GetContents(
+                                (contentBlobId, whenCompleted) =>
+                                {
+                                    return executionResult.executionResultRef.StorageUpdateAsync(
+                                        async (executionResultToUpdate, saveAsync) =>
                                         {
-                                            return lastExecuted.PairWithValue((int)result.StatusCode);
-                                        }
-                                        return exHi;
-                                    })
-                                .ToArray();
-                            await saveAsync(invocationMessageToUpdate);
-                            return result;
-                        },
-                        () => result);
+                                            executionResultToUpdate.ended = whenCompleted;
+                                            executionResultToUpdate.contentBlobId = contentBlobId;
+                                            await saveAsync(executionResultToUpdate);
+                                            return result;
+                                        },
+                                        () => result);
+                                });
+
+                            async Task<TResult> GetContents<TResult>(
+                                Func<Guid?, DateTime, TResult> onContents)
+                            {
+                                if (result.Content.IsDefaultOrNull())
+                                    return onContents(default,  DateTime.UtcNow);
+                                
+                                var contents = await result.Content.ReadAsByteArrayAsync();
+                                var whenCompleted = DateTime.UtcNow;
+                                return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
+                                    contentBlobId => onContents(contentBlobId, whenCompleted),
+                                    contentType: result.Content.Headers.ContentType.MediaType);
+                            }
+                        });
+
 
                     bool ShortCircuit(out DateTime? latestExecution)
                     {

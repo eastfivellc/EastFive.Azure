@@ -334,6 +334,7 @@
     <Compile Include="Auth\XIntegration.cs" />
     <Compile Include="Auth\Whoami.cs" />
     <Compile Include="Configuration.cs" />
+    <Compile Include="Functions\ExecutionResult.cs" />
     <Compile Include="Functions\FunctionApplication.cs" />
     <Compile Include="Functions\FunctionInstigatorAttribute.cs" />
     <Compile Include="Functions\InvocationMessage.cs" />
@@ -386,6 +387,7 @@
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\UrlLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Lookups\StringLookupAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByDayAttribute.cs" />
+    <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\PartitionByIdAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\PartitionKey\ScopedPartitionAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeStringAttribute.cs" />
     <Compile Include="Persistence\StorageTables\Attributes\Scoping\ScopeIdPrefixAttribute.cs" />
@@ -402,6 +404,7 @@
     <Compile Include="Persistence\StorageTables\Backups\TableBackup.cs" />
     <Compile Include="Persistence\StorageTables\Backups\WhereInformation.cs" />
     <Compile Include="Persistence\StorageTables\Caching\MemoryCache.cs" />
+    <Compile Include="Persistence\StorageTables\MessageWriter.cs" />
     <Compile Include="Persistence\StorageTables\TableInformationAttribute.cs" />
     <Compile Include="Monitoring\Monitoring.cs" />
     <Compile Include="IProvideIntegration.cs" />

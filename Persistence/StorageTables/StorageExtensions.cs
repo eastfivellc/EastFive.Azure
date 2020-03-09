@@ -22,6 +22,7 @@ using System.IO;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Analytics;
+using System.Threading;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -325,7 +326,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var tableInformationTaskObj = typeof(AzureTableDriverDynamic)
                 .GetMethod("TableInformationAsync", BindingFlags.Instance | BindingFlags.Public)
                 .MakeGenericMethod(entityType.AsArray())
-                .Invoke(driver, new object[] { table, tableName, numberOfTimesToRetry });
+                .Invoke(driver, new object[] { table, tableName, numberOfTimesToRetry, default(CancellationToken) });
 
             var tableInformationTask = tableInformationTaskObj as Task<StorageTables.TableInformation>;
             return tableInformationTask;
@@ -400,12 +401,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onNotFound: onDoesNotExists);
         }
 
-        public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IQueryable<TEntity> entityQuery)
+        public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IQueryable<TEntity> entityQuery,
+            System.Threading.CancellationToken cancellationToken = default)
             where TEntity : IReferenceable, new()
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy<TEntity>(entityQuery, tableName:default);
+                .FindBy<TEntity>(entityQuery, tableName:default, cancellationToken: cancellationToken);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,

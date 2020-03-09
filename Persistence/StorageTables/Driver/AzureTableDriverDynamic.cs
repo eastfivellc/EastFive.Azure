@@ -193,7 +193,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TableInformation> TableInformationAsync<TEntity>(
             CloudTable table = default(CloudTable),
             string tableName = default,
-            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
             //where TEntity : IReferenceable
         {
             if(table.IsDefaultOrNull())
@@ -208,7 +209,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
                 .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
-                .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry });
+                .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry, cancellationToken });
 
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
 
@@ -728,7 +729,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public static IEnumerableAsync<TEntity> FindAllInternal<TEntity>(
             TableQuery<TEntity> query,
             CloudTable table,
-            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
             where TEntity : ITableEntity, new()
         {
             var token = default(TableContinuationToken);
@@ -736,6 +738,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             return EnumerableAsync.YieldBatch<TEntity>(
                 async (yieldReturn, yieldBreak) =>
                 {
+                    if (!cancellationToken.IsDefault())
+                        if (cancellationToken.IsCancellationRequested)
+                            return yieldBreak;
                     if (segmentFecthing.IsDefaultOrNull())
                         return yieldBreak;
                     try
@@ -774,7 +779,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         }
                         throw;
                     }
-                });
+                },
+                cancellationToken:cancellationToken);
         }
 
         #endregion
@@ -1574,12 +1580,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             string filter,
             string tableName,
             AzureTableDriverDynamic copyTo,
-            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             var table = this.TableClient.GetTableReference(tableName);
             var query = new TableQuery<GenericTableEntity>();
             var filteredQuery = query.Where(filter);
-            var allRows = FindAllInternal(filteredQuery, table, numberOfTimesToRetry);
+            var allRows = FindAllInternal(filteredQuery, table, numberOfTimesToRetry, cancellationToken);
             return copyTo.CreateOrReplaceBatch(allRows,
                 row => row.RowKey,
                 row => row.PartitionKey,
@@ -1631,7 +1638,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         }
 
         public IEnumerableAsync<TEntity> FindBy<TEntity>(IQueryable<TEntity> entityQuery,
-            string tableName = default)
+            string tableName = default,
+            System.Threading.CancellationToken cancellationToken = default)
             where TEntity : IReferenceable, new()
         {
             var table = tableName.HasBlackSpace() ?
@@ -1692,11 +1700,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         return combinedFilter;
                     });
 
-            return RunQuery<TEntity>(filter, table);
+            return RunQuery<TEntity>(filter, table, cancellationToken:cancellationToken);
         }
 
         private IEnumerableAsync<TEntity> RunQuery<TEntity>(string whereFilter, CloudTable table,
-            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             var query = whereFilter.AsTableQuery<TEntity>();
 
@@ -1713,14 +1722,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
                 .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
-                .Invoke(null, new object[] { query, table, numberOfTimesToRetry });
+                .Invoke(null, new object[] { query, table, numberOfTimesToRetry, cancellationToken });
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
             return findAllCasted
                 .Select(segResult => segResult.Entity);
         }
 
         public IEnumerableAsync<TData> FindByPartition<TData>(string partitionKeyValue,
-            string tableName = default)
+            string tableName = default,
+            System.Threading.CancellationToken cancellationToken = default)
             where TData  : ITableEntity, new()
         {
             var table = tableName.HasBlackSpace() ?
@@ -1729,12 +1739,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 GetTable<TData>();
             string filter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKeyValue);
             var tableQuery = new TableQuery<TData>().Where(filter);
-            return FindAllInternal(tableQuery, table);
+            return FindAllInternal(tableQuery, table,cancellationToken:cancellationToken);
         }
 
         public IEnumerableAsync<TEntity> FindEntityBypartition<TEntity>(string partitionKeyValue,
             string tableName = default,
-            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             var table = tableName.HasBlackSpace() ?
                 this.TableClient.GetTableReference(tableName)
@@ -1746,7 +1757,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
                 .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
-                .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry });
+                .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry, cancellationToken });
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
             return findAllCasted
                 .Select(segResult => segResult.Entity);
