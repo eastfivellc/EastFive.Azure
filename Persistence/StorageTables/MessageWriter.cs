@@ -70,42 +70,43 @@ namespace EastFive.Azure.Persistence.StorageTables
                 },
                 cancellationToken);
         }
+    }
 
-        [StorageTable]
-        public struct EventMessageLine : IReferenceable
-        {
-            [JsonIgnore]
-            public Guid id => this.eventMessageLineRef.id;
 
-            public const string IdPropertyName = "id";
-            [JsonProperty(PropertyName = IdPropertyName)]
-            [ApiProperty(PropertyName = IdPropertyName)]
-            [RowKey]
-            public IRef<EventMessageLine> eventMessageLineRef;
+    [StorageTable]
+    public struct EventMessageLine : IReferenceable
+    {
+        [JsonIgnore]
+        public Guid id => this.eventMessageLineRef.id;
 
-            public const string EventPropertyName = "event";
-            [JsonProperty(PropertyName = EventPropertyName)]
-            [ApiProperty(PropertyName = EventPropertyName)]
-            [PartitionById]
-            public Guid eventId;
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [ApiProperty(PropertyName = IdPropertyName)]
+        [RowKey]
+        public IRef<EventMessageLine> eventMessageLineRef;
 
-            public const string MessagePropertyName = "message";
-            [JsonProperty(PropertyName = MessagePropertyName)]
-            [ApiProperty(PropertyName = MessagePropertyName)]
-            [Storage]
-            public string message;
+        public const string EventPropertyName = "event";
+        [JsonProperty(PropertyName = EventPropertyName)]
+        [ApiProperty(PropertyName = EventPropertyName)]
+        [PartitionById]
+        public Guid eventId;
 
-            public const string WhenPropertyName = "when";
-            [JsonProperty(PropertyName = WhenPropertyName)]
-            [ApiProperty(PropertyName = WhenPropertyName)]
-            [Storage]
-            public DateTime when;
+        public const string MessagePropertyName = "message";
+        [JsonProperty(PropertyName = MessagePropertyName)]
+        [ApiProperty(PropertyName = MessagePropertyName)]
+        [Storage]
+        public string message;
 
-            public const string OrderPropertyName = "order";
-            [JsonProperty(PropertyName = OrderPropertyName)]
-            [ApiProperty(PropertyName = OrderPropertyName)]
-            [Storage]
-            public int order;
-        }
+        public const string WhenPropertyName = "when";
+        [JsonProperty(PropertyName = WhenPropertyName)]
+        [ApiProperty(PropertyName = WhenPropertyName)]
+        [Storage]
+        public DateTime when;
+
+        public const string OrderPropertyName = "order";
+        [JsonProperty(PropertyName = OrderPropertyName)]
+        [ApiProperty(PropertyName = OrderPropertyName)]
+        [Storage]
+        public int order;
     }
 }

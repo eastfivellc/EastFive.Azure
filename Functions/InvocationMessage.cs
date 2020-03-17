@@ -295,7 +295,8 @@ namespace EastFive.Azure.Functions
         {
             var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
             var executionResultRef = Ref<ExecutionResult>.SecureRef();
-            var messageWriter = new MessageWriter(logging, executionResultRef.id, cancellationToken);
+            var traceId = Security.SecureGuid.Generate();
+            var messageWriter = new MessageWriter(logging, traceId, cancellationToken);
             scopedLogger.Trace($"Loading message from storage.");
             return await await invocationMessageRef.StorageGetAsync(
                 async (invocationMessage) =>
@@ -353,7 +354,7 @@ namespace EastFive.Azure.Functions
                         executionResultRef = executionResultRef,
                         invocationMessage = invocationMessageRef,
                         started = lastExecuted,
-                        traceBlobId = Guid.NewGuid(),
+                        eventMessageId = traceId,
                     };
                     return await await executionResult.StorageCreateAsync(
                         async (discard) =>
