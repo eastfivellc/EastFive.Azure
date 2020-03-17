@@ -18,7 +18,7 @@ namespace EastFive.Azure.Functions
                 .IsAssignableFrom(typeof(InvokeApplicationFromFunction));
         }
 
-        public override Task<HttpResponseMessage> Instigate(HttpApplication httpApp,
+        public override Task<HttpResponseMessage> Instigate(IApplication httpApp,
                 HttpRequestMessage request, CancellationToken cancellationToken,
                 ParameterInfo parameterInfo,
             Func<object, Task<HttpResponseMessage>> onSuccess)
@@ -31,7 +31,7 @@ namespace EastFive.Azure.Functions
 
         protected class InvokeApplicationFromFunction : InvokeApplicationFromRequest
         {
-            public InvokeApplicationFromFunction(HttpApplication httpApp,
+            public InvokeApplicationFromFunction(IApplication httpApp,
                     HttpRequestMessage request, 
                     Uri serverLocation, string apiPrefix) :
                 base(httpApp, request, serverLocation, apiPrefix)
