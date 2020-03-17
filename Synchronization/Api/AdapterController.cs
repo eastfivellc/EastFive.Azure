@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.Threading.Tasks;
 using System.Linq.Expressions;
 
@@ -108,14 +108,15 @@ namespace EastFive.Api.Controllers
         #endregion
         
         internal static EastFive.Api.Resources.Adapter GetResource(EastFive.Azure.Synchronization.Connection connection,
-            System.Web.Http.Routing.UrlHelper url)
+            UrlHelper url)
         {
             var adapter = connection.adapterInternal;
             return GetResource(adapter, url);
         }
         
-        internal static EastFive.Api.Resources.Adapter GetResource(EastFive.Azure.Synchronization.Adapter adapter,
-            System.Web.Http.Routing.UrlHelper url)
+        internal static EastFive.Api.Resources.Adapter GetResource(
+            EastFive.Azure.Synchronization.Adapter adapter,
+            UrlHelper url)
         {
             var resource = new EastFive.Api.Resources.Adapter()
             {

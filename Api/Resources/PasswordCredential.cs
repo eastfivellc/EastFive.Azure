@@ -3,7 +3,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api;
 using BlackBarLabs.Api.Resources;
 using EastFive.Api;
@@ -12,6 +12,7 @@ using EastFive.Api.Controllers;
 using EastFive.Azure.Auth;
 using EastFive.Extensions;
 using Newtonsoft.Json;
+using EastFive.Azure;
 
 namespace EastFive.Security.SessionServer.Api.Resources
 {
@@ -70,7 +71,7 @@ namespace EastFive.Security.SessionServer.Api.Resources
                 [PropertyOptional(Name = IsEmailPropertyName)]bool isEmail,
                 [PropertyOptional(Name = ForceChangePropertyName)]bool forceChange,
                 [PropertyOptional(Name = LastEmailSentPropertyName)]DateTime? lastEmailSent,
-                Context context, AzureApplication application,
+                Context context, IAuthApplication application,
                 UrlHelper url,
                 EastFive.Api.SessionToken security,
             CreatedResponse onCreated,

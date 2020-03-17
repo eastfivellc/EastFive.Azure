@@ -7,7 +7,7 @@ using System;
 using BlackBarLabs.Api;
 using EastFive.Api;
 using EastFive;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Api.Controllers;
 using EastFive.Linq;
 using EastFive.Extensions;
@@ -147,8 +147,6 @@ namespace EastFive.Api.Azure.Controllers
                     .GetTypes();
                 var results = types
                     .Where(type =>
-                        typeof(BlackBarLabs.Api.Controllers.BaseController).IsAssignableFrom(type) ||
-                        typeof(System.Web.Http.ApiController).IsAssignableFrom(type) ||
                         type.GetCustomAttribute<FunctionViewControllerAttribute, bool>((attrs) => true, () => false))
                     .ToArray();
 

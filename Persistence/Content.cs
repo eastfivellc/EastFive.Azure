@@ -45,7 +45,7 @@ namespace EastFive.Api.Azure.Persistence
             Func<TResult> onAlreadyExists)
         {
             var container = BlobStore().GetContainerReference("content");
-            container.CreateIfNotExists();
+            await container.CreateIfNotExistsAsync();
             var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
             try
             {

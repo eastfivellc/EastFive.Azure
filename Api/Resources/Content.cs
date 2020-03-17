@@ -4,16 +4,12 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using BlackBarLabs.Web;
-using BlackBarLabs.Api;
 using System.Threading.Tasks;
 using EastFive.Api.Controllers;
 using Newtonsoft.Json;
 using System.IO;
 using System.IO.Compression;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
 using EastFive.Extensions;
 using EastFive.Linq;
 
@@ -97,8 +93,7 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
                 [OptionalQueryParameter]string renderer,
-            HttpRequestMessage request,
-            System.Web.Http.Routing.UrlHelper url)
+            HttpRequestMessage request)
         {
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                 (contentType, image) =>
@@ -215,8 +210,7 @@ namespace EastFive.Api.Azure.Resources
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [QueryParameter(Name = StreamingPropertyName)]bool streaming,
                 HttpRequestMessage request,
-                EastFive.Api.Security security,
-                System.Web.Http.Routing.UrlHelper url)
+                EastFive.Api.Security security)
         {
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                     security,

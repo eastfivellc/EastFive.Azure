@@ -6,7 +6,7 @@ using System.Net;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
@@ -112,7 +112,6 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public static Task<HttpResponseMessage> GetAsync(
                 [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
                 EastFive.Api.SessionToken? securityMaybe,
             ContentTypeResponse<Authorization> onFound,
             NotFoundResponse onNotFound,
@@ -150,7 +149,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = MethodPropertyName)]IRef<Method> method,
                 [Property(Name = LocationAuthorizationReturnPropertyName)]Uri LocationAuthenticationReturn,
                 [Resource]Authorization authorization,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, UrlHelper urlHelper,
             CreatedBodyResponse<Authorization> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Method> onAuthenticationDoesNotExist)
@@ -278,7 +277,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         public async Task<TResult> ParseCredentailParameters<TResult>(
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             Func<string, IProvideLogin, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {

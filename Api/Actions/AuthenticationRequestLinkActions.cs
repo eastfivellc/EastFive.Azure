@@ -3,11 +3,10 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using System.Net.Http;
-using System.Web.Http.Routing;
 using System.Configuration;
 
-using BlackBarLabs;
-using BlackBarLabs.Extensions;
+using Microsoft.AspNetCore.Mvc.Routing;
+
 using EastFive.Api.Services;
 using EastFive.Security.SessionServer.Configuration;
 using EastFive.Api;
@@ -16,6 +15,7 @@ using EastFive.Security.SessionServer.Api.Controllers;
 using EastFive.Security;
 using BlackBarLabs.Api;
 using System.Collections.Generic;
+
 
 namespace EastFive.Api.Azure.Credentials
 {
@@ -66,7 +66,7 @@ namespace EastFive.Api.Azure.Credentials
             var name = providerPair.Value is IProvideIntegration integrationProvider ? integrationProvider.GetDefaultName(null) : method.ToString();
             return new Resources.AuthenticationRequestLink
             {
-                Id = urlHelper.GetWebId<Controllers.SessionController>(SecureGuid.Generate()),
+                //Id = urlHelper.GetWebId<Controllers.SessionController>(SecureGuid.Generate()),
                 Method = method,
                 Name = name,
                 SecureId = SecureGuid.Generate(),

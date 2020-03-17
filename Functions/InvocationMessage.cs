@@ -26,6 +26,7 @@ using EastFive.Azure.Auth;
 using System.Net.Http.Headers;
 using EastFive.Azure.Persistence.StorageTables;
 using System.Threading;
+using System.Security.Claims;
 
 namespace EastFive.Azure.Functions
 {
@@ -116,7 +117,7 @@ namespace EastFive.Azure.Functions
         #region GET
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> GetByIdAsync(
             [QueryId]IRef<InvocationMessage> invocationMessageRef,
             ContentTypeResponse<InvocationMessage> onFound,
@@ -128,7 +129,7 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
@@ -145,7 +146,7 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> ListByRequerUrlAsync(
             [QueryParameter(Name = "request_uri")]Uri requestUri,
             MultipartResponseAsync<InvocationMessage> onRun)
@@ -160,7 +161,7 @@ namespace EastFive.Azure.Functions
         #region Actions
 
         [HttpAction("Invoke")]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
                 [HeaderLog]ILogger analyticsLog,
@@ -179,10 +180,10 @@ namespace EastFive.Azure.Functions
         }
 
         [HttpAction("Enqueue")]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> EnqueueAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
-                AzureApplication application,
+                IAzureApplication application,
             NoContentResponse onNoContent)
         {
             await SendToQueueAsync(invocationMessageRef, application);
@@ -194,7 +195,7 @@ namespace EastFive.Azure.Functions
         #region Update
 
         [Api.HttpPatch]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<HttpResponseMessage> UpdateByIdAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
                 [Property(Name = ExecutionLimitPropertyName)]int executionLimit,
@@ -257,13 +258,13 @@ namespace EastFive.Azure.Functions
                 () => throw new Exception());
         }
 
-        public Task SendToQueueAsync(AzureApplication application)
+        public Task SendToQueueAsync(IAzureApplication application)
         {
             return InvocationMessage.SendToQueueAsync(this.invocationRef, application);
         }
 
         public static Task SendToQueueAsync(IRef<InvocationMessage> invocationMessageRef,
-            AzureApplication azureApplication)
+            IAzureApplication azureApplication)
         {
             var byteContent = invocationMessageRef.id.ToByteArray();
             return EastFive.Web.Configuration.Settings.GetString(
@@ -276,7 +277,7 @@ namespace EastFive.Azure.Functions
         }
 
         public static Task SendToQueueAsync(IRefs<InvocationMessage> invocationMessageRefs,
-            AzureApplication azureApplication)
+            IAzureApplication azureApplication)
         {
             var byteContents = invocationMessageRefs.ids.Select(id => id.ToByteArray()).ToArray();
             return EastFive.Web.Configuration.Settings.GetString(
@@ -324,8 +325,8 @@ namespace EastFive.Azure.Functions
                     var httpRequest = new HttpRequestMessage(
                         new HttpMethod(invocationMessage.method),
                         invocationMessage.requestUri);
-                    var config = new HttpConfiguration();
-                    httpRequest.SetConfiguration(config);
+                    //var config = new HttpConfiguration();
+                    //httpRequest.SetConfiguration(config);
 
                     logging.Trace($"Message origin:[{invocationMessage.referrer}].");
                     if(invocationMessage.headers.ContainsKey(InvocationMessageSourceHeaderKey))

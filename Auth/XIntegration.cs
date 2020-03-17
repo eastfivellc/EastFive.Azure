@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive;
@@ -77,7 +77,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public async static Task<HttpResponseMessage> GetByIdAsync(
                 [QueryParameter(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                Api.Azure.AzureApplication application, SessionToken security,
+                IAuthApplication application, SessionToken security,
             ContentTypeResponse<XIntegration> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -104,7 +104,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public async static Task<HttpResponseMessage> GetByAccountAsync(
                 [QueryParameter(Name = AccountPropertyName)]Guid accountId,
-                Api.Azure.AzureApplication application, SessionToken security,
+                IAuthApplication application, SessionToken security,
             MultipartResponseAsync<XIntegration> onContents,
             ReferencedDocumentNotFoundResponse<object> onAccountNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -135,7 +135,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public async static Task<HttpResponseMessage> GetByMethodAsync(
                 [QueryParameter(Name = Authorization.MethodPropertyName)]IRef<Method> methodRef,
-                Api.Azure.AzureApplication application, SessionToken security,
+                IAuthApplication application, SessionToken security,
             MultipartResponseAsync<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
@@ -168,7 +168,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]XIntegration integration,
-                Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
+                IAuthApplication application, EastFive.Api.SessionToken security,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onForbidden,
@@ -202,7 +202,7 @@ namespace EastFive.Azure.Auth
         [HttpDelete]
         public static async Task<HttpResponseMessage> DeleteAsync(
         [UpdateId(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
+                IAuthApplication application, EastFive.Api.SessionToken security,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound,
             ForbiddenResponse onForbidden)
@@ -215,7 +215,7 @@ namespace EastFive.Azure.Auth
             if (!await application.CanAdministerCredentialAsync(integration.accountId, security))
                 return onForbidden();
 
-            return await DeleteInternalAsync(integrationRef, application, () => onDeleted(), () => onNotFound());
+            return await DeleteInternalAsync(integrationRef, () => onDeleted(), () => onNotFound());
         }
 
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]
@@ -271,7 +271,7 @@ namespace EastFive.Azure.Auth
         #region Utility Methods
 
         public static Task<TResult> DeleteInternalAsync<TResult>(
-                IRef<XIntegration> integrationRef, Api.Azure.AzureApplication application, 
+                IRef<XIntegration> integrationRef,
             Func<TResult> onDeleted,
             Func<TResult> onNotFound)
         {

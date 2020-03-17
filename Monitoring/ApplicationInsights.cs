@@ -8,7 +8,6 @@ using EastFive.Api;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
 using Microsoft.Azure.ApplicationInsights;
-using Microsoft.Rest.Azure.Authentication;
 using Microsoft.Azure.ApplicationInsights.Models;
 
 namespace EastFive.Azure.Monitoring

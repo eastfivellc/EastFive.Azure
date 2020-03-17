@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Collections.Concurrent;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using BlackBarLabs;
 using BlackBarLabs.Api;
@@ -48,7 +48,6 @@ namespace EastFive.Security.SessionServer
         
 
         public static async Task<TResult> InitializeAsync<TResult>(IConfigureIdentityServer configurationManager,
-                HttpConfiguration config,
                 Func<
                     Func<IProvideAuthorization, IProvideAuthorization[]>, // onProvideAuthorization
                     Func<IProvideAuthorization[]>, // onProvideNothing
@@ -241,27 +240,6 @@ namespace EastFive.Security.SessionServer
                                 });
                     },
                     (IEnumerable<string> resourceTypes) => onFound(resourceTypes.ToArray()).ToTask());
-        }
-
-        private static void AddExternalControllers<TController>(HttpConfiguration config)
-           where TController : ApiController
-        {
-            var routes = typeof(TController)
-                .GetCustomAttributes<RoutePrefixAttribute>()
-                .Select(routePrefix => routePrefix.Prefix)
-                .Distinct();
-
-            foreach (var routePrefix in routes)
-            {
-                config.Routes.MapHttpRoute(
-                    name: routePrefix,
-                    routeTemplate: routePrefix + "/{controller}/{id}",
-                    defaults: new { id = RouteParameter.Optional });
-            }
-
-            //var assemblyRecognition = new InjectableAssemblyResolver(typeof(TController).Assembly,
-            //    config.Services.GetAssembliesResolver());
-            //config.Services.Replace(typeof(System.Web.Http.Dispatcher.IAssembliesResolver), assemblyRecognition);
         }
     }
 }

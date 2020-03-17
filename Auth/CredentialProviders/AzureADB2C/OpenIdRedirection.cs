@@ -3,6 +3,7 @@ using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Azure.Credentials;
 using EastFive.Api.Controllers;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
 {
@@ -42,7 +43,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<HttpResponseMessage> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
-                AzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, UrlHelper urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -52,7 +53,6 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
             var parameters = request.RequestUri.ParseQuery();
             var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
                 AzureADB2CProvider.IntegrationName, application);
-            
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
                     parameters,
                     application,
@@ -67,7 +67,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<HttpResponseMessage> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,
-                AzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, UrlHelper urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,

@@ -7,10 +7,10 @@ using System.Web.Http;
 using System.Net.Http;
 using System.Threading;
 
+using Microsoft.AspNetCore.Mvc.Routing;
+
 using BlackBarLabs.Api;
 using BlackBarLabs.Extensions;
-using System.Web.Http.Routing;
-using BlackBarLabs;
 using EastFive.Api.Services;
 using EastFive.Security.SessionServer.Configuration;
 using EastFive.Api.Azure.Credentials.Resources.Queries;
@@ -62,7 +62,7 @@ namespace EastFive.Api.Azure.Credentials
         {
             return new Resources.InviteCredential
             {
-                Id = urlHelper.GetWebId<Controllers.InviteCredentialController>(invite.id),
+                //Id = urlHelper.GetWebId<Controllers.InviteCredentialController>(invite.id),
                 Actor = Library.configurationManager.GetActorLink(invite.actorId, urlHelper),
                 Email = invite.email,
                 LastEmailSent = invite.lastSent,
@@ -83,10 +83,11 @@ namespace EastFive.Api.Azure.Credentials
                 {
                     var context = request.GetSessionServerContext();
                     var creationResults = await context.Credentials.SendEmailInviteAsync(
-                        credential.Id.UUID, actorId.Value, credential.Email,
-                        // TODO: Pass in application instead of null
-                        null, performingActorId, claims.ToArray(),
-                        (inviteId, token) => url.GetLocation<Controllers.InviteCredentialController>().SetQueryParam("token", token.ToString("N")),
+                            credential.Id.UUID, actorId.Value, credential.Email,
+                            // TODO: Pass in application instead of null
+                            null, performingActorId, claims.ToArray(),
+                        (inviteId, token) => new Uri("http://example.com/todo")
+                            .SetQueryParam("token", token.ToString("N")),
                         () => request.CreateResponse(HttpStatusCode.Created),
                         () => request.CreateResponse(HttpStatusCode.Conflict)
                             .AddReason($"Invite already exists"),

@@ -170,9 +170,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var token = default(TableContinuationToken);
             if (StillScanning)
             {
-                token = new TableContinuationToken();
-                var tokenReader = XmlReader.Create(new StringReader(continuationToken));
-                token.ReadXml(tokenReader);
+                token = JsonConvert.DeserializeObject<TableContinuationToken>(continuationToken);
+                //token = new TableContinuationToken();
+                //var tokenReader = XmlReader.Create(new StringReader(continuationToken));
+                //token.ReadXml(tokenReader);
             }
 
             var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
@@ -244,14 +245,16 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 return default;
 
                             logger.Trace($"{rowList.Count} rows read [{tableBackup.tableName}]");
-                            using (var writer = new StringWriter())
-                            {
-                                using (var xmlWriter = XmlWriter.Create(writer))
-                                {
-                                    token.WriteXml(xmlWriter);
-                                }
-                                return writer.ToString();
-                            }
+                            
+                            return JsonConvert.SerializeObject(token);
+                            //using (var writer = new StringWriter())
+                            //{
+                            //    using (var xmlWriter = XmlWriter.Create(writer))
+                            //    {
+                            //        token.WriteXml(xmlWriter);
+                            //    }
+                            //    return writer.ToString();
+                            //}
                         }
 
                         segmentFetching = token.IsDefaultOrNull() ?

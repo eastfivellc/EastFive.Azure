@@ -6,6 +6,7 @@ using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Web;
+using EastFive.Web.Configuration;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 
@@ -35,10 +36,13 @@ namespace EastFive.Api.Azure.Monitoring
 
         private static AzureStorageRepository GetRepo(string storageAppSettingKey)
         {
-            var storageSetting = ConfigurationContext.Instance.AppSettings[storageAppSettingKey];
-            var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
-            var repo = new AzureStorageRepository(cloudStorageAccount);
-            return repo;
+            return storageAppSettingKey.ConfigurationString(
+                storageSetting =>
+                {
+                    var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
+                    var repo = new AzureStorageRepository(cloudStorageAccount);
+                    return repo;
+                });
         }
 
         public static Task<TResult> CreateAsync<TResult>(Guid id, Guid authenticationId, DateTime time, string method, string controller, string content,

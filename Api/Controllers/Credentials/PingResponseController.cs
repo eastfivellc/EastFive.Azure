@@ -6,30 +6,27 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
-using BlackBarLabs.Api.Controllers;
-
-using BlackBarLabs;
-using BlackBarLabs.Api;
-using EastFive.Api.Services;
 using System.Xml;
-using BlackBarLabs.Extensions;
 using System.Text;
 using System.IO;
 using System.Net.Http.Headers;
+
 using Microsoft.ApplicationInsights;
-using EastFive.Security.SessionServer.Configuration;
-using EastFive.Security.SessionServer.Exceptions;
+using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
+
+using EastFive.Api.Services;
 using EastFive.Extensions;
 using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
-using Newtonsoft.Json;
 using EastFive.Azure.Auth;
 using EastFive.Linq;
 
 namespace EastFive.Api.Azure.Credentials.Controllers
 {
-    [RoutePrefix("aadb2c")]
     [FunctionViewController6(
+        Prefix="aadb2c",
         Route="PingResponse",
         Resource = typeof(PingResponse),
         ContentType = "x-application/ping-response",
@@ -53,7 +50,7 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
                 AzureApplication application,
                 HttpRequestMessage request,
-                System.Web.Http.Routing.UrlHelper urlHelper,
+                UrlHelper urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -88,7 +85,8 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                     return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
                         async reportSetId =>
                         {
-                            var requestParams = request.GetQueryNameValuePairs()
+                            var requestParams = request.RequestUri
+                                .ParseQuery()
                                 .Append("PingAuthName".PairWithValue(pingAuthName))
                                 .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
                                 .ToDictionary();

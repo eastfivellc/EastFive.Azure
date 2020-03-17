@@ -55,7 +55,6 @@ namespace EastFive.Azure.Login
         public static async Task<HttpResponseMessage> UpdateAsync(
                 [Property(Name = UserIdentificationPropertyName)]string userIdentification,
                 [Property(Name = PasswordPropertyName)]string password,
-                Api.Azure.AzureApplication application,
             CreatedResponse onUpdated,
             AlreadyExistsResponse onUsernameAlreadyTaken,
             GeneralConflictResponse onInvalidPassword)

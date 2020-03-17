@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api.Resources;
 using BlackBarLabs;
 using BlackBarLabs.Extensions;

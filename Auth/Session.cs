@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
@@ -91,7 +91,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         private static async Task<TResult> GetClaimsAsync<TResult>(
-            Api.Azure.AzureApplication application, IRefOptional<Authorization> authorizationRefMaybe,
+            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
             Func<string, TResult> onFailure)
         {
@@ -122,7 +122,7 @@ namespace EastFive.Azure.Auth
         public static async Task<HttpResponseMessage> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
                 EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, UrlHelper urlHelper,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -169,7 +169,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
                 //EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, UrlHelper urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse forbidden,
@@ -190,7 +190,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = SessionIdPropertyName)]IRef<Session> sessionId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]Session session,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             CreatedBodyResponse<Session> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse forbidden,
@@ -248,7 +248,7 @@ namespace EastFive.Azure.Auth
         public static Task<HttpResponseMessage> UpdateBodyAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse forbidden,
@@ -293,7 +293,6 @@ namespace EastFive.Azure.Auth
         [HttpDelete]
         public static Task<HttpResponseMessage> DeleteAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
-                Api.Azure.AzureApplication application,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound)
         {
@@ -308,7 +307,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             Func<Guid, bool, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {

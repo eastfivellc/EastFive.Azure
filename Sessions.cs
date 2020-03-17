@@ -14,6 +14,7 @@ using EastFive.Linq;
 using EastFive.Api.Azure;
 using EastFive.Extensions;
 using EastFive.Azure.Monitoring;
+using EastFive.Azure;
 
 namespace EastFive.Security.SessionServer
 {

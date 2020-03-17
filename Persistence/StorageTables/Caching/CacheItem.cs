@@ -252,7 +252,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
 
             var blobClient = GetBlobClient();
             var container = blobClient.GetContainerReference("cache");
-            container.CreateIfNotExists();
+            await container.CreateIfNotExistsAsync();
             var contentType = response.Content.Headers.ContentType.IsDefaultOrNull()?
                 string.Empty
                 :
@@ -311,7 +311,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
 
             var blobClient = GetBlobClient();
             var container = blobClient.GetContainerReference("cache");
-            container.CreateIfNotExists();
+            await container.CreateIfNotExistsAsync();
             try
             {
                 var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));

@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
+using Microsoft.AspNetCore.Mvc.Routing;
+
 using EastFive;
 using EastFive.Linq;
 using EastFive.Api;
@@ -54,7 +56,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = TokenPropertyName)]string token,
                 AzureApplication application,
                 HttpRequestMessage request,
-                System.Web.Http.Routing.UrlHelper urlHelper,
+                UrlHelper urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -62,8 +64,8 @@ namespace EastFive.Azure.Auth
         {
             var method = await EastFive.Azure.Auth.Method.ByMethodName(
                 EastFive.Api.Azure.Credentials.AzureADB2CProvider.IntegrationName, application);
-            var requestParams = request
-                .GetQueryNameValuePairs()
+            var requestParams = request.RequestUri
+                .ParseQuery()
                 .Distinct(kvp => kvp.Key)
                 .ToDictionary();
             if (state.HasBlackSpace())

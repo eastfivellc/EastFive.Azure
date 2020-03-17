@@ -1,27 +1,28 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Collections.Generic;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-using EastFive.Serialization;
 using System.Net.NetworkInformation;
-using EastFive.Extensions;
-using BlackBarLabs.Web;
-using Microsoft.ApplicationInsights;
-using EastFive.Api;
 using System.Net.Http;
 using System.Threading;
-using BlackBarLabs.Api;
+using System.Reflection;
+
+using Microsoft.ApplicationInsights;
+
+using Newtonsoft.Json;
+
+using EastFive.Serialization;
+using EastFive.Extensions;
+using EastFive.Api;
 using EastFive.Linq;
+using EastFive.Linq.Async;
+using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Linq.Async;
-using Newtonsoft.Json;
 
 namespace EastFive.Api.Azure.Modules
 {
@@ -30,11 +31,13 @@ namespace EastFive.Api.Azure.Modules
         public const string HeaderKey = "StorageTableInformation";
 
         public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType, 
-            IApplication httpApp, HttpRequestMessage request, string routeName,
+            IApplication httpApp, HttpRequestMessage request,
+            RouteData routeData, MethodInfo [] extensionsMethods,
             RouteHandlingDelegate continueExecution)
         {
             if (!request.Headers.Contains(HeaderKey))
-                return continueExecution(controllerType, httpApp, request, routeName);
+                return continueExecution(controllerType, httpApp, request,
+                    routeData, extensionsMethods);
             return EastFive.Azure.AppSettings.TableInformationToken.ConfigurationString(
                 async headerToken =>
                 {
@@ -59,7 +62,8 @@ namespace EastFive.Api.Azure.Modules
                     var tableInformation = await controllerType.StorageTableInformationAsync();
                     return request.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
                 },
-                why => continueExecution(controllerType, httpApp, request, routeName));
+                why => continueExecution(controllerType, httpApp, request,
+                    routeData, extensionsMethods));
         }
 
     }

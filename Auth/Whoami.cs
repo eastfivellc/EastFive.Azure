@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -47,7 +47,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
         public static async Task<HttpResponseMessage> GetAsync(
                 EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application,
             ContentTypeResponse<Whoami> onFound)
         {
             async Task<string> GetName()

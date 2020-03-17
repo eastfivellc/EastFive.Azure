@@ -11,11 +11,18 @@ using System.Web.Http;
 
 namespace EastFive.Security.SessionServer.Api.Controllers
 {
+    [FunctionViewController6(
+        Prefix = "/",
+        Route= "apple-app-site-association", 
+        Resource = typeof(AppleAppSiteAssociationController))]
     public class AppleAppSiteAssociationController : ApiController
     {
-        public IHttpActionResult Get()
+        [HttpGet]
+        public HttpResponseMessage Get(
+            ContentResponse onSuccess,
+            NotFoundResponse onNotFound)
         {
-            var response = SessionServer.Configuration.AppSettings.AppleAppSiteAssociationId.ConfigurationString(
+            return Configuration.AppSettings.AppleAppSiteAssociationId.ConfigurationString(
                 (appId) =>
                 {
                     var content = new
@@ -33,13 +40,9 @@ namespace EastFive.Security.SessionServer.Api.Controllers
                             }
                         }
                     };
-                    return this.Request.CreateResponse(HttpStatusCode.OK, 
-                        content, Configuration.Formatters.JsonFormatter);
+                    return onSuccess(content);
                 },
-                (why) => this.Request.CreateResponse(HttpStatusCode.NotFound)
-                    .AddReason(why));
-            
-            return this.ActionResult(() => response.AsTask());
+                (why) => onNotFound().AddReason(why));
         }
     }
 }

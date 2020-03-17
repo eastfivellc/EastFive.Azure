@@ -226,9 +226,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var token = default(TableContinuationToken);
             if (continuationToken.HasBlackSpace())
             {
-                token = new TableContinuationToken();
-                var tokenReader = XmlReader.Create(new StringReader(continuationToken));
-                token.ReadXml(tokenReader);
+                token = JsonConvert.DeserializeObject<TableContinuationToken>(continuationToken);
+                //token = new TableContinuationToken();
+                //var tokenReader = XmlReader.Create(new StringReader(continuationToken));
+                //token.ReadXml(tokenReader);
             }
 
             var timer = Stopwatch.StartNew();
@@ -316,14 +317,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         var tokenToSave = string.Empty;
                         if (!token.IsDefaultOrNull())
                         {
-                            using (var writer = new StringWriter())
-                            {
-                                using (var xmlWriter = XmlWriter.Create(writer))
-                                {
-                                    token.WriteXml(xmlWriter);
-                                }
-                                tokenToSave = writer.ToString();
-                            }
+                            tokenToSave = JsonConvert.SerializeObject(token);
+                            //using (var writer = new StringWriter())
+                            //{
+                            //    using (var xmlWriter = XmlWriter.Create(writer))
+                            //    {
+                            //        token.WriteXml(xmlWriter);
+                            //    }
+                            //    tokenToSave = writer.ToString();
+                            //}
                         }
 
                         bool saved = await this.tableBackupOperationRef.StorageUpdateAsync(

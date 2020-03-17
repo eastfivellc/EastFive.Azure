@@ -2,15 +2,19 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-using EastFive.Security.SessionServer.Exceptions;
+
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.ApplicationInsights;
+
+using Newtonsoft.Json;
+
 using EastFive.Extensions;
 using EastFive.Security.SessionServer;
+using EastFive.Security.SessionServer.Exceptions;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
-using Newtonsoft.Json;
 using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Auth
@@ -39,14 +43,14 @@ namespace EastFive.Azure.Auth
         public static async Task<TResult> ProcessRequestAsync<TResult>(
                 EastFive.Azure.Auth.Method method,
                 IDictionary<string, string> values,
-                AzureApplication application, HttpRequestMessage request,
-                System.Web.Http.Routing.UrlHelper urlHelper,
+                IAzureApplication application, HttpRequestMessage request,
+                UrlHelper urlHelper,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onBadCredentials,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onFailure)
         {
-            var authorizationRequestManager = application.AuthorizationRequestManager;
+            //var authorizationRequestManager = application.AuthorizationRequestManager;
 
             var telemetry = application.Telemetry;
             telemetry.TrackEvent($"ResponseController.ProcessRequestAsync - Requesting credential manager.");
@@ -77,14 +81,13 @@ namespace EastFive.Azure.Auth
 
         public async static Task<TResult> AuthenticationAsync<TResult>(
                 EastFive.Azure.Auth.Method authentication, IDictionary<string, string> values, Uri baseUri,
-                AzureApplication application,
+                IAzureApplication application,
                 IRefOptional<Authorization> authorizationRefToCreate,
             Func<Uri, TResult> onRedirect,
             Func<TResult> onAuthorizationNotFound,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onGeneralFailure)
         {
-            var authorizationRequestManager = application.AuthorizationRequestManager;
             var telemetry = application.Telemetry;
             return await await authentication.RedeemTokenAsync(values, application,
                 async (externalAccountKey, authorizationRefMaybe, loginProvider, extraParams) =>
@@ -148,7 +151,7 @@ namespace EastFive.Azure.Auth
                 Func<Authorization, Task> saveAsync,
                 Method authentication, string externalAccountKey,
                 IDictionary<string, string> extraParams,
-                Uri baseUri, AzureApplication application, IProvideLogin loginProvider,
+                Uri baseUri, IAzureApplication application, IProvideLogin loginProvider,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onGeneralFailure,
             TelemetryClient telemetry)
@@ -280,7 +283,7 @@ namespace EastFive.Azure.Auth
                 Guid? accountId, IDictionary<string, string> extraParams,
                 Method method, Authorization authorization,
                 Uri baseUri,
-                AzureApplication application, IProvideAuthorization authorizationProvider,
+                IAuthApplication application, IProvideAuthorization authorizationProvider,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onBadResponse,
             TelemetryClient telemetry)
@@ -313,8 +316,8 @@ namespace EastFive.Azure.Auth
         private static Task<TResult> UnmappedCredentialAsync<TResult>(
                 string subject, IDictionary<string, string> extraParams,
                 EastFive.Azure.Auth.Method authentication, Authorization authorization,
-                IProvideAuthorization authorizationProvider, 
-                AzureApplication application,
+                IProvideAuthorization authorizationProvider,
+                IAuthApplication application,
                 Uri baseUri,
             Func<Guid, TResult> createMapping,
             Func<TResult> onAllowSelfServe,

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Linq.Async;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
@@ -10,9 +12,15 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
     {
 		public async Task<bool> PurgeAsync()
         {
-            var deleteTasks = this.TableClient.ListTables().Select(
-                table => table.DeleteAsync());
-            await Task.WhenAll(deleteTasks);
+            var deletedTableName = await this.TableClient.GetTables()
+                .Select(
+                    async table =>
+                    {
+                        await table.DeleteAsync();
+                        return table.Name;
+                    })
+                .Await(readAhead:50)
+                .ToArrayAsync();
             return true;
         }
 

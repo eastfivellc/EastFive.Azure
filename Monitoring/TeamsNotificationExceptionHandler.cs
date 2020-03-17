@@ -34,7 +34,8 @@ namespace EastFive.Azure.Monitoring
         }
 
         public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
-            IApplication httpApp, HttpRequestMessage request, string routeName,
+            IApplication httpApp, HttpRequestMessage request,
+            RouteData routeData, MethodInfo [] extensionsMethods,
             RouteHandlingDelegate continueExecution)
         {
             if (request.Headers.Contains("X-Teams-Notify"))
@@ -45,25 +46,27 @@ namespace EastFive.Azure.Monitoring
                     var teamsNotifyParam = teamsNotifyParams.First();
 
                     return TeamsNotifyAsync(teamsNotifyParam, controllerType,
-                        httpApp, request, routeName,
+                        httpApp, request, routeData, extensionsMethods,
                         continueExecution);
                 }
             }
 
-            return continueExecution(controllerType, httpApp, request, routeName);
+            return continueExecution(controllerType, httpApp, request, routeData, extensionsMethods);
         }
 
         public Task<HttpResponseMessage> TeamsNotifyAsync(string teamsNotifyParam,
             Type controllerType,
-            IApplication httpApp, HttpRequestMessage request, string routeName,
+            IApplication httpApp, HttpRequestMessage request,
+            RouteData routeData, MethodInfo[] extensionsMethods,
             RouteHandlingDelegate continueExecution)
         {
             return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
                 async teamsHookUrl =>
                 {
-                    var response = await continueExecution(controllerType, httpApp, request, routeName);
+                    var routeName = controllerType.GetRouteName(n => n);
+                    var response = await continueExecution(controllerType, httpApp, request, routeData, extensionsMethods);
                     var message = await CreateMessageCardAsync(
-                        teamsNotifyParam, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
+                        teamsNotifyParam, $"{routeData} = {response.StatusCode} / {response.ReasonPhrase}", 
                         httpApp, request,
                         () => new MessageCard.Section
                         {
@@ -96,7 +99,7 @@ namespace EastFive.Azure.Monitoring
                     string responseMessage = await message.SendAsync(teamsHookUrl);
                     return response;
                 },
-                (why) => continueExecution(controllerType, httpApp, request, routeName));
+                (why) => continueExecution(controllerType, httpApp, request, routeData, extensionsMethods));
         }
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,

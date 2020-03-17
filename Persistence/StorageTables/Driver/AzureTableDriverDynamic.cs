@@ -763,7 +763,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     }
                     catch (StorageException ex)
                     {
-                        if (!table.Exists())
+                        if (!await table.ExistsAsync())
                             return yieldBreak;
                         if (ex.IsProblemTimeout())
                         {
@@ -2550,7 +2550,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var container = this.BlobClient.GetContainerReference(containerName);
             try
             {
-                container.CreateIfNotExists();
+                bool created = await container.CreateIfNotExistsAsync();
                 var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));
 
                 if (await blockBlob.ExistsAsync())
@@ -2596,7 +2596,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
             var container = this.BlobClient.GetContainerReference(containerName);
-            container.CreateIfNotExists();
+            bool created = await container.CreateIfNotExistsAsync();
             var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));
             try
             {

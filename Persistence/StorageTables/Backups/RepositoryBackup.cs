@@ -18,6 +18,7 @@ using EastFive.Persistence.Azure.StorageTables.Driver;
 using System.Collections.Concurrent;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -96,8 +97,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         .Select(x => x.tableName)
                         .ToArray();
 
-                    var resourceInfoToProcess = tableClient
-                        .ListTables()
+                    var resourceInfoToProcess = tableClient.GetTables()
                         .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
                         .Distinct()
                         .Select(
@@ -118,7 +118,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .AsyncEnumerable();
+                        .Await(readAhead:10);
                     return onQueued(resourceInfoToProcess);
                 },
                 () => onAlreadyExists().AsTask());
@@ -163,8 +163,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     CloudTableClient tableClient =
                         new CloudTableClient(account.TableEndpoint, account.Credentials);
 
-                    var resourceInfoToProcess = tableClient
-                        .ListTables()
+                    var tables = tableClient.GetTables();
+                    var resourceInfoToProcess = tables
                         .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
                         .Distinct()
                         .Select(
@@ -185,11 +185,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .AsyncEnumerable();
+                        .Await(readAhead:10);
                     repoBack.when = when;
                     await saveAsync(repoBack);
 
                     return await onQueued(resourceInfoToProcess);
+
+
                 },
                 () => onNotFound());
         }

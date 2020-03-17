@@ -19,19 +19,19 @@ namespace EastFive.Azure.Functions
     {
         public override IApplication Application => azureApplication;
 
-        private AzureApplication azureApplication;
+        private IAzureApplication azureApplication;
 
         private int executionLimit = 1;
 
-        public InvokeFunction(AzureApplication application, Uri serverUrl, string apiRouteName, int executionLimit = 1)
+        public InvokeFunction(IAzureApplication application, Uri serverUrl, string apiRouteName, int executionLimit = 1)
             : base(serverUrl, apiRouteName)
         {
-            AzureApplication GetApplication()
+            IAzureApplication GetApplication()
             {
                 if (application is FunctionApplication)
                     return application;
-                var newApp = Activator.CreateInstance(application.GetType()) as AzureApplication;
-                newApp.ApplicationStart();
+                var newApp = Activator.CreateInstance(application.GetType()) as IAzureApplication;
+                //newApp.ApplicationStart();
                 return newApp;
             }
             this.azureApplication = GetApplication();

@@ -6,7 +6,9 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -110,7 +112,7 @@ namespace EastFive.Azure.Configuration
         #endregion
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static HttpResponseMessage GetAsync(
             ContentTypeResponse<Configuration[]> onFound)
         {

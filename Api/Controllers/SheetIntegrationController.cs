@@ -19,9 +19,7 @@ namespace EastFive.Api.Controllers
     {
         [HttpGet]
         public async static Task<HttpResponseMessage> IntegrationUploadAsync(
-                [QueryParameter(CheckFileName = true)]Guid integration,
-                EastFive.Security.SessionServer.Context context,
-                HttpRequestMessage request, System.Web.Http.Routing.UrlHelper url,
+                [QueryId()]Guid integration,
             ViewFileResponse onLoadUploadPage)
         {
             return await onLoadUploadPage("SheetIntegration/UploadSheet.cshtml", null).ToTask();
@@ -30,7 +28,7 @@ namespace EastFive.Api.Controllers
         [HttpPost]
         public async static Task<HttpResponseMessage> XlsPostAsync(EastFive.Security.SessionServer.Context context,
                 ContentBytes sheet, [QueryParameter]Guid integration, IDictionary<string, bool> resourceTypes,
-                HttpRequestMessage request, System.Web.Http.Routing.UrlHelper url,
+                HttpRequestMessage request,
             RedirectResponse onSuccess,
             NotFoundResponse onNotFound,
             GeneralConflictResponse onError)

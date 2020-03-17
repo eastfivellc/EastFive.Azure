@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Web.Http;
-using System.Web.Mvc;
 using System.Net.Http;
 using System.Net;
 using HtmlAgilityPack;
@@ -10,13 +9,16 @@ using System.Collections.Generic;
 using EastFive.Security.SessionServer.Exceptions;
 using System.Linq;
 using EastFive.Extensions;
-using BlackBarLabs.Api;
 
 namespace EastFive.Api.Azure.Controllers
 {
-    public class SpaServeController : BaseController
+    [FunctionViewController6]
+    public class SpaServeController
     { 
-        public IHttpActionResult Get([FromUri]string id)
+        [HttpGet]
+        public static HttpResponseMessage Get(
+            [QueryId]string id,
+            HttpRequestMessage request)
         {
 
             //var indexFile = SpaHandlerModule.indexHTML;
@@ -54,7 +56,7 @@ namespace EastFive.Api.Azure.Controllers
 
                     //var content = $"{head}|{body}";
 
-                    var response = Request.CreateResponse(HttpStatusCode.OK,
+                    var response = request.CreateResponse(HttpStatusCode.OK,
                         new
                         {
                             head = head,
@@ -62,11 +64,11 @@ namespace EastFive.Api.Azure.Controllers
                             body = body
                         });
                     //response.Content = new StringContent(content);
-                    return response.ToActionResult();
+                    return response;
                 }
             } catch (Exception ex)
             {
-                return Request.CreateResponse(HttpStatusCode.InternalServerError).ToActionResult();
+                return request.CreateResponse(HttpStatusCode.InternalServerError);
             }
         }
     }

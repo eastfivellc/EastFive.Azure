@@ -61,65 +61,7 @@ namespace EastFive.Azure.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to {
-        ///  &quot;accountEnabled&quot;: true,
-        ///  &quot;creationType&quot;: &quot;LocalAccount&quot;,
-        ///  &quot;displayName&quot;: &quot;{2}&quot;,
-        ///  &quot;passwordProfile&quot;: {
-        ///    &quot;password&quot;: &quot;{1}&quot;,
-        ///    &quot;forceChangePasswordNextLogin&quot;: false
-        ///  },
-        ///  &quot;signInNames&quot;: [
-        ///    {
-        ///      &quot;type&quot;: &quot;emailAddress&quot;,
-        ///      &quot;value&quot;: &quot;{0}&quot;
-        ///    }
-        ///  ]
-        ///}.
-        /// </summary>
-        internal static string b2c_graphclient_user_post_email {
-            get {
-                return ResourceManager.GetString("b2c_graphclient_user_post_email", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to {
-        ///	&quot;$schema&quot;: &quot;https://adaptivecards.io/schemas/adaptive-card.json&quot;,
-        ///	&quot;type&quot;: &quot;AdaptiveCard&quot;,
-        ///	&quot;version&quot;: &quot;1.0&quot;,
-        ///	&quot;body&quot;: [
-        ///		{
-        ///			&quot;type&quot;: &quot;ColumnSet&quot;,
-        ///			&quot;columns&quot;: [
-        ///				{
-        ///					&quot;width&quot;: &quot;32px&quot;,
-        ///					&quot;items&quot;: [
-        ///						{
-        ///							&quot;type&quot;: &quot;Image&quot;,
-        ///							&quot;width&quot;: &quot;32px&quot;,
-        ///							&quot;horizontalAlignment&quot;: &quot;center&quot;,
-        ///							&quot;url&quot;: &quot;https://media.licdn.com/dms/image/C4E0BAQG-aWr51MCkgw/company-logo_200_200/0?e=2159024400&amp;v=beta&amp;t=x7Lkr0pb_hiach9ewQsIZaGkksiX69WTrfJfzVzAt0M&quot;,
-        ///							&quot;altText&quot;: &quot;E5 FVC&quot;
-        /// [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string ExampleHook {
-            get {
-                return ResourceManager.GetString("ExampleHook", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to &lt;!DOCTYPE html&gt;
-        ///&lt;html&gt;
-        ///&lt;head id=&quot;head&quot;&gt;
-        ///    &lt;meta charset=&quot;utf-8&quot;&gt;
-        ///    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
-        ///    &lt;title&gt;Affirm Health&lt;/title&gt;
-        ///&lt;/head&gt;
-        ///&lt;body id=&quot;body&quot; class=&quot;hold-transition sidebar-mini fixed&quot;&gt;
-        ///    &lt;div style=&quot;background-color: #f2f2f2; font-family: Arial, Helvetica, sans-serif;&quot;&gt;
-        ///        &lt;img style=&quot;max-width: 200px;&quot; alt=&quot;Affirm Health&quot; src=&quot;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPoAAACCCAYAAABvndWRAAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqc [rest of string was truncated]&quot;;.
+        ///   Looks up a localized string similar to &lt;html&gt;&lt;head&gt;&lt;title&gt;TODO: Load spa page here&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;.
         /// </summary>
         internal static string indexPage {
             get {
@@ -128,67 +70,11 @@ namespace EastFive.Azure.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to &lt;!DOCTYPE html&gt;
-        ///&lt;html lang=&quot;en&quot;&gt;
-        ///&lt;head&gt;
-        ///    &lt;meta charset=&quot;UTF-8&quot;&gt;
-        ///    &lt;title&gt;Title&lt;/title&gt;
-        ///    &lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAQAAADZc7J/AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAAJ18AACdfAR2GumoAAAAHdElNRQfjBAQAFS7NhRnAAAAC8UlEQVRIx62VS2icVRTHf99kZmKcxk5SCe34bFrfSHxR0WorWqQgoZgiiChYUaiiLlp058IXbiQEfJSCbnTjQnTRxCBtsVIlpZguiqUJrdhEh7QNtGOenZlkfi4yab5vZtIE8dzNPfee8z/3nP [rest of string was truncated]&quot;;.
+        ///   Looks up a localized string similar to &lt;html&gt;&lt;head&gt;&lt;title&gt;TODO: Load login page here&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;.
         /// </summary>
         internal static string loginHtml {
             get {
                 return ResourceManager.GetString("loginHtml", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to &lt;dash-root&gt;&lt;/dash-root&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;inline.54c1233f72172d979b96.bundle.js&quot;&gt;&lt;/script&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;polyfills.d9faed5c4d2817543fd2.bundle.js&quot;&gt;&lt;/script&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;scripts.02bf58f26e3bc6f16cdb.bundle.js&quot;&gt;&lt;/script&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;main.6d7888cd63472334f6ce.bundle.js&quot;&gt;&lt;/script&gt;.
-        /// </summary>
-        internal static string spabody {
-            get {
-                return ResourceManager.GetString("spabody", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to &lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Dash&lt;/title&gt;&lt;base href=&quot;/&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;favicon.ico&quot;&gt;&lt;link href=&quot;styles.0bc98765f532baaa7699.bundle.css&quot; rel=&quot;stylesheet&quot;/&gt;.
-        /// </summary>
-        internal static string spahead {
-            get {
-                return ResourceManager.GetString("spahead", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to &lt;!doctype html&gt;&lt;html lang=&quot;en&quot; data.ie=&quot;isloading&quot;&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Dash&lt;/title&gt;&lt;base href=&quot;/&quot;&gt;&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;&lt;link rel=&quot;icon&quot; type=&quot;image/x-icon&quot; href=&quot;favicon.ico&quot;&gt;&lt;link href=&quot;styles.0bc98765f532baaa7699.bundle.css&quot; rel=&quot;stylesheet&quot;/&gt;&lt;/head&gt;&lt;body class=&quot;hold-transition sidebar-mini fixed&quot;&gt;&lt;dash-root&gt;&lt;/dash-root&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;inline.54c1233f72172d979b96.bundle.js&quot;&gt;&lt;/script&gt;&lt;script type=&quot;text/javascript&quot; src=&quot;polyfil [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string spahtml {
-            get {
-                return ResourceManager.GetString("spahtml", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to {
-        ///  &quot;summary&quot;: &quot;500 \&quot;Error\&quot;&quot;,
-        ///  &quot;themeColor&quot;: &quot;0078D7&quot;,
-        ///  &quot;title&quot;: &quot;SearchResourceType..CreateAsync: \&quot;Could not assign X to Y\&quot;&quot;,
-        ///  &quot;sections&quot;: [
-        ///    {
-        ///      &quot;activityTitle&quot;: &quot;Affirm Health - Production&quot;,
-        ///      &quot;activitySubtitle&quot;: &quot;11/3/2019, 3:34pm&quot;,
-        ///      &quot;activityImage&quot;: &quot;https://s3.amazonaws.com/f6s-public/profiles/1245479_original.jpg&quot;,
-        ///      &quot;facts&quot;: [
-        ///        {
-        ///          &quot;name&quot;: &quot;Resource:&quot;,
-        ///          &quot;value&quot;: &quot;SearchResourceType&quot;
-        ///        },
-        ///        {
-        ///          &quot;name&quot;: &quot;Http Method: [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string teamNotification {
-            get {
-                return ResourceManager.GetString("teamNotification", resourceCulture);
             }
         }
     }

@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
 using BlackBarLabs.Api;
 using System.Linq;
 using BlackBarLabs;
 using EastFive;
 using BlackBarLabs.Extensions;
-using EastFive.Security.SessionServer.Api.Controllers;
 using EastFive.Security.SessionServer;
 
 namespace EastFive.Api.Azure
@@ -56,7 +57,7 @@ namespace EastFive.Api.Azure
                 {
                     var roleResource = new Resources.Role()
                     {
-                        Id = url.GetWebId<Controllers.RoleController>(role.id),
+                        //Id = url.GetWebId<Controllers.RoleController>(role.id),
                         Actor = Library.configurationManager.GetActorLink(role.actorId, url),
                         Name = role.name,
                     };
@@ -75,7 +76,7 @@ namespace EastFive.Api.Azure
                     {
                         var resourceRole = new Resources.Role()
                         {
-                            Id = url.GetWebId<Controllers.RoleController>(role.id),
+                            //Id = url.GetWebId<Controllers.RoleController>(role.id),
                             Actor = Library.configurationManager.GetActorLink(role.actorId, url),
                             Name = role.name,
                         };

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using System.Security.Claims;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -25,6 +26,7 @@ using EastFive.Linq.Expressions;
 using EastFive.Linq;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
+
 
 namespace EastFive.Azure.Persistence
 {
@@ -66,7 +68,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static HttpResponseMessage All(
             HttpApplication httpApp,
@@ -78,7 +80,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> List(
                 [QueryParameter(Name = NamePropertyName)]string name,
@@ -122,7 +124,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpAction("Information")]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> Information(
                 [QueryParameter(Name = NamePropertyName)]string name,
@@ -144,7 +146,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpAction("PropertyInformation")]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
@@ -180,7 +182,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role, 
+            ClaimTypes.Role, 
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> List2(
                 [QueryParameter(Name = NamePropertyName)]string name,

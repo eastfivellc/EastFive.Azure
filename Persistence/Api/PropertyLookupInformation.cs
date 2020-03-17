@@ -5,21 +5,19 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using System.Security.Claims;
+
+using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Azure.Auth;
 using EastFive.Persistence.Azure.StorageTables;
-
-using Newtonsoft.Json;
-using EastFive.Api.Azure;
 using EastFive.Extensions;
-using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Api.Serialization;
 using System.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Microsoft.WindowsAzure.Storage.Table;
 using EastFive.Persistence;
 using EastFive.Linq.Expressions;
 using EastFive.Linq;
@@ -63,7 +61,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,

@@ -15,7 +15,7 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
 using EastFive.Serialization;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.Net.Http.Headers;
 
 namespace EastFive.Azure.Login
@@ -97,14 +97,12 @@ namespace EastFive.Azure.Login
         public static async Task<HttpResponseMessage> GetAsync(
                 [QueryParameter(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
                 [Accepts(Media = "text/html")]MediaTypeWithQualityHeaderValue accept,
-                HttpRequestMessage request,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
             ContentTypeResponse<Authentication> onFound,
             HtmlResponse onHtmlWanted,
             NotFoundResponse onNotFound)
         {
             if (!accept.IsDefaultOrNull())
-                return onHtmlWanted(EastFive.Azure.Properties.Resources.loginHtml);
+                return onHtmlWanted(Properties.Resources.loginHtml);
             return await authenticationRef.StorageGetAsync(
                 (authentication) =>
                 {
@@ -118,7 +116,7 @@ namespace EastFive.Azure.Login
                 [QueryParameter(Name = StatePropertyName)]string state,
                 [QueryParameter(Name = ClientPropertyName)]IRef<Client> clientRef,
                 [QueryParameter(Name = ValidationPropertyName)]string validation,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, UrlHelper urlHelper,
             //ContentTypeResponse<Authentication> onFound,
             RedirectResponse onFound,
             ReferencedDocumentNotFoundResponse<Client> onInvalidClient)

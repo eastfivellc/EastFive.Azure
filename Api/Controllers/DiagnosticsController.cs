@@ -21,9 +21,10 @@ namespace EastFive.Security.SessionServer.Api.Controllers
         public string Value { get; set; }
     }
 
-    [RoutePrefix("aadb2c")]
-    [FunctionViewController(Route = "Diagnostics")]
-    public class DiagnosticsController : BaseController
+    [FunctionViewController6(
+        Prefix = "aadb2c",
+        Route = "Diagnostics")]
+    public class DiagnosticsController 
     {
         [EastFive.Api.HttpGet]
         public static Task<HttpResponseMessage> Get(EastFive.Api.Security security, HttpRequestMessage request)

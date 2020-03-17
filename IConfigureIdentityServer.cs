@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
 using System.Security.Claims;
 using System.Net.Http;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Security.SessionServer
 {

@@ -29,8 +29,8 @@ namespace EastFive.Api.Azure.Credentials
         {
             return onProvideNothing().ToTask();
         }
-        
-        public Type CallbackController => typeof(Controllers.TokenController);
+
+        public Type CallbackController => typeof(ImplicitlyCreatedCredentialProvider); // typeof(Controllers.TokenController);
 
         public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,

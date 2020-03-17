@@ -23,10 +23,10 @@ namespace EastFive.AzureADB2C
         private B2CGraphClient(string clientId, string clientSecret, string tenant)
         {
             this.tenant = tenant;
-            var wrh = new WebRequestHandler()
-            {
-                ReadWriteTimeout = (int)TimeSpan.FromMinutes(5).TotalMilliseconds
-            };
+            //var wrh = new WebRequestHandler()
+            //{
+            //    ReadWriteTimeout = (int)TimeSpan.FromMinutes(5).TotalMilliseconds
+            //};
             this.http = new HttpClient(
                 new HttpRetryHandler(5, 2, 
                     new RefreshTokenMessageHandler(
@@ -36,8 +36,9 @@ namespace EastFive.AzureADB2C
                     // The ClientCredential is where you pass in your client_id and client_secret, which are 
                     // provided to Azure AD in order to receive an access_token using the app's identity.
                     clientId,
-                    clientSecret,
-                    wrh)), true)
+                    clientSecret //,
+                    //wrh
+                    )), true)
             {
                 Timeout = new TimeSpan(0, 5, 0)
             };

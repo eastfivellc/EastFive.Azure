@@ -9,7 +9,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Login
 {
@@ -27,7 +27,7 @@ namespace EastFive.Azure.Login
 
         [HttpGet(MatchAllParameters = false)]
         public static async Task<HttpResponseMessage> Get(
-                AzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, UrlHelper urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,

@@ -8,6 +8,7 @@ using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using System.Linq;
 using System.Threading.Tasks;
 using BlackBarLabs.Web;
+using EastFive.Web.Configuration;
 
 namespace BlackBarLabs.Persistence.Azure
 {
@@ -31,8 +32,8 @@ namespace BlackBarLabs.Persistence.Azure
             this.documentDbPrimaryKey = documentDbPrimaryKey;
             this.documentDbDatabaseName = documentDbDatabaseName;
 
-            var storageSetting = ConfigurationContext.Instance.AppSettings[this.azureKey];
-            cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
+            cloudStorageAccount = this.azureKey.ConfigurationString(
+                storageSetting => CloudStorageAccount.Parse(storageSetting));
         }
 
         private static readonly object AstLock = new object();
@@ -40,13 +41,15 @@ namespace BlackBarLabs.Persistence.Azure
         {
             get
             {
-                if (azureStorageRepository != null) return azureStorageRepository;
+                if (azureStorageRepository != null)
+                    return azureStorageRepository;
 
                 lock (AstLock)
                     if (azureStorageRepository == null)
                     {
-                        var storageSetting = ConfigurationContext.Instance.AppSettings[azureKey];
-                        cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
+                        cloudStorageAccount = azureKey.ConfigurationString(
+                            storageSetting => CloudStorageAccount.Parse(storageSetting));
+                        
                         azureStorageRepository = new AzureStorageRepository(cloudStorageAccount);
                     }
 
@@ -67,12 +70,20 @@ namespace BlackBarLabs.Persistence.Azure
                     {
                         if (cloudStorageAccount == null)
                         {
-                            var storageSetting = ConfigurationContext.Instance.AppSettings[azureKey];
-                            cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
+                            cloudStorageAccount = azureKey.ConfigurationString(
+                                storageSetting => CloudStorageAccount.Parse(storageSetting));
                         }
                         blobClient = cloudStorageAccount.CreateCloudBlobClient();
                         blobClient.DefaultRequestOptions.RetryPolicy = new ExponentialRetry(TimeSpan.FromSeconds(1), 10);
-                        blobClient.GetContainerReference("media").CreateIfNotExists(BlobContainerPublicAccessType.Container);
+                        blobClient.GetContainerReference("media")
+                            .CreateIfNotExistsAsync(BlobContainerPublicAccessType.Container,
+                                new BlobRequestOptions
+                                {
+
+                                },
+                                new OperationContext
+                                { });
+
                     }
 
                 return blobClient;

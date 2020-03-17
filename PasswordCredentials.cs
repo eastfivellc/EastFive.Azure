@@ -10,8 +10,8 @@ using System.Security.Claims;
 using BlackBarLabs;
 using EastFive.Linq.Async;
 using EastFive.Extensions;
-using System.Web.Security;
 using EastFive.Security.SessionServer;
+using EastFive.Azure;
 
 namespace EastFive.Api.Azure.Credentials
 {
@@ -52,7 +52,7 @@ namespace EastFive.Api.Azure.Credentials
         public async Task<TResult> CreatePasswordCredentialsAsync<TResult>(Guid passwordCredentialId, Guid actorId,
                 string displayName, string username, bool isEmail, string token, bool forceChange,
                 DateTime? emailLastSent, Uri callbackUrl,
-                EastFive.Api.SessionToken security, AzureApplication application,
+                EastFive.Api.SessionToken security, IAuthApplication application,
             Func<TResult> onSuccess,
             Func<TResult> credentialAlreadyExists,
             Func<Guid, TResult> onUsernameAlreadyInUse,
@@ -66,7 +66,7 @@ namespace EastFive.Api.Azure.Credentials
             if (!await application.CanAdministerCredentialAsync(actorId, security))
                 return onUnathorized();
             
-            return await await application.InstantiateAll<IProvideLoginManagement>()
+            return await await (application).InstantiateAll<IProvideLoginManagement>()
                 .FirstAsync(
                     async managmentProvider =>
                     {
@@ -190,7 +190,7 @@ namespace EastFive.Api.Azure.Credentials
         }
 
         internal async Task<TResult> GetPasswordCredentialAsync<TResult>(Guid passwordCredentialId,
-                EastFive.Api.SessionToken security, AzureApplication application,
+                EastFive.Api.SessionToken security, IAzureApplication application,
             Func<PasswordCredential, TResult> success,
             Func<TResult> notFound,
             Func<TResult> onUnauthorized,
@@ -225,7 +225,7 @@ namespace EastFive.Api.Azure.Credentials
         }
 
         internal async Task<TResult> GetPasswordCredentialByActorAsync<TResult>(Guid actorId,
-                EastFive.Api.SessionToken security, AzureApplication application,
+                EastFive.Api.SessionToken security, IAzureApplication application,
             Func<PasswordCredential[], TResult> success,
             Func<TResult> notFound,
             Func<TResult> onUnauthorized,
@@ -348,7 +348,7 @@ namespace EastFive.Api.Azure.Credentials
 
         internal async Task<TResult> UpdatePasswordCredentialAsync<TResult>(Guid passwordCredentialId,
                 string password, bool forceChange, DateTime? emailLastSent,
-                EastFive.Api.SessionToken security, AzureApplication application,
+                EastFive.Api.SessionToken security, IAzureApplication application,
             Func<TResult> onSuccess,
             Func<TResult> onNotFound,
             Func<TResult> onUnathorized,
@@ -401,7 +401,9 @@ namespace EastFive.Api.Azure.Credentials
                                     async (landingPage) =>
                                     {
                                         if (string.IsNullOrWhiteSpace(password))
-                                            password = Membership.GeneratePassword(8, 2);
+                                            password = EastFive.Security.SecureGuid.Generate()
+                                                .ToByteArray()
+                                                .Base58Encode();
                                         // TODO: the purpose of the next line is to send the password. 
                                         // If we don't want it sent, don't update the last sent value!!!
                                         return await await SendInvitePasswordAsync(email, loginInfo.userName, password, landingPage,
@@ -521,7 +523,7 @@ namespace EastFive.Api.Azure.Credentials
         }
         
         internal async Task<TResult> DeletePasswordCredentialAsync<TResult>(Guid passwordCredentialId,
-                EastFive.Api.SessionToken security, AzureApplication application,
+                EastFive.Api.SessionToken security, IAzureApplication application,
             Func<TResult> success,
             Func<TResult> onUnauthorized,
             Func<TResult> notFound,

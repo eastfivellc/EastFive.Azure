@@ -2,22 +2,20 @@
 using System.Net;
 using System.Threading.Tasks;
 using System.Net.Http;
-using System.Web.Http.Routing;
 using System.Configuration;
 using EastFive.Api.Services;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Web.Http.Results;
-using BlackBarLabs;
 using EastFive.Collections.Generic;
 using Microsoft.ApplicationInsights;
 using EastFive.Linq.Async;
 using EastFive.Linq;
-using BlackBarLabs.Linq;
 using EastFive.Security.SessionServer;
 using BlackBarLabs.Api;
 using EastFive.Extensions;
+using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.Mvc;
 
 namespace EastFive.Api.Azure.Credentials
 {
@@ -71,7 +69,7 @@ namespace EastFive.Api.Azure.Credentials
                                         .Append("ActorId".PairWithValue(info.ActorId.ToString()))
                                         .Append("Token".PairWithValue(token))
                                         .Aggregate(
-                                            url.GetLocation<Controllers.ActAsUserController>(),
+                                            new Uri(request.RequestUri.GetLeftPart(UriPartial.Path) + "/api/"),
                                             (baseUrl, param) => baseUrl.AddParameter(param.Key, param.Value),
                                             (uri) => uri.AbsoluteUri),
                                 };

@@ -6,7 +6,11 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -19,7 +23,6 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
-using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
@@ -79,13 +82,13 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         public static async Task<HttpResponseMessage> AllAsync(
                 [QueryParameter(Name = "start_time")]DateTime startTime,
                 [QueryParameter(Name = "end_time")]DateTime endTime,
                 RequestMessage<Authorization> authorizations,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application,
                 EastFive.Api.SessionToken? securityMaybe,
             MultipartResponseAsync<Login> onFound)
         {

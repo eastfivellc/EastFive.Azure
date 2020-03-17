@@ -17,6 +17,7 @@ using System.Security.Claims;
 using EastFive.Security.SessionServer;
 using EastFive.Api.Azure.Credentials.Attributes;
 using EastFive.Serialization;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Api.Azure.Credentials
 {
@@ -57,7 +58,7 @@ namespace EastFive.Api.Azure.Credentials
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            return await EastFive.Web.Configuration.Settings.GetBase64Bytes(EastFive.Azure.AppSettings.SAML.SAMLCertificate,
+            return await EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
                 async (certBuffer) =>
                 {
                     var certificate = new X509Certificate2(certBuffer);
@@ -110,7 +111,7 @@ namespace EastFive.Api.Azure.Credentials
 
         #region IProvideLogin
 
-        public Type CallbackController => typeof(Controllers.SAMLRedirectController);
+        public Type CallbackController => typeof(SAMLProvider); // typeof(Controllers.SAMLRedirectController);
 
         public Uri GetSignupUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {

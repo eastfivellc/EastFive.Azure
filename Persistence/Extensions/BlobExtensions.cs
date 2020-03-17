@@ -29,13 +29,13 @@ namespace BlackBarLabs.Identity.AzureStorageTables.Extensions
             {
                 var blockId = id.AsRowKey();
                 var container = context.BlobStore.GetContainerReference(containerReference);
-                container.CreateIfNotExists();
+                await container.CreateIfNotExistsAsync();
                 var blockBlob = container.GetBlockBlobReference(blockId);
                 blockBlob.Metadata["id"] = blockId; // TODO: As row key
-                blockBlob.SetMetadata();
+                await blockBlob.SetMetadataAsync();
                 await blockBlob.UploadFromByteArrayAsync(data, 0, data.Length);
                 blockBlob.Properties.ContentType = "application/excel";
-                blockBlob.SetProperties();
+                await blockBlob.SetPropertiesAsync();
                 return success();
             }
             catch (Exception ex)
@@ -55,7 +55,7 @@ namespace BlackBarLabs.Identity.AzureStorageTables.Extensions
             {
                 var blockId = id.AsRowKey();
                 var container = context.BlobStore.GetContainerReference(containerReference);
-                container.CreateIfNotExists();
+                await container.CreateIfNotExistsAsync();
                 var blockBlob = container.GetBlockBlobReference(blockId);
                 
                 await blockBlob.UploadFromByteArrayAsync(data, 0, data.Length);
@@ -91,11 +91,11 @@ namespace BlackBarLabs.Identity.AzureStorageTables.Extensions
             {
                 var blockId = id.AsRowKey();
                 var container = context.BlobStore.GetContainerReference(containerReference);
-                if (!container.Exists())
+                if (!await container.ExistsAsync())
                     return await context.SaveBlobAsync(containerReference, id, data, new Dictionary<string, string>(), string.Empty, success, failure);
 
                 var blockBlob = container.GetBlockBlobReference(blockId);
-                if (blockBlob.Exists())
+                if (await blockBlob.ExistsAsync())
                     return blobAlreadyExists();
 
                 foreach (var item in metadata)
@@ -156,7 +156,8 @@ namespace BlackBarLabs.Identity.AzureStorageTables.Extensions
                 var container = context.BlobStore.GetContainerReference(containerReference);
                 var blockId = id.AsRowKey();
                 var blob = await container.GetBlobReferenceFromServerAsync(blockId);
-                var returnStream = await blob.OpenReadAsync();
+                var returnStream = await blob.OpenReadAsync(AccessCondition.GenerateEmptyCondition(),
+                    new BlobRequestOptions(), new OperationContext());
                 return success(returnStream, blob.Properties.ContentType, blob.Metadata);
             }
             catch (Exception ex)
@@ -187,7 +188,7 @@ namespace BlackBarLabs.Identity.AzureStorageTables.Extensions
         public static async Task DeleteBlobContainerAsync(this Persistence.Azure.DataStores context, string containerReference)
         {
             var container = context.BlobStore.GetContainerReference(containerReference);
-            if (container.Exists())
+            if (await container.ExistsAsync())
                 await container.DeleteAsync();
         }
 

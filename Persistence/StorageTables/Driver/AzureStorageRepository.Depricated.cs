@@ -104,7 +104,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                 }
                 catch (Exception ex)
                 {
-                    if (!table.Exists()) return new TData[] { };
+                    if (!await table.ExistsAsync()) return new TData[] { };
                     if (ex is StorageException except && except.IsProblemTimeout())
                     {
                         if (--numberOfTimesToRetry > 0)
@@ -157,7 +157,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                             }
                             catch (Exception ex)
                             {
-                                if (!table.Exists())
+                                if (!await table.ExistsAsync())
                                     return yieldBreak;
                                 if (ex is StorageException except && except.IsProblemTimeout())
                                 {

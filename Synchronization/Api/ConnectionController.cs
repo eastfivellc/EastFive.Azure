@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.Threading.Tasks;
 using System.Linq.Expressions;
 
@@ -47,7 +47,7 @@ namespace EastFive.Api.Controllers
         }
 
         internal static EastFive.Api.Resources.Connection GetResource(Connection connection,
-            System.Web.Http.Routing.UrlHelper url)
+            UrlHelper url)
         {
             var resource = new EastFive.Api.Resources.Connection()
             {

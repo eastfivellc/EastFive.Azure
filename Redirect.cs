@@ -20,9 +20,10 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.ComponentModel;
 using EastFive.Api.Azure;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure
 {
@@ -66,14 +67,13 @@ namespace EastFive.Azure
         public static HttpResponseMessage QueryByResourceIdAndTypeAsync(
                 [QueryParameter(Name = ResourceTypePropertyName)]Type resourceType,
                 [QueryParameter(Name = ResourcePropertyName)]Guid resourceId,
-                AzureApplication application,
+                IApiApplication application,
             RedirectResponse onRedirect,
             UnauthorizedResponse onUnauthorized,
             NotFoundResponse onRedirectNotFound,
             ConfigurationFailureResponse onConfigurationFailure)
         {
-            return EastFive.Web.Configuration.Settings.GetUri(
-                EastFive.Azure.AppSettings.SpaSiteLocation,
+            return AppSettings.SpaSiteLocation.ConfigurationUri(
                 siteUrl =>
                 {
                     var resourceName = application.GetResourceMime(resourceType);

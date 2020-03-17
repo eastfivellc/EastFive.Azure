@@ -8,13 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using Microsoft.ApplicationInsights;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
 
-using BlackBarLabs;
 using BlackBarLabs.Api.Resources;
 using EastFive.Linq;
 using EastFive.Security.SessionServer;
@@ -24,12 +23,59 @@ using EastFive.Collections.Generic;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
+using EastFive.Api;
+using System.Reflection;
+
+namespace EastFive.Azure
+{
+    public interface IAuthApplication : IApiApplication
+    {
+        IDictionaryAsync<string, IProvideLogin> LoginProviders { get; }
+
+        Task<TResult> GetRedirectUriAsync<TResult>(
+                Guid? accountIdMaybe, IDictionary<string, string> authParams,
+                EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
+                Uri baseUri,
+                IProvideAuthorization authorizationProvider,
+            Func<Uri, TResult> onSuccess,
+            Func<string, string, TResult> onInvalidParameter,
+            Func<string, TResult> onFailure);
+
+        Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security);
+
+        Task<TResult> OnUnmappedUserAsync<TResult>(
+                string subject, IDictionary<string, string> extraParameters,
+                EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
+                IProvideAuthorization authorizationProvider, Uri baseUri,
+            Func<Guid, TResult> onCreatedMapping,
+            Func<TResult> onAllowSelfServeAccounts,
+            Func<Uri, TResult> onInterceptProcess,
+            Func<TResult> onNoChange);
+
+        Task<bool> ShouldAuthorizeIntegrationAsync(XIntegration integration, EastFive.Azure.Auth.Authorization authorization);
+
+        Task<TResult> GetActorNameDetailsAsync<TResult>(Guid actorId,
+            Func<string, string, string, TResult> onActorFound,
+            Func<TResult> onActorNotFound);
+    }
+
+    public interface IAzureApplication : IAuthApplication
+    {
+        EastFive.Api.IInvokeApplication CDN { get; }
+
+        TelemetryClient Telemetry { get; }
+
+        Task SendServiceBusMessageAsync(string queueName, byte[] bytes);
+
+        Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes);
+    }
+}
 
 namespace EastFive.Api.Azure
 {
 
     [ApiResources(NameSpacePrefixes = "EastFive.Azure,EastFive.Search")]
-    public class AzureApplication : EastFive.Api.HttpApplication
+    public class AzureApplication : EastFive.Api.HttpApplication, EastFive.Azure.IAzureApplication
     {
         public const string QueryRequestIdentfier = "request_id";
 
@@ -122,18 +168,6 @@ namespace EastFive.Api.Azure
                     return false;
                 },
                 (why) => false).AsTask();
-        }
-
-        protected override void Configure(HttpConfiguration config)
-        {
-            base.Configure(config);
-            config.MessageHandlers.Add(new Api.Azure.Modules.SpaHandler(this, config));
-            config.Routes.MapHttpRoute(name: "apple-app-links",
-                routeTemplate: "apple-app-site-association",
-                defaults: new { controller = "AppleAppSiteAssociation", id = RouteParameter.Optional });
-            config.Routes.MapHttpRoute(name: "apple-developer-domain-association",
-                routeTemplate: ".well-known/apple-developer-domain-association.txt",
-                defaults: new { controller = "AppleDeveloperDomainAssociation", id = RouteParameter.Optional });
         }
 
         public IDictionaryAsync<string, IProvideAuthorization> AuthorizationProviders
@@ -245,18 +279,18 @@ namespace EastFive.Api.Azure
 
         public virtual async Task<CloudQueueMessage> SendQueueMessageAsync(string queueName, byte[] byteContent)
         {
-            var appQueue = EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
-                (connString) =>
+            var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
+                async (connString) =>
                 {
                     var storageAccount = CloudStorageAccount.Parse(connString);
                     var queueClient = storageAccount.CreateCloudQueueClient();
                     var queue = queueClient.GetQueueReference(queueName);
-                    queue.CreateIfNotExists();
+                    await queue.CreateIfNotExistsAsync();
                     return queue;
                 },
                 (why) => throw new Exception(why));
 
-            var message = new CloudQueueMessage(byteContent);
+            var message = new CloudQueueMessage(byteContent.ToBase64String());
             await appQueue.AddMessageAsync(message);
             return message;
         }
@@ -267,13 +301,13 @@ namespace EastFive.Api.Azure
                 Task<TResult>> onNextMessage,
             Func<TResult> onEmpty)
         {
-            var appQueue = EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
-                (connString) =>
+            var appQueue = await EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
+                async (connString) =>
                 {
                     var storageAccount = CloudStorageAccount.Parse(connString);
                     var queueClient = storageAccount.CreateCloudQueueClient();
                     var queue = queueClient.GetQueueReference(queueName);
-                    queue.CreateIfNotExists();
+                    await queue.CreateIfNotExistsAsync();
                     return queue;
                 },
                 (why) => throw new Exception(why));

@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
@@ -167,7 +167,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 [Resource]AccountMapping accountMapping,
-                Api.Azure.AzureApplication application, Api.SessionToken security,
+                IAuthApplication application, Api.SessionToken security,
             CreatedResponse onCreated,
             ForbiddenResponse onForbidden,
             UnauthorizedResponse onUnauthorized,

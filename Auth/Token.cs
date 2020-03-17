@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -55,8 +55,7 @@ namespace EastFive.Azure.Auth
         public string secret;
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+        public static HttpResponseMessage Get(
             ContentTypeResponse<Token> onFound)
         {
             var token = new Token()
