@@ -957,6 +957,65 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 });
         }
 
+        private async Task<TResult> UpdateIfNotModifiedAsync<TData, TResult>(TData data,
+            Func<TResult> success,
+            Func<TResult> documentModified,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+            AzureStorageDriver.RetryDelegate onTimeout = null,
+            CloudTable table = default(CloudTable))
+        {
+            if (table.IsDefaultOrNull())
+                table = GetTable<TData>();
+            var tableData = GetEntity(data);
+            var update = TableOperation.Replace(tableData);
+            try
+            {
+                await table.ExecuteAsync(update);
+                return success();
+            }
+            catch (StorageException ex)
+            {
+                return await ex.ParseStorageException(
+                    async (errorCode, errorMessage) =>
+                    {
+                        switch (errorCode)
+                        {
+                            case ExtendedErrorInformationCodes.Timeout:
+                                {
+                                    var timeoutResult = default(TResult);
+                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
+                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
+                                        async () =>
+                                        {
+                                            timeoutResult = await UpdateIfNotModifiedAsync(data,
+                                                success,
+                                                documentModified,
+                                                onFailure: onFailure,
+                                                onTimeout: onTimeout,
+                                                table: table);
+                                        });
+                                    return timeoutResult;
+                                }
+                            case ExtendedErrorInformationCodes.UpdateConditionNotSatisfied:
+                                {
+                                    return documentModified();
+                                }
+                            default:
+                                {
+                                    if (onFailure.IsDefaultOrNull())
+                                        throw ex;
+                                    return onFailure(errorCode, errorMessage);
+                                }
+                        }
+                    },
+                    () =>
+                    {
+                        throw ex;
+                    });
+            }
+        }
+
         public Task<TResult> ReplaceAsync<TData, TResult>(TData data,
             Func<TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
@@ -2454,7 +2513,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             document = mutateUponLock(document);
                         // Save document in locked state
                         return await await this.UpdateIfNotModifiedAsync(document,
-                                originalDoc, // should not be triggering modifers here anyway
                             () => PerformLockedCallback(rowKey, partitionKey, document, unlockDocument, onLockAquired),
                             () => retry(0));
                     }
