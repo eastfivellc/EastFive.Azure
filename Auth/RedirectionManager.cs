@@ -85,13 +85,13 @@ namespace EastFive.Azure.Auth
                 return onBadRequest().AddReason("Method no longer supported");
             var method = methodMaybe.Value;
 
-            var twoMonthsAgo = DateTime.UtcNow.AddMonths(-2);
+            var oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
             var query = new TableQuery<GenericTableEntity>().Where(
             TableQuery.CombineFilters(
                 TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
                 TableOperators.And,
                 TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, twoMonthsAgo),
+                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, oneMonthAgo),
                     TableOperators.And,
                     TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
                     )
@@ -113,12 +113,10 @@ namespace EastFive.Azure.Auth
             {
                 segment = await table.ExecuteQuerySegmentedAsync(query, token);
                 token = segment.ContinuationToken;
-                redirections = await segment.Results
-                    .Aggregate(
-                        redirections.AsTask(),
-                        async (aggr, entity) =>
+                var result = await segment.Results
+                    .Select(
+                        async (entity) =>
                         {
-                            var res = await aggr;
                             var id = Guid.Parse(entity.RowKey);
                             var when = entity.Timestamp.DateTime;
                             var props = entity.WriteEntity(default);
@@ -139,7 +137,7 @@ namespace EastFive.Azure.Auth
                                 };
                             }
 
-                            var item = await method.ParseTokenAsync(parameters, application,
+                            return await method.ParseTokenAsync(parameters, application,
                                 (externalId, loginProvider) =>
                                 {
                                     return new RedirectionManager
@@ -153,11 +151,12 @@ namespace EastFive.Azure.Auth
                                     };
                                 },
                                 (why) => Failure(why));
-                            if (item.IsDefault())
-                                return res;
+                        })
+                    .AsyncEnumerable(readAhead: 10)
+                    .SelectWhereHasValue()
+                    .ToArrayAsync();
+                redirections = redirections.Concat(result).ToArray();
 
-                            return res.Append(item.Value).ToArray();
-                        });
             } while (token != null);
             return onContent(redirections.OrderByDescending(x => x.when).ToArray());
 
