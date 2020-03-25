@@ -19,6 +19,7 @@ using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
 using EastFive.Api;
+using Microsoft.AspNetCore.Http;
 
 namespace EastFive.Azure
 {
@@ -47,7 +48,7 @@ namespace EastFive.Azure
 
         public IApplication Application => ((IInvokeApplication)_).Application;
 
-        public HttpRequestMessage GetHttpRequest()
+        public IHttpRequest GetHttpRequest()
         {
             return ((IInvokeApplication)_).GetHttpRequest();
         }
@@ -57,7 +58,7 @@ namespace EastFive.Azure
             return ((IInvokeApplication)_).GetRequest<TResource>();
         }
 
-        public Task<HttpResponseMessage> SendAsync(HttpRequestMessage httpRequest)
+        public Task<IHttpResponse> SendAsync(IHttpRequest httpRequest)
         {
             return ((IInvokeApplication)_).SendAsync(httpRequest);
         }
@@ -70,10 +71,10 @@ namespace EastFive.Azure
             return parameterInfo.ParameterType.IsAssignableFrom(typeof(CDN));
         }
 
-        public Task<HttpResponseMessage> Instigate(
-            IApplication httpApp, HttpRequestMessage request, CancellationToken cancellationToken,
+        public Task<IHttpResponse> Instigate(
+            IApplication httpApp, IHttpRequest request,
             ParameterInfo parameterInfo,
-            Func<object, Task<HttpResponseMessage>> onSuccess)
+            Func<object, Task<IHttpResponse>> onSuccess)
         {
             var cdn = new CDN();
             return onSuccess(cdn);

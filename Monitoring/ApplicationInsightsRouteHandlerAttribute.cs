@@ -8,12 +8,14 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
+using Microsoft.ApplicationInsights.DataContracts;
+
 using EastFive.Api;
+using EastFive.Api.Core;
 using EastFive.Api.Modules;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
-using Microsoft.ApplicationInsights.DataContracts;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -24,9 +26,8 @@ namespace EastFive.Azure.Monitoring
 
         internal const string HttpRequestMessagePropertyRequestTelemetryKey = "e5_monitoring_requesttelemetry_key";
 
-        public async Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
-                IApplication httpApp, HttpRequestMessage request,
-                RouteData routeData, MethodInfo [] extensionMethods,
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType,
+                IApplication httpApp, IHttpRequest routeData,
             RouteHandlingDelegate continueExecution)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -36,12 +37,12 @@ namespace EastFive.Azure.Monitoring
                 Id = requestId,
                 Source = "EastFive.Api",
                 Timestamp = DateTimeOffset.UtcNow,
-                Url = request.RequestUri,
+                Url = routeData.request.GetAbsoluteUri(), // request.RequestUri,
             };
 
             #region User / Session
 
-            var claims = request.GetClaims(
+            var claims = routeData.request.GetClaims(
                 claimsEnumerable => claimsEnumerable.ToArray(),
                 () => new Claim[] { },
                 (why) => new Claim[] { });
@@ -69,23 +70,22 @@ namespace EastFive.Azure.Monitoring
 
             #endregion
 
-            request.Properties.Add(HttpRequestMessagePropertyRequestTelemetryKey, telemetry);
-            var response = await continueExecution(controllerType, httpApp, request,
-                routeData, extensionMethods);
+            routeData.Properties.Add(HttpRequestMessagePropertyRequestTelemetryKey, telemetry);
+            var response = await continueExecution(controllerType, httpApp, routeData);
 
             telemetry.ResponseCode = response.StatusCode.ToString();
             if (response.ReasonPhrase.HasBlackSpace())
                 telemetry.Properties.AddOrReplace("reason_phrase", response.ReasonPhrase);
-            telemetry.Success = response.IsSuccessStatusCode;
+            telemetry.Success = response.StatusCode.IsSuccess();
 
             #region Method result identfiers
 
-            if (response.Headers.TryGetValues(ControllerHandler.HeaderStatusName, out IEnumerable<string> statusNames))
+            if (response.Headers.TryGetValue(Middleware.HeaderStatusName, out string[] statusNames))
             {
                 if (statusNames.Any())
                     telemetry.Properties.Add(TelemetryStatusName, statusNames.First());
             }
-            if (response.Headers.TryGetValues(ControllerHandler.HeaderStatusInstance, out IEnumerable<string> statusInstances))
+            if (response.Headers.TryGetValue(Middleware.HeaderStatusInstance, out string[] statusInstances))
             {
                 if(statusInstances.Any())
                     telemetry.Properties.Add(TelemetryStatusInstance, statusInstances.First());

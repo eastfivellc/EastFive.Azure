@@ -121,7 +121,7 @@ namespace EastFive.Api.Azure.Resources
             {
                 Id = url.GetWebId<ProcessResourceView>(view.processViewId),
                 Actor = application.GetActorLink(view.actorId, url),
-                Resource = application.GetResourceLink(view.resourceType, view.resourceId, url),
+                //Resource = application.GetResourceLink(view.resourceType, view.resourceId, url),
                 ResourceType = application.GetResourceMime(view.resourceType),
 
                 CurrentProcessStep = url.GetWebId<ProcessStep>(view.currentProcessStepId),
@@ -135,7 +135,7 @@ namespace EastFive.Api.Azure.Resources
                         resourceProvided => new Resources.ProcessResourceView.ConfirmableResource
                         {
                             Key = resourceProvided.key,
-                            Resource = application.GetResourceLink(resourceProvided.type, resourceProvided.resourceId, url),
+                            //Resource = application.GetResourceLink(resourceProvided.type, resourceProvided.resourceId, url),
                             Type = application.GetResourceMime(resourceProvided.type),
                         })
                     .ToArray(),

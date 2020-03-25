@@ -30,40 +30,30 @@ namespace EastFive.Api.Azure.Modules
     {
         public const string HeaderKey = "StorageTableInformation";
 
-        public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType, 
-            IApplication httpApp, HttpRequestMessage request,
-            RouteData routeData, MethodInfo [] extensionsMethods,
+        public Task<IHttpResponse> HandleRouteAsync(Type controllerType, 
+            IApplication httpApp, IHttpRequest routeData, 
             RouteHandlingDelegate continueExecution)
         {
-            if (!request.Headers.Contains(HeaderKey))
-                return continueExecution(controllerType, httpApp, request,
-                    routeData, extensionsMethods);
+            var request = routeData.request;
+            if (!request.Headers.ContainsKey(HeaderKey))
+                return continueExecution(controllerType, httpApp, routeData);
             return EastFive.Azure.AppSettings.TableInformationToken.ConfigurationString(
                 async headerToken =>
                 {
-                    if (request.Headers.GetValues(HeaderKey).First() != headerToken)
-                        return request.CreateResponse(System.Net.HttpStatusCode.Unauthorized);
+                    if (request.Headers[HeaderKey].First() != headerToken)
+                        return routeData.CreateResponse(System.Net.HttpStatusCode.Unauthorized);
 
-                    if(request.Headers.Contains("X-StorageTableInformation-List"))
+                    if(request.Headers.ContainsKey("X-StorageTableInformation-List"))
                     {
                         var tableData = await controllerType.StorageGetAll().ToArrayAsync();
-
-                        var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
-                        var converter = new Serialization.ExtrudeConvert(httpApp as HttpApplication, request);
-                        var jsonObj = Newtonsoft.Json.JsonConvert.SerializeObject(tableData,
-                            new JsonSerializerSettings
-                            {
-                                Converters = new JsonConverter[] { converter }.ToList(),
-                            });
-                        response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
-                        return response;
+                        return routeData.CreateExtrudedResponse(
+                            System.Net.HttpStatusCode.OK,  tableData);
                     }
 
                     var tableInformation = await controllerType.StorageTableInformationAsync();
-                    return request.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
+                    return routeData.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
                 },
-                why => continueExecution(controllerType, httpApp, request,
-                    routeData, extensionsMethods));
+                why => continueExecution(controllerType, httpApp, routeData));
         }
 
     }

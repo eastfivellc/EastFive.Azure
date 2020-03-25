@@ -74,7 +74,7 @@ namespace EastFive.Api.Azure.Resources
             {
                 Id = urlHelper.GetWebId<ProcessStep>(process.processId),
                 Stage = urlHelper.GetWebId<EastFive.Api.Azure.Resources.ProcessStage>(process.processStageId),
-                Resource = httpApplication.GetResourceLink(process.resourceType, process.resourceId, urlHelper),
+                //Resource = httpApplication.GetResourceLink(process.resourceType, process.resourceId, urlHelper),
                 CreatedOn = process.createdOn,
 
                 ConfirmedBy = process.confirmedBy.HasValue ?
@@ -83,9 +83,9 @@ namespace EastFive.Api.Azure.Resources
                     default(WebId),
                 ConfirmedWhen = process.confirmedWhen,
                 Previous = urlHelper.GetWebId<ProcessStep>(process.previousStep),
-                Resources = process.resources
-                    .Select(resource => httpApplication.GetResourceLink(process.resourceType, resource.resourceId, urlHelper))
-                    .ToArray(),
+                //Resources = process.resources
+                //    .Select(resource => httpApplication.GetResourceLink(process.resourceType, resource.resourceId, urlHelper))
+                //    .ToArray(),
                 ResourceKeys = process.resources
                     .Select(resource => (resource.key))
                     .ToArray(),
