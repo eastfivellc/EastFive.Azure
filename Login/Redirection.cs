@@ -26,9 +26,9 @@ namespace EastFive.Azure.Login
         public string state;
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
+        public static async Task<IHttpResponse> Get(
                 IAzureApplication application, UrlHelper urlHelper,
-                HttpRequestMessage request,
+                IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,

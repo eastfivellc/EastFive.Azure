@@ -55,7 +55,7 @@ namespace EastFive.Azure.Auth
         public string secret;
 
         [Api.HttpGet]
-        public static HttpResponseMessage Get(
+        public static IHttpResponse Get(
             ContentTypeResponse<Token> onFound)
         {
             var token = new Token()

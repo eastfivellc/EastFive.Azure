@@ -37,9 +37,8 @@ namespace EastFive.Azure.Login
         public string secret;
 
         [Api.HttpPost]
-        public static async Task<HttpResponseMessage> CreateAsync(
+        public static async Task<IHttpResponse> CreateAsync(
                 [Resource]Client client,
-                Api.Azure.AzureApplication application,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onFailure)

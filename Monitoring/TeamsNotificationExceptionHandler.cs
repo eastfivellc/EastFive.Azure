@@ -18,7 +18,7 @@ namespace EastFive.Azure.Monitoring
 {
     public class TeamsNotificationExceptionHandlerAttribute : Attribute, IHandleExceptions, IHandleRoutes
     {
-        public async Task<HttpResponseMessage> HandleExceptionAsync(Exception ex, 
+        public async Task<IHttpResponse> HandleExceptionAsync(Exception ex, 
             MethodInfo method, KeyValuePair<ParameterInfo, object>[] queryParameters, 
             IApplication httpApp, IHttpRequest routeData,
             HandleExceptionDelegate continueExecution)
@@ -39,9 +39,9 @@ namespace EastFive.Azure.Monitoring
             IApplication httpApp, IHttpRequest routeData,
             RouteHandlingDelegate continueExecution)
         {
-            if (routeData.request.Headers.ContainsKey("X-Teams-Notify"))
+            if (routeData.Headers.ContainsKey("X-Teams-Notify"))
             {
-                var teamsNotifyParams = routeData.request.Headers["X-Teams-Notify"];
+                var teamsNotifyParams = routeData.Headers["X-Teams-Notify"];
                 if (teamsNotifyParams.Any())
                 {
                     var teamsNotifyParam = teamsNotifyParams.First();
@@ -58,18 +58,17 @@ namespace EastFive.Azure.Monitoring
         public Task<IHttpResponse> TeamsNotifyAsync(string teamsNotifyParam,
             Type controllerType,
             IApplication httpApp,
-            IHttpRequest routeData,
+            IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
             return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
                 async teamsHookUrl =>
                 {
                     var routeName = controllerType.GetRouteName(n => n);
-                    var request = routeData.request;
-                    var response = await continueExecution(controllerType, httpApp, routeData);
+                    var response = await continueExecution(controllerType, httpApp, request);
                     var message = await CreateMessageCardAsync(
-                        teamsNotifyParam, $"{routeData} = {response.StatusCode} / {response.ReasonPhrase}",
-                        httpApp, routeData,
+                        teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
+                        httpApp, request,
                         () => new MessageCard.Section
                         {
                             title = "Request/Response Information",
@@ -83,7 +82,7 @@ namespace EastFive.Azure.Monitoring
                                 new MessageCard.Section.Fact
                                 {
                                     name = "Http Method:",
-                                    value = request.Method,
+                                    value = request.Method.Method,
                                 },
                                 new MessageCard.Section.Fact
                                 {
@@ -101,7 +100,7 @@ namespace EastFive.Azure.Monitoring
                     string responseMessage = await message.SendAsync(teamsHookUrl);
                     return response;
                 },
-                (why) => continueExecution(controllerType, httpApp, routeData));
+                (why) => continueExecution(controllerType, httpApp, request));
         }
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
@@ -142,11 +141,10 @@ namespace EastFive.Azure.Monitoring
         //}
 
         private static async Task<MessageCard> CreateMessageCardAsync(Exception ex, MethodInfo method,
-            IApplication httpApp, IHttpRequest routeData)
+            IApplication httpApp, IHttpRequest request)
         {
-            var request = routeData.request;
             var messageCard = await CreateMessageCardAsync(method, ex.Message,
-                summary:"Server Esception", httpApp, routeData);
+                summary:"Server Esception", httpApp, request);
 
             var stackTrackSection = new MessageCard.Section
             {
@@ -195,10 +193,9 @@ namespace EastFive.Azure.Monitoring
 
         private static Task<MessageCard> CreateMessageCardAsync(MethodInfo method,
              string title, string summary,
-             IApplication httpApp, IHttpRequest routeData)
+             IApplication httpApp, IHttpRequest request)
         {
-            var request = routeData.request;
-            return CreateMessageCardAsync(title, summary, httpApp, routeData,
+            return CreateMessageCardAsync(title, summary, httpApp, request,
                 () => new MessageCard.Section
                 {
                     title = "Request Information",
@@ -212,7 +209,7 @@ namespace EastFive.Azure.Monitoring
                             new MessageCard.Section.Fact
                             {
                                 name = "Http Method:",
-                                value = request.Method,
+                                value = request.Method.Method,
                             },
                             new MessageCard.Section.Fact
                             {
@@ -230,10 +227,9 @@ namespace EastFive.Azure.Monitoring
 
         private static async Task<MessageCard> CreateMessageCardAsync(
              string title, string summary,
-             IApplication httpApp, IHttpRequest routeData,
+             IApplication httpApp, IHttpRequest request,
              Func<MessageCard.Section> getRequestInformation)
         {
-            var request = routeData.request;
             var appName = AppSettings.ApplicationInsights.TeamsAppIdentification
                 .ConfigurationString(
                     x => x,
@@ -280,9 +276,9 @@ namespace EastFive.Azure.Monitoring
                 }
             };
 
-            if (routeData.Properties.ContainsKey(HttpApplication.DiagnosticsLogProperty))
+            if (request.Properties.ContainsKey(HttpApplication.DiagnosticsLogProperty))
             {
-                var diagnosticsLogs = (string[])routeData.Properties[HttpApplication.DiagnosticsLogProperty];
+                var diagnosticsLogs = (string[])request.Properties[HttpApplication.DiagnosticsLogProperty];
                 sections = sections
                     .Append(
                         new MessageCard.Section

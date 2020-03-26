@@ -96,7 +96,7 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByResourceTypeAsync(
+        public static async Task<IHttpResponse> FindByResourceTypeAsync(
                 [EastFive.Api.QueryParameter(Name = ActorPropertyName)]Guid actorId,
                 [EastFive.Api.QueryParameter(Name = Resources.ProcessStageType.ResourceTypePropertyName)]Type resourceType,
                 EastFive.Api.Security security, AzureApplication application, UrlHelper url,
@@ -152,7 +152,7 @@ namespace EastFive.Api.Azure.Resources
 
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, AzureApplication application, UrlHelper url,
+        public static IHttpResponse Options(AzureApplication application, UrlHelper url,
             ContentResponse onOption)
         {
             return onOption(

@@ -68,12 +68,12 @@ namespace EastFive.Azure.Auth
         public Uri redirection { get; set; }
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetAllSecureAsync(
+        public async static Task<IHttpResponse> GetAllSecureAsync(
                 [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
                 AzureApplication application,
-                HttpRequestMessage request,
+                IHttpRequest request,
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure,
@@ -206,7 +206,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static Task<HttpResponseMessage> GetRedirection(
+        public static Task<IHttpResponse> GetRedirection(
                 [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
                 AzureApplication application,
@@ -271,11 +271,11 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAllSecureAsync(
+        public static async Task<IHttpResponse> GetAllSecureAsync(
                 [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
                 AzureApplication application,
-                HttpRequestMessage request,
+                IHttpRequest request,
             MultipartResponseAsync<Authorization> onContent,
             RedirectResponse onSuccess,
             NotFoundResponse onNotFound,

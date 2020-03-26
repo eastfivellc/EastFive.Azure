@@ -52,7 +52,7 @@ namespace EastFive.Azure.Login
 
         [Api.HttpPost]
         [HtmlAction(Label = "Create")]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [Property(Name = UserIdentificationPropertyName)]string userIdentification,
                 [Property(Name = PasswordPropertyName)]string password,
             CreatedResponse onUpdated,

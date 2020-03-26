@@ -23,8 +23,7 @@ namespace OrderOwl.Auth
     public class AppleDeveloperDomainAssociation
     {
         [HttpGet(MatchAllParameters = false)]
-        public static HttpResponseMessage Get(
-                HttpRequestMessage request,
+        public static IHttpResponse Get(
             TextResponse onResponse,
             ConfigurationFailureResponse onConfigurationFailure)
         {

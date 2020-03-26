@@ -63,10 +63,10 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> PropertyInformation(
+        public static async Task<IHttpResponse> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
                 [QueryParameter(Name = "property")]string propertyName,
-                HttpApplication httpApp,
+                IApplication httpApp,
             ContentTypeResponse<PropertyLookupInformation[]> onFound,
             NotFoundResponse onNotFound,
             BadRequestResponse onPropertyDoesNotSupportFindBy)

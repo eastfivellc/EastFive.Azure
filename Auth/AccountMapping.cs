@@ -163,7 +163,7 @@ namespace EastFive.Azure.Auth
         //}
 
         [Api.HttpPost] //(MatchAllBodyParameters = false)]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 [Resource]AccountMapping accountMapping,

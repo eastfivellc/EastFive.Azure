@@ -492,8 +492,8 @@ namespace EastFive.Azure
 
 
         public async Task<TResult> DeleteByIdAsync<TResult>(Guid accessId,
-                Guid performingActorId, System.Security.Claims.Claim [] claims, HttpRequestMessage request,
-            Func<HttpResponseMessage, TResult> onSuccess, 
+                Guid performingActorId, System.Security.Claims.Claim [] claims, IHttpRequest request,
+            Func<IHttpResponse, TResult> onSuccess, 
             Func<TResult> onNotFound,
             Func<TResult> onUnathorized)
         {

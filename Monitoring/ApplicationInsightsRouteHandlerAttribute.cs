@@ -37,12 +37,12 @@ namespace EastFive.Azure.Monitoring
                 Id = requestId,
                 Source = "EastFive.Api",
                 Timestamp = DateTimeOffset.UtcNow,
-                Url = routeData.request.GetAbsoluteUri(), // request.RequestUri,
+                Url = routeData.GetAbsoluteUri(), // request.RequestUri,
             };
 
             #region User / Session
 
-            var claims = routeData.request.GetClaims(
+            var claims = routeData.GetClaims(
                 claimsEnumerable => claimsEnumerable.ToArray(),
                 () => new Claim[] { },
                 (why) => new Claim[] { });
@@ -100,9 +100,9 @@ namespace EastFive.Azure.Monitoring
             return response;
         }
  
-        public async Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
+        public async Task<IHttpResponse> HandleMethodAsync(MethodInfo method,
             KeyValuePair<ParameterInfo, object>[] queryParameters, 
-            IApplication httpApp, HttpRequestMessage request, 
+            IApplication httpApp, IHttpRequest request, 
             MethodHandlingDelegate continueExecution)
         {
             var telemetry = request.GetRequestTelemetry();
@@ -113,9 +113,9 @@ namespace EastFive.Azure.Monitoring
 
         }
 
-        public async Task<HttpResponseMessage> HandleExceptionAsync(Exception ex, 
+        public async Task<IHttpResponse> HandleExceptionAsync(Exception ex, 
             MethodInfo method, KeyValuePair<ParameterInfo, object>[] queryParameters, 
-            IApplication httpApp, HttpRequestMessage request,
+            IApplication httpApp, IHttpRequest request,
             HandleExceptionDelegate continueExecution)
         {
             var telemetry = request.GetRequestTelemetry();
@@ -146,13 +146,11 @@ namespace EastFive.Azure.Monitoring
                 telemetryEx.Properties.Add($"parameter[{queryParameter.Key.Name}]", queryParameter.Value.ToString());
             }
 
-            if (!request.Content.IsDefaultOrNull())
+            if (!request.Body.IsDefaultOrNull())
             {
-                foreach (var header in request.Content.Headers)
-                    telemetryEx.Properties.Add($"header_content[{header.Key}]", header.Value.Join(","));
                 try
                 {
-                    var contentData = await request.Content.ReadAsByteArrayAsync();
+                    var contentData = request.Body.ToBytes();
                     telemetryEx.Properties.Add("content", contentData.ToBase64String());
                 }
                 catch (Exception)
@@ -168,7 +166,7 @@ namespace EastFive.Azure.Monitoring
     public static class ApplicationInsightsRouteHandlerExtensions
     {
 
-        public static RequestTelemetry GetRequestTelemetry(this HttpRequestMessage message)
+        public static RequestTelemetry GetRequestTelemetry(this IHttpRequest message)
         {
             return (RequestTelemetry)message.Properties[
                 ApplicationInsightsRouteHandlerAttribute.HttpRequestMessagePropertyRequestTelemetryKey];

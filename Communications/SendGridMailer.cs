@@ -8,6 +8,7 @@ using BlackBarLabs.Web;
 using EastFive.Web.Services;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
+using EastFive.Api;
 
 namespace EastFive.Communications.Azure
 {

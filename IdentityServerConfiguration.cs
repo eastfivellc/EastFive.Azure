@@ -12,6 +12,7 @@ using System.Security.Claims;
 using System.Net.Http;
 using System.Net;
 using EastFive.Extensions;
+using EastFive.Api;
 
 namespace EastFive.Security.SessionServer
 {
@@ -114,8 +115,8 @@ namespace EastFive.Security.SessionServer
             return deny().ToTask();
         }
 
-        public virtual Task<TResult> RemoveIntegrationAsync<TResult>(Session integration, HttpRequestMessage request,
-            Func<HttpResponseMessage, TResult> onSuccess,
+        public virtual Task<TResult> RemoveIntegrationAsync<TResult>(Session integration, IHttpRequest request,
+            Func<IHttpResponse, TResult> onSuccess,
             Func<TResult> onFailure)
         {
             return onSuccess(request.CreateResponse(HttpStatusCode.NoContent)).ToTask();

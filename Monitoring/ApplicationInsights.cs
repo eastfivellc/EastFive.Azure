@@ -20,7 +20,7 @@ namespace EastFive.Azure.Monitoring
     public class ApplicationInsights
     {
         [HttpGet]
-        public static Task<HttpResponseMessage> GetAsync(
+        public static Task<IHttpResponse> GetAsync(
                 [QueryParameter]string eventId,
                 ContentTypeResponse<EventsExceptionResult[]> onResults)
         {
@@ -51,7 +51,7 @@ namespace EastFive.Azure.Monitoring
         }
 
         [HttpPost]
-        public static Task<HttpResponseMessage> WebhookAsync(
+        public static Task<IHttpResponse> WebhookAsync(
                 [Resource]object appInsightsCallback,
                 ContentTypeResponse<EventsExceptionResult[]> onResults)
         {

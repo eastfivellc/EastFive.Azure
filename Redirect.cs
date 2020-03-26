@@ -64,7 +64,7 @@ namespace EastFive.Azure
 
         [HttpGet]
         [Description("Looks for the redirect by the resource ID and resource type.")]
-        public static HttpResponseMessage QueryByResourceIdAndTypeAsync(
+        public static IHttpResponse QueryByResourceIdAndTypeAsync(
                 [QueryParameter(Name = ResourceTypePropertyName)]Type resourceType,
                 [QueryParameter(Name = ResourcePropertyName)]Guid resourceId,
                 IApiApplication application,

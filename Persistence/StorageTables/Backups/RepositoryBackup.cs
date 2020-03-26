@@ -72,14 +72,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         #region Http Methods
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> QueueUpBackupPartitions(
+        public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Property(Name = StorageSettingCopyFromPropertyName)]string storageSettingCopyFrom,
                 [Property(Name = StorageSettingCopyToPropertyName)]string storageSettingCopyTo,
                 [Resource]RepositoryBackup repositoryBackup,
                 AzureApplication application,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             MultipartResponseAsync<InvocationMessage> onQueued,
             AlreadyExistsResponse onAlreadyExists)
@@ -125,11 +125,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> QueueUpBackupPartitions(
+        public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             MultipartResponseAsync<InvocationMessage> onQueued,
             NoContentResponse onTooEarly,

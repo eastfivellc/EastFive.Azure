@@ -40,11 +40,11 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         //public string token;
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
+        public static async Task<IHttpResponse> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
                 IAzureApplication application, UrlHelper urlHelper,
-                HttpRequestMessage request,
+                IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,
@@ -64,11 +64,11 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         }
 
         [HttpPost(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> PostAsync(
+        public static async Task<IHttpResponse> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,
                 IAzureApplication application, UrlHelper urlHelper,
-                HttpRequestMessage request,
+                IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,

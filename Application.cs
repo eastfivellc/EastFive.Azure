@@ -510,7 +510,7 @@ namespace EastFive.Api.Azure
             return onMonitorUsingThisCallback(callback);
         }
 
-        public delegate Task<HttpResponseMessage> ExecuteAsyncDelegate(DateTime whenRequested, Action<double, string> updateProgress);
+        public delegate Task<IHttpResponse> ExecuteAsyncDelegate(DateTime whenRequested, Action<double, string> updateProgress);
 
         private class ExecuteAsyncWrapper : IExecuteAsync
         {
@@ -519,7 +519,7 @@ namespace EastFive.Api.Azure
 
             public bool ForceBackground => false;
 
-            public Task<HttpResponseMessage> InvokeAsync(Action<double> updateCallback)
+            public Task<IHttpResponse> InvokeAsync(Action<double> updateCallback)
             {
                 return callback.Compile().Invoke(
                     when,

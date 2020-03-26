@@ -113,10 +113,11 @@ namespace EastFive.Azure.Configuration
 
         [Api.HttpGet]
         [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static HttpResponseMessage GetAsync(
+        public static IHttpResponse GetAsync(
+            IApplication application,
             ContentTypeResponse<Configuration[]> onFound)
         {
-            var configs = HttpApplication.configurationTypes
+            var configs = application.ConfigurationTypes
                 .SelectMany(configurationType =>
                     configurationType.Key.GetFields(BindingFlags.Public |
                             BindingFlags.Static | BindingFlags.FlattenHierarchy)

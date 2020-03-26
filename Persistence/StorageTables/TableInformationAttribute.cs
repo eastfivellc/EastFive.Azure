@@ -31,29 +31,28 @@ namespace EastFive.Api.Azure.Modules
         public const string HeaderKey = "StorageTableInformation";
 
         public Task<IHttpResponse> HandleRouteAsync(Type controllerType, 
-            IApplication httpApp, IHttpRequest routeData, 
+            IApplication httpApp, IHttpRequest request, 
             RouteHandlingDelegate continueExecution)
         {
-            var request = routeData.request;
             if (!request.Headers.ContainsKey(HeaderKey))
-                return continueExecution(controllerType, httpApp, routeData);
+                return continueExecution(controllerType, httpApp, request);
             return EastFive.Azure.AppSettings.TableInformationToken.ConfigurationString(
                 async headerToken =>
                 {
                     if (request.Headers[HeaderKey].First() != headerToken)
-                        return routeData.CreateResponse(System.Net.HttpStatusCode.Unauthorized);
+                        return request.CreateResponse(System.Net.HttpStatusCode.Unauthorized);
 
                     if(request.Headers.ContainsKey("X-StorageTableInformation-List"))
                     {
                         var tableData = await controllerType.StorageGetAll().ToArrayAsync();
-                        return routeData.CreateExtrudedResponse(
+                        return request.CreateExtrudedResponse(
                             System.Net.HttpStatusCode.OK,  tableData);
                     }
 
                     var tableInformation = await controllerType.StorageTableInformationAsync();
-                    return routeData.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
+                    return request.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
                 },
-                why => continueExecution(controllerType, httpApp, routeData));
+                why => continueExecution(controllerType, httpApp, request));
         }
 
     }

@@ -59,7 +59,7 @@ namespace EastFive.Api.Azure.Resources
         public string contentType { get; set; }
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateContentAsync(
+        public static async Task<IHttpResponse> CreateContentAsync(
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [QueryParameter(Name = ContentPropertyName)]ByteArrayContent content,
             CreatedResponse onCreated,
@@ -73,7 +73,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateContentFormAsync(
+        public static async Task<IHttpResponse> CreateContentFormAsync(
                 [Property(Name = ContentIdPropertyName)]Guid contentId,
                 [Property(Name = ContentPropertyName)]byte[] contentBytes,
                 [Header(Content = ContentPropertyName)]System.Net.Http.Headers.MediaTypeHeaderValue mediaHeader,

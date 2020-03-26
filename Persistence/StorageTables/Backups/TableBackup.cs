@@ -87,14 +87,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         #region Http Methods
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateAsync(
+        public static async Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 [Property(Name = TableNamePropertyName)]string tableName,
                 [Property(Name = BackupPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Resource]TableBackup tableBackup,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onCreated,
             AlreadyExistsResponse onAlreadyExists)
@@ -115,10 +115,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onContinued,
             NoContentResponse onComplete,
@@ -153,7 +153,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             string storageSettingCopyFrom,
             string storageSettingCopyTo,
             RequestMessage<TableBackup> requestQuery,
-            HttpRequestMessage request,
+            IHttpRequest request,
             ILogger logger)
         {
             var watch = new Stopwatch();

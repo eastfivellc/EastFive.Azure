@@ -87,14 +87,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         #region Http Methods
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateAsync(
+        public static async Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<TableBackupOperation> tableBackupOperationRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 [Property(Name = TableBackupPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property(Name = OperationSetPropertyName)]string operationSet,
                 [Resource]TableBackupOperation tableBackup,
                 RequestMessage<TableBackupOperation> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onCreated,
             AlreadyExistsResponse onAlreadyExists)
@@ -115,10 +115,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onContinued,
             NoContentResponse onComplete,
@@ -162,11 +162,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property]string continuationToken,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onContinued,
             NoContentResponse onComplete,

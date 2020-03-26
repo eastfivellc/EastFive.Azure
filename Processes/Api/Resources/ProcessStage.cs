@@ -68,7 +68,7 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
                 EastFive.Api.Security security, UrlHelper url,
             ContentResponse onFound,
@@ -83,7 +83,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByResourceAsync(
+        public static async Task<IHttpResponse> FindByResourceAsync(
                 [QueryParameter]Guid resourceId,
                 EastFive.Api.Security security, UrlHelper url,
             MultipartAcceptArrayResponseAsync onMultipart,
@@ -97,7 +97,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByFirstStepByActorAndTypeAsync(
+        public static async Task<IHttpResponse> FindByFirstStepByActorAndTypeAsync(
                 [QueryParameter(Name = Resources.ProcessStage.OwnerPropertyName)]Guid ownerId,
                 [QueryParameter(Name = Resources.ProcessStage.TypePropertyName)]Type resourceType,
                 [QueryParameter(Name = "processstage." + Resources.ProcessStage.ConfirmablePropertyName + "." + Resources.ProcessStage.ConfirmableResource.ProcessStageNextPropertyName)]
@@ -114,7 +114,8 @@ namespace EastFive.Api.Azure.Resources
                 () => onUnauthorized().ToTask());
         }
 
-        internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage, UrlHelper url)
+        internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage,
+            UrlHelper url)
         {
             return new Resources.ProcessStage
             {
@@ -147,7 +148,7 @@ namespace EastFive.Api.Azure.Resources
         #endregion
 
         [EastFive.Api.HttpPost(Type = typeof(Resources.ProcessStage), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = Resources.ProcessStage.IdPropertyName)]
                     Guid processStageId,
                 [Property(Name = Resources.ProcessStage.OwnerPropertyName)]
@@ -194,7 +195,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpPut(Type = typeof(Resources.ProcessStage), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateConnectorAsync(
+        public static Task<IHttpResponse> UpdateConnectorAsync(
                 [Property(Name = Resources.ProcessStage.IdPropertyName)]
                     Guid processStageId,
                 [PropertyOptional(Name = Resources.ProcessStage.TypePropertyName)]
@@ -237,7 +238,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse Options(UrlHelper url,
             ContentResponse onOption)
         {
             return onOption(GetResource(

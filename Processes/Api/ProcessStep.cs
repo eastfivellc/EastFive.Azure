@@ -54,7 +54,7 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ProcessStep.IdPropertyName)]Guid id,
                 AzureApplication httpApplication, EastFive.Api.Security security, UrlHelper url,
             ContentResponse onFound,
@@ -95,7 +95,7 @@ namespace EastFive.Api.Azure.Resources
         #endregion
 
         [EastFive.Api.HttpPost(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = ProcessStep.IdPropertyName)]Guid processId,
                 [PropertyOptional(Name = ProcessStep.PreviousPropertyName)]Guid? previousStepId,
                 [Property(Name = ProcessStep.ResourcePropertyName)]Guid resourceId,
@@ -123,7 +123,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpPatch(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateProcessStepAsync(
+        public static Task<IHttpResponse> UpdateProcessStepAsync(
                 [QueryParameter(Name = ProcessStep.IdPropertyName, CheckFileName = true)]Guid processId,
                 [PropertyOptional(Name = ProcessStep.ConfirmedByPropertyName)]Guid? confirmedById,
                 [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
@@ -152,7 +152,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpDelete]
-        public static Task<HttpResponseMessage> DeleteByIdAsync(
+        public static Task<IHttpResponse> DeleteByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ProcessStep.IdPropertyName)]Guid processStepId,
                 EastFive.Api.Security security,
             NoContentResponse onDeleted,
@@ -166,7 +166,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url, AzureApplication application,
+        public static IHttpResponse Options(IHttpRequest request, UrlHelper url, AzureApplication application,
             ContentResponse onOption)
         {
             return onOption(

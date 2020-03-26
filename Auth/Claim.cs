@@ -79,7 +79,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         [Api.HttpOptions]
-        public static HttpResponseMessage OptionsAsync(
+        public static IHttpResponse OptionsAsync(
                 IApplication application,
             ContentTypeResponse<Claim[]> onFound)
         {
@@ -97,7 +97,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 RequestMessage<Claim> claims,
                 Authorization auth,
             MultipartResponseAsync<Claim> onFound,
@@ -114,7 +114,7 @@ namespace EastFive.Azure.Auth
 
         [HttpPost]
         [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<Claim> claimRef,
                 [Property(Name = ActorPropertyName)]Guid actorId,
                 [Property(Name = TypePropertyName)]string type,

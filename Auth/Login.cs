@@ -84,7 +84,7 @@ namespace EastFive.Azure.Auth
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> AllAsync(
+        public static async Task<IHttpResponse> AllAsync(
                 [QueryParameter(Name = "start_time")]DateTime startTime,
                 [QueryParameter(Name = "end_time")]DateTime endTime,
                 RequestMessage<Authorization> authorizations,

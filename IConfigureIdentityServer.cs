@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Security.Claims;
 using System.Net.Http;
 using Microsoft.AspNetCore.Mvc.Routing;
+using EastFive.Api;
 
 namespace EastFive.Security.SessionServer
 {
@@ -29,8 +30,8 @@ namespace EastFive.Security.SessionServer
 
         Task<TResult> CanActAsUsersAsync<TResult>(Guid actorTakingAction, System.Security.Claims.Claim[] claims, Func<TResult> canActAsUsers, Func<TResult> deny);
 
-        Task<TResult> RemoveIntegrationAsync<TResult>(Session session, HttpRequestMessage request,
-            Func<HttpResponseMessage, TResult> onSuccess,
+        Task<TResult> RemoveIntegrationAsync<TResult>(Session session, IHttpRequest request,
+            Func<IHttpResponse, TResult> onSuccess,
             Func<TResult> onFailure);
 
         Task<TResult> GetActorAdministrationEmailAsync<TResult>(Guid actorId, Guid performingActorId, IEnumerable<System.Security.Claims.Claim> claims,

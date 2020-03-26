@@ -70,7 +70,7 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static HttpResponseMessage All(
+        public static IHttpResponse All(
             HttpApplication httpApp,
             ContentTypeResponse<StorageTable[]> onFound)
         {
@@ -82,7 +82,7 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> List(
+        public static async Task<IHttpResponse> List(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
             MultipartResponseAsync<StorageRow> onFound,
@@ -126,7 +126,7 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> Information(
+        public static async Task<IHttpResponse> Information(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
             ContentTypeResponse<TableInformation> onFound,
@@ -148,7 +148,7 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> PropertyInformation(
+        public static async Task<IHttpResponse> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
                 [QueryParameter(Name = "property")]string propertyName,
                 HttpApplication httpApp,
@@ -184,10 +184,10 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role, 
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> List2(
+        public static async Task<IHttpResponse> List2(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
-                HttpRequestMessage request,
+                IHttpRequest request,
             NotFoundResponse onNotFound)
         {
             return await DiscoverStorageResources(httpApp.GetType())
@@ -197,14 +197,7 @@ namespace EastFive.Azure.Persistence
                     {
                         var tableData = await storageTable.type.StorageGetAll().ToArrayAsync();
 
-                        var response = request.CreateResponse(System.Net.HttpStatusCode.OK);
-                        var converter = new ExtrudeConvert(httpApp as HttpApplication, request);
-                        var jsonObj = Newtonsoft.Json.JsonConvert.SerializeObject(tableData,
-                            new JsonSerializerSettings
-                            {
-                                Converters = new JsonConverter[] { converter }.ToList(),
-                            });
-                        response.Content = new StringContent(jsonObj, Encoding.UTF8, "application/json");
+                        var response = request.CreateResponse(System.Net.HttpStatusCode.OK, tableData);
                         return response;
                     },
                     () => onNotFound().AsTask());

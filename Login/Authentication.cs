@@ -94,7 +94,7 @@ namespace EastFive.Azure.Login
         #region HTTP Methods
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
                 [Accepts(Media = "text/html")]MediaTypeWithQualityHeaderValue accept,
             ContentTypeResponse<Authentication> onFound,
@@ -112,7 +112,7 @@ namespace EastFive.Azure.Login
         }
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = StatePropertyName)]string state,
                 [QueryParameter(Name = ClientPropertyName)]IRef<Client> clientRef,
                 [QueryParameter(Name = ValidationPropertyName)]string validation,
@@ -144,7 +144,7 @@ namespace EastFive.Azure.Login
 
         [Api.HttpPatch]
         [HtmlAction(Label = "Login")]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
                 [OptionalQueryParameter(Name = "hold")]bool? hold,
                 [Property(Name = UserIdentificationPropertyName)]string userIdentification,

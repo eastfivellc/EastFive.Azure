@@ -18,7 +18,7 @@ namespace EastFive.Security.SessionServer.Api.Controllers
     public class AppleAppSiteAssociationController : ApiController
     {
         [HttpGet]
-        public HttpResponseMessage Get(
+        public IHttpResponse Get(
             ContentResponse onSuccess,
             NotFoundResponse onNotFound)
         {

@@ -16,6 +16,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using BlackBarLabs.Persistence.Azure.Attributes;
+using EastFive.Api;
 
 namespace EastFive.Azure.Auth
 {
@@ -43,7 +44,7 @@ namespace EastFive.Azure.Auth
         public static async Task<TResult> ProcessRequestAsync<TResult>(
                 EastFive.Azure.Auth.Method method,
                 IDictionary<string, string> values,
-                IAzureApplication application, HttpRequestMessage request,
+                IAzureApplication application, IHttpRequest request,
                 UrlHelper urlHelper,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onBadCredentials,
@@ -56,12 +57,13 @@ namespace EastFive.Azure.Auth
             telemetry.TrackEvent($"ResponseController.ProcessRequestAsync - Requesting credential manager.");
 
             var requestId = Guid.NewGuid();
+            request.TryGetReferer(out Uri referer);
             var redirection = new Redirection
             {
                 webDataRef = requestId.AsRef<Redirection>(),
                 method = method.authenticationId,
                 values = values,
-                redirectedFrom = request.Headers.Referrer,
+                redirectedFrom = referer,
             };
 
             return await await redirection.StorageCreateAsync(

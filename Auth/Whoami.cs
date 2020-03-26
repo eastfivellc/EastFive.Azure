@@ -45,7 +45,7 @@ namespace EastFive.Azure.Auth
         public Guid? account { get; set; }
 
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 EastFive.Api.SessionToken security,
                 IAuthApplication application,
             ContentTypeResponse<Whoami> onFound)

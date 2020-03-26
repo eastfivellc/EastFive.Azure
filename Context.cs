@@ -131,17 +131,6 @@ namespace EastFive.Security.SessionServer
             }
         }
 
-        private PasswordCredentials passwordCredentials;
-        public PasswordCredentials PasswordCredentials
-        {
-            get
-            {
-                if (default(PasswordCredentials) == passwordCredentials)
-                    passwordCredentials = new PasswordCredentials(this, this.DataContext);
-                return passwordCredentials;
-            }
-        }
-
         private Sessions sessions;
         public Sessions Sessions
         {

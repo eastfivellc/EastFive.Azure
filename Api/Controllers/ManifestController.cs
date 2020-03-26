@@ -20,13 +20,13 @@ namespace EastFive.Api.Azure.Controllers
     public static class ManifestController
     {
         [EastFive.Api.HttpGet]
-        public static HttpResponseMessage FindAsync(
-                HttpApplication application, HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse FindAsync(
+                HttpApplication application, IHttpRequest request, UrlHelper url,
             ContentResponse onFound,
             ContentTypeResponse<Api.Resources.Manifest> onContent,
             ViewFileResponse onHtml)
         {
-            if (request.Headers.Accept.Where(accept => accept.MediaType.ToLower().Contains("html")).Any())
+            if (request.GetAcceptTypes().Where(accept => accept.MediaType.ToLower().Contains("html")).Any())
                 return HtmlContent(application, request, url, onHtml);
 
             LocateControllers();
@@ -48,8 +48,8 @@ namespace EastFive.Api.Azure.Controllers
             return request.CreateResponse(System.Net.HttpStatusCode.OK, manifest);
         }
 
-        public static HttpResponseMessage HtmlContent(
-                HttpApplication httpApp, HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse HtmlContent(
+                HttpApplication httpApp, IHttpRequest request, UrlHelper url,
             ViewFileResponse onHtml)
         {
             var lookups = httpApp.GetResources();
@@ -57,7 +57,7 @@ namespace EastFive.Api.Azure.Controllers
             return onHtml("Manifest/Manifest.cshtml", manifest);
         }
 
-        public static HttpResponseMessage ManifestContent(
+        public static IHttpResponse ManifestContent(
                 HttpApplication httpApp, HttpRequestMessage request, UrlHelper url,
             ContentTypeResponse<Api.Resources.Manifest> onContent)
         {

@@ -110,7 +110,7 @@ namespace EastFive.Azure.Auth
         #region Http Methods
 
         [Api.HttpGet]
-        public static Task<HttpResponseMessage> GetAsync(
+        public static Task<IHttpResponse> GetAsync(
                 [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 EastFive.Api.SessionToken? securityMaybe,
             ContentTypeResponse<Authorization> onFound,
@@ -144,7 +144,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AuthorizationIdPropertyName)]Guid authorizationId,
                 [Property(Name = MethodPropertyName)]IRef<Method> method,
                 [Property(Name = LocationAuthorizationReturnPropertyName)]Uri LocationAuthenticationReturn,
@@ -170,7 +170,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPost]
-        public async static Task<HttpResponseMessage> CreateAuthorizedAsync(
+        public async static Task<IHttpResponse> CreateAuthorizedAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
                 [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
@@ -202,7 +202,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]
-        public async static Task<HttpResponseMessage> UpdateAsync(
+        public async static Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = LocationLogoutReturnPropertyName)]Uri locationLogoutReturn,
                 EastFive.Api.SessionToken? securityMaybe,
@@ -229,9 +229,9 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpDelete]
-        public static async Task<HttpResponseMessage> DeleteAsync(
+        public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
-                Context context, UrlHelper urlHelper, AzureApplication application,
+                UrlHelper urlHelper, AzureApplication application,
             NoContentResponse onLogoutComplete,
             AcceptedBodyResponse onExternalSessionActive,
             NotFoundResponse onNotFound,

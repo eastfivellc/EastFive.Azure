@@ -75,7 +75,7 @@ namespace EastFive.Azure.Auth
         #region Http Methods
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByIdAsync(
+        public async static Task<IHttpResponse> GetByIdAsync(
                 [QueryParameter(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
                 IAuthApplication application, SessionToken security,
             ContentTypeResponse<XIntegration> onFound,
@@ -102,7 +102,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByAccountAsync(
+        public async static Task<IHttpResponse> GetByAccountAsync(
                 [QueryParameter(Name = AccountPropertyName)]Guid accountId,
                 IAuthApplication application, SessionToken security,
             MultipartResponseAsync<XIntegration> onContents,
@@ -133,7 +133,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByMethodAsync(
+        public async static Task<IHttpResponse> GetByMethodAsync(
                 [QueryParameter(Name = Authorization.MethodPropertyName)]IRef<Method> methodRef,
                 IAuthApplication application, SessionToken security,
             MultipartResponseAsync<XIntegration> onContents,
@@ -164,7 +164,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]XIntegration integration,
@@ -200,7 +200,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpDelete]
-        public static async Task<HttpResponseMessage> DeleteAsync(
+        public static async Task<IHttpResponse> DeleteAsync(
         [UpdateId(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
                 IAuthApplication application, EastFive.Api.SessionToken security,
             NoContentResponse onDeleted,
@@ -219,7 +219,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]
-        public async static Task<HttpResponseMessage> UpdateAsync(
+        public async static Task<IHttpResponse> UpdateAsync(
                 [Property(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,

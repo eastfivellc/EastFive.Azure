@@ -51,7 +51,7 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
                 EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
             ContentResponse onFound,
@@ -75,39 +75,18 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindAllAsync(
+        public static Task<IHttpResponse> FindAllAsync(
                 EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
             MultipartAcceptArrayResponseAsync onMultipart)
         {
             return onMultipart(stages);
         }
 
-
         #endregion
 
 
-        [EastFive.Api.HttpPut(Type = typeof(EastFive.Api.Resources.Connector), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateGroupAsync(
-                [Property]Guid id,
-                [Property(Name = EastFive.Api.Resources.Connector.SourcePropertyName)]Guid source,
-                [PropertyOptional(Name = EastFive.Api.Resources.Connector.DestinationPropertyName)]Guid? destination,
-                [PropertyOptional(Name = EastFive.Api.Resources.Connector.DestinationIntegrationPropertyName)]Guid? destinationIntegration,
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
-            NoContentResponse onUpdated,
-            NotFoundResponse onNotFound,
-            UnauthorizedResponse onUnauthorized,
-            GeneralConflictResponse onFailure)
-        {
-            throw new NotImplementedException();
-            //return Connectors.UpdateConnectorAsync(id,
-            //        Flow, security.performingAsActorId, security.claims,
-            //    () => onUpdated(),
-            //    () => onNotFound(),
-            //    (why) => onFailure(why));
-        }
-
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse Options(HttpRequestMessage request, UrlHelper url,
             ContentResponse onOption)
         {
             return onOption(stages[1]);

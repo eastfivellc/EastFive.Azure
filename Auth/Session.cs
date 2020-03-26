@@ -119,10 +119,10 @@ namespace EastFive.Azure.Auth
         #region Http Methods
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
                 EastFive.Api.SessionToken security,
-                IAuthApplication application, UrlHelper urlHelper,
+                IAuthApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -165,7 +165,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static Task<HttpResponseMessage> GetByRequestIdAsync(
+        public static Task<IHttpResponse> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
                 //EastFive.Api.SessionToken security,
@@ -186,7 +186,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = SessionIdPropertyName)]IRef<Session> sessionId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]Session session,
@@ -245,7 +245,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpPatch]
-        public static Task<HttpResponseMessage> UpdateBodyAsync(
+        public static Task<IHttpResponse> UpdateBodyAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 IAuthApplication application,
@@ -291,7 +291,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpDelete]
-        public static Task<HttpResponseMessage> DeleteAsync(
+        public static Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound)

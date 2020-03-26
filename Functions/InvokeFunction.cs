@@ -38,7 +38,7 @@ namespace EastFive.Azure.Functions
             this.executionLimit = executionLimit;
         }
 
-        public override Task<HttpResponseMessage> SendAsync(HttpRequestMessage httpRequest)
+        public override Task<IHttpResponse> SendAsync(IHttpRequest httpRequest)
         {
             return InvocationMessage.CreateAsync(httpRequest, executionLimit:executionLimit);
         }

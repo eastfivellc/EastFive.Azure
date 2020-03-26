@@ -75,7 +75,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
-        public static Task<HttpResponseMessage> QueryByIdAsync(
+        public static Task<IHttpResponse> QueryByIdAsync(
                 [QueryId]IRef<Method> methodRef,
             IAuthApplication application,
             ContentTypeResponse<Method> onFound,
@@ -88,7 +88,7 @@ namespace EastFive.Azure.Auth
 
         [Obsolete]
         [HttpGet]
-        public static Task<HttpResponseMessage> QueryAsync(
+        public static Task<IHttpResponse> QueryAsync(
             IAuthApplication application,
             MultipartResponseAsync<Method> onContent)
         {
@@ -106,7 +106,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QueryByIntegrationAsync(
+        public static async Task<IHttpResponse> QueryByIntegrationAsync(
             [QueryParameter(Name = "integration")]IRef<XIntegration> integrationRef,
             IAuthApplication application, EastFive.Api.SessionToken security,
             MultipartResponseAsync<Method> onContent,
@@ -149,7 +149,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QueryByIntegrationAccountAsync(
+        public static async Task<IHttpResponse> QueryByIntegrationAccountAsync(
             [QueryParameter(Name = "integration_account")]Guid accountId,
             IAuthApplication application, EastFive.Api.SessionToken security,
             MultipartResponseAsync<Method> onContent,
@@ -184,7 +184,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QueryBySessionAsync(
+        public static async Task<IHttpResponse> QueryBySessionAsync(
                 [QueryParameter(Name = "session")]IRef<Session> sessionRef,
                 IAuthApplication application,
             MultipartResponseAsync<Method> onContent,

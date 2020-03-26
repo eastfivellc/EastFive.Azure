@@ -50,12 +50,12 @@ namespace EastFive.Azure.Auth
         public string errorDescription { get; set; }
 
         [HttpPost(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Post(
+        public static async Task<IHttpResponse> Post(
                 [Property(Name = StatePropertyName)]string state,
                 [PropertyOptional(Name = CodePropertyName)]string code,
                 [Property(Name = TokenPropertyName)]string token,
                 AzureApplication application,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 UrlHelper urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,

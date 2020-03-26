@@ -44,12 +44,12 @@ namespace EastFive.Api.Azure.Credentials.Controllers
         public string agentid { get; set; }
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
+        public static async Task<IHttpResponse> Get(
                 [OptionalQueryParameter(CheckFileName = true)]string tag,
                 [QueryParameter(Name = TokenIdPropertyName)]string tokenId,
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
                 AzureApplication application,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 UrlHelper urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
