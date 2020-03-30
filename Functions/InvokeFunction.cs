@@ -1,27 +1,19 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api;
+﻿using EastFive.Api;
 using EastFive.Api.Azure;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Serialization;
-using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Functions
 {
-    public class InvokeFunction : InvokeApplication
+    public class InvokeFunction : InvokeApplication, IDisposable
     {
         public override IApplication Application => azureApplication;
 
         private AzureApplication azureApplication;
-
         private int executionLimit = 1;
+        private bool createdByThis;
+        private bool disposed;
 
         public InvokeFunction(AzureApplication application, Uri serverUrl, string apiRouteName, int executionLimit = 1)
             : base(serverUrl, apiRouteName)
@@ -31,6 +23,7 @@ namespace EastFive.Azure.Functions
                 if (application is FunctionApplication)
                     return application;
                 var newApp = Activator.CreateInstance(application.GetType()) as AzureApplication;
+                createdByThis = true;
                 newApp.ApplicationStart();
                 return newApp;
             }
@@ -41,6 +34,25 @@ namespace EastFive.Azure.Functions
         public override Task<HttpResponseMessage> SendAsync(HttpRequestMessage httpRequest)
         {
             return InvocationMessage.CreateAsync(httpRequest, executionLimit:executionLimit);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
+
+            if (disposing)
+            {
+                if (createdByThis)
+                    azureApplication.Dispose();
+            }
+            disposed = true;
         }
     }
 }
