@@ -57,35 +57,41 @@ namespace EastFive.Azure.Persistence.StorageTables
             task = Task.Run(
                 async () =>
                 {
-                    countdown.Reset(1);
-                    var order = 0;
-                    while (true)
+                    try
                     {
-                        if (!linkedToken.Token.IsCancellationRequested)
+                        countdown.Reset(1);
+                        var order = 0;
+                        while (true)
                         {
-                            if (!autoMutex.WaitOne(mutexWait))
+                            if (!linkedToken.Token.IsCancellationRequested)
+                            {
+                                if (!autoMutex.WaitOne(mutexWait))
+                                    continue;
+                            }
+                            if (!queue.TryDequeue(out string message))
+                            {
+                                if (linkedToken.Token.IsCancellationRequested)
+                                    break;
                                 continue;
-                        }
-                        if (!queue.TryDequeue(out string message))
-                        {
-                            if (linkedToken.Token.IsCancellationRequested)
-                                break;
-                            continue;
-                        }
+                            }
 
-                        var messageLine = new EventMessageLine
-                        {
-                            eventMessageLineRef = Ref<EventMessageLine>.NewRef(),
-                            eventId = eventId,
-                            order = order,
-                            when = DateTime.UtcNow,
-                            message = message,
-                        };
-                        order++;
-                        bool created = await messageLine.StorageCreateAsync(
-                            discard => true);
+                            var messageLine = new EventMessageLine
+                            {
+                                eventMessageLineRef = Ref<EventMessageLine>.NewRef(),
+                                eventId = eventId,
+                                order = order,
+                                when = DateTime.UtcNow,
+                                message = message,
+                            };
+                            order++;
+                            bool created = await messageLine.StorageCreateAsync(
+                                discard => true);
+                        }
                     }
-                    countdown.Signal();
+                    finally
+                    {
+                        countdown.Signal();
+                    }
                 },
                 linkedToken.Token);
         }
