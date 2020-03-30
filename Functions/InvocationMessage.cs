@@ -296,146 +296,148 @@ namespace EastFive.Azure.Functions
             var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
             var executionResultRef = Ref<ExecutionResult>.SecureRef();
             var traceId = Security.SecureGuid.Generate();
-            var messageWriter = new MessageWriter(logging, traceId, cancellationToken);
-            scopedLogger.Trace($"Loading message from storage.");
-            return await await invocationMessageRef.StorageGetAsync(
-                async (invocationMessage) =>
-                {
-                    var lastExecuted = DateTime.UtcNow;
-
-                    if (ShortCircuit(out DateTime? latestExecutionSS))
+            using (var messageWriter = new MessageWriter(logging, traceId, cancellationToken))
+            {
+                scopedLogger.Trace($"Loading message from storage.");
+                return await await invocationMessageRef.StorageGetAsync(
+                    async (invocationMessage) =>
                     {
-                        logging.Trace($"The message {invocationMessage.id} was already executed on {latestExecutionSS}.");
-                        var responseShortCurcuit = new HttpResponseMessage(System.Net.HttpStatusCode.ExpectationFailed);
-                        return await invocationMessageRef.StorageUpdateAsync(
-                            async (invocationMessageShortCircuit, saveAsync) =>
-                            {
-                                invocationMessageShortCircuit.lastExecuted = lastExecuted;
-                                invocationMessageShortCircuit.executionHistory = invocationMessageShortCircuit
-                                    .executionHistory
-                                    .Append(lastExecuted.PairWithValue((int)responseShortCurcuit.StatusCode))
-                                    .ToArray();
-                                await saveAsync(invocationMessageShortCircuit);
-                                return responseShortCurcuit;
-                            },
-                            () => responseShortCurcuit);
-                    }
+                        var lastExecuted = DateTime.UtcNow;
 
-                    scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
-                    var httpRequest = new HttpRequestMessage(
-                        new HttpMethod(invocationMessage.method),
-                        invocationMessage.requestUri);
-                    var config = new HttpConfiguration();
-                    httpRequest.SetConfiguration(config);
-
-                    logging.Trace($"Message origin:[{invocationMessage.referrer}].");
-                    if(invocationMessage.headers.ContainsKey(InvocationMessageSourceHeaderKey))
-                    {
-                        var sourceInvocationMessageIdStr = invocationMessage.headers[InvocationMessageSourceHeaderKey];
-                        if (Guid.TryParse(sourceInvocationMessageIdStr, out Guid sourceInvocationMessageId))
-                            logging.Trace($"Function origin:[{sourceInvocationMessageId}].");
-                    }
-                    foreach (var headerKVP in invocationMessage.headers
-                        .Where(headerKvp => headerKvp.Key != InvocationMessageSourceHeaderKey))
-                        httpRequest.Headers.Add(headerKVP.Key, headerKVP.Value);
-                    httpRequest.Headers.Add(InvocationMessageSourceHeaderKey, 
-                        invocationMessageRef.id.ToString());
-
-                    if (!invocationMessage.content.IsDefaultOrNull())
-                    {
-                        var contentJson = System.Text.Encoding.UTF8.GetString(invocationMessage.content);
-                        scopedLogger.Trace(contentJson);
-                        httpRequest.Content = new ByteArrayContent(invocationMessage.content);
-                        httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-                    }
-
-                    var executionResult = new ExecutionResult
-                    {
-                        executionResultRef = executionResultRef,
-                        invocationMessage = invocationMessageRef,
-                        started = lastExecuted,
-                        eventMessageId = traceId,
-                    };
-                    return await await executionResult.StorageCreateAsync(
-                        async (discard) =>
+                        if (ShortCircuit(out DateTime? latestExecutionSS))
                         {
-                            logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
-                            
-                            var result = await invokeApplication.SendAsync(httpRequest);
-                            bool saved = await invocationMessageRef.StorageUpdateAsync(
-                                async (invocationMessageToSave, saveInvocationMessage) =>
+                            logging.Trace($"The message {invocationMessage.id} was already executed on {latestExecutionSS}.");
+                            var responseShortCurcuit = new HttpResponseMessage(System.Net.HttpStatusCode.ExpectationFailed);
+                            return await invocationMessageRef.StorageUpdateAsync(
+                                async (invocationMessageShortCircuit, saveAsync) =>
                                 {
-                                    invocationMessage.lastExecuted = lastExecuted;
-                                    invocationMessage.executionHistory = invocationMessage.executionHistory
-                                        .Select(
-                                            exHi =>
-                                            {
-                                                if ((exHi.Key - lastExecuted).TotalSeconds < 1.0)
-                                                {
-                                                    return lastExecuted.PairWithValue((int)result.StatusCode);
-                                                }
-                                                return exHi;
-                                            })
+                                    invocationMessageShortCircuit.lastExecuted = lastExecuted;
+                                    invocationMessageShortCircuit.executionHistory = invocationMessageShortCircuit
+                                        .executionHistory
+                                        .Append(lastExecuted.PairWithValue((int)responseShortCurcuit.StatusCode))
                                         .ToArray();
-                                    await saveInvocationMessage(invocationMessage);
-                                    return true;
-                                });
-                            return await await GetContents(
-                                (contentBlobId, whenCompleted) =>
-                                {
-                                    return executionResult.executionResultRef.StorageUpdateAsync(
-                                        async (executionResultToUpdate, saveAsync) =>
-                                        {
-                                            executionResultToUpdate.ended = whenCompleted;
-                                            executionResultToUpdate.contentBlobId = contentBlobId;
-                                            await saveAsync(executionResultToUpdate);
-                                            return result;
-                                        },
-                                        () => result);
-                                });
+                                    await saveAsync(invocationMessageShortCircuit);
+                                    return responseShortCurcuit;
+                                },
+                                () => responseShortCurcuit);
+                        }
 
-                            async Task<TResult> GetContents<TResult>(
-                                Func<Guid?, DateTime, TResult> onContents)
+                        scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
+                        var httpRequest = new HttpRequestMessage(
+                            new HttpMethod(invocationMessage.method),
+                            invocationMessage.requestUri);
+                        var config = new HttpConfiguration();
+                        httpRequest.SetConfiguration(config);
+
+                        logging.Trace($"Message origin:[{invocationMessage.referrer}].");
+                        if (invocationMessage.headers.ContainsKey(InvocationMessageSourceHeaderKey))
+                        {
+                            var sourceInvocationMessageIdStr = invocationMessage.headers[InvocationMessageSourceHeaderKey];
+                            if (Guid.TryParse(sourceInvocationMessageIdStr, out Guid sourceInvocationMessageId))
+                                logging.Trace($"Function origin:[{sourceInvocationMessageId}].");
+                        }
+                        foreach (var headerKVP in invocationMessage.headers
+                            .Where(headerKvp => headerKvp.Key != InvocationMessageSourceHeaderKey))
+                            httpRequest.Headers.Add(headerKVP.Key, headerKVP.Value);
+                        httpRequest.Headers.Add(InvocationMessageSourceHeaderKey,
+                            invocationMessageRef.id.ToString());
+
+                        if (!invocationMessage.content.IsDefaultOrNull())
+                        {
+                            var contentJson = System.Text.Encoding.UTF8.GetString(invocationMessage.content);
+                            scopedLogger.Trace(contentJson);
+                            httpRequest.Content = new ByteArrayContent(invocationMessage.content);
+                            httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                        }
+
+                        var executionResult = new ExecutionResult
+                        {
+                            executionResultRef = executionResultRef,
+                            invocationMessage = invocationMessageRef,
+                            started = lastExecuted,
+                            eventMessageId = traceId,
+                        };
+                        return await await executionResult.StorageCreateAsync(
+                            async (discard) =>
                             {
-                                if (result.Content.IsDefaultOrNull())
-                                    return onContents(default,  DateTime.UtcNow);
-                                
-                                var contents = await result.Content.ReadAsByteArrayAsync();
-                                var whenCompleted = DateTime.UtcNow;
-                                return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
-                                    contentBlobId => onContents(contentBlobId, whenCompleted),
-                                    contentType: result.Content.Headers.ContentType.MediaType);
-                            }
-                        });
+                                logging.Trace($"{httpRequest.Method.Method}'ing to `{httpRequest.RequestUri.OriginalString}`.");
 
+                                var result = await invokeApplication.SendAsync(httpRequest);
+                                bool saved = await invocationMessageRef.StorageUpdateAsync(
+                                    async (invocationMessageToSave, saveInvocationMessage) =>
+                                    {
+                                        invocationMessage.lastExecuted = lastExecuted;
+                                        invocationMessage.executionHistory = invocationMessage.executionHistory
+                                            .Select(
+                                                exHi =>
+                                                {
+                                                    if ((exHi.Key - lastExecuted).TotalSeconds < 1.0)
+                                                    {
+                                                        return lastExecuted.PairWithValue((int)result.StatusCode);
+                                                    }
+                                                    return exHi;
+                                                })
+                                            .ToArray();
+                                        await saveInvocationMessage(invocationMessage);
+                                        return true;
+                                    });
+                                return await await GetContents(
+                                    (contentBlobId, whenCompleted) =>
+                                    {
+                                        return executionResult.executionResultRef.StorageUpdateAsync(
+                                            async (executionResultToUpdate, saveAsync) =>
+                                            {
+                                                executionResultToUpdate.ended = whenCompleted;
+                                                executionResultToUpdate.contentBlobId = contentBlobId;
+                                                await saveAsync(executionResultToUpdate);
+                                                return result;
+                                            },
+                                            () => result);
+                                    });
 
-                    bool ShortCircuit(out DateTime? latestExecution)
-                    {
-                        latestExecution = invocationMessage.executionHistory
-                            .NullToEmpty()
-                            .Aggregate(default(DateTime?),
-                                (dt, exec) =>
+                                async Task<TResult> GetContents<TResult>(
+                                    Func<Guid?, DateTime, TResult> onContents)
                                 {
-                                    if (!dt.HasValue)
-                                        return exec.Key;
-                                    return dt.Value > exec.Key ? dt.Value : exec.Key;
-                                });
+                                    if (result.Content.IsDefaultOrNull())
+                                        return onContents(default, DateTime.UtcNow);
 
-                        var hasExecutionHistory = latestExecution.HasValue;
-                        if (!hasExecutionHistory)
+                                    var contents = await result.Content.ReadAsByteArrayAsync();
+                                    var whenCompleted = DateTime.UtcNow;
+                                    return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
+                                        contentBlobId => onContents(contentBlobId, whenCompleted),
+                                        contentType: result.Content.Headers.ContentType.MediaType);
+                                }
+                            });
+
+
+                        bool ShortCircuit(out DateTime? latestExecution)
+                        {
+                            latestExecution = invocationMessage.executionHistory
+                                .NullToEmpty()
+                                .Aggregate(default(DateTime?),
+                                    (dt, exec) =>
+                                    {
+                                        if (!dt.HasValue)
+                                            return exec.Key;
+                                        return dt.Value > exec.Key ? dt.Value : exec.Key;
+                                    });
+
+                            var hasExecutionHistory = latestExecution.HasValue;
+                            if (!hasExecutionHistory)
+                                return false;
+
+                            if (!invocationMessage.executionLimit.HasValue)
+                                return true;
+
+                            var executionLimit = invocationMessage.executionLimit.Value;
+                            if (executionLimit <= invocationMessage.executionHistory.Length)
+                                return true;
+
                             return false;
-
-                        if (!invocationMessage.executionLimit.HasValue)
-                            return true;
-
-                        var executionLimit = invocationMessage.executionLimit.Value;
-                        if (executionLimit <= invocationMessage.executionHistory.Length)
-                            return true;
-
-                        return false;
-                    }
-                },
-                ResourceNotFoundException.StorageGetAsync<Task<HttpResponseMessage>>);
+                        }
+                    },
+                    ResourceNotFoundException.StorageGetAsync<Task<HttpResponseMessage>>);
+            }
         }
     }
 }

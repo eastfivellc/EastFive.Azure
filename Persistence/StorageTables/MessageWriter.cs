@@ -1,5 +1,6 @@
 ﻿using EastFive.Analytics;
 using EastFive.Api;
+using EastFive.Azure.Functions;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -15,42 +16,60 @@ using System.Threading.Tasks;
 
 namespace EastFive.Azure.Persistence.StorageTables
 {
-    public class MessageWriter
+    public class MessageWriter : IDisposable
     {
+        private static readonly TimeSpan mutexWait = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan countdownWait = mutexWait + TimeSpan.FromSeconds(5);
+
+        private readonly ILoggerWithEvents logging;
+        private readonly LinkedTokenSource linkedToken;
+        private readonly ConcurrentQueue<string> queue;
+        private readonly AutoResetEvent autoMutex;
+        private readonly CountdownEvent countdown;
         private Task task;
+        private bool disposed;
+
+        private void onMessage(string message)
+        {
+            this.queue.Enqueue(message);
+            this.autoMutex.Set();
+        }
 
         public MessageWriter(ILoggerWithEvents logging, Guid eventId, CancellationToken cancellationToken)
         {
-            ConcurrentQueue<string> queue = new ConcurrentQueue<string>();
-            AutoResetEvent autoMutex = new AutoResetEvent(false);
-
-            OnMessageHandler onMessage = (message) =>
-            {
-                queue.Enqueue(message);
-                autoMutex.Set();
-            };
-
-            logging.OnInformation += onMessage;
-            logging.OnTrace += onMessage;
-            logging.OnWarning += onMessage;
             if (cancellationToken.IsDefault())
                 cancellationToken = new CancellationToken();
+
+            this.logging = logging;
+            linkedToken = new LinkedTokenSource(cancellationToken,
+                (cancelledByAzure, cancelledManually) =>
+                {
+                    return false.AsTask();
+                });
+
+            queue = new ConcurrentQueue<string>();
+            autoMutex = new AutoResetEvent(false);
+            countdown = new CountdownEvent(0);
+            this.logging.OnInformation += onMessage;
+            this.logging.OnTrace += onMessage;
+            this.logging.OnWarning += onMessage;
 
             task = Task.Run(
                 async () =>
                 {
+                    countdown.Reset(1);
                     var order = 0;
                     while (true)
                     {
-                        if (!cancellationToken.IsCancellationRequested)
+                        if (!linkedToken.Token.IsCancellationRequested)
                         {
-                            if (!autoMutex.WaitOne(TimeSpan.FromSeconds(10)))
+                            if (!autoMutex.WaitOne(mutexWait))
                                 continue;
                         }
                         if (!queue.TryDequeue(out string message))
                         {
-                            if (cancellationToken.IsCancellationRequested)
-                                return;
+                            if (linkedToken.Token.IsCancellationRequested)
+                                break;
                             continue;
                         }
 
@@ -65,13 +84,38 @@ namespace EastFive.Azure.Persistence.StorageTables
                         order++;
                         bool created = await messageLine.StorageCreateAsync(
                             discard => true);
-
                     }
+                    countdown.Signal();
                 },
-                cancellationToken);
+                linkedToken.Token);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+                return;
+
+            if (disposing)
+            {
+                this.logging.OnInformation -= onMessage;
+                this.logging.OnTrace -= onMessage;
+                this.logging.OnWarning -= onMessage;
+                linkedToken.Source.Cancel();    // cancels loop
+                autoMutex.Set();                // causes WaitOne() to exit
+                countdown.Wait();               // wait for Task to finish all queued messages and exit
+                countdown.Dispose();
+                autoMutex.Dispose();
+                linkedToken.Dispose();
+            }
+            disposed = true;
         }
     }
-
 
     [StorageTable]
     public struct EventMessageLine : IReferenceable
