@@ -26,7 +26,7 @@ using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Persistence
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "PropertyLookupInformation",
         Resource = typeof(PropertyLookupInformation),
         ContentType = "x-application/eastfive.azure.storage.property-lookup-info",

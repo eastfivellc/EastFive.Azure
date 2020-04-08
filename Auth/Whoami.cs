@@ -21,7 +21,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Whoami",
         Resource = typeof(Whoami),
         ContentType = "x-application/auth-whoami",
@@ -44,9 +44,15 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = AccountPropertyName)]
         public Guid? account { get; set; }
 
+        public const string TokenPropertyName = "token";
+        [JsonProperty(PropertyName = TokenPropertyName)]
+        [ApiProperty(PropertyName = TokenPropertyName)]
+        public System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken;
+
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
         public static async Task<IHttpResponse> GetAsync(
                 EastFive.Api.SessionToken security,
+                IHttpRequest request,
                 IAuthApplication application,
             ContentTypeResponse<Whoami> onFound)
         {
@@ -61,11 +67,13 @@ namespace EastFive.Azure.Auth
                     },
                     () => string.Empty);
             }
+            request.TryParseJwt(out System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken);
             var whoami = new Whoami()
             {
                 session = security.sessionId.AsRef<Session>(),
                 account = security.accountIdMaybe,
                 name = await GetName(),
+                securityToken = securityToken,
             };
             return onFound(whoami);
         }

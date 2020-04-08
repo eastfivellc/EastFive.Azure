@@ -31,24 +31,6 @@ namespace EastFive.Security.SessionServer
             this.context = context;
         }
 
-        internal async Task<TResult> CreateAsync<TResult>(Guid credentialId, Guid authenticationId,
-                string method, string subject,
-                Guid performingActorId, System.Security.Claims.Claim[] claims,
-            Func<TResult> onSuccess,
-            Func<Guid, TResult> onAlreadyExists,
-            Func<TResult> onSubjectAlreadyInUse,
-            Func<TResult> onUnauthorized,
-            Func<string, TResult> onFailure)
-        {
-            if (!await Library.configurationManager.CanAdministerCredentialAsync(authenticationId, performingActorId, claims))
-                return onUnauthorized();
-
-            return await this.dataContext.CredentialMappings.CreateCredentialMappingAsync(credentialId, method, subject, authenticationId,
-                onSuccess,
-                () => onAlreadyExists(credentialId),
-                onSubjectAlreadyInUse);
-        }
-
         #region InviteCredential
 
         public async Task<TResult> CreateInviteCredentialAsync<TResult>(Guid sessionId, Guid? stateId,
@@ -172,11 +154,6 @@ namespace EastFive.Security.SessionServer
 
         #endregion
         
-        public Task<TResult> GetAllAccountIdAsync<TResult>(
-            Func<Persistence.CredentialMapping[], TResult> onSuccess)
-        {
-            return this.dataContext.CredentialMappings.FindAllCredentialMappingAsync(onSuccess);
-        }
 
         public async Task<TResult> CreateSamlCredentialAsync<TResult>(Guid samlCredentialId,
             Guid actorId, string nameId,

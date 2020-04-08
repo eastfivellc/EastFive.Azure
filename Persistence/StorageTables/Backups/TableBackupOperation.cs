@@ -24,7 +24,7 @@ using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "TableBackupOperation",
         Resource = typeof(TableBackupOperation),
         ContentType = "x-application/table-backup-operation",

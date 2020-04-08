@@ -25,7 +25,7 @@ using System.Collections.Concurrent;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "TableBackup",
         Resource = typeof(TableBackup),
         ContentType = "x-application/table-backup",

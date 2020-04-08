@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "LoginClient",
         Resource = typeof(Client),
         ContentType = "x-application/login-client",

@@ -5,9 +5,7 @@ using System.Configuration;
 using System.Security.Claims;
 using System.Collections.Generic;
 
-using BlackBarLabs.Collections.Generic;
 using BlackBarLabs.Extensions;
-using BlackBarLabs;
 using EastFive.Collections.Generic;
 using Microsoft.ApplicationInsights;
 using EastFive.Linq;
@@ -15,6 +13,7 @@ using EastFive.Api.Azure;
 using EastFive.Extensions;
 using EastFive.Azure.Monitoring;
 using EastFive.Azure;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Security.SessionServer
 {
@@ -58,49 +57,6 @@ namespace EastFive.Security.SessionServer
             telemetry = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
         }
         
-        public async Task<TResult> CreateLoginAsync<TResult>(Guid authenticationRequestId,
-                string method, Uri redirectUrl, Uri redirectLogoutUrl,
-                Func<Type, Uri> controllerToLocation,
-            Func<Session, TResult> onSuccess,
-            Func<TResult> onAlreadyExists,
-            Func<TResult> onCredentialSystemNotAvailable,
-            Func<string, TResult> onCredentialSystemNotInitialized,
-            Func<string, TResult> onFailure)
-        {
-            return await Context.GetLoginProvider(method,
-                async (provider) =>
-                {
-                    var callbackLocation = controllerToLocation(provider.CallbackController);
-                    var sessionId = SecureGuid.Generate();
-                    var methodName = method;
-                    var result = await this.dataContext.AuthenticationRequests.CreateAsync(authenticationRequestId,
-                            methodName, AuthenticationActions.signin, redirectUrl, redirectLogoutUrl,
-                        () => EastFive.Api.Auth.JwtTools.CreateToken(sessionId, callbackLocation, TimeSpan.FromMinutes(30),
-                            (token) =>
-                            {
-                                var session = new Session()
-                                {
-                                    id = authenticationRequestId,
-                                    method = methodName,
-                                    name = methodName,
-                                    action = AuthenticationActions.signin,
-                                    loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackLocation, controllerToLocation),
-                                    logoutUrl = provider.GetLogoutUrl(authenticationRequestId, callbackLocation, controllerToLocation),
-                                    redirectUrl = redirectUrl,
-                                    redirectLogoutUrl = redirectLogoutUrl,
-                                    token = token,
-                                };
-                                return onSuccess(session);
-                            },
-                            why => onFailure(why),
-                            (param, why) => onFailure($"Invalid configuration for {param}:{why}")),
-                        onAlreadyExists);
-                    return result;
-                },
-                onCredentialSystemNotAvailable.AsAsyncFunc(),
-                onCredentialSystemNotInitialized.AsAsyncFunc());
-        }
-
         internal async Task<TResult> CreateLoginAsync<TResult>(Guid authenticationRequestId, Guid authenticationId,
                 string method, Uri callbackLocation, IDictionary<string, string> authParams,
             Func<Session, TResult> onSuccess,
@@ -166,43 +122,6 @@ namespace EastFive.Security.SessionServer
                 () => authenticate(new Dictionary<string, string>()));
         }
         
-        internal async Task<TResult> GetAsync<TResult>(Guid authenticationRequestId, Func<Type, Uri> callbackUrlFunc,
-                AzureApplication application,
-            Func<Session, TResult> onSuccess,
-            Func<string, TResult> onNotFound,
-            Func<string, TResult> onFailure)
-        {
-            return await await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
-                async (authenticationRequestStorage) =>
-                {
-                    if (authenticationRequestStorage.Deleted.HasValue)
-                        return onNotFound("Session was deleted");
-
-                    return await await application.GetLoginProviderAsync(authenticationRequestStorage.method,
-                        async (provider) =>
-                        {
-                            var authenticationRequest = Convert(authenticationRequestStorage);
-                            if(authenticationRequest.authorizationId.HasValue)
-                            {
-                                authenticationRequest = await CreateSessionAsync(authenticationRequest.id, authenticationRequest.authorizationId.Value,
-                                    (token, refreshToken) =>
-                                    {
-                                        authenticationRequest.token = token;
-                                        authenticationRequest.refreshToken = refreshToken;
-                                        return authenticationRequest;
-                                    },
-                                    (why) => authenticationRequest);
-                            }
-                            var callbackUrl = callbackUrlFunc(provider.CallbackController);
-                            authenticationRequest.loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
-                            authenticationRequest.logoutUrl = provider.GetLogoutUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
-                            return onSuccess(authenticationRequest);
-                        },
-                        () => onFailure("The credential provider for this request is no longer enabled in this system").ToTask(),
-                        (why) => onFailure(why).ToTask());
-                },
-                () => onNotFound("Session does not exist").ToTask());
-        }
 
         public async Task<TResult> LookupCredentialMappingAsync<TResult>(
                 string method, string subject, Guid? loginId, Guid sessionId, 
@@ -308,104 +227,6 @@ namespace EastFive.Security.SessionServer
                 Func<string, TResult>, // mapping creation failed
                 Task<TResult>> createLookupCallback);
 
-        public async Task<TResult> CreateOrUpdateWithAuthenticationAsync<TResult>(
-                AzureApplication application, string method,
-                IDictionary<string, string> extraParams,
-            Func<Guid, Guid, string, string, AuthenticationActions, IProvideAuthorization, IDictionary<string, string>, Uri, TResult> onLogin,
-            Func<Uri, string, IProvideAuthorization, IDictionary<string, string>, TResult> onLogout,
-            LookupCredentialNotFoundDelegate<TResult> lookupCredentialNotFound,
-            Func<string, TResult> onInvalidToken,
-            Func<string, TResult> systemOffline,
-            Func<string, TResult> onNotConfigured,
-            Func<string, TResult> onFailure)
-        {
-            return await await application.GetAuthorizationProviderAsync(method,
-                async (provider) =>
-                {
-                    return await await provider.RedeemTokenAsync(extraParams,
-                        (subject, stateId, loginId, extraParamsWithRedemptionParams) =>
-                            TokenRedeemedAsync(method, provider,
-                                subject, stateId, loginId, extraParamsWithRedemptionParams,
-                                onLogin,
-                                onLogout,
-                                lookupCredentialNotFound,
-                                onInvalidToken,
-                                onNotConfigured,
-                                onFailure,
-                                this.telemetry),
-                        async (stateId, extraParamsWithRedemptionParams) =>
-                        {
-                            telemetry.TrackEvent("Sessions.CreateOrUpdateWithAuthenticationAsync:  Not Authenticated");
-                            if (!stateId.HasValue)
-                                onLogout(default(Uri), "State id missing.", provider, extraParamsWithRedemptionParams);
-
-                            return await dataContext.AuthenticationRequests.FindByIdAsync(stateId.Value,
-                                (authRequest) => onLogout(authRequest.redirectLogout, $"Not authenticated. [{stateId.Value}]", provider, extraParamsWithRedemptionParams),
-                                () => onLogout(default(Uri), $"Authentication request not found. [{stateId.Value}]", provider, extraParamsWithRedemptionParams));
-                        },
-                        onInvalidToken.AsAsyncFunc(),
-                        systemOffline.AsAsyncFunc(),
-                        onNotConfigured.AsAsyncFunc(),
-                        onFailure.AsAsyncFunc());
-                },
-                () => systemOffline($"The requested credential system is not enabled for this deployment. [{method}]").ToTask(),
-                (why) => onNotConfigured(why).ToTask());
-        }
-        
-        public async Task<TResult> TokenRedeemedAsync<TResult>(string method, IProvideAuthorization provider,
-                string subject, Guid? stateId, Guid? loginId, IDictionary<string, string> extraParamsWithRedemptionParams,
-            Func<Guid, Guid, string, string, AuthenticationActions, IProvideAuthorization, IDictionary<string, string>, Uri, TResult> onLogin,
-            Func<Uri, string, IProvideAuthorization, IDictionary<string, string>, TResult> onLogout,
-            LookupCredentialNotFoundDelegate<TResult> lookupCredentialNotFound,
-            Func<string, TResult> onInvalidToken,
-            Func<string, TResult> onNotConfigured,
-            Func<string, TResult> onFailure,
-            TelemetryClient telemetry)
-        {
-            telemetry.TrackEvent("Sessions.CreateOrUpdateWithAuthenticationAsync:  Authenticated", extraParamsWithRedemptionParams);
-            // This is the case where the login process started from an existing authentication resource
-            if (stateId.HasValue)
-            {
-                telemetry.TrackEvent($"Sessions.CreateOrUpdateWithAuthenticationAsync:  StateId: {stateId.Value.ToString()}");
-                return await AuthenticateStateAsync(stateId.Value, loginId, method, subject, extraParamsWithRedemptionParams,
-                    (authorizationId, authenticationId, token, refreshToken, action, extraParamsAuthenticated, redirectUrl) =>
-                        onLogin(authorizationId, authenticationId, token, refreshToken, action, provider, extraParamsAuthenticated, redirectUrl),
-                    (redirectUrl, reason, extraParamsAuthenticated) => onLogout(redirectUrl, reason, provider, extraParamsAuthenticated),
-                    onInvalidToken,
-                    onNotConfigured,
-                    onFailure);
-            }
-            // This is the case where the login process started from an external system
-            telemetry.TrackEvent("StateId not found.  Starting external system login flow.");
-            return await await dataContext.CredentialMappings.LookupCredentialMappingAsync(method, subject, loginId,
-                (authenticationId) =>
-                {
-                    telemetry.TrackEvent($"Sessions.CreateOrUpdateWithAuthenticationAsync:  Called from external login system.  AuthenticationId: {authenticationId.ToString()}");
-                    var authorizationId = Guid.NewGuid();
-                    return this.CreateLoginAsync(authorizationId, authenticationId, method, default(Uri), extraParamsWithRedemptionParams,
-                        (session) => onLogin(authorizationId, authenticationId, session.token, session.refreshToken, AuthenticationActions.signin, provider, session.extraParams,
-                                default(Uri)),
-                        "Guid not unique for creating authentication started from external system".AsFunctionException<TResult>(),
-                        onFailure);
-                },
-                () => lookupCredentialNotFound(subject, provider, extraParamsWithRedemptionParams,
-                    async (authenticationId, onCreatedLogin, onFailureToCreateLogin) =>
-                    {
-                        var sessionId = Guid.NewGuid();
-                        var authorizationId = sessionId;
-                        return await await dataContext.CredentialMappings.CreateCredentialMappingAsync<Task<TResult>>(
-                            sessionId, method, subject, authenticationId,
-                            async () =>
-                            {
-                                return await await this.CreateLoginAsync<Task<TResult>>(authorizationId, authenticationId, method, default(Uri), extraParamsWithRedemptionParams,
-                                    (session) => onCreatedLogin(sessionId, session.token, session.refreshToken, AuthenticationActions.signin, session.redirectUrl),
-                                    "Guid not unique for creating authentication started from external system".AsFunctionException<Task<TResult>>(),
-                                    onFailureToCreateLogin.AsAsyncFunc());
-                            },
-                            () => "Guid not unique for creating authentication started from external system".AsFunctionException<Task<TResult>>()(),
-                            () => onFailureToCreateLogin("Token is already in use.").ToTask());
-                    }));
-        }
 
         private async Task<TResult> AuthenticateStateAsync<TResult>(Guid sessionId, Guid? loginId, string method,
                 string subject, IDictionary<string, string> extraParams,

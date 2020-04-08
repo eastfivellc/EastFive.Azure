@@ -45,7 +45,7 @@ namespace EastFive.Azure.Auth
                 EastFive.Azure.Auth.Method method,
                 IDictionary<string, string> values,
                 IAzureApplication application, IHttpRequest request,
-                UrlHelper urlHelper,
+                IProvideUrl urlHelper,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onBadCredentials,
             Func<string, TResult> onCouldNotConnect,

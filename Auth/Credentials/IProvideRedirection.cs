@@ -1,10 +1,11 @@
-﻿using EastFive.Security.SessionServer;
+﻿using EastFive.Azure.Auth;
+using EastFive.Security.SessionServer;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     public interface IProvideRedirection
     {

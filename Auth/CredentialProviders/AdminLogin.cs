@@ -96,7 +96,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         [HttpPost]
         public static async Task<IHttpResponse> PostLoginAsync(
                 Guid authenticationId,
-                HttpApplication application, UrlHelper urlHelper,
+                HttpApplication application, IProvideUrl urlHelper,
             RedirectResponse onRedirect,
             GeneralFailureResponse onFailure)
         {

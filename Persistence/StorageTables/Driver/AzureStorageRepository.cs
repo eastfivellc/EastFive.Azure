@@ -762,7 +762,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         {
                             var innerException = ex.InnerException as System.Net.WebException;
                             var responseContentStream = innerException.Response.GetResponseStream();
-                            var responseContentBytes = responseContentStream.ToBytes();
+                            var responseContentBytes = await responseContentStream.ToBytesAsync();
                             var responseString = responseContentBytes.ToText();
                             throw new Exception(responseString);
                         }

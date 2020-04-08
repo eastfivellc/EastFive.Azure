@@ -31,7 +31,7 @@ using System.IO;
 
 namespace EastFive.Azure.Functions
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "InvocationMessage",
         Resource = typeof(InvocationMessage),
         ContentType = "x-application/eastfive.azure.invocation-message",
@@ -244,10 +244,10 @@ namespace EastFive.Azure.Functions
                 (created) =>
                 {
                     var invocationSerialized = JsonConvert.SerializeObject(invocationMessage,
-                        new EastFive.Api.Serialization.Converter());
+                        new Api.Serialization.Converter(httpRequest));
                     var response = new StringHttpResponse(httpRequest, System.Net.HttpStatusCode.Accepted,
                         default, "x-application/eastfive-invocationmessage", default, 
-                        invocationSerialized, Encoding.UTF8);
+                        invocationSerialized, new UTF8Encoding(false));
                     return response;
                 },
                 () => throw new Exception());

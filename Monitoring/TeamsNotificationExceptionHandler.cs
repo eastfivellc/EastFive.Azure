@@ -239,10 +239,10 @@ namespace EastFive.Azure.Monitoring
                     x => new Uri(x),
                     (why) => default);
             var content = string.Empty;
-            if (!request.Body.IsDefaultOrNull())
+            if (request.HasBody)
             {
                 //var contentData = await request.Content.ReadAsByteArrayAsync();
-                content = request.Body.ReadAsString(); // .ReadAsStringAsync();
+                content = await request.Body.ReadAsStringAsync(); // .ReadAsStringAsync();
             }
             var utcOffset = TimeZoneInfo
                 .FindSystemTimeZoneById("Central Standard Time")

@@ -3,13 +3,11 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Microsoft.IdentityModel.Tokens;
 using System.Web;
 using System.IdentityModel.Tokens.Jwt;
-using EastFive.Security.SessionServer;
-using BlackBarLabs.Extensions;
-using EastFive.Api.Azure.Credentials;
-using EastFive.Api.Azure.Credentials.Attributes;
+
+using Microsoft.IdentityModel.Tokens;
+
 using EastFive.Linq;
 using EastFive.Collections.Generic;
 using EastFive.Serialization;
@@ -17,8 +15,9 @@ using EastFive.Azure.Auth;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
 using EastFive.AzureADB2C;
+using EastFive.Api;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     [IntegrationName(IntegrationName)]
     public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession
@@ -162,7 +161,7 @@ namespace EastFive.Api.Azure.Credentials
                         },
                         onUnspecifiedConfiguration);
                 },
-                onInvalidCredentials).ToTask();
+                onInvalidCredentials).AsTask();
         }
         
         private TResult ValidateToken<TResult>(string idToken,
@@ -371,7 +370,10 @@ namespace EastFive.Api.Azure.Credentials
         public Task<TResult> UserParametersAsync<TResult>(Guid actorId, System.Security.Claims.Claim[] claims, IDictionary<string, string> extraParams,
             Func<IDictionary<string, string>, IDictionary<string, Type>, IDictionary<string, string>, TResult> onSuccess)
         {
-            return onSuccess(new Dictionary<string, string>(), new Dictionary<string, Type>(), new Dictionary<string, string>()).ToTask();
+            return onSuccess(
+                new Dictionary<string, string>(),
+                new Dictionary<string, Type>(), 
+                new Dictionary<string, string>()).AsTask();
         }
 
         #endregion
@@ -381,4 +383,5 @@ namespace EastFive.Api.Azure.Credentials
             return true.AsTask();
         }
     }
+
 }

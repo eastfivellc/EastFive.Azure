@@ -71,7 +71,7 @@ namespace EastFive.Api.Azure.Modules
                         indexHTML = zipArchive.Entries
                             .First(item => string.Compare(item.FullName, IndexHTMLFileName, true) == 0)
                             .Open()
-                            .ToBytes();
+                            .ToBytesAsync().Result;
                         
                         lookupSpaFile = EastFive.Azure.AppSettings.SpaSiteLocation.ConfigurationString(
                             (siteLocation) =>
@@ -83,10 +83,10 @@ namespace EastFive.Api.Azure.Modules
                                         entity =>
                                         {
                                             if (!entity.FullName.EndsWith(".js"))
-                                                return entity.FullName.PairWithValue(entity.Open().ToBytes());
+                                                return entity.FullName.PairWithValue(entity.Open().ToBytesAsync().Result);
                                             
                                             var fileBytes = entity.Open()
-                                                .ToBytes()
+                                                .ToBytesAsync().Result
                                                 .GetString()
                                                 .Replace("8FCC3D6A-9C25-4802-8837-16C51BE9FDBE.example.com", siteLocation)
                                                 .GetBytes();

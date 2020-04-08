@@ -15,8 +15,6 @@ using EastFive.Linq;
 using EastFive.Security.SessionServer;
 using EastFive.Security;
 using EastFive.Linq.Async;
-using EastFive.Api.Azure.Credentials.Attributes;
-using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Api.Azure.Monitoring;
 
 namespace EastFive.Azure.Monitoring

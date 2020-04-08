@@ -1,4 +1,5 @@
-﻿using EastFive.Azure.Auth;
+﻿using EastFive.Api.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Security.SessionServer;
 using System;
 using System.Collections.Generic;
@@ -7,7 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     public interface IManageAuthorizationRequests
     {

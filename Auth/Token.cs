@@ -22,7 +22,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Token",
         Resource = typeof(Token),
         ContentType = "x-application/auth-token",

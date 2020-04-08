@@ -1,16 +1,18 @@
-﻿using BlackBarLabs.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+
 using EastFive.Security.SessionServer.Persistence;
 using EastFive.Api.Services;
 using EastFive.Security.SessionServer;
 using EastFive.Serialization;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(IntegrationName)]
+    [IntegrationName(IntegrationName)]
     public class TokenCredentialProvider : IProvideAuthorization, IProvideLoginManagement
     {
         public const string IntegrationName = "Token";
@@ -26,13 +28,13 @@ namespace EastFive.Api.Azure.Credentials
             this.dataContext = new DataContext(EastFive.Azure.AppSettings.ASTConnectionStringKey);
         }
 
-        [Attributes.IntegrationName(IntegrationName)]
+        [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new TokenCredentialProvider()).ToTask();
+            return onProvideAuthorization(new TokenCredentialProvider()).AsTask();
         }
         
         public Type CallbackController => typeof(TokenCredentialProvider);

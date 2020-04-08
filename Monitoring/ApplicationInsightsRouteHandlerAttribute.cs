@@ -146,11 +146,11 @@ namespace EastFive.Azure.Monitoring
                 telemetryEx.Properties.Add($"parameter[{queryParameter.Key.Name}]", queryParameter.Value.ToString());
             }
 
-            if (!request.Body.IsDefaultOrNull())
+            if (request.HasBody)
             {
                 try
                 {
-                    var contentData = request.Body.ToBytes();
+                    var contentData = await request.Body.ToBytesAsync();
                     telemetryEx.Properties.Add("content", contentData.ToBase64String());
                 }
                 catch (Exception)

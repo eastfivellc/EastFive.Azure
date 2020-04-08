@@ -12,13 +12,13 @@ using EastFive.Extensions;
 
 namespace EastFive.Api.Azure.Controllers
 {
-    [FunctionViewController6]
+    [FunctionViewController]
     public class SpaServeController
     { 
         [HttpGet]
-        public static HttpResponseMessage Get(
+        public static IHttpResponse Get(
             [QueryId]string id,
-            HttpRequestMessage request)
+            IHttpRequest request)
         {
 
             //var indexFile = SpaHandlerModule.indexHTML;

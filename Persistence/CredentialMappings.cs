@@ -56,33 +56,6 @@ namespace EastFive.Security.SessionServer.Persistence
                 () => onNotExist());
         }
 
-        public async Task<TResult> FindAllCredentialMappingAsync<TResult>(
-            Func<CredentialMapping[], TResult> onSuccess)
-        {
-            var actorCredMappingsTask = repository.FindAllAsync(
-                (Documents.LoginActorLookupDocument[] docs) =>
-                    docs
-                        .Select(
-                            doc => new CredentialMapping
-                            {
-                                actorId = doc.ActorId,
-                                loginId = doc.Id,
-                                method = Enum.GetName(typeof(CredentialValidationMethodTypes), CredentialValidationMethodTypes.Password),
-                                id = Guid.NewGuid(),
-                                subject = doc.Id.ToString(),
-                            }));
-
-            return await await repository.FindAllAsync(
-                async (Documents.CredentialMappingDocument[] docs) =>
-                    onSuccess(docs.Select(doc => Convert(doc))
-                        .Concat(await actorCredMappingsTask)
-                        .GroupBy(
-                            x => new { x.actorId, x.subject, x.method, x.loginId})  // this makes the returned array distinct on the important fields since we've joined two tables
-                        .Select(g => g.First())
-                        .OrderBy(c => c.actorId)
-                        .ToArray()));
-        }
-        
         internal async Task<TResult> CreateCredentialMappingAsync<TResult>(Guid credentialMappingId,
                 string method, string subjectId, Guid actorId,
             Func<TResult> onSuccess,

@@ -291,7 +291,7 @@ namespace EastFive.Azure.StorageTables.Driver
                             var httpWebResponse = webEx.Response as System.Net.HttpWebResponse;
                             try
                             {
-                                var responseContent = httpWebResponse.GetResponseStream().ReadAsString();
+                                var responseContent = webEx.Message; // await httpWebResponse.GetResponseStream().ReadAsStringAsync();
                                 System.Diagnostics.Debug.WriteLine($"AST replied:{responseContent}");
                                 return onParsed(ExtendedErrorInformationCodes.General, responseContent);
                             }

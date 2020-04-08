@@ -242,26 +242,6 @@ namespace EastFive.Azure.Persistence.Persistence
             return results;
         }
 
-        public async Task<TResult> DeleteAsync<TResult>(Guid accessId,
-            Func<Api.Azure.Credentials.CredentialValidationMethodTypes, IDictionary<string, string>, TResult> onDeleted,
-            Func<TResult> actorNotFound)
-        {
-            var results = await repository.DeleteIfAsync<AccessDocument, TResult>(accessId,
-                async (doc, deleteAsync) =>
-                {
-                    await deleteAsync();
-                    Enum.TryParse(doc.Method, out Api.Azure.Credentials.CredentialValidationMethodTypes method);
-                    return await repository.DeleteIfAsync<AccessDocument, TResult>(doc.LookupId, doc.Method,
-                        async (lookupDoc, deleteLookupAsync) =>
-                        {
-                            await deleteLookupAsync();
-                            return onDeleted(method, doc.GetExtraParams());
-                        },
-                        () => onDeleted(method, doc.GetExtraParams()));
-                },
-                () => actorNotFound());
-            return results;
-        }
 
         public async Task<TResult> DeleteAsync<TResult>(Guid actorId, string method,
             Func<IDictionary<string, string>, TResult> onDeleted,

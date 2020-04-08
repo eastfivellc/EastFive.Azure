@@ -9,6 +9,7 @@ using System.Text;
 using System.Xml;
 using Microsoft.WindowsAzure.Storage.Table;
 using BlackBarLabs.Persistence.Azure.StorageTables;
+using System.Runtime.InteropServices;
 
 namespace BlackBarLabs.Persistence.Azure
 {
@@ -25,31 +26,27 @@ namespace BlackBarLabs.Persistence.Azure
 
         private static int GetHashCode(string str)
         {
-            unsafe
+            var src = new Span<char>(str.ToCharArray());
+            var hash1 = (5381 << 16) + 5381;
+            var hash2 = hash1;
+            
+            // 32 bit machines. 
+            var pint = MemoryMarshal.Cast<char, int>(src);
+            var len = str.Length;
+            var pIndex = 0;
+            while (len > 2)
             {
-                fixed (char* src = str)
-                {
-                    var hash1 = (5381 << 16) + 5381;
-                    var hash2 = hash1;
-
-                    // 32 bit machines. 
-                    var pint = (int*)src;
-                    var len = str.Length;
-                    while (len > 2)
-                    {
-                        hash1 = ((hash1 << 5) + hash1 + (hash1 >> 27)) ^ pint[0];
-                        hash2 = ((hash2 << 5) + hash2 + (hash2 >> 27)) ^ pint[1];
-                        pint += 2;
-                        len -= 4;
-                    }
-
-                    if (len > 0)
-                    {
-                        hash1 = ((hash1 << 5) + hash1 + (hash1 >> 27)) ^ pint[0];
-                    }
-                    return hash1 + (hash2 * 1566083941);
-                }
+                hash1 = ((hash1 << 5) + hash1 + (hash1 >> 27)) ^ pint[pIndex + 0];
+                hash2 = ((hash2 << 5) + hash2 + (hash2 >> 27)) ^ pint[pIndex + 1];
+                pIndex += 2;
+                len -= 4;
             }
+ 
+            if (len > 0)
+            {
+                hash1 = ((hash1 << 5) + hash1 + (hash1 >> 27)) ^ pint[pIndex + 0];
+            }
+            return hash1 + (hash2 * 1566083941);
         }
 
         internal static string BuildPartitionKey(string rowKey)

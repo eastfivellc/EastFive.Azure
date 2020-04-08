@@ -24,7 +24,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "AccountMapping",
         Resource = typeof(AccountMapping),
         ContentType = "x-application/auth-account-mapping",

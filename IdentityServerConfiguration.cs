@@ -47,7 +47,7 @@ namespace EastFive.Security.SessionServer
                 (why) => false);
         }
 
-        public virtual WebId GetActorLink(Guid actorId, UrlHelper urlHelper)
+        public virtual WebId GetActorLink(Guid actorId, IProvideUrl urlHelper)
         {
             return urlHelper.GetWebId<TActorController>(actorId);
         }

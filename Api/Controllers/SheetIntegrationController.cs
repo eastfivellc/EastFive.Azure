@@ -41,10 +41,11 @@ namespace EastFive.Api.Controllers
                 },
                 (redirectUrl) =>
                 {
-                    return EastFive.Api.Azure.Credentials.Sheets.SaveAsync(sheetId, sheet.contentType.MediaType,  sheet.content, integration,
-                            context.DataContext,
-                        () => onSuccess(redirectUrl),
-                        "Guid not unique".AsFunctionException<IHttpResponse>());
+                    //return Sheets.SaveAsync(sheetId, sheet.contentType.MediaType,  sheet.content, integration,
+                    //        context.DataContext,
+                    //    () => onSuccess(redirectUrl),
+                    //    "Guid not unique".AsFunctionException<IHttpResponse>());
+                    throw new NotImplementedException();
                 },
                 () => onNotFound().AsTask(),
                 () => onError("The provided integration ID has not been connected to an authorization.").AsTask());

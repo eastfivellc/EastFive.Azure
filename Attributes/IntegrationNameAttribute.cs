@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EastFive.Api.Azure.Credentials.Attributes
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     public class IntegrationNameAttribute : Attribute
     {

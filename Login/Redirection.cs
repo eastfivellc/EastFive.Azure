@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "LoginRedirection",
         Resource = typeof(Redirection),
         ContentType = "x-application/login-redirection",
@@ -27,7 +27,7 @@ namespace EastFive.Azure.Login
 
         [HttpGet(MatchAllParameters = false)]
         public static async Task<IHttpResponse> Get(
-                IAzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -36,7 +36,7 @@ namespace EastFive.Azure.Login
         {
             var parameters = request.RequestUri.ParseQuery();
             parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
                 CredentialProvider.IntegrationName, application);
 
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 

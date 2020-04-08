@@ -13,7 +13,7 @@ namespace EastFive.Security.SessionServer
 {
     public interface IConfigureIdentityServer
     {
-        WebId GetActorLink(Guid actorId, UrlHelper urlHelper);
+        WebId GetActorLink(Guid actorId, IProvideUrl urlHelper);
 
         Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Guid actorTakingAction, System.Security.Claims.Claim[] claims);
 

@@ -8,13 +8,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
-using Microsoft.AspNetCore.Mvc.Routing;
+using System.Reflection;
 
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.ApplicationInsights;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
 
-using BlackBarLabs.Api.Resources;
 using EastFive.Linq;
 using EastFive.Security.SessionServer;
 using EastFive.Extensions;
@@ -24,13 +27,14 @@ using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
 using EastFive.Api;
-using System.Reflection;
+using EastFive.Azure.Auth.CredentialProviders;
+using Microsoft.AspNetCore.Mvc.Razor;
 
 namespace EastFive.Azure
 {
     public interface IAuthApplication : IApiApplication
     {
-        IDictionaryAsync<string, IProvideLogin> LoginProviders { get; }
+        IDictionary<string, IProvideLogin> LoginProviders { get; }
 
         Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
@@ -81,9 +85,16 @@ namespace EastFive.Api.Azure
 
         public TelemetryClient Telemetry { get; private set; }
 
-        public AzureApplication()
-            : base()
+        public AzureApplication(IConfiguration configuration)
+            : base(configuration)
         {
+
+        }
+
+        protected override void ConfigureCallback(IApplicationBuilder app, IHostEnvironment env, IRazorViewEngine razorViewEngine)
+        {
+            base.ConfigureCallback(app, env, razorViewEngine);
+
             Telemetry = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
 
             this.AddInstigator(typeof(EastFive.Security.SessionServer.Context),
@@ -108,7 +119,6 @@ namespace EastFive.Api.Azure
                         httpApp, baseUri, apiPath, default(CancellationToken));
                     return onCreated(invokeFunction);
                 });
-
         }
 
         public virtual async Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security)
@@ -181,18 +191,27 @@ namespace EastFive.Api.Azure
             }
         }
 
-        public IDictionaryAsync<string, IProvideLogin> LoginProviders
+        public IDictionary<string, IProvideLogin> LoginProviders
         {
             get
             {
-                return this.InstantiateAll<IProvideLogin>()
-                    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
+                return this.GetType()
+                    .GetAttributesInterface<IProvideLoginProvider>(true, true)
                     .Select(
-                        loginProvider =>
-                        {
-                            return loginProvider.PairWithKey(loginProvider.Method);
-                        })
-                    .ToDictionary();
+                        loginProviderProvider => loginProviderProvider.ProvideLoginProvider(
+                            loginProvider => loginProvider,
+                            (why) => default))
+                    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
+                    .ToDictionary(ktem => ktem.Method);
+
+                //return this.InstantiateAll<IProvideLogin>()
+                //    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
+                //    .Select(
+                //        loginProvider =>
+                //        {
+                //            return loginProvider.PairWithKey(loginProvider.Method);
+                //        })
+                //    .ToDictionary();
             }
         }
 
@@ -326,11 +345,11 @@ namespace EastFive.Api.Azure
             return await base.InitializeAsync();
         }
 
-        internal virtual Credentials.IManageAuthorizationRequests AuthorizationRequestManager
+        internal virtual IManageAuthorizationRequests AuthorizationRequestManager
         {
             get
             {
-                return new Credentials.AzureStorageTablesLogAuthorizationRequestManager();
+                return new AzureStorageTablesLogAuthorizationRequestManager();
             }
         }
 
@@ -344,15 +363,17 @@ namespace EastFive.Api.Azure
                 onCredentialSystemNotAvailable);
         }
         
-        internal async Task<TResult> GetLoginProviderAsync<TResult>(string method,
+        internal TResult GetLoginProvider<TResult>(string method,
             Func<IProvideLogin, TResult> onSuccess,
             Func<TResult> onCredentialSystemNotAvailable,
             Func<string, TResult> onFailure)
         {
             // this.InitializationWait();
-            return await this.LoginProviders.TryGetValueAsync(method,
-                onSuccess,
-                onCredentialSystemNotAvailable);
+            if(this.LoginProviders.ContainsKey(method))
+            {
+                return onSuccess(this.LoginProviders[method]);
+            }
+            return onCredentialSystemNotAvailable();
         }
         
         public virtual async Task<TResult> OnUnmappedUserAsync<TResult>(
@@ -384,9 +405,9 @@ namespace EastFive.Api.Azure
         
         public virtual Web.Services.ITimeService TimeService { get => Web.Services.ServiceConfiguration.TimeService(); }
         
-        internal virtual WebId GetActorLink(Guid actorId, UrlHelper url)
+        internal virtual Uri GetActorLink(Guid actorId, IProvideUrl url)
         {
-            return EastFive.Security.SessionServer.Library.configurationManager.GetActorLink(actorId, url);
+            return Library.configurationManager.GetActorLink(actorId, url).Source;
         }
 
         public virtual Task<TResult> GetActorNameDetailsAsync<TResult>(Guid actorId,
@@ -405,7 +426,7 @@ namespace EastFive.Api.Azure
             Func<string, string, TResult> onInvalidParameter,
             Func<string, TResult> onFailure)
         {
-            if(!(authorizationProvider is Credentials.IProvideRedirection))
+            if(!(authorizationProvider is IProvideRedirection))
                 return await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization,
                         baseUri, authorizationProvider,
@@ -413,7 +434,7 @@ namespace EastFive.Api.Azure
                     onInvalidParameter,
                     onFailure);
 
-            var redirectionProvider = authorizationProvider as Credentials.IProvideRedirection;
+            var redirectionProvider = authorizationProvider as IProvideRedirection;
             return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, authorizationProvider, authParams,
                         method, authorization,
                         baseUri, this,

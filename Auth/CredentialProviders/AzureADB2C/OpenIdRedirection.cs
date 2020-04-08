@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "OpenIdRedirection",
         Resource = typeof(Redirection),
         ContentType = "x-application/auth-redirection.aadb2c",
@@ -43,7 +43,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<IHttpResponse> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
-                IAzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -51,7 +51,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
             GeneralConflictResponse onFailure)
         {
             var parameters = request.RequestUri.ParseQuery();
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
                 AzureADB2CProvider.IntegrationName, application);
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
                     parameters,
@@ -67,7 +67,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<IHttpResponse> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,
-                IAzureApplication application, UrlHelper urlHelper,
+                IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -79,7 +79,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
                 { id_token, idToken },
                 { state, authorization.id.ToString("N") },
             };
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
                 AzureADB2CProvider.IntegrationName, application);
 
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication,

@@ -17,21 +17,12 @@ using System.IO;
 using EastFive.Security.SessionServer;
 using EastFive.Serialization;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     public static class Sheets
     {
-        internal static Task<TResult> SaveAsync<TResult>(Guid sheetId, string contentType, byte [] sheet, Guid integrationId,
-                EastFive.Security.SessionServer.Persistence.DataContext dataContext,
-            Func<TResult> onSaved,
-            Func<TResult> onAlreadyExists)
-        {
-            return Persistence.Content.CreateAsync(sheetId, contentType, sheet,
-                onSaved,
-                onAlreadyExists);
-        }
 
-        [Attributes.IntegrationName(IntegrationName)]
+        [IntegrationName(IntegrationName)]
         public class Provider : IProvideAuthorization, IProvideLogin
         {
             public const string IntegrationName = "Sheets";
@@ -77,7 +68,7 @@ namespace EastFive.Api.Azure.Credentials
                 return onSuccess(new Dictionary<string, string>(), new Dictionary<string, Type>(), new Dictionary<string, string>()).ToTask();
             }
 
-            [Attributes.IntegrationName(IntegrationName)]
+            [IntegrationName(IntegrationName)]
             public static Task<TResult> InitializeProviderAsync<TResult>(
                 Func<IProvideAuthorization, TResult> onProvideAuthorization,
                 Func<TResult> onProvideNothing,

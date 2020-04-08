@@ -18,7 +18,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "XSession",
         Resource = typeof(Session),
         ContentType = "x-application/auth-session",
@@ -169,7 +169,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
                 //EastFive.Api.SessionToken security,
-                IAuthApplication application, UrlHelper urlHelper,
+                IAuthApplication application, IProvideUrl urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse forbidden,

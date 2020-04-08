@@ -50,7 +50,7 @@ namespace EastFive.Api.Azure.Resources
         [EastFive.Api.HttpGet]
         public static async Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid processStageTypeId,
-                EastFive.Api.Security security, IHttpRequest request, UrlHelper url,
+                EastFive.Api.Security security, 
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -76,7 +76,7 @@ namespace EastFive.Api.Azure.Resources
 
         [EastFive.Api.HttpGet]
         public static async Task<IHttpResponse> FindAllAsync(
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             MultipartAcceptArrayResponseAsync onMultipart,
             UnauthorizedResponse onUnauthorized)
         {
@@ -85,7 +85,8 @@ namespace EastFive.Api.Azure.Resources
                 () => onUnauthorized().ToTask());
         }
 
-        internal static Resources.ProcessStageType GetResource(EastFive.Azure.ProcessStageType processStageType, UrlHelper urlHelper)
+        internal static Resources.ProcessStageType GetResource(
+            EastFive.Azure.ProcessStageType processStageType, IProvideUrl urlHelper)
         {
             return new Resources.ProcessStageType
             {
@@ -121,7 +122,7 @@ namespace EastFive.Api.Azure.Resources
                 [Property(Name = Resources.ProcessStageType.ResourceTypePropertyName)]Type resourceType,
                 [Property(Name = Resources.ProcessStageType.ResourceKeysPropertyName)]string[] resourceKeys,
                 [Property(Name = Resources.ProcessStageType.ResourceTypesPropertyName)]Type[] resourceTypes,
-                EastFive.Api.Security security, IHttpRequest request, UrlHelper url,
+                EastFive.Api.Security security, IHttpRequest request, IProvideUrl url,
             CreatedResponse onCreated,
             CreatedBodyResponse<ProcessStageType> onCreatedAndModified,
             AlreadyExistsResponse onAlreadyExists,
@@ -144,7 +145,7 @@ namespace EastFive.Api.Azure.Resources
 
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static IHttpResponse Options(IHttpRequest request, UrlHelper url,
+        public static IHttpResponse Options(IHttpRequest request, IProvideUrl url,
             ContentResponse onOption)
         {
             var stage =

@@ -95,30 +95,6 @@ namespace EastFive.Azure.Synchronization
                 () => onUnauthorized());
         }
 
-        [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByIntegrationAsync(
-                [QueryParameter]Guid integration,
-                [QueryParameter]string resourceType,
-                Api.Security security,
-            MultipartAcceptArrayResponseAsync onMultipart,
-            ReferencedDocumentNotFoundResponse onReferenceNotFound,
-            UnauthorizedResponse onUnauthorized)
-        {
-            return await await EastFive.Azure.Synchronization.Synchronizations.FindAdaptersByIntgrationAndResourceTypeAsync(integration, resourceType,
-                    security.performingAsActorId, security.claims,
-                synchronizations =>
-                {
-                    var r = onMultipart(synchronizations.Cast<object>());
-                    return r;
-                },
-                // TODO: Clean these up
-                () => onReferenceNotFound().ToTask(),
-                () => onReferenceNotFound().AddReason($"Resource type [{resourceType}] is not currently supported.").ToTask(),
-                () => onReferenceNotFound().AddReason($"The integration needs to be authenticated before it can be queried (this should be a 409).").ToTask(),
-                () => onUnauthorized().ToTask(),
-                (why) => onReferenceNotFound().AddReason(why + " (this should be a 409)").ToTask());
-        }
-
         #endregion
     }
 

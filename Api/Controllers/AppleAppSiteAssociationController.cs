@@ -11,13 +11,13 @@ using System.Web.Http;
 
 namespace EastFive.Security.SessionServer.Api.Controllers
 {
-    [FunctionViewController6(
-        Prefix = "/",
+    [FunctionViewController(
+        Namespace = "/",
         Route= "apple-app-site-association", 
         Resource = typeof(AppleAppSiteAssociationController))]
-    public class AppleAppSiteAssociationController : ApiController
+    public class AppleAppSiteAssociationController
     {
-        [HttpGet]
+        [EastFive.Api.HttpGet]
         public IHttpResponse Get(
             ContentResponse onSuccess,
             NotFoundResponse onNotFound)

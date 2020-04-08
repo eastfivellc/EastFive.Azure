@@ -948,17 +948,6 @@ namespace EastFive.Persistence
             return onFailedToBind();
         }
 
-        public TResult Bind<TResult>(IDictionary<string, EntityProperty> value, Type type,
-            Func<object, TResult> onBound,
-            Func<TResult> onFailedToBind)
-        {
-            throw new NotImplementedException();
-        }
-
-        public TResult Cast<TResult>(object value, Type valueType, Func<KeyValuePair<string, EntityProperty>[], TResult> onValue, Func<TResult> onNoCast)
-        {
-            throw new NotImplementedException();
-        }
     }
 
 }

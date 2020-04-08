@@ -326,7 +326,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                     var requestUri = default(Uri);
                     if (blockBlob.Metadata.ContainsKey("requestUri"))
                         Uri.TryCreate(blockBlob.Metadata["requestUri"], UriKind.RelativeOrAbsolute, out requestUri);
-                    var responseBytes = stream.ToBytes(); ;
+                    var responseBytes = await stream.ToBytesAsync(); ;
                     var response = new HttpResponseMessage(statusCode)
                     {
                         Content = new ByteArrayContent(responseBytes),

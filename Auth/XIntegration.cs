@@ -26,7 +26,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "XIntegration",
         Resource = typeof(XIntegration),
         ContentType = "x-application/auth-xintegration",

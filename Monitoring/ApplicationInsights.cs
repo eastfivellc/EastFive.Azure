@@ -12,7 +12,7 @@ using Microsoft.Azure.ApplicationInsights.Models;
 
 namespace EastFive.Azure.Monitoring
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "ApplicationInsights",
         Resource = typeof(ApplicationInsights),
         ContentType = "x-application/application-sights-results",

@@ -27,7 +27,7 @@ using EastFive.Web.Configuration;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "AuthLogin",
         Resource = typeof(Login),
         ContentType = "x-application/auth-login",
@@ -92,13 +92,13 @@ namespace EastFive.Azure.Auth
                 EastFive.Api.SessionToken? securityMaybe,
             MultipartResponseAsync<Login> onFound)
         {
-            var methodLookups = await application.LoginProviders
+            var methodLookups = application.LoginProviders
                 .Select(
                     (loginProvider) =>
                     {
                         return loginProvider.Value.Id.PairWithValue(loginProvider.Value.Method);
                     })
-                .ToDictionaryAsync();
+                .ToDictionary();
             var results = authorizations
                 .Where(auth => auth.lastModified <= endTime)
                 .Where(auth => auth.lastModified >= startTime)

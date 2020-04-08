@@ -1,29 +1,24 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Security.CredentialProvider;
-using Newtonsoft.Json;
-using System;
+﻿using System;
+using System.Net;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
-using EastFive.Security.SessionServer.Persistence;
+using System.Collections;
+using System.Security.Claims;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net;
-using EastFive.Api.Services;
-using System.Security.Claims;
-using EastFive.Security.SessionServer;
-using System.Collections;
-using EastFive.Serialization;
 
-namespace EastFive.Api.Azure.Credentials
+using Newtonsoft.Json;
+
+using EastFive.Serialization;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
+
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(PingProvider.IntegrationName)]
+    [IntegrationName(PingProvider.IntegrationName)]
     public class PingProvider : IProvideLogin
     {
         public const string IntegrationName = "Ping";
@@ -53,17 +48,17 @@ namespace EastFive.Api.Azure.Credentials
             //return "https://sso.connect.pingidentity.com/sso/TXS/2.0/2/" + pingConnectToken;
         }
 
-        [Attributes.IntegrationName(PingProvider.IntegrationName)]
+        [IntegrationName(PingProvider.IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new PingProvider()).ToTask();
+            return onProvideAuthorization(new PingProvider()).AsTask();
         }
         
 
-        public Type CallbackController => typeof(Controllers.PingResponse);
+        public Type CallbackController => typeof(PingResponse);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
@@ -135,7 +130,7 @@ namespace EastFive.Api.Azure.Credentials
                         }
                     }
                 },
-                (why) => onUnspecifiedConfiguration(why).ToTask());
+                (why) => onUnspecifiedConfiguration(why).AsTask());
         }
         
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, 
@@ -176,7 +171,7 @@ namespace EastFive.Api.Azure.Credentials
             return onSuccess(
                 new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "Push PMP file to EHR" } },
                 new Dictionary<string, Type>() { { "push_pmp_file_to_ehr", typeof(bool) } },
-                new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "When true, the system will push PMP files into the provider's clinical documents in their EHR system." } }).ToTask();
+                new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "When true, the system will push PMP files into the provider's clinical documents in their EHR system." } }).AsTask();
         }
 
         #endregion

@@ -14,10 +14,11 @@ using EastFive.Api.Azure;
 using EastFive.Collections.Generic;
 
 using Newtonsoft.Json;
+using EastFive.Azure.Auth.CredentialProviders;
 
 namespace EastFive.Azure.Auth
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "OpenIdResponse",
         Resource = typeof(OpenIdResponse),
         ContentType = "x-application/open-id-response",
@@ -56,14 +57,14 @@ namespace EastFive.Azure.Auth
                 [Property(Name = TokenPropertyName)]string token,
                 AzureApplication application,
                 IHttpRequest request,
-                UrlHelper urlHelper,
+                IProvideUrl urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
             HtmlResponse onGeneralFailure)
         {
-            var method = await EastFive.Azure.Auth.Method.ByMethodName(
-                EastFive.Api.Azure.Credentials.AzureADB2CProvider.IntegrationName, application);
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
+                AzureADB2CProvider.IntegrationName, application);
             var requestParams = request.RequestUri
                 .ParseQuery()
                 .Distinct(kvp => kvp.Key)

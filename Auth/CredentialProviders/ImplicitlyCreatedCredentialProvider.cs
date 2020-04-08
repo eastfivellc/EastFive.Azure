@@ -3,16 +3,18 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Configuration;
-using BlackBarLabs.Extensions;
-using System.Security.Claims;
-using EastFive.Security.CredentialProvider.ImplicitCreation;
 using System.Collections.Generic;
+using System.Security.Claims;
+
 using EastFive.Security.SessionServer;
 using EastFive.Serialization;
+using EastFive.Security.CredentialProvider.ImplicitCreation;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(IntegrationName)]
+    [IntegrationName(IntegrationName)]
     public class ImplicitlyCreatedCredentialProvider : IProvideLoginManagement, IProvideAuthorization
     {
         public const string IntegrationName = "Implicit";
@@ -20,14 +22,14 @@ namespace EastFive.Api.Azure.Credentials
 
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        [Attributes.IntegrationName(IntegrationName)]
+        [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideLogin, TResult> onProvideLogin,
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideNothing().ToTask();
+            return onProvideNothing().AsTask();
         }
 
         public Type CallbackController => typeof(ImplicitlyCreatedCredentialProvider); // typeof(Controllers.TokenController);

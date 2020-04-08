@@ -20,13 +20,13 @@ using System.Net.Http.Headers;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController5(
+    [FunctionViewController(
         Route = "Authentication",
         Resource = typeof(Authentication),
         ContentType = "x-application/login-authentication",
         ContentTypeVersion = "0.1")]
     [StorageTable]
-    [Html(Title = "Login")]
+    [Html(Title = "Login", Preference = -10.0)]
     public struct Authentication : IReferenceable
     {
         #region Properties
@@ -64,8 +64,6 @@ namespace EastFive.Azure.Login
         public DateTime? authenticated;
 
         public const string StatePropertyName = "state";
-        [ApiProperty(PropertyName = StatePropertyName)]
-        [JsonProperty(PropertyName = StatePropertyName)]
         [Storage]
         [JsonIgnore]
         public string state;
@@ -74,7 +72,7 @@ namespace EastFive.Azure.Login
         [ApiProperty(PropertyName = ClientPropertyName)]
         [JsonProperty(PropertyName = ClientPropertyName)]
         [Storage]
-        public Guid client;
+        public IRef<Client> client;
 
         public const string ValidationPropertyName = "validation";
         [ApiProperty(PropertyName = ValidationPropertyName)]
@@ -116,7 +114,7 @@ namespace EastFive.Azure.Login
                 [QueryParameter(Name = StatePropertyName)]string state,
                 [QueryParameter(Name = ClientPropertyName)]IRef<Client> clientRef,
                 [QueryParameter(Name = ValidationPropertyName)]string validation,
-                IAuthApplication application, UrlHelper urlHelper,
+                IAuthApplication application, IProvideUrl urlHelper,
             //ContentTypeResponse<Authentication> onFound,
             RedirectResponse onFound,
             ReferencedDocumentNotFoundResponse<Client> onInvalidClient)
@@ -128,6 +126,7 @@ namespace EastFive.Azure.Login
                     {
                         authenticationRef = SecureGuid.Generate().AsRef<Authentication>(),
                         state = state,
+                        client = clientRef,
                     };
                     return authentication.StorageCreateAsync(
                         (entity) =>
@@ -149,7 +148,7 @@ namespace EastFive.Azure.Login
                 [OptionalQueryParameter(Name = "hold")]bool? hold,
                 [Property(Name = UserIdentificationPropertyName)]string userIdentification,
                 [Property(Name = PasswordPropertyName)]string password,
-                HttpRequestMessage httpRequest,
+                IHttpRequest httpRequest,
             RedirectResponse onUpdated,
             ContentTypeResponse<string> onHeldup,
             NotFoundResponse onNotFound,

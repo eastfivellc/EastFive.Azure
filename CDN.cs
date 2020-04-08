@@ -64,12 +64,12 @@ namespace EastFive.Azure
         }
     }
 
-    public class CDNAttribute : System.Attribute, IInstigate
+    public class CDNAttribute : System.Attribute, IInstigatable
     {
-        public bool CanInstigate(ParameterInfo parameterInfo)
-        {
-            return parameterInfo.ParameterType.IsAssignableFrom(typeof(CDN));
-        }
+        //public bool CanInstigate(ParameterInfo parameterInfo)
+        //{
+        //    return parameterInfo.ParameterType.IsAssignableFrom(typeof(CDN));
+        //}
 
         public Task<IHttpResponse> Instigate(
             IApplication httpApp, IHttpRequest request,

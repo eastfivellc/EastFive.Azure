@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace EastFive.Azure.Functions
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "ExecutionResult",
         Resource = typeof(ExecutionResult),
         ContentType = "x-application/eastfive.azure.execution-result",

@@ -2643,7 +2643,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));
                 using (var stream = await blockBlob.OpenReadAsync())
                 {
-                    var content = stream.ToBytes();
+                    var content = await stream.ToBytesAsync();
                     var contentType = blockBlob.Properties.ContentType;
                     return onFound(content, contentType);
                 }

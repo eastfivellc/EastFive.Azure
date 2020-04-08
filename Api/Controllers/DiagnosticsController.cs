@@ -1,14 +1,11 @@
-﻿using BlackBarLabs.Api;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System.Configuration;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
-using BlackBarLabs.Extensions;
-using EastFive.Api.Azure.Controllers;
-using EastFive.Api.Azure.Credentials.Controllers;
 using EastFive.Api;
+using EastFive.Extensions;
 
 namespace EastFive.Security.SessionServer.Api.Controllers
 {
@@ -21,13 +18,13 @@ namespace EastFive.Security.SessionServer.Api.Controllers
         public string Value { get; set; }
     }
 
-    [FunctionViewController6(
-        Prefix = "aadb2c",
+    [FunctionViewController(
+        Namespace = "aadb2c",
         Route = "Diagnostics")]
     public class DiagnosticsController 
     {
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> Get(EastFive.Api.Security security, HttpRequestMessage request)
+        public static Task<IHttpResponse> Get(EastFive.Api.Security security, IHttpRequest request)
         {
             return EastFive.Web.Configuration.Settings.GetGuid(
                 EastFive.Api.AppSettings.ActorIdSuperAdmin,
@@ -37,11 +34,11 @@ namespace EastFive.Security.SessionServer.Api.Controllers
                     {
                         var settings = ConfigurationManager.AppSettings.AllKeys
                             .Select(x => new AppSetting { Name = x, Value = ConfigurationManager.AppSettings[x] }).OrderBy(x => x.Name).ToArray();
-                        return request.CreateResponse(System.Net.HttpStatusCode.OK, settings, "application/json").ToTask();
+                        return new JsonHttpResponse(request, System.Net.HttpStatusCode.OK, settings).AsTask<IHttpResponse>();
                     }
-                    return request.CreateResponse(System.Net.HttpStatusCode.NotFound).ToTask();
+                    return request.CreateResponse(System.Net.HttpStatusCode.NotFound).AsTask();
                 },
-                (why) => request.CreateResponse(System.Net.HttpStatusCode.InternalServerError, why).ToTask());
+                (why) => request.CreateResponse(System.Net.HttpStatusCode.InternalServerError, why).AsTask());
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using EastFive.Security.SessionServer;
+﻿using EastFive.Api.Azure;
+using EastFive.Api.Azure.Credentials;
+using EastFive.Security.SessionServer;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,7 +8,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     class NoActionAuthorizationRequestManager : IManageAuthorizationRequests
     {

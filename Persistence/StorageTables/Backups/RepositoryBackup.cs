@@ -22,7 +22,7 @@ using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "RepositoryBackup",
         Resource = typeof(RepositoryBackup),
         ContentType = "x-application/repository-backup",

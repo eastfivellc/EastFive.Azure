@@ -1,29 +1,26 @@
-﻿using BlackBarLabs.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using EastFive.Security.SessionServer.Persistence;
-using EastFive.Api.Services;
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
+using EastFive.Extensions;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(IntegrationName)]
+    [IntegrationName(IntegrationName)]
     public class VoucherCredentialProvider : IProvideAuthorization
     {
         public const string IntegrationName = "Voucher";
         public string Method => IntegrationName;
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        [Attributes.IntegrationName(IntegrationName)]
+        [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new VoucherCredentialProvider()).ToTask();
+            return onProvideAuthorization(new VoucherCredentialProvider()).AsTask();
         }
         
         public Type CallbackController => typeof(VoucherCredentialProvider);
@@ -50,7 +47,7 @@ namespace EastFive.Api.Azure.Credentials
                 (errorMessage) => onInvalidCredentials(errorMessage),
                 (errorMessage) => onInvalidCredentials(errorMessage),
                 (errorMessage) => onInvalidCredentials(errorMessage),
-                onUnspecifiedConfiguration).ToTask();
+                onUnspecifiedConfiguration).AsTask();
         }
 
         public Task<TResult> UserParametersAsync<TResult>(Guid actorId, System.Security.Claims.Claim[] claims, IDictionary<string, string> extraParams, Func<IDictionary<string, string>, IDictionary<string, Type>, IDictionary<string, string>, TResult> onSuccess)

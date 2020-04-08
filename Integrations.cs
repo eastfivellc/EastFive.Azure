@@ -15,10 +15,10 @@ using EastFive.Linq;
 using EastFive.Security.SessionServer;
 using EastFive.Security;
 using EastFive.Linq.Async;
-using EastFive.Api.Azure.Credentials.Attributes;
 using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Api;
 using BlackBarLabs;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure
 {
@@ -246,142 +246,105 @@ namespace EastFive.Azure
                 () => onNotFound());
         }
 
-        public async Task<TResult> GetByActorAsync<TResult>(Guid actorId, Func<Type, Uri> callbackUrlFunc,
-                Guid actingAs, System.Security.Claims.Claim [] claims,
-            Func<Session[], TResult> onSuccess,
-            Func<TResult> onNotFound,
-            Func<TResult> onUnathorized,
-            Func<string, TResult> onFailure)
-        {
-            if (!await Library.configurationManager.CanAdministerCredentialAsync(actorId,
-                actingAs, claims))
-                return onUnathorized();
+        //public async Task<TResult> GetByActorAsync<TResult>(Guid actorId, Func<Type, Uri> callbackUrlFunc,
+        //        Guid actingAs, System.Security.Claims.Claim [] claims,
+        //    Func<Session[], TResult> onSuccess,
+        //    Func<TResult> onNotFound,
+        //    Func<TResult> onUnathorized,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    if (!await Library.configurationManager.CanAdministerCredentialAsync(actorId,
+        //        actingAs, claims))
+        //        return onUnathorized();
 
-            var integrations = await ServiceConfiguration.loginProviders
-                .Where(ap => ap.Value is EastFive.Azure.Auth.IProvideIntegration)
-                .Select(
-                    async ap => await await this.dataContext.Integrations.FindAsync<Task<Session?>>(actorId, ap.Key,
-                        async (authenticationRequestId) =>
-                        {
-                            var provider = ap.Value;
-                            var integrationProvider = provider as EastFive.Azure.Auth.IProvideIntegration;
-                            var method = ap.Key;
-                            return await await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
-                                async (authRequest) =>
-                                {
-                                    return await await integrationProvider.UserParametersAsync(actorId, null, null,
-                                        async (labels, types, descriptions) =>
-                                        {
-                                            var callbackUrl = callbackUrlFunc(provider.CallbackController);
-                                            var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
-                                            var authenticationRequest = await Convert(authenticationRequestId, ap.Key, authRequest.name, provider, AuthenticationActions.access,
-                                                default(string), authenticationRequestId, loginUrl, authRequest.redirect, authRequest.extraParams, labels, types, descriptions);
-                                            return authenticationRequest;
-                                        });
-                                },
-                                async () =>
-                                {
-                                    #region SHIM
-                                    var integrationId = authenticationRequestId;
-                                    return await await this.dataContext.AuthenticationRequests.CreateAsync(integrationId, method, AuthenticationActions.link, default(Uri), default(Uri),
-                                        async () =>
-                                        {
-                                            return await await integrationProvider.UserParametersAsync(actorId, null, null,
-                                                async (labels, types, descriptions) =>
-                                                {
-                                                    var callbackUrl = callbackUrlFunc(provider.CallbackController);
-                                                    var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
-                                                    var authenticationRequest = await Convert(authenticationRequestId, ap.Key, default(string), provider, AuthenticationActions.access,
-                                                        default(string), authenticationRequestId, loginUrl, default(Uri), default(IDictionary<string, string>), labels, types, descriptions);
-                                                    return authenticationRequest;
-                                                });
-                                        },
-                                        "Guid not unique".AsFunctionException<Task<Session>>());
-                                    #endregion
-                                });
+        //    var integrations = await ServiceConfiguration.loginProviders
+        //        .Where(ap => ap.Value is EastFive.Azure.Auth.IProvideIntegration)
+        //        .Select(
+        //            async ap => await await this.dataContext.Integrations.FindAsync<Task<Session?>>(actorId, ap.Key,
+        //                async (authenticationRequestId) =>
+        //                {
+        //                    var provider = ap.Value;
+        //                    var integrationProvider = provider as EastFive.Azure.Auth.IProvideIntegration;
+        //                    var method = ap.Key;
+        //                    return await await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
+        //                        async (authRequest) =>
+        //                        {
+        //                            return await await integrationProvider.UserParametersAsync(actorId, null, null,
+        //                                async (labels, types, descriptions) =>
+        //                                {
+        //                                    var callbackUrl = callbackUrlFunc(provider.CallbackController);
+        //                                    var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
+        //                                    var authenticationRequest = await Convert(authenticationRequestId, ap.Key, authRequest.name, provider, AuthenticationActions.access,
+        //                                        default(string), authenticationRequestId, loginUrl, authRequest.redirect, authRequest.extraParams, labels, types, descriptions);
+        //                                    return authenticationRequest;
+        //                                });
+        //                        },
+        //                        async () =>
+        //                        {
+        //                            #region SHIM
+        //                            var integrationId = authenticationRequestId;
+        //                            return await await this.dataContext.AuthenticationRequests.CreateAsync(integrationId, method, AuthenticationActions.link, default(Uri), default(Uri),
+        //                                async () =>
+        //                                {
+        //                                    return await await integrationProvider.UserParametersAsync(actorId, null, null,
+        //                                        async (labels, types, descriptions) =>
+        //                                        {
+        //                                            var callbackUrl = callbackUrlFunc(provider.CallbackController);
+        //                                            var loginUrl = provider.GetLoginUrl(authenticationRequestId, callbackUrl, callbackUrlFunc);
+        //                                            var authenticationRequest = await Convert(authenticationRequestId, ap.Key, default(string), provider, AuthenticationActions.access,
+        //                                                default(string), authenticationRequestId, loginUrl, default(Uri), default(IDictionary<string, string>), labels, types, descriptions);
+        //                                            return authenticationRequest;
+        //                                        });
+        //                                },
+        //                                "Guid not unique".AsFunctionException<Task<Session>>());
+        //                            #endregion
+        //                        });
                             
-                        },
-                        () => default(Session?).AsTask()))
-                .WhenAllAsync()
-                .SelectWhereHasValueAsync()
-                .ToArrayAsync();
-            return onSuccess(integrations);
-        }
+        //                },
+        //                () => default(Session?).AsTask()))
+        //        .WhenAllAsync()
+        //        .SelectWhereHasValueAsync()
+        //        .ToArrayAsync();
+        //    return onSuccess(integrations);
+        //}
 
-        internal async Task<TResult> GetAllAsync<TResult>(
-                Func<Type, Uri> callbackUrlFunc,
-                Guid actingAs, System.Security.Claims.Claim[] claims,
-            Func<Session[], TResult> onSuccess,
-            Func<TResult> onNotFound,
-            Func<TResult> onUnathorized,
-            Func<string, TResult> onFailure)
-        {
-            var accesses = await this.dataContext.Integrations.FindAllAsync();
-            var integrations = await accesses
-                .FlatMap(
-                    async (accessKvp, next, skip) =>
-                    {
-                        var access = accessKvp.Key;
-                        if (!await Library.configurationManager.CanAdministerCredentialAsync(access.authorizationId, actingAs, claims))
-                            return await skip();
-                        var session = new Session
-                        {
-                            authorizationId = access.authorizationId,
-                            extraParams = access.parameters, // TODO: Only if super admin!!
-                            method = access.method,
-                            name = access.method,
-                        };
-                        if (!accessKvp.Value.HasValue)
-                            return await next(session);
+        //internal async Task<TResult> GetAllAsync<TResult>(
+        //        Func<Type, Uri> callbackUrlFunc,
+        //        Guid actingAs, System.Security.Claims.Claim[] claims,
+        //    Func<Session[], TResult> onSuccess,
+        //    Func<TResult> onNotFound,
+        //    Func<TResult> onUnathorized,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    var accesses = await this.dataContext.Integrations.FindAllAsync();
+        //    var integrations = await accesses
+        //        .FlatMap(
+        //            async (accessKvp, next, skip) =>
+        //            {
+        //                var access = accessKvp.Key;
+        //                if (!await Library.configurationManager.CanAdministerCredentialAsync(access.authorizationId, actingAs, claims))
+        //                    return await skip();
+        //                var session = new Session
+        //                {
+        //                    authorizationId = access.authorizationId,
+        //                    extraParams = access.parameters, // TODO: Only if super admin!!
+        //                    method = access.method,
+        //                    name = access.method,
+        //                };
+        //                if (!accessKvp.Value.HasValue)
+        //                    return await next(session);
 
-                        var authRequest = accessKvp.Value.Value;
-                        session.id = authRequest.id;
-                        session.action = authRequest.action;
-                        //session.extraParams = authRequest.extraParams;
-                        session.token = authRequest.token;
-                        return await next(session);
-                    },
-                    (IEnumerable<Session> sessions) => sessions.ToArray().AsTask());
-            return onSuccess(integrations);
-        }
+        //                var authRequest = accessKvp.Value.Value;
+        //                session.id = authRequest.id;
+        //                session.action = authRequest.action;
+        //                //session.extraParams = authRequest.extraParams;
+        //                session.token = authRequest.token;
+        //                return await next(session);
+        //            },
+        //            (IEnumerable<Session> sessions) => sessions.ToArray().AsTask());
+        //    return onSuccess(integrations);
+        //}
 
-        public async Task<KeyValuePair<Integration, T>[]> GetActivitiesAsync<T>(Guid actorId)
-        {
-            if (!ServiceConfiguration.integrationActivites.ContainsKey(typeof(T)))
-                return new KeyValuePair<Integration, T>[] { };
-            var activitiesOfTypeT = ServiceConfiguration.integrationActivites[typeof(T)];
-
-            var integrations = await dataContext.Integrations.FindAsync(actorId);
-            var integrationsMatchingActivities = integrations
-                .Where(integration => activitiesOfTypeT.ContainsKey(integration.method))
-                .ToArray();
-            return await integrationsMatchingActivities
-                .Select(
-                    integration => activitiesOfTypeT[integration.method]
-                        .FlatMap(
-                            (invocation, next, skip) =>
-                            {
-                                return (Task<KeyValuePair<Integration, T>[]>)invocation(integration,
-                                    async (obj) => await next(integration.PairWithValue((T)obj)),
-                                    async (why) => await skip());
-                            },
-                            (IEnumerable<KeyValuePair<Integration, T>> integrationsKvp) =>
-                            {
-                                var integrationsKvpArray = integrationsKvp.ToArray();
-                                return integrationsKvpArray.AsTask();
-                            }))
-                .WhenAllAsync()
-                .SelectManyAsync()
-                .ToArrayAsync();
-        }
-
-        public async Task<KeyValuePair<Integration, T[]>> GetActivityAsync<T>(Guid integrationId)
-        {
-            var activities = await GetActivityAsync(integrationId, typeof(T));
-            return activities.Key.PairWithValue(activities.Value
-                .Select(activity => (T)activity)
-                .ToArray());
-        }
 
         private struct InvocationResult
         {
@@ -390,87 +353,6 @@ namespace EastFive.Azure
             public bool success;
         }
 
-        public async Task<KeyValuePair<Integration, object[]>> GetActivityAsync(Guid integrationId, Type typeofT)
-        {
-            if (!ServiceConfiguration.integrationActivites.ContainsKey(typeofT))
-                return new KeyValuePair<Integration, object[]> { };
-            var activitiesOfTypeT = ServiceConfiguration.integrationActivites[typeofT];
-
-            return await await dataContext.Integrations.FindAuthorizedAsync(integrationId,
-                async integration =>
-                {
-                    if (!activitiesOfTypeT.ContainsKey(integration.method))
-                        return new KeyValuePair<Integration, object[]> { };
-                    var activities = await activitiesOfTypeT[integration.method]
-                        .Select(
-                            async invocation =>
-                            {
-                                var kvp = invocation(integration,
-                                    obj =>
-                                    {
-                                        var ir = new InvocationResult
-                                        {
-                                            obj = obj,
-                                            success = true,
-                                        };
-                                        return ir.AsTask<object>();
-                                    },
-                                    why =>
-                                    {
-                                        var ir = new InvocationResult
-                                        {
-                                            why = why,
-                                            success = false,
-                                        };
-                                        return ir.AsTask<object>();
-                                    });
-                                var irResultTask = kvp as Task<InvocationResult>;
-                                var irResult = await irResultTask;
-                                return irResult;
-                            })
-                        .AsyncEnumerable()
-                        .Where(ir => ir.success)
-                        .Select(ir => ir.obj)
-                        //.SelectAsyncOptional<ServiceConfiguration.IntegrationActivityDelegate, object>(
-                        //    async (invocation, select, skip) =>
-                        //    {
-                        //        var resultTask = (Task<object>)invocation(integration,
-                        //            (obj) => select(obj).AsTask<object>(),
-                        //            (why) => skip().AsTask<object>());
-                        //        var result = await resultTask;
-                        //        return (EnumerableAsync.ISelected<object>)(result);
-                        //    })
-                        .ToArrayAsync();
-                    return integration.PairWithValue(activities);
-                },
-                () => (new KeyValuePair<Integration, object[]> { }).AsTask());
-        }
-
-        public async Task<TResult> GetAsync<TIntegration, TResult>(Guid actorId,
-            Func<TIntegration, TResult> onEnabled,
-            Func<TResult> onDisabled,
-            Func<string, TResult> onFailure)
-        {
-            throw new NotImplementedException();
-            //return ServiceConfiguration.integrations.
-        }
-
-        public async Task<TResult> GetParamsByActorAsync<TResult>(Guid actorId, string method,
-            Func<Guid, IDictionary<string, string>, TResult> onSuccess,
-            Func<TResult> onNotFound)
-        {
-            return await await dataContext.Integrations.FindAsync(actorId, method,
-                async (authenticationRequestId) =>
-                {
-                    return await this.dataContext.AuthenticationRequests.FindByIdAsync(authenticationRequestId,
-                        (authRequest) =>
-                        {
-                            return onSuccess(authenticationRequestId, authRequest.extraParams);
-                        },
-                        onNotFound);
-                },
-                ()=> onNotFound().AsTask());
-        }
 
         public Task<TResult> UpdateAsync<TResult>(Guid authenticationRequestId,
               string token, IDictionary<string, string> updatedUserParameters,
@@ -491,134 +373,134 @@ namespace EastFive.Azure
         }
 
 
-        public async Task<TResult> DeleteByIdAsync<TResult>(Guid accessId,
-                Guid performingActorId, System.Security.Claims.Claim [] claims, IHttpRequest request,
-            Func<IHttpResponse, TResult> onSuccess, 
-            Func<TResult> onNotFound,
-            Func<TResult> onUnathorized)
-        {
-            return await await this.dataContext.AuthenticationRequests.DeleteByIdAsync(accessId,
-                async (integration, deleteAsync) =>
-                {
-                    var integrationDeleted = await Convert(integration, default(IProvideLogin), default(Uri), default(Dictionary<string, string>),
-                                   default(Dictionary<string, string>), default(Dictionary<string, Type>), default(Dictionary<string, string>));
-                    if (!integration.authorizationId.HasValue)
-                    {
+        //public async Task<TResult> DeleteByIdAsync<TResult>(Guid accessId,
+        //        Guid performingActorId, System.Security.Claims.Claim [] claims, IHttpRequest request,
+        //    Func<IHttpResponse, TResult> onSuccess, 
+        //    Func<TResult> onNotFound,
+        //    Func<TResult> onUnathorized)
+        //{
+        //    return await await this.dataContext.AuthenticationRequests.DeleteByIdAsync(accessId,
+        //        async (integration, deleteAsync) =>
+        //        {
+        //            var integrationDeleted = await Convert(integration, default(IProvideLogin), default(Uri), default(Dictionary<string, string>),
+        //                           default(Dictionary<string, string>), default(Dictionary<string, Type>), default(Dictionary<string, string>));
+        //            if (!integration.authorizationId.HasValue)
+        //            {
                         
-                        return await Library.configurationManager.RemoveIntegrationAsync(integrationDeleted, request,
-                            async (response) =>
-                            {
-                                await deleteAsync();
-                                return onSuccess(response);
-                            },
-                            () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
-                    }
+        //                return await Library.configurationManager.RemoveIntegrationAsync(integrationDeleted, request,
+        //                    async (response) =>
+        //                    {
+        //                        await deleteAsync();
+        //                        return onSuccess(response);
+        //                    },
+        //                    () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
+        //            }
                     
-                    return await dataContext.Integrations.DeleteAsync(integration.authorizationId.Value, integration.method,
-                        async (parames) =>
-                        {
-                            return await await Library.configurationManager.RemoveIntegrationAsync(integrationDeleted, request,
-                                async (response) =>
-                                {
-                                    await deleteAsync();
-                                    return onSuccess(response);
-                                },
-                                () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
-                        },
-                        onNotFound.AsAsyncFunc());
-                },
-                async () =>
-                {
-                    var x = await context.GetLoginProviders<Task<bool[]>>(
-                        async (accessProviders) =>
-                        {
-                            return await accessProviders
-                                .Select(
-                                    accessProvider =>
-                                    {
-                                        return dataContext.Integrations.DeleteAsync(performingActorId,
-                                                accessProvider.GetType().GetCustomAttribute<IntegrationNameAttribute>().Name,
-                                            (parames) => true,
-                                            () => false);
-                                    })
-                                .WhenAllAsync();
-                        },
-                        (why) => (new bool[] { }).AsTask());
-                    return onSuccess(request.CreateResponse(HttpStatusCode.NoContent).AddReason("Access ID not found"));
-                });
-        }
+        //            return await dataContext.Integrations.DeleteAsync(integration.authorizationId.Value, integration.method,
+        //                async (parames) =>
+        //                {
+        //                    return await await Library.configurationManager.RemoveIntegrationAsync(integrationDeleted, request,
+        //                        async (response) =>
+        //                        {
+        //                            await deleteAsync();
+        //                            return onSuccess(response);
+        //                        },
+        //                        () => onSuccess(request.CreateResponse(HttpStatusCode.InternalServerError).AddReason("failure")).AsTask());
+        //                },
+        //                onNotFound.AsAsyncFunc());
+        //        },
+        //        async () =>
+        //        {
+        //            var x = await context.GetLoginProviders<Task<bool[]>>(
+        //                async (accessProviders) =>
+        //                {
+        //                    return await accessProviders
+        //                        .Select(
+        //                            accessProvider =>
+        //                            {
+        //                                return dataContext.Integrations.DeleteAsync(performingActorId,
+        //                                        accessProvider.GetType().GetCustomAttribute<IntegrationNameAttribute>().Name,
+        //                                    (parames) => true,
+        //                                    () => false);
+        //                            })
+        //                        .WhenAllAsync();
+        //                },
+        //                (why) => (new bool[] { }).AsTask());
+        //            return onSuccess(request.CreateResponse(HttpStatusCode.NoContent).AddReason("Access ID not found"));
+        //        });
+        //}
 
-        private static Task<Session> Convert(
-            Security.SessionServer.Persistence.AuthenticationRequest authenticationRequest,
-            IProvideLogin provider,
-            Uri loginUrl,
-            IDictionary<string, string> extraParams, 
-            IDictionary<string, string> labels, 
-            IDictionary<string, Type> types, 
-            IDictionary<string, string> descriptions)
-        {
-            return Convert(authenticationRequest.id, authenticationRequest.method, authenticationRequest.name, provider, authenticationRequest.action, authenticationRequest.token, 
-                authenticationRequest.authorizationId.Value, loginUrl, authenticationRequest.redirect, extraParams, labels, types, descriptions);
-        }
+        //private static Task<Session> Convert(
+        //    Security.SessionServer.Persistence.AuthenticationRequest authenticationRequest,
+        //    IProvideLogin provider,
+        //    Uri loginUrl,
+        //    IDictionary<string, string> extraParams, 
+        //    IDictionary<string, string> labels, 
+        //    IDictionary<string, Type> types, 
+        //    IDictionary<string, string> descriptions)
+        //{
+        //    return Convert(authenticationRequest.id, authenticationRequest.method, authenticationRequest.name, provider, authenticationRequest.action, authenticationRequest.token, 
+        //        authenticationRequest.authorizationId.Value, loginUrl, authenticationRequest.redirect, extraParams, labels, types, descriptions);
+        //}
 
-        private async static Task<Session> Convert(
-            Guid authenticationRequestStorageId,
-            string method,
-            string name,
-            IProvideLogin provider,
-            AuthenticationActions action,
-            string token,
-            Guid authorizationId,
-            Uri loginUrl,
-            Uri redirect,
-            IDictionary<string, string> extraParams,
-            IDictionary<string, string> labels,
-            IDictionary<string, Type> types,
-            IDictionary<string, string> descriptions)
-        {
-            var keys = labels.SelectKeys().Concat(types.SelectKeys()).Concat(descriptions.SelectKeys());
-            var userParams = keys
-                .Distinct()
-                .Select(
-                    key =>
-                    {
-                        var val = default(string);
-                        if (null != extraParams)
-                            val = extraParams.ContainsKey(key) ? extraParams[key] : default(string);
+        //private async static Task<Session> Convert(
+        //    Guid authenticationRequestStorageId,
+        //    string method,
+        //    string name,
+        //    IProvideLogin provider,
+        //    AuthenticationActions action,
+        //    string token,
+        //    Guid authorizationId,
+        //    Uri loginUrl,
+        //    Uri redirect,
+        //    IDictionary<string, string> extraParams,
+        //    IDictionary<string, string> labels,
+        //    IDictionary<string, Type> types,
+        //    IDictionary<string, string> descriptions)
+        //{
+        //    var keys = labels.SelectKeys().Concat(types.SelectKeys()).Concat(descriptions.SelectKeys());
+        //    var userParams = keys
+        //        .Distinct()
+        //        .Select(
+        //            key =>
+        //            {
+        //                var val = default(string);
+        //                if (null != extraParams)
+        //                    val = extraParams.ContainsKey(key) ? extraParams[key] : default(string);
 
-                        return (new CustomParameter
-                        {
-                            Value = val,
-                            Type = types.ContainsKey(key) ? types[key] : default(Type),
-                            Label = labels.ContainsKey(key) ? labels[key] : default(string),
-                            Description = descriptions.ContainsKey(key) ? descriptions[key] : default(string),
-                        }).PairWithKey(key);
-                    })
-                .ToDictionary();
+        //                return (new CustomParameter
+        //                {
+        //                    Value = val,
+        //                    Type = types.ContainsKey(key) ? types[key] : default(Type),
+        //                    Label = labels.ContainsKey(key) ? labels[key] : default(string),
+        //                    Description = descriptions.ContainsKey(key) ? descriptions[key] : default(string),
+        //                }).PairWithKey(key);
+        //            })
+        //        .ToDictionary();
 
-            var resourceTypes = await ServiceConfiguration.IntegrationResourceTypesAsync(authenticationRequestStorageId,
-                (resourceTypesInner) => resourceTypesInner,
-                () => new string[] { });
+        //    var resourceTypes = await ServiceConfiguration.IntegrationResourceTypesAsync(authenticationRequestStorageId,
+        //        (resourceTypesInner) => resourceTypesInner,
+        //        () => new string[] { });
 
-            var computedName = !string.IsNullOrWhiteSpace(name) ?
-                name :
-                provider is IProvideIntegration integrationProvider ? integrationProvider.GetDefaultName(extraParams) : method;
+        //    var computedName = !string.IsNullOrWhiteSpace(name) ?
+        //        name :
+        //        provider is IProvideIntegration integrationProvider ? integrationProvider.GetDefaultName(extraParams) : method;
 
-            return new Session
-            {
-                id = authenticationRequestStorageId,
-                method = method,
-                name = computedName,
-                action = action,
-                token = token,
-                authorizationId = authorizationId,
-                redirectUrl = redirect,
-                loginUrl = loginUrl,
-                userParams = userParams,
-                resourceTypes = resourceTypes
-                    .Select(resourceType => resourceType.PairWithValue(resourceType))
-                    .ToDictionary(),
-            };
-        }
+        //    return new Session
+        //    {
+        //        id = authenticationRequestStorageId,
+        //        method = method,
+        //        name = computedName,
+        //        action = action,
+        //        token = token,
+        //        authorizationId = authorizationId,
+        //        redirectUrl = redirect,
+        //        loginUrl = loginUrl,
+        //        userParams = userParams,
+        //        resourceTypes = resourceTypes
+        //            .Select(resourceType => resourceType.PairWithValue(resourceType))
+        //            .ToDictionary(),
+        //    };
+        //}
     }
 }

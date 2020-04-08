@@ -16,6 +16,8 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Serialization;
 using EastFive.Api.Azure.Credentials;
+using EastFive.Azure.Auth;
+using EastFive.Azure.Auth.CredentialProviders;
 
 namespace EastFive.Security.SessionServer
 {
@@ -54,22 +56,6 @@ namespace EastFive.Security.SessionServer
                 () => onFailure("Claim is already in use"));
         }
 
-        [Obsolete("User Login Providers from Application.")]
-        internal static TResult GetLoginProvider<TResult>(string method,
-            Func<IProvideLogin, TResult> onSuccess,
-            Func<TResult> onCredintialSystemNotAvailable,
-            Func<string, TResult> onFailure)
-        {
-            if (ServiceConfiguration.loginProviders.IsDefault())
-                return onFailure("Authentication system not initialized.");
-            
-            if (!ServiceConfiguration.loginProviders.ContainsKey(method))
-                return onCredintialSystemNotAvailable();
-
-            var provider = ServiceConfiguration.loginProviders[method];
-            return onSuccess(provider);
-        }
-
 
         //internal TResult GetAccessProvider<TResult>(CredentialValidationMethodTypes method,
         //    Func<IProvideAccess, TResult> onSuccess,
@@ -93,43 +79,8 @@ namespace EastFive.Security.SessionServer
         //    return onSuccess(ServiceConfiguration.accessProviders.SelectValues().ToArray());
         //}
 
-        internal TResult GetLoginProviders<TResult>(
-            Func<IProvideLogin[], TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            if (ServiceConfiguration.loginProviders.IsDefault())
-                return onFailure("Authentication system not initialized.");
-            
-            return onSuccess(ServiceConfiguration.loginProviders.SelectValues().ToArray());
-        }
-
-        internal TResult GetManagementProvider<TResult>(string method,
-            Func<IProvideLoginManagement, TResult> onSuccess,
-            Func<TResult> onCredintialSystemNotAvailable,
-            Func<string, TResult> onFailure)
-        {
-            if (ServiceConfiguration.managementProviders.IsDefault())
-                return onFailure("Authentication system not initialized.");
-
-            if (!ServiceConfiguration.managementProviders.ContainsKey(method))
-                return onCredintialSystemNotAvailable();
-
-            var provider = ServiceConfiguration.managementProviders[method];
-            return onSuccess(provider);
-        }
         
         #endregion
-
-        private Credentials credentialMappings;
-        public Credentials Credentials
-        {
-            get
-            {
-                if (default(Credentials) == credentialMappings)
-                    credentialMappings = new Credentials(this, this.DataContext);
-                return credentialMappings;
-            }
-        }
 
         private Sessions sessions;
         public Sessions Sessions
@@ -142,16 +93,6 @@ namespace EastFive.Security.SessionServer
             }
         }
 
-        private Authorizations authorizations;
-        public Authorizations Authorizations
-        {
-            get
-            {
-                if (default(Authorizations) == authorizations)
-                    authorizations = new Authorizations(this, this.DataContext);
-                return authorizations;
-            }
-        }
 
         private EastFive.Azure.Integrations integrations;
         public EastFive.Azure.Integrations Integrations
@@ -186,46 +127,9 @@ namespace EastFive.Security.SessionServer
             }
         }
 
-        private Roles roles;
-        public Roles Roles
-        {
-
-            get
-            {
-                if (default(Roles) == roles)
-                    roles = new Roles(this, DataContext);
-                return roles;
-            }
-        }
-        
-        private LoginProviders loginProviders;
-        public LoginProviders LoginProviders
-        {
-
-            get
-            {
-                if (loginProviders.IsDefault())
-                    loginProviders = new LoginProviders(this, DataContext);
-                return loginProviders;
-            }
-        }
-
-        private Azure.Monitoring.Monitoring monitoring;
-        public Azure.Monitoring.Monitoring Monitoring
-        {
-
-            get
-            {
-                if (default(Azure.Monitoring.Monitoring) == monitoring)
-                    monitoring = new Azure.Monitoring.Monitoring(this, DataContext);
-                return monitoring;
-            }
-        }
 
         #region Authorizations
 
-        public delegate bool GetCredentialDelegate(CredentialValidationMethodTypes validationMethod, Uri provider, string userId, string userToken);
-        
         #endregion
     }
 }

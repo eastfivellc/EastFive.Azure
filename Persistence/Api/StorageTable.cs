@@ -30,7 +30,7 @@ using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Persistence
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "StorageTable",
         Resource = typeof(StorageTable),
         ContentType = "x-application/eastfive.azure.storage.table",

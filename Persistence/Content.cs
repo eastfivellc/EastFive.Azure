@@ -76,7 +76,7 @@ namespace EastFive.Api.Azure.Persistence
                 var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
                 using (var stream = await blockBlob.OpenReadAsync())
                 {
-                    var image = stream.ToBytes();
+                    var image = await stream.ToBytesAsync();
                     var contentType = (!String.IsNullOrWhiteSpace(blockBlob.Properties.ContentType)) ?
                         blockBlob.Properties.ContentType
                         :
@@ -126,7 +126,7 @@ namespace EastFive.Api.Azure.Persistence
                 var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
                 using (var stream = await blockBlob.OpenReadAsync())
                 {
-                    var image = stream.ToBytes();
+                    var image = await stream.ToBytesAsync();
                     var contentType = (!String.IsNullOrWhiteSpace(blockBlob.Properties.ContentType)) ?
                         blockBlob.Properties.ContentType
                         :

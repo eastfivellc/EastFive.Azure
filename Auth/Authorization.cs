@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "XAuthorization",
         Resource = typeof(Authorization),
         ContentType = "x-application/auth-authorization",
@@ -145,11 +145,11 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
-                [Property(Name = AuthorizationIdPropertyName)]Guid authorizationId,
+                [Property(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> method,
                 [Property(Name = LocationAuthorizationReturnPropertyName)]Uri LocationAuthenticationReturn,
                 [Resource]Authorization authorization,
-                IAuthApplication application, UrlHelper urlHelper,
+                IAuthApplication application, IProvideUrl urlHelper,
             CreatedBodyResponse<Authorization> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Method> onAuthenticationDoesNotExist)
@@ -159,7 +159,7 @@ namespace EastFive.Azure.Auth
                 {
                     //var authorizationIdSecure = authentication.authenticationId;
                     authorization.LocationAuthentication = await authentication.GetLoginUrlAsync(
-                        application, urlHelper, authorizationId);
+                        application, urlHelper, authorizationRef.id);
 
                     //throw new ArgumentNullException();
                     return await authorization.StorageCreateAsync(
@@ -175,7 +175,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
                 [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
                 [Resource]Authorization authorization,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                Api.Azure.AzureApplication application, IProvideUrl urlHelper,
                 HttpRequestMessage request,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
@@ -231,7 +231,7 @@ namespace EastFive.Azure.Auth
         [HttpDelete]
         public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
-                UrlHelper urlHelper, AzureApplication application,
+                IProvideUrl urlHelper, AzureApplication application,
             NoContentResponse onLogoutComplete,
             AcceptedBodyResponse onExternalSessionActive,
             NotFoundResponse onNotFound,
@@ -282,25 +282,38 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onFailure)
         {
             var parameters = this.parameters;
-            return await await Auth.Method.ById(this.Method, application, // TODO: Cleanup 
+            return await Auth.Method.ById(this.Method, application, // TODO: Cleanup 
                 (method) =>
                 {
-                    return application.LoginProviders
-                        .SelectValues()
-                        .Where(loginProvider => loginProvider.Method == method.name)
-                        .FirstAsync(
-                            (loginProvider) =>
-                            {
-                                return loginProvider.ParseCredentailParameters(parameters,
-                                    (string userKey, Guid? authorizationIdDiscard, Guid? deprecatedId) =>
-                                    {
-                                        return onSuccess(userKey, loginProvider);
-                                    },
-                                    (why) => onFailure(why));
-                            },
-                            () => onFailure("Method does not match any existing authentication."));
+                    var loginProviders = application.LoginProviders;
+                    var methodName = method.name;
+                    if (!loginProviders.ContainsKey(methodName))
+                        return onFailure("Method does not match any existing authentication.");
+
+                    var loginProvider = loginProviders[method.name];
+                    return loginProvider.ParseCredentailParameters(parameters,
+                        (string userKey, Guid? authorizationIdDiscard, Guid? deprecatedId) =>
+                        {
+                            return onSuccess(userKey, loginProvider);
+                        },
+                        (why) => onFailure(why));
+
+                    //return application.LoginProviders
+                    //    .SelectValues()
+                    //    .Where(loginProvider => loginProvider.Method == method.name)
+                    //    .FirstAsync(
+                    //        (loginProvider) =>
+                    //        {
+                    //            return loginProvider.ParseCredentailParameters(parameters,
+                    //                (string userKey, Guid? authorizationIdDiscard, Guid? deprecatedId) =>
+                    //                {
+                    //                    return onSuccess(userKey, loginProvider);
+                    //                },
+                    //                (why) => onFailure(why));
+                    //        },
+                    //        () => onFailure("Method does not match any existing authentication."));
                 },
-                () => onFailure("Authentication not found").AsTask());
+                () => onFailure("Authentication not found"));
         }
     }
 }

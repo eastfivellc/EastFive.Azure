@@ -99,7 +99,7 @@ namespace EastFive.Api.Azure.Resources
         public static async Task<IHttpResponse> FindByResourceTypeAsync(
                 [EastFive.Api.QueryParameter(Name = ActorPropertyName)]Guid actorId,
                 [EastFive.Api.QueryParameter(Name = Resources.ProcessStageType.ResourceTypePropertyName)]Type resourceType,
-                EastFive.Api.Security security, AzureApplication application, UrlHelper url,
+                EastFive.Api.Security security, AzureApplication application, IProvideUrl url,
             [Display(Name = "Found")]MultipartAcceptArrayResponseAsync onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -115,12 +115,15 @@ namespace EastFive.Api.Azure.Resources
                 () => onUnauthorized().ToTask());
         }
 
-        internal static Resources.ProcessResourceView GetResource(EastFive.Azure.ProcessResourceView view, AzureApplication application, UrlHelper url)
+        internal static Resources.ProcessResourceView GetResource(
+            EastFive.Azure.ProcessResourceView view, 
+            AzureApplication application,
+            IProvideUrl url)
         {
             return new Resources.ProcessResourceView
             {
                 Id = url.GetWebId<ProcessResourceView>(view.processViewId),
-                Actor = application.GetActorLink(view.actorId, url),
+                //Actor = application.GetActorLink(view.actorId, url),
                 //Resource = application.GetResourceLink(view.resourceType, view.resourceId, url),
                 ResourceType = application.GetResourceMime(view.resourceType),
 
@@ -152,7 +155,7 @@ namespace EastFive.Api.Azure.Resources
 
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static IHttpResponse Options(AzureApplication application, UrlHelper url,
+        public static IHttpResponse Options(AzureApplication application, IProvideUrl url,
             ContentResponse onOption)
         {
             return onOption(

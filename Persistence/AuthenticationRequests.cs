@@ -84,32 +84,6 @@ namespace EastFive.Security.SessionServer.Persistence
                 () => onAlreadyExists());
         }
 
-        public async Task<TResult> CreateAsync<TResult>(Guid authenticationRequestId,
-                EastFive.Api.Azure.Credentials.CredentialValidationMethodTypes method, AuthenticationActions action,
-                Guid actorLinkId, string token, Uri redirectUrl, Uri redirectLogoutUrl,
-            Func<TResult> onSuccess,
-            Func<TResult> onAlreadyExists)
-        {
-            var doc = new Documents.AuthenticationRequestDocument
-            {
-                Method = Enum.GetName(typeof(EastFive.Api.Azure.Credentials.CredentialValidationMethodTypes), method),
-                Action = Enum.GetName(typeof(AuthenticationActions), action),
-                LinkedAuthenticationId = actorLinkId,
-                Token = token,
-                RedirectUrl = redirectUrl.IsDefault() ?
-                    default(string)
-                    :
-                    redirectUrl.AbsoluteUri,
-                RedirectLogoutUrl = redirectLogoutUrl.IsDefault() ?
-                    default(string)
-                    :
-                    redirectLogoutUrl.AbsoluteUri,
-            };
-            return await this.repository.CreateAsync(authenticationRequestId, doc,
-                () => onSuccess(),
-                () => onAlreadyExists());
-        }
-
         public async Task<TResult> FindByIdAsync<TResult>(Guid authenticationRequestId,
             Func<AuthenticationRequest, TResult> onSuccess,
             Func<TResult> onNotFound)
@@ -143,34 +117,6 @@ namespace EastFive.Security.SessionServer.Persistence
                 });
         }
     
-        public async Task<TResult> DeleteAsync<TResult>(Guid authenticationRequestId,
-            Func<AuthenticationRequest, Func<Task>, Task<TResult>> onFound,
-            Func<TResult> onNotFound)
-        {
-            return await this.repository.UpdateAsync<Documents.AuthenticationRequestDocument, TResult>(authenticationRequestId,
-                async (document, saveAsync) =>
-                {
-                    return await onFound(Convert(document),
-                        async () =>
-                        {
-                            document.Deleted = DateTime.UtcNow;
-                            await saveAsync(document);
-                        });
-                },
-                () => onNotFound());
-        }
-
-        public async Task<TResult> DeleteByIdAsync<TResult>(Guid authenticationRequestId,
-            Func<AuthenticationRequest, Func<Task>, Task<TResult>> onSuccess,
-            Func<TResult> onNotFound)
-        {
-            return await repository.DeleteIfAsync<Documents.AuthenticationRequestDocument, TResult>(authenticationRequestId,
-                async (document, deleteAsync) =>
-                {
-                    return await onSuccess(Convert(document), deleteAsync);
-                },
-                () => onNotFound());
-        }
 
         internal static AuthenticationRequest Convert(Documents.AuthenticationRequestDocument document)
         {

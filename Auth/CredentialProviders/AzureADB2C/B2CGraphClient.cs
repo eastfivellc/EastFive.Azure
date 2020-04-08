@@ -540,7 +540,7 @@ namespace EastFive.AzureADB2C
 
             using (HttpRequestMessage request = new HttpRequestMessage(new HttpMethod("PATCH"), url))
             {
-                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                request.Content = new StringContent(json, new UTF8Encoding(false), "application/json");
                 using (HttpResponseMessage response = await http.SendAsync(request))
                 {
                     if (!response.IsSuccessStatusCode)
@@ -562,7 +562,7 @@ namespace EastFive.AzureADB2C
 
             using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url))
             {
-                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+                request.Content = new StringContent(json, new UTF8Encoding(false), "application/json");
                 using (HttpResponseMessage response = await http.SendAsync(request))
                 {
                     if (!response.IsSuccessStatusCode)

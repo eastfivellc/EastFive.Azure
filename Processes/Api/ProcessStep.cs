@@ -56,7 +56,7 @@ namespace EastFive.Api.Azure.Resources
         [EastFive.Api.HttpGet]
         public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ProcessStep.IdPropertyName)]Guid id,
-                AzureApplication httpApplication, EastFive.Api.Security security, UrlHelper url,
+                AzureApplication httpApplication, EastFive.Api.Security security, IProvideUrl url,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -68,7 +68,7 @@ namespace EastFive.Api.Azure.Resources
                 () => onUnauthorized());
         }
 
-        internal static Resources.ProcessStep GetResource(EastFive.Azure.Process process, AzureApplication httpApplication, UrlHelper urlHelper)
+        internal static Resources.ProcessStep GetResource(EastFive.Azure.Process process, AzureApplication httpApplication, IProvideUrl urlHelper)
         {
             return new Resources.ProcessStep
             {
@@ -105,7 +105,7 @@ namespace EastFive.Api.Azure.Resources
                 [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
                 [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
                 [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStage> onStageNotFound,
@@ -129,7 +129,7 @@ namespace EastFive.Api.Azure.Resources
                 [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
                 [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
                 [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             NoContentResponse onUpdated,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -166,7 +166,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static IHttpResponse Options(IHttpRequest request, UrlHelper url, AzureApplication application,
+        public static IHttpResponse Options(IHttpRequest request, IProvideUrl url, AzureApplication application,
             ContentResponse onOption)
         {
             return onOption(

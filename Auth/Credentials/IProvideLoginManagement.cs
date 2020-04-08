@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace EastFive.Security.SessionServer
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     public struct LoginInfo
     {

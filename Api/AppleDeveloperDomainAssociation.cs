@@ -14,8 +14,8 @@ using System.Threading.Tasks;
 
 namespace OrderOwl.Auth
 {
-    [FunctionViewController6(
-        Prefix = ".well-known",
+    [FunctionViewController(
+        Namespace = ".well-known",
         Route = "apple-developer-domain-association.txt",
         Resource = typeof(AppleDeveloperDomainAssociation),
         ContentType = "x-application/apple-redirect",

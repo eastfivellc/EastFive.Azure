@@ -21,8 +21,8 @@ namespace EastFive.Api.Azure.Controllers
     {
         [EastFive.Api.HttpGet]
         public static IHttpResponse FindAsync(
-                HttpApplication application, IHttpRequest request, UrlHelper url,
-            ContentResponse onFound,
+                HttpApplication application, IHttpRequest request, IProvideUrl url,
+            ContentTypeResponse<Resources.Manifest> onFound,
             ContentTypeResponse<Api.Resources.Manifest> onContent,
             ViewFileResponse onHtml)
         {
@@ -45,11 +45,11 @@ namespace EastFive.Api.Azure.Controllers
                 Endpoints = endpoints,
             };
 
-            return request.CreateResponse(System.Net.HttpStatusCode.OK, manifest);
+            return onFound(manifest);
         }
 
         public static IHttpResponse HtmlContent(
-                HttpApplication httpApp, IHttpRequest request, UrlHelper url,
+                HttpApplication httpApp, IHttpRequest request, IProvideUrl url,
             ViewFileResponse onHtml)
         {
             var lookups = httpApp.GetResources();
@@ -58,7 +58,7 @@ namespace EastFive.Api.Azure.Controllers
         }
 
         public static IHttpResponse ManifestContent(
-                HttpApplication httpApp, HttpRequestMessage request, UrlHelper url,
+                HttpApplication httpApp, HttpRequestMessage request, IProvideUrl url,
             ContentTypeResponse<Api.Resources.Manifest> onContent)
         {
             var lookups = httpApp.GetResources();

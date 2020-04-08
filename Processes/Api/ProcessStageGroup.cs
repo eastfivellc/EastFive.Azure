@@ -53,7 +53,7 @@ namespace EastFive.Api.Azure.Resources
         [EastFive.Api.HttpGet]
         public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -76,7 +76,7 @@ namespace EastFive.Api.Azure.Resources
 
         [EastFive.Api.HttpGet]
         public static Task<IHttpResponse> FindAllAsync(
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security,
             MultipartAcceptArrayResponseAsync onMultipart)
         {
             return onMultipart(stages);
@@ -86,7 +86,7 @@ namespace EastFive.Api.Azure.Resources
 
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static IHttpResponse Options(HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse Options(
             ContentResponse onOption)
         {
             return onOption(stages[1]);

@@ -4,14 +4,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Web;
-using System.Web.Http;
-using System.Xml;
-using System.Text;
-using System.IO;
 using System.Net.Http.Headers;
 
-using Microsoft.ApplicationInsights;
 using Microsoft.AspNetCore.Mvc.Routing;
 
 using Newtonsoft.Json;
@@ -22,11 +16,14 @@ using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
 using EastFive.Azure.Auth;
 using EastFive.Linq;
+using EastFive.Api;
+using EastFive.Api.Azure;
+using EastFive.Api.Azure.Credentials;
 
-namespace EastFive.Api.Azure.Credentials.Controllers
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [FunctionViewController6(
-        Prefix="aadb2c",
+    [FunctionViewController(
+        Namespace = "aadb2c",
         Route="PingResponse",
         Resource = typeof(PingResponse),
         ContentType = "x-application/ping-response",
@@ -50,7 +47,7 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
                 AzureApplication application,
                 IHttpRequest request,
-                UrlHelper urlHelper,
+                IProvideUrl urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -74,8 +71,8 @@ namespace EastFive.Api.Azure.Credentials.Controllers
             if (tag.IsNullOrWhiteSpace())
                 tag = "OpioidTool";
 
-            var methodName = Enum.GetName(typeof(CredentialValidationMethodTypes), CredentialValidationMethodTypes.Ping);
-            var method = await EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
+            var methodName = PingProvider.IntegrationName;
+            var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
 
             var failureHtml = "<html><title>{0}</title><body>{1} Please report:<code>{2}</code> to Affirm Health if the issue persists.</body></html>";
 

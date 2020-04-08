@@ -27,7 +27,7 @@ using EastFive.Web.Configuration;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Claim",
         Resource = typeof(Claim),
         ContentType = "x-application/auth-claim",

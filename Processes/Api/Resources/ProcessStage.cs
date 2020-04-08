@@ -70,7 +70,7 @@ namespace EastFive.Api.Azure.Resources
         [EastFive.Api.HttpGet]
         public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -85,7 +85,7 @@ namespace EastFive.Api.Azure.Resources
         [EastFive.Api.HttpGet]
         public static async Task<IHttpResponse> FindByResourceAsync(
                 [QueryParameter]Guid resourceId,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             MultipartAcceptArrayResponseAsync onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -102,7 +102,7 @@ namespace EastFive.Api.Azure.Resources
                 [QueryParameter(Name = Resources.ProcessStage.TypePropertyName)]Type resourceType,
                 [QueryParameter(Name = "processstage." + Resources.ProcessStage.ConfirmablePropertyName + "." + Resources.ProcessStage.ConfirmableResource.ProcessStageNextPropertyName)]
                     IRefOptional<IReferenceable> nextStage,
-                AzureApplication application, EastFive.Api.Security security, UrlHelper url,
+                AzureApplication application, EastFive.Api.Security security, IProvideUrl url,
             MultipartAcceptArrayResponseAsync onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -115,7 +115,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage,
-            UrlHelper url)
+            IProvideUrl url)
         {
             return new Resources.ProcessStage
             {
@@ -210,7 +210,7 @@ namespace EastFive.Api.Azure.Resources
                     Guid [] editableIds,
                 [PropertyOptional(Name = Resources.ProcessStage.ConfirmablePropertyName)]
                     Resources.ProcessStage.ConfirmableResource [] confirmables,
-                EastFive.Api.Security security, Context context, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security, Context context,
             NoContentResponse onUpdated,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -238,7 +238,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static IHttpResponse Options(UrlHelper url,
+        public static IHttpResponse Options(IProvideUrl url,
             ContentResponse onOption)
         {
             return onOption(GetResource(

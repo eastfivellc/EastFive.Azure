@@ -24,7 +24,10 @@ namespace EastFive.Azure.Functions
                     refererTmp
                     :
                     new Uri(System.Web.HttpUtility.UrlDecode(refererTmp.OriginalString));
-            var content = request.Body.IsDefaultOrNull()? new byte[] { } : request.Body.ToBytes();
+            var content = request.HasBody?
+                request.Body.IsDefaultOrNull()? new byte[] { } : await request.Body.ToBytesAsync()
+                :
+                new byte[] { };
             var invocationMessage = new InvocationMessage
             {
                 invocationRef = invocationMessageRef,

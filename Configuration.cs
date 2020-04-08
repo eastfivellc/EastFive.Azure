@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Configuration
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Configuration",
         Resource = typeof(Configuration),
         ContentType = "x-application/auth-configuration",
