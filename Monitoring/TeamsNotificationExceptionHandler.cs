@@ -33,37 +33,36 @@ namespace EastFive.Azure.Monitoring
                         httpApp, request));
         }
 
-        public Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
+        public async Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
             IApplication httpApp, HttpRequestMessage request, string routeName,
             RouteHandlingDelegate continueExecution)
         {
+            var response = await continueExecution(controllerType, httpApp, request, routeName);
+            bool HasReportableError() => ((int)response.StatusCode) >= 400 && response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+
+            string teamsNotifyParam = default;
             if (request.Headers.Contains("X-Teams-Notify"))
             {
                 var teamsNotifyParams = request.Headers.GetValues("X-Teams-Notify");
                 if (teamsNotifyParams.Any())
-                {
-                    var teamsNotifyParam = teamsNotifyParams.First();
-
-                    return TeamsNotifyAsync(teamsNotifyParam, controllerType,
-                        httpApp, request, routeName,
-                        continueExecution);
-                }
+                    teamsNotifyParam = teamsNotifyParams.First();
             }
+            bool RequestTeamsNotify() => teamsNotifyParam != default;
 
-            return continueExecution(controllerType, httpApp, request, routeName);
+            if (HasReportableError() || RequestTeamsNotify())
+                await TeamsNotifyAsync(response, teamsNotifyParam, httpApp, request, routeName);
+
+            return response;
         }
 
-        public Task<HttpResponseMessage> TeamsNotifyAsync(string teamsNotifyParam,
-            Type controllerType,
-            IApplication httpApp, HttpRequestMessage request, string routeName,
-            RouteHandlingDelegate continueExecution)
+        public Task<string> TeamsNotifyAsync(HttpResponseMessage response, string teamsNotifyParam,
+            IApplication httpApp, HttpRequestMessage request, string routeName)
         {
             return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
                 async teamsHookUrl =>
                 {
-                    var response = await continueExecution(controllerType, httpApp, request, routeName);
                     var message = await CreateMessageCardAsync(
-                        teamsNotifyParam, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
+                        teamsNotifyParam ?? string.Empty, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
                         httpApp, request,
                         () => new MessageCard.Section
                         {
@@ -90,13 +89,17 @@ namespace EastFive.Azure.Monitoring
                                     name = "Status Code:",
                                     value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
                                 },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Reason:",
+                                    value = response.ReasonPhrase,
+                                },
                             }
                         });
 
-                    string responseMessage = await message.SendAsync(teamsHookUrl);
-                    return response;
+                    return await message.SendAsync(teamsHookUrl);
                 },
-                (why) => continueExecution(controllerType, httpApp, request, routeName));
+                (why) => why.AsTask());
         }
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
@@ -139,7 +142,7 @@ namespace EastFive.Azure.Monitoring
         private static async Task<MessageCard> CreateMessageCardAsync(Exception ex, MethodInfo method,
             IApplication httpApp, HttpRequestMessage request)
         {
-            var messageCard = await CreateMessageCardAsync(method, ex.Message, summary:"Server Esception", httpApp, request);
+            var messageCard = await CreateMessageCardAsync(method, ex.Message, summary:"Server Exception", httpApp, request);
 
             var stackTrackSection = new MessageCard.Section
             {
@@ -215,7 +218,12 @@ namespace EastFive.Azure.Monitoring
                             {
                                 name = "URL",
                                 value = request.RequestUri.OriginalString,
-                            }
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Reason:",
+                                value = summary,
+                            },
                         }
                 });
         }
