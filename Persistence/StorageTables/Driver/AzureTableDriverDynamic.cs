@@ -1875,7 +1875,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 async () =>
                                 {
                                     if (onTimeoutAsync.IsDefaultOrNull())
-                                        onTimeoutAsync = AzureStorageDriver.GetRetryDelegateContentionAsync<Task<TResult>>();
+                                    {
+                                        resultGlobal = await UpdateAsyncAsync(rowKey, partitionKey,
+                                            onUpdate,
+                                            onNotFound,
+                                            onModificationFailures: onModificationFailures,
+                                                table: table);
+                                        return true;
+                                    }
 
                                     resultGlobal = await await onTimeoutAsync(
                                         async () => await UpdateAsyncAsync(rowKey, partitionKey, 
