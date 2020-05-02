@@ -97,10 +97,10 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static async Task<IHttpResponse> GetAsync(
+        public static IHttpResponse GetAsync(
                 RequestMessage<Claim> claims,
                 Authorization auth,
-            MultipartResponseAsync<Claim> onFound,
+            MultipartAsyncResponse<Claim> onFound,
             UnauthorizedResponse onUnauthorized)
         {
             if (!auth.accountIdMaybe.HasValue)
@@ -109,7 +109,7 @@ namespace EastFive.Azure.Auth
             var claimsForUser = claims
                 .Where(claim => claim.actorId == auth.accountIdMaybe.Value)
                 .StorageGet();
-            return await onFound(claimsForUser);
+            return onFound(claimsForUser);
         }
 
         [HttpPost]
