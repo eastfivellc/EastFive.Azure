@@ -14,9 +14,7 @@ using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Microsoft.WindowsAzure.Storage.Table;
 
-using BlackBarLabs.Extensions;
 using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
@@ -28,6 +26,8 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
+using System.Xml;
+using Newtonsoft.Json;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -783,6 +783,74 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 cancellationToken:cancellationToken);
         }
 
+        public static IEnumerableAsync<(ITableEntity, string)> FindAllSegmented<TEntity>(
+            TableQuery<TEntity> query,
+            TableContinuationToken token,
+            CloudTable table,
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
+            where TEntity : ITableEntity, new()
+        {
+            var segmentFecthing = table.ExecuteQuerySegmentedAsync(query, token);
+            return EnumerableAsync.YieldBatch<(ITableEntity, string)>(
+                async (yieldReturn, yieldBreak) =>
+                {
+                    if (!cancellationToken.IsDefault())
+                        if (cancellationToken.IsCancellationRequested)
+                            return yieldBreak;
+                    if (segmentFecthing.IsDefaultOrNull())
+                        return yieldBreak;
+                    try
+                    {
+                        var segment = await segmentFecthing;
+                        if (segment.IsDefaultOrNull())
+                            return yieldBreak;
+
+                        token = segment.ContinuationToken;
+                        segmentFecthing = token.IsDefaultOrNull() ?
+                            default(Task<TableQuerySegment<TEntity>>)
+                            :
+                            table.ExecuteQuerySegmentedAsync(query, token);
+                        
+                        var tokenString = GetToken();
+                        var results = segment.Results
+                            .Select(result => (result as ITableEntity, tokenString))
+                            .ToArray();
+                        return yieldReturn(results);
+
+                        string GetToken()
+                        {
+                            if (token.IsDefaultOrNull())
+                                return default;
+                            return JsonConvert.SerializeObject(token);
+                        }
+                    }
+                    catch (AggregateException)
+                    {
+                        throw;
+                    }
+                    catch (StorageException ex)
+                    {
+                        if (!await table.ExistsAsync())
+                            return yieldBreak;
+                        if (ex.IsProblemTimeout())
+                        {
+                            if (--numberOfTimesToRetry > 0)
+                            {
+                                await Task.Delay(DefaultBackoffForRetry);
+                                segmentFecthing = token.IsDefaultOrNull() ?
+                                    default(Task<TableQuerySegment<TEntity>>)
+                                    :
+                                    table.ExecuteQuerySegmentedAsync(query, token);
+                                return yieldReturn(new (ITableEntity, string)[] { });
+                            }
+                        }
+                        throw;
+                    }
+                },
+                cancellationToken: cancellationToken);
+        }
+
         #endregion
 
 
@@ -955,6 +1023,65 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             () => throw new Exception("Modifiers failed to execute."))
                         .AsTask();
                 });
+        }
+
+        private async Task<TResult> UpdateIfNotModifiedAsync<TData, TResult>(TData data,
+            Func<TResult> success,
+            Func<TResult> documentModified,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+            AzureStorageDriver.RetryDelegate onTimeout = null,
+            CloudTable table = default(CloudTable))
+        {
+            if (table.IsDefaultOrNull())
+                table = GetTable<TData>();
+            var tableData = GetEntity(data);
+            var update = TableOperation.Replace(tableData);
+            try
+            {
+                await table.ExecuteAsync(update);
+                return success();
+            }
+            catch (StorageException ex)
+            {
+                return await ex.ParseStorageException(
+                    async (errorCode, errorMessage) =>
+                    {
+                        switch (errorCode)
+                        {
+                            case ExtendedErrorInformationCodes.Timeout:
+                                {
+                                    var timeoutResult = default(TResult);
+                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
+                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
+                                        async () =>
+                                        {
+                                            timeoutResult = await UpdateIfNotModifiedAsync(data,
+                                                success,
+                                                documentModified,
+                                                onFailure: onFailure,
+                                                onTimeout: onTimeout,
+                                                table: table);
+                                        });
+                                    return timeoutResult;
+                                }
+                            case ExtendedErrorInformationCodes.UpdateConditionNotSatisfied:
+                                {
+                                    return documentModified();
+                                }
+                            default:
+                                {
+                                    if (onFailure.IsDefaultOrNull())
+                                        throw ex;
+                                    return onFailure(errorCode, errorMessage);
+                                }
+                        }
+                    },
+                    () =>
+                    {
+                        throw ex;
+                    });
+            }
         }
 
         public Task<TResult> ReplaceAsync<TData, TResult>(TData data,
@@ -1642,6 +1769,26 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             System.Threading.CancellationToken cancellationToken = default)
             where TEntity : IReferenceable, new()
         {
+            var runQueryData = ParseFindBy(entityQuery, tableName);
+
+            return RunQuery<TEntity>(runQueryData.Item2, runQueryData.Item1,
+                cancellationToken: cancellationToken);
+        }
+
+        public IEnumerableAsync<(TEntity, string)> FindBySegmented<TEntity>(IQueryable<TEntity> entityQuery,
+            TableContinuationToken token,
+            string tableName = default,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            var runQueryData = ParseFindBy(entityQuery, tableName);
+
+            return RunQuerySegmented<TEntity>(runQueryData.Item2, runQueryData.Item1, token,
+                cancellationToken: cancellationToken);
+        }
+
+        public (CloudTable, string) ParseFindBy<TEntity>(IQueryable<TEntity> entityQuery,
+            string tableName = default)
+        {
             var table = tableName.HasBlackSpace() ?
                 this.TableClient.GetTableReference(tableName)
                 :
@@ -1700,7 +1847,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         return combinedFilter;
                     });
 
-            return RunQuery<TEntity>(filter, table, cancellationToken:cancellationToken);
+            return (table, filter);
         }
 
         private IEnumerableAsync<TEntity> RunQuery<TEntity>(string whereFilter, CloudTable table,
@@ -1726,6 +1873,39 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
             return findAllCasted
                 .Select(segResult => segResult.Entity);
+        }
+
+        private IEnumerableAsync<(TEntity, string)> RunQuerySegmented<TEntity>(string whereFilter, 
+            CloudTable table, TableContinuationToken token,
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            var query = whereFilter.AsTableQuery<TEntity>();
+
+            var tableEntityTypes = query.GetType().GetGenericArguments();
+            if (table.IsDefaultOrNull())
+            {
+                var tableEntityType = tableEntityTypes.First();
+                if (tableEntityType.IsSubClassOfGeneric(typeof(IWrapTableEntity<>)))
+                {
+                    tableEntityType = tableEntityType.GetGenericArguments().First();
+                }
+                table = AzureTableDriverDynamic.TableFromEntity(tableEntityType, this.TableClient);
+            }
+
+            //AzureTableDriverDynamic.FindAllSegmented<TEntity>(query, token, table,
+            //    numberOfTimesToRetry: numberOfTimesToRetry,
+            //    cancellationToken: cancellationToken);
+
+            var findAllIntermediate = typeof(AzureTableDriverDynamic)
+                .GetMethod("FindAllSegmented", BindingFlags.Static | BindingFlags.Public)
+                .MakeGenericMethod(tableEntityTypes)
+                .Invoke(null, new object[] { query, token, table, numberOfTimesToRetry, cancellationToken });
+            var findAllCasted = findAllIntermediate as IEnumerableAsync<(ITableEntity, string)>;
+            return findAllCasted
+                .Select(segResult => (
+                    (segResult.Item1 as IWrapTableEntity<TEntity>).Entity,
+                    segResult.Item2));
         }
 
         public IEnumerableAsync<TData> FindByPartition<TData>(string partitionKeyValue,
@@ -2461,7 +2641,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             document = mutateUponLock(document);
                         // Save document in locked state
                         return await await this.UpdateIfNotModifiedAsync(document,
-                                originalDoc, // should not be triggering modifers here anyway
                             () => PerformLockedCallback(rowKey, partitionKey, document, unlockDocument, onLockAquired),
                             () => retry(0));
                     }

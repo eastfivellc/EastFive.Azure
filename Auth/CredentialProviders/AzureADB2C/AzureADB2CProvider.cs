@@ -7,7 +7,6 @@ using System.Web;
 using System.IdentityModel.Tokens.Jwt;
 
 using Microsoft.IdentityModel.Tokens;
-
 using EastFive.Linq;
 using EastFive.Collections.Generic;
 using EastFive.Serialization;
@@ -22,52 +21,26 @@ namespace EastFive.Azure.Auth.CredentialProviders
     [IntegrationName(IntegrationName)]
     public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession
     {
-        public const string IntegrationName = "Password";
-        public string Method => IntegrationName;
+        private static readonly string clientId;
+        private static readonly Lazy<Task<Endpoints>> endpointsAsync;
+        private readonly Endpoints endpoints;
 
-        #region Setup
-
-        internal const string StateKey = "state";
-        internal const string IdTokenKey = "id_token";
-        
-        private static EastFive.AzureADB2C.B2CGraphClient client
+        private struct Endpoints
         {
-            get
-            {
-                return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
-                    client => client,
-                    (why) =>
-                    {
-                        throw new ConfigurationException(why, typeof(string), why);
-                    });
-            }
+            public string loginEndpoint;
+            public string signupEndpoint;
+            public string logoutEndpoint;
+            public TokenValidationParameters validationParameters;
         }
 
-        private TokenValidationParameters validationParameters;
-        internal string clientId;
-        private string loginEndpoint;
-        private string signupEndpoint;
-        private string logoutEndpoint;
-
-        public AzureADB2CProvider(string clientId,
-            string signupEndpoint, string signinEndpoint, string logoutEndpoint,
-            TokenValidationParameters validationParams)
+        static AzureADB2CProvider()
         {
-            this.clientId = clientId;
-            this.signupEndpoint = signupEndpoint;
-            this.loginEndpoint = signinEndpoint;
-            this.logoutEndpoint = logoutEndpoint;
-            this.validationParameters = validationParams;
-        }
+            clientId = EastFive.Azure.AppSettings.AzureADB2C.ApplicationId.ConfigurationString(
+                (value) => value,
+                (why) => throw new Exception(why));
 
-        [IntegrationName(IntegrationName)]
-        public static Task<TResult> InitializeAsync<TResult>(
-            Func<IProvideAuthorization, TResult> onProvideAuthorization,
-            Func<TResult> onProvideNothing,
-            Func<string, TResult> onFailure)
-        {
-            return EastFive.Azure.AppSettings.AzureADB2C.ApplicationId.ConfigurationString(
-                (applicationId) =>
+            endpointsAsync = new Lazy<Task<Endpoints>>(
+                () =>
                 {
                     return EastFive.Azure.AppSettings.AzureADB2C.Tenant.ConfigurationString(
                         (tenant) =>
@@ -89,27 +62,62 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                                             return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
                                                                 client =>
                                                                 {
-                                                                    var provider = new AzureADB2CProvider(applicationId,
-                                                                        signupEndpoint, signinEndpoint, logoutEndpoint,
-                                                                        validationParams);
-                                                                    return onProvideAuthorization(provider);
+                                                                    return new Endpoints
+                                                                    {
+                                                                        signupEndpoint = signupEndpoint,
+                                                                        loginEndpoint = signinEndpoint,
+                                                                        logoutEndpoint = logoutEndpoint,
+                                                                        validationParameters = validationParams,
+                                                                    };
                                                                 },
-                                                                (why) =>
-                                                                {
-                                                                    return onFailure(why);
-                                                                });
+                                                                (why) => throw new Exception(why));
                                                         },
-                                                        onFailure);
+                                                        (why) => throw new Exception(why));
                                                 },
-                                                onFailure.AsAsyncFunc());
+                                                (why) => throw new Exception(why));
                                         },
-                                        onFailure.AsAsyncFunc());
+                                        (why) => throw new Exception(why));
                                 },
-                                onFailure.AsAsyncFunc());
+                                (why) => throw new Exception(why));
                         },
-                        onFailure.AsAsyncFunc());
-                },
-                onFailure.AsAsyncFunc());
+                        (why) => throw new Exception(why));
+                });
+        }
+
+        public const string IntegrationName = "Password";
+        public string Method => IntegrationName;
+
+        #region Setup
+
+        internal const string StateKey = "state";
+        internal const string IdTokenKey = "id_token";
+        
+        private static EastFive.AzureADB2C.B2CGraphClient client
+        {
+            get
+            {
+                return EastFive.AzureADB2C.B2CGraphClient.LoadFromConfig(
+                    client => client,
+                    (why) =>
+                    {
+                        throw new ConfigurationException(why, typeof(string), why);
+                    });
+            }
+        }
+
+        private AzureADB2CProvider(Endpoints endpoints)
+        {
+            this.endpoints = endpoints;
+        }
+
+        [IntegrationName(IntegrationName)]
+        public static async Task<TResult> InitializeAsync<TResult>(
+            Func<IProvideAuthorization, TResult> onProvideAuthorization,
+            Func<TResult> onProvideNothing,
+            Func<string, TResult> onFailure)
+        {
+            var endpoints = await endpointsAsync.Value;
+            return onProvideAuthorization(new AzureADB2CProvider(endpoints));
         }
 
         #endregion
@@ -168,12 +176,12 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<ClaimsPrincipal, TResult> onSuccess,
             Func<string, TResult> onFailed)
         {
-            if (default(TokenValidationParameters) == validationParameters)
+            if (default(TokenValidationParameters) == endpoints.validationParameters)
                 return onFailed("AADB2C Provider not initialized");
             var handler = new JwtSecurityTokenHandler();
             try
             {
-                var claims = handler.ValidateToken(idToken, validationParameters, out SecurityToken validatedToken);
+                var claims = handler.ValidateToken(idToken, endpoints.validationParameters, out SecurityToken validatedToken);
                 //var claims = new ClaimsPrincipal();
                 return onSuccess(claims);
             }
@@ -223,22 +231,19 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
         public Type CallbackController => typeof(EastFive.Azure.Auth.OpenIdResponse);
 
-        //typeof(SessionServer.Api.Controllers.AADB2CResponseController);
-
         public Uri GetLoginUrl(Guid state, Uri responseLocation, Func<Type, Uri> controllerToLocation)
         {
-            //var responseLocation = controllerToLocation(typeof());
-            return GetUrl(this.loginEndpoint, state, responseLocation);
+            return GetUrl(endpoints.loginEndpoint, state, responseLocation);
         }
 
         public Uri GetLogoutUrl(Guid state, Uri responseLocation, Func<Type, Uri> controllerToLocation)
         {
-            return GetUrl(this.logoutEndpoint, state, responseLocation);
+            return GetUrl(endpoints.logoutEndpoint, state, responseLocation);
         }
 
         public Uri GetSignupUrl(Guid state, Uri callbackLocation, Func<Type, Uri> controllerToLocation)
         {
-            return GetUrl(this.signupEndpoint, state, callbackLocation);
+            return GetUrl(endpoints.signupEndpoint, state, callbackLocation);
         }
         
         private Uri GetUrl(string longurl, Guid stateGuid,
@@ -246,7 +251,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         {
             var uriBuilder = new UriBuilder(longurl);
             var query = HttpUtility.ParseQueryString(uriBuilder.Query);
-            query["client_id"] = this.clientId;
+            query["client_id"] = clientId;
             query["response_type"] = AzureADB2CProvider.IdTokenKey;
             query["redirect_uri"] = callbackLocation.AbsoluteUri;
             query["response_mode"] = "form_post";

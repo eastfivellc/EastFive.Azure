@@ -35,7 +35,7 @@ namespace EastFive.Azure.Functions
             public InvokeApplicationFromFunction(IApplication httpApp,
                     IHttpRequest request, 
                     Uri serverLocation, string apiPrefix) :
-                base(httpApp, request, serverLocation, apiPrefix)
+                base(httpApp as HttpApplication, request, serverLocation, apiPrefix)
             {
 
             }

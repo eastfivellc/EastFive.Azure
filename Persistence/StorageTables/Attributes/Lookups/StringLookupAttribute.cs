@@ -11,6 +11,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class StringLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
+        public bool IgnoreNull { get; set; }
+
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -24,6 +26,10 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(string).IsAssignableFrom(propertyValueType))
             {
                 var rowKey = (string)rowKeyValue;
+                
+                if (IgnoreNull && rowKey.IsDefaultOrNull())
+                    return Enumerable.Empty<IRefAst>();
+
                 var partitionKey = GetPartitionKey(rowKey);
                 return new RefAst(rowKey, partitionKey).AsEnumerable();
             }

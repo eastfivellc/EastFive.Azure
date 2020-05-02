@@ -1,10 +1,17 @@
 ﻿using EastFive.Api;
+using EastFive.Api.Auth;
+using EastFive.Azure.Auth;
+using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
+using System.Net.Http;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -30,7 +37,9 @@ namespace EastFive.Azure.Functions
         [StandardParititionKey]
         public IRef<ExecutionResult> executionResultRef;
 
-        [JsonProperty]
+        public const string InvocationMessagePropertyName = "invocation_message";
+        [JsonProperty(PropertyName = InvocationMessagePropertyName)]
+        [ApiProperty(PropertyName = InvocationMessagePropertyName)]
         [Storage]
         [IdPrefixLookup(Characters = 4)]
         public IRef<InvocationMessage> invocationMessage;
@@ -67,7 +76,7 @@ namespace EastFive.Azure.Functions
         public string trace;
 
         [Storage]
-        public Guid traceBlobId;
+        public Guid eventMessageId;
 
         [JsonProperty]
         [Storage]
@@ -77,5 +86,33 @@ namespace EastFive.Azure.Functions
         public Guid? contentBlobId;
 
         #endregion
+
+        [Api.HttpGet]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse GetByInvocationMessageAsync(
+            [QueryParameter(Name = InvocationMessagePropertyName)]IRef<InvocationMessage> message,
+            MultipartAsyncResponse<ExecutionResult> onResults)
+        {
+            var messages = message.StorageGetBy(
+                (ExecutionResult ent) => ent.invocationMessage);
+            return onResults(messages);
+        }
+
+        [Api.HttpGet]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse ListAsync(
+            [QueryParameter(Name = "start_time")]DateTime startTime,
+            [QueryParameter(Name = "end_time")]DateTime endTime,
+            [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
+            MultipartAsyncResponse<InvocationMessage> onRun)
+        {
+            Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
+
+            var messages = allQuery
+                .StorageQuery()
+                .Where(msg => msg.lastModified >= startTime)
+                .Where(msg => msg.lastModified <= endTime);
+            return onRun(messages);
+        }
     }
 }
