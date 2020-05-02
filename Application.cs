@@ -14,7 +14,6 @@ using Microsoft.ApplicationInsights;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.WindowsAzure.Storage;
 
-using BlackBarLabs;
 using BlackBarLabs.Api.Resources;
 using EastFive.Linq;
 using EastFive.Security.SessionServer;

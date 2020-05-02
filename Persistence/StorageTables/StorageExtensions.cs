@@ -353,6 +353,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .Select(doc => (object)doc);
         }
 
+        public static IEnumerableAsync<(TEntity, string)> StorageGetSegmented<TEntity>(this IQueryable<TEntity> entities,
+            TableContinuationToken token = default,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            var driver = AzureTableDriverDynamic.FromSettings();
+            return driver.FindBySegmented(entities, token,
+                cancellationToken:cancellationToken);
+        }
+
         public static Task<TResult> StorageGetAsync<TEntity, TResult>(this Guid resourceId,
             Func<TEntity, TResult> onFound,
             Func<TResult> onDoesNotExists = default(Func<TResult>),
