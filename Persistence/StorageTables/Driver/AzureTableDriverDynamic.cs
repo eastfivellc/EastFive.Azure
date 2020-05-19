@@ -726,6 +726,42 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 () => throw new Exception());
         }
 
+        public IEnumerableAsync<IRefAst> FindIdsBy<TMatch, TEntity>(object findByValue,
+                Expression<Func<TEntity, TMatch>> by,
+                ILogger logger = default,
+                params Expression<Func<TEntity, bool>>[] queries)
+            where TEntity : IReferenceable
+        {
+            return by.MemberInfo(
+                (memberCandidate, expr) =>
+                {
+                    return memberCandidate
+                        .GetAttributesInterface<IProvideFindBy>()
+                        .First<IProvideFindBy, IEnumerableAsync<IRefAst>>(
+                            (attr, next) =>
+                            {
+                                var memberAssignments = queries
+                                    .Where(query => !query.IsDefaultOrNull())
+                                    .Select(
+                                        query =>
+                                        {
+                                            var memberInfo = (query).MemberComparison(out ExpressionType operand, out object value);
+                                            return memberInfo.PairWithValue(value);
+                                        })
+                                    .Append(findByValue.PairWithKey(memberCandidate))
+                                    .ToArray();
+
+                                return attr.GetKeys(memberCandidate, this, memberAssignments, 
+                                    logger: logger);
+                            },
+                            () =>
+                            {
+                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy.");
+                            });
+                },
+                () => throw new Exception());
+        }
+
         public static IEnumerableAsync<TEntity> FindAllInternal<TEntity>(
             TableQuery<TEntity> query,
             CloudTable table,

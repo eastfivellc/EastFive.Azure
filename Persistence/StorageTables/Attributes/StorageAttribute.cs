@@ -865,6 +865,14 @@ namespace EastFive.Persistence
             Func<object, TResult> onBound,
             Func<TResult> onFailedToBind)
         {
+            if (type.IsSubClassOfGeneric(typeof(Nullable<>)))
+            {
+                var resourceType = type.GenericTypeArguments.First();
+                var instantiatableType = typeof(Nullable<>).MakeGenericType(resourceType);
+                var instance = Activator.CreateInstance(instantiatableType, new object[] { });
+                return onBound(instance);
+            }
+
             if (type.IsAssignableFrom(typeof(Guid)))
                 return onBound(default(Guid));
 
@@ -904,19 +912,17 @@ namespace EastFive.Persistence
             if (type.IsAssignableFrom(typeof(int)))
                 return onBound(default(int));
 
+            if (type.IsAssignableFrom(typeof(float)))
+                return onBound(default(float));
+
+            if (type.IsAssignableFrom(typeof(double)))
+                return onBound(default(double));
+
             if (type.IsAssignableFrom(typeof(Uri)))
                 return onBound(default(Uri));
 
             if (type.IsAssignableFrom(typeof(bool)))
                 return onBound(default(bool));
-
-            if (type.IsSubClassOfGeneric(typeof(Nullable<>)))
-            {
-                var resourceType = type.GenericTypeArguments.First();
-                var instantiatableType = typeof(Nullable<>).MakeGenericType(resourceType);
-                var instance = Activator.CreateInstance(instantiatableType, new object[] { });
-                return onBound(instance);
-            }
 
             if (typeof(Type) == type)
                 return onBound(null);

@@ -453,6 +453,29 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FindBy(propertyValue, propertyExpr, query1, query2, logger:logger);
         }
 
+        public static IEnumerableAsync<IRef<TEntity>> StorageGetIdsBy<TProperty, TEntity>(this TProperty propertyValue,
+                Expression<Func<TEntity, TProperty>> propertyExpr,
+                Expression<Func<TEntity, bool>> query1 = default,
+                Expression<Func<TEntity, bool>> query2 = default,
+                ILogger logger = default)
+            where TEntity : IReferenceable
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .FindIdsBy(propertyValue, propertyExpr, logger: logger,
+                    query1, query2)
+                .Select(
+                    refAst =>
+                    {
+                        var entity = Activator.CreateInstance<TEntity>();
+                        var entityId = entity
+                            .StorageParseRowKey(refAst.RowKey)
+                            .StorageParsePartitionKey(refAst.PartitionKey)
+                            .id;
+                        return (IRef<TEntity>) new Ref<TEntity>(entityId);
+                    });
+        }
+
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
                 Expression<Func<TEntity, IRefOptional<TRefEntity>>> idProperty)
             where TEntity : IReferenceable

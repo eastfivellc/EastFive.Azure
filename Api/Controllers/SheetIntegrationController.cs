@@ -19,9 +19,9 @@ namespace EastFive.Api.Controllers
         [HttpGet]
         public async static Task<IHttpResponse> IntegrationUploadAsync(
                 [QueryId()]Guid integration,
-            ViewFileResponse onLoadUploadPage)
+            ViewFileResponse<int> onLoadUploadPage)
         {
-            return await onLoadUploadPage("SheetIntegration/UploadSheet.cshtml", null).AsTask();
+            return await onLoadUploadPage("SheetIntegration/UploadSheet.cshtml", default).AsTask();
         }
 
         [HttpPost]
