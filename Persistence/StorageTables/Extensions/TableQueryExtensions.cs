@@ -137,6 +137,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(Guid).IsInstanceOfType(assignmentValue))
                 return TableQuery.GenerateFilterConditionForGuid(assignmentName, queryComparison, (Guid)assignmentValue);
 
+            if (typeof(IReferenceable).IsInstanceOfType(assignmentValue))
+                return TableQuery.GenerateFilterConditionForGuid(assignmentName, queryComparison, ((IReferenceable)assignmentValue).id);
+
             if (typeof(bool).IsInstanceOfType(assignmentValue))
                 return TableQuery.GenerateFilterConditionForBool(assignmentName, queryComparison, (bool)assignmentValue);
 
