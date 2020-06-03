@@ -208,7 +208,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = LocationLogoutReturnPropertyName)]Uri locationLogoutReturn,
                 EastFive.Api.SessionToken? securityMaybe,
             NoContentResponse onUpdated,
-            AlreadyExistsResponse onNotFound,
+            NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
         {
             return await authorizationRef.StorageUpdateAsync(
