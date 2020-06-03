@@ -223,7 +223,7 @@ namespace EastFive.Azure.Auth
         internal static async Task<TResult> CreateByMethodAndKeyAsync<TResult>(Authorization authorization, 
                 string externalAccountKey, Guid internalAccountId,
             Func<TResult> onCreated,
-            Func<string, TResult> onFailure)
+            Func<TResult> onAlreadyMapped)
         {
             var accountMapping = new AccountMapping()
             {
@@ -262,7 +262,7 @@ namespace EastFive.Azure.Auth
                 {
                     return onCreated();
                 },
-                () => onFailure("Account is already mapped to that authentication."));
+                () => onAlreadyMapped());
         }
     
 
