@@ -16,6 +16,7 @@ using BlackBarLabs.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Linq;
+using EastFive.Azure.Persistence.AzureStorageTables;
 
 namespace EastFive.Persistence
 {
@@ -588,6 +589,28 @@ namespace EastFive.Persistence
             if (storageMembers.Any())
             {
                 var value = Activator.CreateInstance(type);
+                var rowKeyKey = $"{propertyName}___rowKey_";
+                if (allValues.ContainsKey(rowKeyKey))
+                {
+                    var rowKeyProperty = allValues[rowKeyKey];
+                    if (rowKeyProperty.PropertyType == EdmType.String)
+                    {
+                        var rowKey = rowKeyProperty.StringValue;
+                        value.StorageParseRowKeyForType(rowKey, type);
+
+                        var partitionKeyKey = $"{propertyName}___partitionKey_";
+                        if (allValues.ContainsKey(partitionKeyKey))
+                        {
+                            var partitionKeyProperty = allValues[partitionKeyKey];
+                            if (partitionKeyProperty.PropertyType == EdmType.String)
+                            {
+                                var partitionKey = partitionKeyProperty.StringValue;
+                                value.StorageParsePartitionKeyForType(partitionKey, type);
+                            }
+                        }
+                    }
+                }
+
                 foreach (var storageMemberKvp in storageMembers)
                 {
                     var attr = storageMemberKvp.Value.First();
@@ -688,6 +711,13 @@ namespace EastFive.Persistence
             var storageMembers = valueType.GetPersistenceAttributes();
             if (storageMembers.Any())
             {
+                var rowKeyKey = $"_rowKey_";
+                var rowKeyValue = value.StorageGetRowKeyForType(valueType);
+                var rowKeyProperty = new EntityProperty(rowKeyValue);
+                var partitionKeyKey = $"_partitionKey_";
+                var partitionKeyValue = value.StorageGetPartitionKeyForType(rowKeyValue, valueType);
+                var partitionKeyProperty = new EntityProperty(partitionKeyValue);
+
                 var storageArrays = storageMembers
                     .Select(
                         storageMemberKvp =>
@@ -704,6 +734,8 @@ namespace EastFive.Persistence
 
                             return epValue.PairWithKey(propName);
                         })
+                    .Append(rowKeyProperty.PairWithKey(rowKeyKey))
+                    .Append(partitionKeyProperty.PairWithKey(partitionKeyKey))
                     .ToArray();
                 return onValues(storageArrays);
             }
@@ -785,6 +817,11 @@ namespace EastFive.Persistence
                 .Select(kvp => kvp.Value.PairWithKey(kvp.Key.Substring(propertyName.Length + 2)))
                 .ToDictionary();
 
+            var rowKeyKey = $"_rowKey_";
+            var rowKeyKeys = GetKeys(rowKeyKey);
+            var partitionKeyKey = $"_partitionKey_";
+            var partitionKeyKeys = GetKeys(partitionKeyKey);
+
             var storageArrays = storageMembers
                 .Select(
                     storageMemberKvp =>
@@ -814,6 +851,16 @@ namespace EastFive.Persistence
             foreach (int i in Enumerable.Range(0, itemsLength))
             {
                 var item = Activator.CreateInstance(arrayType);
+                if(i < rowKeyKeys.Length)
+                {
+                    var rowKeyValue = rowKeyKeys[i];
+                    item = item.StorageParseRowKeyForType(rowKeyValue, arrayType);
+                }
+                if (i < partitionKeyKeys.Length)
+                {
+                    var partitionKeyValue = partitionKeyKeys[i];
+                    item = item.StorageParsePartitionKeyForType(partitionKeyValue, arrayType);
+                }
                 items.SetValue(item, i);
             }
             foreach (var storageArray in storageArrays)
@@ -825,7 +872,21 @@ namespace EastFive.Persistence
                     member.SetValue(ref item, value);
                     items.SetValue(item, i); // needed for copied structs
                 }
+
             return items;
+
+
+            string[] GetKeys(string keyKey)
+            {
+                if (!entityProperties.ContainsKey(keyKey))
+                    return new string[] { };
+
+                var ep = entityProperties[keyKey];
+                if (ep.PropertyType != EdmType.Binary)
+                    return new string[] { };
+
+                return ep.BinaryValue.ToStringsFromUTF8ByteArray();
+            }
         }
 
         protected KeyValuePair<string, EntityProperty>[] CastArrayEntityProperties(object value,
@@ -834,6 +895,27 @@ namespace EastFive.Persistence
             var items = ((IEnumerable)value)
                 .Cast<object>()
                 .ToArray();
+
+            var rowKeyKey = $"_rowKey_";
+            var partitionKeyKey = $"_partitionKey_";
+            var keyValues = items
+                .Select(
+                    item =>
+                    {
+                        var itemType = item.GetType();
+                        var rowKeyValue = item.StorageGetRowKeyForType(itemType);
+                        var partitionKeyValue = item.StorageGetPartitionKeyForType(rowKeyValue, itemType);
+                        return (rowKeyValue, partitionKeyValue);
+                    });
+            var rowKeyValue = keyValues
+                .Select(kv => kv.rowKeyValue)
+                .ToUTF8ByteArrayOfStrings();
+            var rowKeyEp = new EntityProperty(rowKeyValue);
+            var partitionKeyValue = keyValues
+                .Select(kv => kv.partitionKeyValue)
+                .ToUTF8ByteArrayOfStrings();
+            var partitionKeyEp = new EntityProperty(partitionKeyValue);
+
             var epsArray = storageMembers
                 .SelectMany(
                     storageMember =>
@@ -854,6 +936,8 @@ namespace EastFive.Persistence
                         var entityProperties = this.CastValue(type, arrayOfPropertyValues, propertyNameDefault);
                         return entityProperties;
                     })
+                .Append(rowKeyEp.PairWithKey(rowKeyKey))
+                .Append(partitionKeyEp.PairWithKey(partitionKeyKey))
                 .ToArray();
             return epsArray;
 

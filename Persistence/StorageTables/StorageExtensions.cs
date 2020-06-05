@@ -132,7 +132,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static string StorageGetRowKey<TEntity>(this TEntity entity)
         {
-            var partitionKeyMember = typeof(TEntity)
+            return entity.StorageGetRowKeyForType(typeof(TEntity));
+        }
+
+        public static string StorageGetRowKeyForType(this object entity, Type entityType)
+        {
+            var partitionKeyMember = entityType
                 .GetPropertyOrFieldMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTableRowKey>())
                 .Select(member =>
@@ -145,7 +150,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static TEntity StorageParseRowKey<TEntity>(this TEntity entity, string rowKey)
         {
-            var partitionKeyMember = typeof(TEntity)
+            return (TEntity)entity.StorageParseRowKeyForType(rowKey, typeof(TEntity));
+            //var partitionKeyMember = typeof(TEntity)
+            //    .GetPropertyOrFieldMembers()
+            //    .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTableRowKey>())
+            //    .Select(member =>
+            //        member.GetAttributesInterface<EastFive.Persistence.IModifyAzureStorageTableRowKey>()
+            //            .First()
+            //            .PairWithKey(member))
+            //    .First();
+            //return partitionKeyMember.Value.ParseRowKey(entity, rowKey, partitionKeyMember.Key);
+        }
+
+        public static object StorageParseRowKeyForType(this object entity, string rowKey, Type entityType)
+        {
+            var rowKeyMember = entityType
                 .GetPropertyOrFieldMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTableRowKey>())
                 .Select(member =>
@@ -153,7 +172,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         .First()
                         .PairWithKey(member))
                 .First();
-            return partitionKeyMember.Value.ParseRowKey(entity, rowKey, partitionKeyMember.Key);
+            return rowKeyMember.Value.ParseRowKey(entity, rowKey, rowKeyMember.Key);
         }
 
         public static string StorageComputePartitionKey<TEntity>(this IRef<TEntity> entityRef,
@@ -276,7 +295,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static string StorageGetPartitionKey<TEntity>(this TEntity entity)
         {
             var rowKey = entity.StorageGetRowKey();
-            var partitionKeyMember = typeof(TEntity)
+            return entity.StorageGetPartitionKeyForType(rowKey, typeof(TEntity));
+        }
+
+        public static string StorageGetPartitionKeyForType(this object entity, string rowKey, Type type)
+        {
+            var partitionKeyMember = type
                 .GetPropertyOrFieldMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>())
                 .Select(member =>
@@ -289,7 +313,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static TEntity StorageParsePartitionKey<TEntity>(this TEntity entity, string partitionKey)
         {
-            var partitionKeyMember = typeof(TEntity)
+            return (TEntity)entity.StorageParsePartitionKeyForType(partitionKey, typeof(TEntity));
+        }
+
+        public static object StorageParsePartitionKeyForType(this object entity, string partitionKey, Type type)
+        {
+            var partitionKeyMember = type
                 .GetPropertyOrFieldMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>())
                 .Select(member =>

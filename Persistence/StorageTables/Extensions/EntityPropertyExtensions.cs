@@ -209,7 +209,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(Uri).IsInstanceOfType(value))
             {
                 var uriValue = (Uri)value;
-                var ep = new EntityProperty(uriValue.ToString());
+                var ep = new EntityProperty(uriValue.OriginalString);
                 return onValue(ep);
             }
             if (typeof(Type).IsInstanceOfType(value))
@@ -662,6 +662,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             return arrayType.IsNullable(
                 nulledType =>
                 {
+                    if (arrayType.IsAssignableFrom(typeof(Guid)))
+                    {
+                        var values = (Guid?[])value;
+                        var bytes = values.ToByteArrayOfNullables(g => g.ToByteArray());
+                        var ep = new EntityProperty(bytes);
+                        return onValue(ep);
+                    }
                     if (arrayType.IsAssignableFrom(typeof(decimal)))
                     {
                         var values = (decimal?[])value;
@@ -748,6 +755,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                     {
                         var values = ((IEnumerable)value).Cast<object>();
                         var bytes = values.ToByteArrayOfEnums(arrayType);
+                        var ep = new EntityProperty(bytes);
+                        return onValue(ep);
+                    }
+                    if (arrayType.IsAssignableFrom(typeof(Uri)))
+                    {
+                        var values = (Uri[])value;
+                        var bytes = values.Select(v => v.OriginalString).ToUTF8ByteArrayOfStringNullOrEmptys();
                         var ep = new EntityProperty(bytes);
                         return onValue(ep);
                     }
@@ -968,6 +982,19 @@ namespace EastFive.Persistence.Azure.StorageTables
                     {
                         var values = value.BinaryValue.FromEdmTypedByteArray(arrayType);
                         return onBound(values);
+                    }
+                    if (typeof(Uri) == arrayType)
+                    {
+                        var values = value.BinaryValue.ToStringNullOrEmptysFromUTF8ByteArray();
+                        var urls = values
+                            .Select(
+                                value =>
+                                {
+                                    bool created = Uri.TryCreate(value, UriKind.RelativeOrAbsolute, out Uri url);
+                                    return url;
+                                })
+                            .ToArray();
+                        return onBound(urls);
                     }
 
                     return arrayType
