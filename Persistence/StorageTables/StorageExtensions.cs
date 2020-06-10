@@ -510,7 +510,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 cache:cache);
         }
 
-        public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs)
+        public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
             where TEntity : IReferenceable
         {
             var partitionMember = typeof(TEntity).GetMembers()
@@ -529,7 +529,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .ToArray();
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindByIdsAsync<TEntity>(keys);
+                .FindByIdsAsync<TEntity>(keys, readAhead: readAhead);
         }
 
         public static IEnumerableAsync<TEntity> StorageQuery<TEntity>(
