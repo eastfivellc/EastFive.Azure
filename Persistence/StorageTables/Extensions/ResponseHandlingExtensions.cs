@@ -83,17 +83,29 @@ namespace EastFive.Azure.StorageTables.Driver
 
         public static bool IsProblemDoesNotExist(this StorageException exception)
         {
-            if (exception.InnerException is System.Net.WebException)
-            {
-                var webEx = (System.Net.WebException)exception.InnerException;
-
-                if (webEx.Response is System.Net.HttpWebResponse)
+            return exception.ParseExtendedErrorInformation(
+                (errorCode, message) =>
                 {
-                    var httpResponse = (System.Net.HttpWebResponse)webEx.Response;
-                    return (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound);
-                }
-            }
-            return false;
+                    if (errorCode == ExtendedErrorInformationCodes.TableNotFound)
+                        return true;
+                    return false;
+                },
+                () =>
+                {
+                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.NotFound)
+                        return true;
+                    if (exception.InnerException is System.Net.WebException)
+                    {
+                        var webEx = (System.Net.WebException)exception.InnerException;
+
+                        if (webEx.Response is System.Net.HttpWebResponse)
+                        {
+                            var httpResponse = (System.Net.HttpWebResponse)webEx.Response;
+                            return (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound);
+                        }
+                    }
+                    return false;
+                });
         }
 
         #endregion
