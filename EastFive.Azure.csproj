@@ -328,6 +328,8 @@
     <Compile Include="Api\Resources\Monitoring.cs" />
     <Compile Include="Api\Resources\Queries\MonitoringQuery.cs" />
     <Compile Include="Attributes\ASTFVCPropertyAttribute.cs" />
+    <Compile Include="Auth\ApiKeyAccessAttribute.cs" />
+    <Compile Include="Auth\CredentialProviders\Voucher\VoucherToken.cs" />
     <Compile Include="Auth\Login.cs" />
     <Compile Include="Auth\Claim.cs" />
     <Compile Include="Auth\Token.cs" />
@@ -554,7 +556,7 @@
     <Compile Include="Attributes\IntegrationNameAttribute.cs" />
     <Compile Include="AuthenticationActions.cs" />
     <Compile Include="Accesses.cs" />
-    <Compile Include="Auth\CredentialProviders\AzureADB2C\AppSettings.cs" />
+    <Compile Include="Auth\AppSettings.cs" />
     <Compile Include="Auth\CredentialProviders\AzureADB2C\B2CGraphClient.cs" />
     <Compile Include="Auth\CredentialProviders\AzureADB2C\Globals.cs" />
     <Compile Include="Auth\CredentialProviders\AzureADB2C\Libary.cs" />

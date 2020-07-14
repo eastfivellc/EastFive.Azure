@@ -3,13 +3,13 @@ using System.Configuration;
 using System.Linq;
 using System.Security.Cryptography;
 
-namespace EastFive.Security.CredentialProvider.Voucher
+namespace EastFive.Azure.Auth.Voucher
 {
     public static class Utilities
     {
         public static Uri GetTrustedProviderId()
         {
-            var trustedVoucherProviderString = ConfigurationManager.AppSettings[AppSettings.CredentialProviderVoucherProviderId];
+            var trustedVoucherProviderString = ConfigurationManager.AppSettings[EastFive.Security.AppSettings.CredentialProviderVoucherProviderId];
             var trustedVoucherProviderId = new Uri(trustedVoucherProviderString);
             return trustedVoucherProviderId;
         }
@@ -19,7 +19,7 @@ namespace EastFive.Security.CredentialProvider.Voucher
             byte[] signatureData;
             var hashedData = ComputeHashData(authId, validUntilUtc, out signatureData);
 
-            return RSA.FromConfig(AppSettings.CredentialProviderVoucherKey,
+            return EastFive.Security.RSA.FromConfig(EastFive.Security.AppSettings.CredentialProviderVoucherKey,
                 (trustedVoucherPrivateKey) =>
                 {
                     var signature = trustedVoucherPrivateKey.SignHash(hashedData, CryptoConfig.MapNameToOID("SHA256"));
@@ -71,7 +71,7 @@ namespace EastFive.Security.CredentialProvider.Voucher
             byte[] signatureData;
             var hashedData = ComputeHashData(authId, validUntilUtc, out signatureData);
 
-            var result = RSA.FromConfig(AppSettings.CredentialProviderVoucherKey,
+            var result = EastFive.Security.RSA.FromConfig(EastFive.Security.AppSettings.CredentialProviderVoucherKey,
                 (trustedVoucher) =>
                 {
                     if (!trustedVoucher.VerifyHash(hashedData, CryptoConfig.MapNameToOID("SHA256"), providedSignature))

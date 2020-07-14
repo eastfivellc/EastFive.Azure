@@ -42,7 +42,7 @@ namespace EastFive.Api.Azure.Credentials
             //    return invalidCredentials("ProviderId given does not match trustred ProviderId");
 
             var token = extraParams["token"]; // TODO: Figure out real value (token is placeholder)
-            return EastFive.Security.CredentialProvider.Voucher.Utilities.ValidateToken(token,
+            return EastFive.Azure.Auth.Voucher.Utilities.ValidateToken(token,
                 (stateId) =>
                 {
                     return onSuccess(stateId.ToString("N"), stateId, default(Guid?), null);
