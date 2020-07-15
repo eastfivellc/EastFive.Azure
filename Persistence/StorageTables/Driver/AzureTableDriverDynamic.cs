@@ -975,7 +975,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             () => throw new Exception("Modifiers failed to execute."))
                         .AsTask();
                 });
-            
         }
 
         private async Task<TResult> UpdateIfNotModifiedAsync<TData, TResult>(TData data,

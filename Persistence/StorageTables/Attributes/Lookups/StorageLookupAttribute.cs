@@ -228,11 +228,16 @@ namespace EastFive.Persistence.Azure.StorageTables
                 KeyValuePair<string, string>[] rollbackRowAndPartitionKeys,
                 KeyValuePair<string, string>[] modifiedDocRowAndPartitionKeys)
             {
-                var modified = modifiedDocRowAndPartitionKeys
+                var modifiedAddedOrUpdated = modifiedDocRowAndPartitionKeys
                     .Except(rollbackRowAndPartitionKeys, rk => $"{rk.Key}|{rk.Value}")
                     .Any();
-                var unmodified = !modified;
-                return unmodified;
+                if (modifiedAddedOrUpdated)
+                    return false;
+
+                var noneDeleted = rollbackRowAndPartitionKeys.Length == 
+                    modifiedDocRowAndPartitionKeys.Length;
+
+                return noneDeleted;
             }
         }
 
