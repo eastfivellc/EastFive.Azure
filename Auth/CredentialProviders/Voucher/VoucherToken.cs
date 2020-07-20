@@ -51,6 +51,12 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [JsonProperty(PropertyName = KeySignaturePropertyName)]
         public string keySignature { get; set; }
 
+        public const string DescriptionPropertyName = "description";
+        [Storage]
+        [ApiProperty(PropertyName = DescriptionPropertyName)]
+        [JsonProperty(PropertyName = DescriptionPropertyName)]
+        public string description { get; set; }
+
         public const string KeyPropertyName = "key";
         [ApiProperty(PropertyName = KeyPropertyName)]
         [JsonProperty(PropertyName = KeyPropertyName)]
@@ -120,6 +126,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
         [HttpAction("whoami")]
         [ApiKeyAccess]
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            "admin")]
         public static HttpResponseMessage WhoAmI(
                 EastFive.Api.Security security,
             ContentTypeResponse<Guid> onFound)

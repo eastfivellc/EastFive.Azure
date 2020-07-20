@@ -23,8 +23,9 @@ namespace EastFive.Api.Auth
             if (!request.RequestUri.TryGetQueryParam("api-voucher", out string apiVoucher))
                 return continueExecution(controllerType, httpApp, request, routeName);
 
-            if (request.Headers.Authorization.Scheme.HasBlackSpace())
-                return continueExecution(controllerType, httpApp, request, routeName);
+            if(!request.Headers.Authorization.IsDefaultOrNull())
+                if (request.Headers.Authorization.Scheme.HasBlackSpace())
+                    return continueExecution(controllerType, httpApp, request, routeName);
 
             return EastFive.Security.VoucherTools.ValidateUrlToken(apiVoucher,
                 async (voucherTokenId) =>
