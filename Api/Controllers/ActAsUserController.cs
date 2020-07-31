@@ -2,9 +2,8 @@
 using System.Threading.Tasks;
 using System.Web.Http;
 using BlackBarLabs.Api;
-using System.Web.Mvc;
+//using System.Web.Mvc;
 using System.Net.Http;
-using BlackBarLabs.Extensions;
 using EastFive.Security.SessionServer.Api;
 
 namespace EastFive.Api.Azure.Credentials.Controllers
