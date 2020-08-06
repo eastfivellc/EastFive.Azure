@@ -39,14 +39,14 @@ namespace EastFive.Azure.Media
         }
 
         public static Task<TResult> LoadImageAsync<TResult>(this IRef<Content> contentRef,
-            Func<System.Drawing.Image, TResult> onFound,
+            Func<System.Drawing.Image, string, TResult> onFound,
             Func<TResult> onNotFound)
         {
             return contentRef.id.BlobLoadStreamAsync("content",
                 (imageStream, contentType) =>
                 {
                     var image = System.Drawing.Image.FromStream(imageStream);
-                    return onFound(image);
+                    return onFound(image, contentType);
                 },
                 onNotFound);
         }
