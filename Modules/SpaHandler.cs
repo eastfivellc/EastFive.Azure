@@ -1,34 +1,55 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Collections.Generic;
+﻿using EastFive.Collections.Generic;
 using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 using EastFive.Serialization;
-using System.Net.NetworkInformation;
 using EastFive.Extensions;
 using BlackBarLabs.Web;
-using Microsoft.ApplicationInsights;
-using EastFive.Api;
 using System.Net.Http;
 using System.Threading;
-using BlackBarLabs.Api;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
+using EastFive.Api.Azure.Controllers;
 
 namespace EastFive.Api.Azure.Modules
 {
     public class SpaHandler : EastFive.Api.Modules.ApplicationHandler
     {
-        internal const string IndexHTMLFileName = "index.html";
+        private const string IndexHTMLFileName = "index.html";
+        private static byte[] indexHTML;
+        private static ManualResetEvent signal = new ManualResetEvent(false);
 
         private Dictionary<string, byte[]> lookupSpaFile;
-        static internal byte[] indexHTML;
         private string[] firstSegments;
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (disposing)
+            {
+                if (signal != null)
+                {
+                    signal.Dispose();
+                    signal = default;
+                }
+            }
+        }
+
+        internal static byte[] IndexHTML
+        {
+            get
+            {
+                if (indexHTML == null)
+                {
+                    signal.WaitOne();
+                }
+                return indexHTML;
+            }
+        }
 
         public SpaHandler(AzureApplication httpApp, System.Web.Http.HttpConfiguration config)
             : base(config)
@@ -44,69 +65,88 @@ namespace EastFive.Api.Azure.Modules
 
             ExtractSpaFiles(httpApp);
         }
+
+        public SpaHandler(AzureApplication httpApp, System.Web.Http.HttpConfiguration config,
+            HttpMessageHandler handler)
+            : base(config, handler)
+        {
+            // TODO: A better job of matching that just grabbing the first segment
+            firstSegments = System.Web.Routing.RouteTable.Routes
+                .Where(route => route is System.Web.Routing.Route)
+                .Select(route => route as System.Web.Routing.Route)
+                .Where(route => !route.Url.IsNullOrWhiteSpace())
+                .Select(
+                    route => route.Url.Split(new char[] { '/' }).First())
+                .ToArray();
+
+            ExtractSpaFiles(httpApp);
+        }
         
         private void ExtractSpaFiles(AzureApplication application)
         {
-            bool setup = EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
-                connectionString =>
-                {
-                    ZipArchive zipArchive = null;
-                    try
+            try
+            {
+                bool setup = EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
+                    connectionString =>
                     {
-                        var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
-                        var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
-                        var container = blobClient.GetContainerReference(containerName);
-                        var blobRef = container.GetBlockBlobReference("spa.zip");
-                        var blobStream = blobRef.OpenRead();
+                        ZipArchive zipArchive = null;
+                        try
+                        {
+                            var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
+                            var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
+                            var container = blobClient.GetContainerReference(containerName);
+                            var blobRef = container.GetBlockBlobReference("spa.zip");
+                            var blobStream = blobRef.OpenRead();
 
-                        zipArchive = new ZipArchive(blobStream);
-                    }
-                    catch
-                    {
-                        indexHTML = System.Text.Encoding.UTF8.GetBytes("SPA Not Installed");
-                        return false;
-                    }
-                    
-                    using (zipArchive)
-                    {
-                        
-                        indexHTML = zipArchive.Entries
-                            .First(item => string.Compare(item.FullName, IndexHTMLFileName, true) == 0)
-                            .Open()
-                            .ToBytes();
-                        
-                        lookupSpaFile = ConfigurationContext.Instance.GetSettingValue(EastFive.Azure.AppSettings.SpaSiteLocation,
-                            (siteLocation) =>
+                            using (zipArchive = new ZipArchive(blobStream))
                             {
-                                application.Telemetry.TrackEvent($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
-                                return zipArchive.Entries
-                                    .Where(item => string.Compare(item.FullName, IndexHTMLFileName, true) != 0)
-                                    .Select(
-                                        entity =>
-                                        {
-                                            if (!entity.FullName.EndsWith(".js"))
-                                                return entity.FullName.PairWithValue(entity.Open().ToBytes());
-                                            
-                                            var fileBytes = entity.Open()
-                                                .ToBytes()
-                                                .GetString()
-                                                .Replace("8FCC3D6A-9C25-4802-8837-16C51BE9FDBE.example.com", siteLocation)
-                                                .GetBytes();
-                                            
-                                            return entity.FullName.PairWithValue(fileBytes);
-                                        })
-                                    .ToDictionary();
-                            },
-                            () =>
-                            {
-                                application.Telemetry.TrackException(new ArgumentNullException("Could not find SpaSiteLocation - is this key set in app settings?"));
-                                return new Dictionary<string, byte[]>();
-                            });
-                    }
-                    return true;
+                                indexHTML = zipArchive.Entries
+                                    .First(item => string.Compare(item.FullName, IndexHTMLFileName, true) == 0)
+                                    .Open()
+                                    .ToBytes();
 
-                },
-                why => false);
+                                lookupSpaFile = ConfigurationContext.Instance.GetSettingValue(EastFive.Azure.AppSettings.SpaSiteLocation,
+                                    (siteLocation) =>
+                                    {
+                                        application.Telemetry.TrackEvent($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
+                                        return zipArchive.Entries
+                                            .Where(item => string.Compare(item.FullName, IndexHTMLFileName, true) != 0)
+                                            .Select(
+                                                entity =>
+                                                {
+                                                    if (!entity.FullName.EndsWith(".js"))
+                                                        return entity.FullName.PairWithValue(entity.Open().ToBytes());
+
+                                                    var fileBytes = entity.Open()
+                                                        .ToBytes()
+                                                        .GetString()
+                                                        .Replace("8FCC3D6A-9C25-4802-8837-16C51BE9FDBE.example.com", siteLocation)
+                                                        .GetBytes();
+
+                                                    return entity.FullName.PairWithValue(fileBytes);
+                                                })
+                                            .ToDictionary();
+                                    },
+                                    () =>
+                                    {
+                                        application.Telemetry.TrackException(new ArgumentNullException("Could not find SpaSiteLocation - is this key set in app settings?"));
+                                        return new Dictionary<string, byte[]>();
+                                    });
+                            }
+                            return true;
+                        }
+                        catch
+                        {
+                            indexHTML = System.Text.Encoding.UTF8.GetBytes("SPA Not Installed");
+                            return false;
+                        }
+                    },
+                    why => false);
+            }
+            finally
+            {
+                signal.Set();
+            }
         }
         
         protected override async Task<HttpResponseMessage> SendAsync(EastFive.Api.HttpApplication httpApp, HttpRequestMessage request, CancellationToken cancellationToken, Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> continuation)
@@ -131,20 +171,37 @@ namespace EastFive.Api.Azure.Modules
 
             if (!(httpApp is AzureApplication))
                 return await continuation(request, cancellationToken);
-            
-            if (lookupSpaFile.ContainsKey(fileName))
-                return request.CreateContentResponse(lookupSpaFile[fileName],
-                    fileName.EndsWith(".js")?
-                        "text/javascript"
-                        :
-                        fileName.EndsWith(".css")?
-                            "text/css"
-                            :
-                            request.Headers.Accept.Any()?
-                                request.Headers.Accept.First().MediaType
-                                :
-                                string.Empty);
 
+            if (lookupSpaFile.ContainsKey(fileName))
+            {
+                var controllerType = typeof(SpaServeController);
+                var routeName = "spaservecontroller";
+                return await httpApp.GetType()
+                    .GetAttributesInterface<IHandleRoutes>(true, true)
+                    .Aggregate<IHandleRoutes, RouteHandlingDelegate>(
+                        (controllerTypeFinal, httpAppFinal, requestFinal, routeNameFinal) =>
+                        {
+                            return request.CreateContentResponse(lookupSpaFile[fileName],
+                                fileName.EndsWith(".js") ?
+                                    "text/javascript"
+                                    :
+                                    fileName.EndsWith(".css") ?
+                                        "text/css"
+                                        :
+                                        request.Headers.Accept.Any() ?
+                                            request.Headers.Accept.First().MediaType
+                                            :
+                                            string.Empty).AsTask();
+                        },
+                        (callback, routeHandler) =>
+                        {
+                            return (controllerTypeCurrent, httpAppCurrent, requestCurrent, routeNameCurrent) =>
+                                routeHandler.HandleRouteAsync(controllerTypeCurrent,
+                                    httpAppCurrent, requestCurrent, routeNameCurrent,
+                                    callback);
+                        })
+                    .Invoke(controllerType, httpApp, request, routeName);
+            }
             var requestStart = request.RequestUri.AbsolutePath.ToLower();
             if (!firstSegments
                     .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
