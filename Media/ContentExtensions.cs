@@ -15,6 +15,7 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Images;
 using EastFive.Web.Configuration;
+using System.Drawing;
 
 namespace EastFive.Azure.Media
 {
@@ -40,13 +41,20 @@ namespace EastFive.Azure.Media
 
         public static Task<TResult> LoadImageAsync<TResult>(this IRef<Content> contentRef,
             Func<System.Drawing.Image, string, TResult> onFound,
-            Func<TResult> onNotFound)
+            Func<TResult> onNotFound,
+            Func<Stream, string, TResult> onInvalidImage = default)
         {
             return contentRef.id.BlobLoadStreamAsync("content",
                 (imageStream, contentType) =>
                 {
-                    var image = System.Drawing.Image.FromStream(imageStream);
-                    return onFound(image, contentType);
+                    //var image = System.Drawing.Image.FromStream(imageStream);
+                    if(imageStream.TryReadImage(out Image image))
+                        return onFound(image, contentType);
+
+                    if(onInvalidImage.IsDefaultOrNull())
+                        return onNotFound();
+
+                    return onInvalidImage(imageStream, contentType);
                 },
                 onNotFound);
         }
