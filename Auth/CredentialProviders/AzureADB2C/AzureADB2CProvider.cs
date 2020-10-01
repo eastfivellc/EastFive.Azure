@@ -20,7 +20,7 @@ using EastFive.AzureADB2C;
 namespace EastFive.Api.Azure.Credentials
 {
     [IntegrationName(IntegrationName)]
-    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession
+    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement
     {
         private static readonly string clientId;
         private static readonly Lazy<Task<Endpoints>> endpointsAsync;
@@ -380,10 +380,5 @@ namespace EastFive.Api.Azure.Credentials
         }
 
         #endregion
-
-        public Task<bool> SupportsSessionAsync(EastFive.Azure.Auth.Session session)
-        {
-            return true.AsTask();
-        }
     }
 }
