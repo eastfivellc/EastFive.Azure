@@ -27,6 +27,7 @@ namespace EastFive.Azure.Monitoring
 
             public string title;
             public string text;
+            public bool markdown;
 
             public struct Fact
             {
