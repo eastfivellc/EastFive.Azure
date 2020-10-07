@@ -131,11 +131,11 @@ namespace EastFive.Azure.Functions
 
         [Api.HttpGet]
         [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<IHttpResponse> ListAsync(
+        public static IHttpResponse ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
-            MultipartResponseAsync<InvocationMessage> onRun)
+            MultipartAsyncResponse<InvocationMessage> onRun)
         {
             Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
 
@@ -148,9 +148,9 @@ namespace EastFive.Azure.Functions
 
         [Api.HttpGet]
         [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<IHttpResponse> ListByRequerUrlAsync(
+        public static IHttpResponse ListByRequestUrlAsync(
             [QueryParameter(Name = "request_uri")]Uri requestUri,
-            MultipartResponseAsync<InvocationMessage> onRun)
+            MultipartAsyncResponse<InvocationMessage> onRun)
         {
             var messages = requestUri.StorageGetBy(
                 (InvocationMessage ent) => ent.requestUri);
@@ -163,12 +163,12 @@ namespace EastFive.Azure.Functions
 
         [HttpAction("Invoke")]
         [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static async Task<IHttpResponse> InvokeAsync(
+        public static IHttpResponse InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
                 [HeaderLog]ILogger analyticsLog,
                 InvokeApplicationDirect invokeApplication,
                 CancellationToken cancellationToken,
-                Api.MultipartResponseAsync<IHttpResponse> onRun)
+                MultipartAsyncResponse<IHttpResponse> onRun)
         {
             var messages = invocationMessageRefs.refs
                 .Select(
@@ -176,7 +176,7 @@ namespace EastFive.Azure.Functions
                         logging:new EventLogger(analyticsLog),
                         cancellationToken: cancellationToken))
                 .AsyncEnumerable();
-            return await onRun(messages);
+            return onRun(messages);
         }
 
         [HttpAction("Enqueue")]

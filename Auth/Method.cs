@@ -111,7 +111,7 @@ namespace EastFive.Azure.Auth
         public static async Task<IHttpResponse> QueryByIntegrationAsync(
             [QueryParameter(Name = "integration")]IRef<XIntegration> integrationRef,
             IAuthApplication application, EastFive.Api.SessionToken security,
-            MultipartResponseAsync<Method> onContent,
+            MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized,
             ReferencedDocumentNotFoundResponse<XIntegration> onIntegrationNotFound)
         {
@@ -144,7 +144,7 @@ namespace EastFive.Azure.Auth
                                     name = integrationProvider.GetDefaultName(new Dictionary<string, string>()),
                                 };
                             });
-                    return await onContent(integrationProviders);
+                    return onContent(integrationProviders);
 
                 },
                 () => onIntegrationNotFound().AsTask());
@@ -154,7 +154,7 @@ namespace EastFive.Azure.Auth
         public static async Task<IHttpResponse> QueryByIntegrationAccountAsync(
             [QueryParameter(Name = "integration_account")]Guid accountId,
             IAuthApplication application, EastFive.Api.SessionToken security,
-            MultipartResponseAsync<Method> onContent,
+            MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized)
         {
             if (!await application.CanAdministerCredentialAsync(accountId, security))
@@ -182,18 +182,18 @@ namespace EastFive.Azure.Auth
                             name = integrationProvider.GetDefaultName(new Dictionary<string,string>()),
                         };
                     });
-            return await onContent(integrationProviders);
+            return onContent(integrationProviders);
         }
 
         [HttpGet]
-        public static async Task<IHttpResponse> QueryBySessionAsync(
+        public static Task<IHttpResponse> QueryBySessionAsync(
                 [QueryParameter(Name = "session")]IRef<Session> sessionRef,
                 IAuthApplication application,
-            MultipartResponseAsync<Method> onContent,
+            MultipartAsyncResponse<Method> onContent,
             ReferencedDocumentNotFoundResponse<Session> onSessionNotFound,
             UnauthorizedResponse onHacked)
         {
-            return await await sessionRef.StorageGetAsync(
+            return sessionRef.StorageGetAsync(
                 session =>
                 {
                     var integrationProviders = application.LoginProviders
@@ -219,7 +219,7 @@ namespace EastFive.Azure.Auth
                     return onContent(integrationProviders);
                 },
                 //() => onSessionNotFound().AsTask());
-                () => onHacked().AsTask());
+                () => onHacked());
         }
 
         public static Task<TResult> ById<TResult>(IRef<Method> method, IAuthApplication application,

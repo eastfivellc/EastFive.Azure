@@ -81,7 +81,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 RequestMessage<TableBackup> requestQuery,
                 IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
-            MultipartResponseAsync<InvocationMessage> onQueued,
+            MultipartAsyncResponse<InvocationMessage> onQueued,
             AlreadyExistsResponse onAlreadyExists)
         {
             CloudStorageAccount account = CloudStorageAccount
@@ -89,7 +89,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             CloudTableClient tableClient =
                 new CloudTableClient(account.TableEndpoint, account.Credentials);
 
-            return await await repositoryBackup.StorageCreateAsync(
+            return await repositoryBackup.StorageCreateAsync(
                 (discard) =>
                 {
                     var includedTables = BackupFunction.DiscoverStorageResources()
@@ -121,7 +121,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         .Await(readAhead:10);
                     return onQueued(resourceInfoToProcess);
                 },
-                () => onAlreadyExists().AsTask());
+                () => onAlreadyExists());
         }
 
         [HttpPatch]
@@ -131,7 +131,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 RequestMessage<TableBackup> requestQuery,
                 IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
-            MultipartResponseAsync<InvocationMessage> onQueued,
+            MultipartAsyncResponse<InvocationMessage> onQueued,
             NoContentResponse onTooEarly,
             NotFoundResponse onNotFound)
         {
@@ -189,7 +189,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     repoBack.when = when;
                     await saveAsync(repoBack);
 
-                    return await onQueued(resourceInfoToProcess);
+                    return onQueued(resourceInfoToProcess);
 
 
                 },

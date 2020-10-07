@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 using EastFive.Api;
-using EastFive.Api.Controllers;
+using EastFive.Linq;
+using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -17,6 +18,8 @@ using EastFive.Security;
 using EastFive.Serialization;
 using Microsoft.AspNetCore.Mvc.Routing;
 using System.Net.Http.Headers;
+using EastFive.Api.Auth;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {

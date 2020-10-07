@@ -17,7 +17,6 @@ namespace OrderOwl.Auth
     [FunctionViewController(
         Namespace = ".well-known",
         Route = "apple-developer-domain-association.txt",
-        Resource = typeof(AppleDeveloperDomainAssociation),
         ContentType = "x-application/apple-redirect",
         ContentTypeVersion = "0.1")]
     public class AppleDeveloperDomainAssociation

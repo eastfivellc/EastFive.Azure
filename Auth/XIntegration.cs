@@ -105,8 +105,7 @@ namespace EastFive.Azure.Auth
         public async static Task<IHttpResponse> GetByAccountAsync(
                 [QueryParameter(Name = AccountPropertyName)]Guid accountId,
                 IAuthApplication application, SessionToken security,
-            MultipartResponseAsync<XIntegration> onContents,
-            ReferencedDocumentNotFoundResponse<object> onAccountNotFound,
+            MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
             if (!await application.CanAdministerCredentialAsync(accountId, security))
@@ -129,14 +128,14 @@ namespace EastFive.Azure.Auth
                 .Await()
                 .SelectWhereHasValue();
 
-            return await onContents(integrations);
+            return onContents(integrations);
         }
 
         [Api.HttpGet]
-        public async static Task<IHttpResponse> GetByMethodAsync(
+        public static IHttpResponse GetByMethodAsync(
                 [QueryParameter(Name = Authorization.MethodPropertyName)]IRef<Method> methodRef,
                 IAuthApplication application, SessionToken security,
-            MultipartResponseAsync<XIntegration> onContents,
+            MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
             if (!security.accountIdMaybe.HasValue)
@@ -160,7 +159,7 @@ namespace EastFive.Azure.Auth
                     })
                 .Await()
                 .SelectWhereHasValue();
-            return await onContents(integrations);
+            return onContents(integrations);
         }
 
         [Api.HttpPost]

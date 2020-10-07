@@ -84,13 +84,13 @@ namespace EastFive.Azure.Auth
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<IHttpResponse> AllAsync(
+        public static IHttpResponse AllAsync(
                 [QueryParameter(Name = "start_time")]DateTime startTime,
                 [QueryParameter(Name = "end_time")]DateTime endTime,
                 RequestMessage<Authorization> authorizations,
                 IAuthApplication application,
                 EastFive.Api.SessionToken? securityMaybe,
-            MultipartResponseAsync<Login> onFound)
+            MultipartAsyncResponse<Login> onFound)
         {
             var methodLookups = application.LoginProviders
                 .Select(
@@ -126,7 +126,7 @@ namespace EastFive.Azure.Auth
                         };
                     })
                 .Await();
-            return await onFound(results);
+            return onFound(results);
         }
     }
 }

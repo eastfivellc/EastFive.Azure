@@ -19,15 +19,15 @@ namespace EastFive.Security.CredentialProvider.Voucher
             byte[] signatureData;
             var hashedData = ComputeHashData(authId, validUntilUtc, out signatureData);
 
-            return RSA.FromConfig(AppSettings.CredentialProviderVoucherKey,
+            return AppSettings.CredentialProviderVoucherKey.RSAFromConfig(
                 (trustedVoucherPrivateKey) =>
                 {
                     var signature = trustedVoucherPrivateKey.SignHash(hashedData, CryptoConfig.MapNameToOID("SHA256"));
                     var tokenBytes = signatureData.Concat(signature).ToArray();
                     return Convert.ToBase64String(tokenBytes);
                 },
-                (setting) => { throw new Exception(); },
-                (setting, issue) => { throw new Exception(); });
+                () => { throw new Exception(); },
+                (issue) => { throw new Exception(); });
         }
 
         public static T ValidateToken<T>(string accessToken,
@@ -71,7 +71,7 @@ namespace EastFive.Security.CredentialProvider.Voucher
             byte[] signatureData;
             var hashedData = ComputeHashData(authId, validUntilUtc, out signatureData);
 
-            var result = RSA.FromConfig(AppSettings.CredentialProviderVoucherKey,
+            return AppSettings.CredentialProviderVoucherKey.RSAFromConfig(
                 (trustedVoucher) =>
                 {
                     if (!trustedVoucher.VerifyHash(hashedData, CryptoConfig.MapNameToOID("SHA256"), providedSignature))
@@ -82,9 +82,8 @@ namespace EastFive.Security.CredentialProvider.Voucher
 
                     return success(authId);
                 },
-                (missing) => unspecifiedConfiguration(missing),
-                (missing, issue) => unspecifiedConfiguration(missing + ":" + issue));
-            return result;
+                () => unspecifiedConfiguration(AppSettings.CredentialProviderVoucherKey),
+                (issue) => unspecifiedConfiguration($"{AppSettings.CredentialProviderVoucherKey}:{issue}"));
         }
 
         private static byte [] ComputeHashData(Guid authId, DateTime validUntilUtc, out byte [] signatureData)

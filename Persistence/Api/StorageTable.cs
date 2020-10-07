@@ -82,13 +82,13 @@ namespace EastFive.Azure.Persistence
         [RequiredClaim(
             ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<IHttpResponse> List(
+        public static IHttpResponse List(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
-            MultipartResponseAsync<StorageRow> onFound,
+            MultipartAsyncResponse<StorageRow> onFound,
             NotFoundResponse onNotFound)
         {
-            return await DiscoverStorageResources(httpApp.GetType())
+            return DiscoverStorageResources(httpApp.GetType())
                 .Where(table => table.name == name)
                 .First(
                     (storageTable, next) =>
@@ -119,7 +119,7 @@ namespace EastFive.Azure.Persistence
                                 });
                         return onFound(allRows);
                     },
-                    () => onNotFound().AsTask());
+                    () => onNotFound());
         }
 
         [Api.HttpAction("Information")]

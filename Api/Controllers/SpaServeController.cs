@@ -12,13 +12,14 @@ using EastFive.Extensions;
 
 namespace EastFive.Api.Azure.Controllers
 {
-    [FunctionViewController]
+    [FunctionViewController(ExcludeNamespaces = "api,admin,aadb2c")]
     public class SpaServeController
     { 
         [HttpGet]
         public static IHttpResponse Get(
             [QueryId]string id,
-            IHttpRequest request)
+            IHttpRequest request,
+            HtmlResponse onNoIndexFile)
         {
 
             //var indexFile = SpaHandlerModule.indexHTML;
@@ -26,6 +27,9 @@ namespace EastFive.Api.Azure.Controllers
 
             var doc = new HtmlDocument();
             //doc.LoadHtml(indexFile.ToString());
+
+            if (indexFile.IsDefaultOrNull())
+                return onNoIndexFile("<html><body>No Index File</body></html>");
 
             try
             {

@@ -275,7 +275,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
                 AzureApplication application,
                 IHttpRequest request,
-            MultipartResponseAsync<Authorization> onContent,
+            MultipartAsyncResponse<Authorization> onContent,
             RedirectResponse onSuccess,
             NotFoundResponse onNotFound,
             ForbiddenResponse onFailure)

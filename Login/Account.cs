@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 using EastFive.Api;
-using EastFive.Api.Controllers;
+using EastFive.Linq;
+using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -14,6 +15,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
 using EastFive.Serialization;
 using System.Net.Http;
+using EastFive.Api.Auth;
 
 namespace EastFive.Azure.Login
 {
@@ -40,6 +42,7 @@ namespace EastFive.Azure.Login
         public const string UserIdentificationPropertyName = "user_identification";
         [ApiProperty(PropertyName = UserIdentificationPropertyName)]
         [JsonProperty(PropertyName = UserIdentificationPropertyName)]
+        [Storage]
         [HtmlInput(Label = "Username or email")]
         public string userIdentification;
 
@@ -77,6 +80,66 @@ namespace EastFive.Azure.Login
                         await saveAsync(account);
                         return onUpdated();
                     });
+        }
+
+        [Api.HttpGet]
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            Auth.ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse List(
+            MultipartAsyncResponse<Account> onFound)
+        {
+            var accounts = typeof(Authentication)
+                .StorageGetAll()
+                .Select(obj => (Authentication)obj)
+                .Distinct(auth => auth.userIdentification)
+                .Select(
+                    (auth) =>
+                    {
+                        var accountRef = auth.userIdentification
+                            .MD5HashGuid()
+                            .AsRef<Account>();
+                        return accountRef.StorageUpdateAsync(
+                            async (account, saveAsync) =>
+                            {
+                                account.userIdentification = auth.userIdentification;
+                                await saveAsync(account);
+                                account.password = "*********";
+                                return account;
+                            },
+                            () =>
+                            {
+                                return new Account
+                                {
+                                    accountRef = accountRef,
+                                    userIdentification = auth.userIdentification,
+                                    password = "*********",
+                                };
+                            });
+                    })
+                .Await();
+            return onFound(accounts);
+        }
+
+        [Api.HttpPatch]
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            Auth.ClaimValues.Roles.SuperAdmin)]
+        public static Task<IHttpResponse> Update(
+                [UpdateId]IRef<Account> accountRef,
+                [Property(Name = PasswordPropertyName)] string password,
+            NoContentResponse onUpdated,
+            NotFoundResponse onNotFound)
+        {
+            return accountRef.StorageUpdateAsync(
+                async (account, saveAsync) =>
+                {
+                    account.password = Account.GeneratePasswordHash(
+                        account.userIdentification, password);
+                    await saveAsync(account);
+                    return onUpdated();
+                },
+                () => onNotFound());
         }
 
         internal static string GeneratePasswordHash(string userIdentification, string password)
