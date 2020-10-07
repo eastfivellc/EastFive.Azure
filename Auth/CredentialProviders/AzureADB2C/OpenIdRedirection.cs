@@ -42,7 +42,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<HttpResponseMessage> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
-                AzureApplication application, UrlHelper urlHelper,
+                AzureApplication application, IInvokeApplication urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -57,7 +57,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
                     parameters,
                     application,
                     request, urlHelper,
-                (redirect) => onRedirectResponse(redirect),
+                (redirect, accountIdMaybe) => onRedirectResponse(redirect),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));
@@ -67,7 +67,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         public static async Task<HttpResponseMessage> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,
-                AzureApplication application, UrlHelper urlHelper,
+                AzureApplication application, IInvokeApplication urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -86,7 +86,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
                     parameters,
                     application,
                     request, urlHelper,
-                (redirect) => onRedirectResponse(redirect),
+                (redirect, accountIdMaybe) => onRedirectResponse(redirect),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));

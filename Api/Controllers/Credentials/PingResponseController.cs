@@ -53,7 +53,7 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
                 AzureApplication application,
                 HttpRequestMessage request,
-                System.Web.Http.Routing.UrlHelper urlHelper,
+                IInvokeApplication urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -96,7 +96,7 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                             return await Redirection.ProcessRequestAsync(method, 
                                     requestParams,
                                     application, request, urlHelper,
-                                (redirect) =>
+                                (redirect, accountIdMaybe) =>
                                 {
                                     return onRedirectResponse(redirect);
                                 },

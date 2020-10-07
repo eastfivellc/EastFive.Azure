@@ -101,6 +101,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             GeneralConflictResponse onFailure)
         {
             return await VoucherTools.GenerateUrlToken(voucherTokenRef.id, expiration,
+                    key,
                 token =>
                 {
                     voucherToken.keySignature = key.MD5HashGuid().ToString("N");
@@ -120,8 +121,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         createdId => onCreated(voucherToken),
                         () => onAlreadyExists());
                 },
-                (why) => onFailure(why).AsTask(),
-                (why, name) => onFailure($"{why}:{name}").AsTask());
+                (why) => onFailure(why).AsTask());
         }
 
         [HttpAction("whoami")]

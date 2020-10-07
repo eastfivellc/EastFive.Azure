@@ -54,7 +54,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = TokenPropertyName)]string token,
                 AzureApplication application,
                 HttpRequestMessage request,
-                System.Web.Http.Routing.UrlHelper urlHelper,
+                IInvokeApplication urlHelper,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -76,7 +76,7 @@ namespace EastFive.Azure.Auth
             return await ProcessRequestAsync(method,
                     requestParams,
                     application, request, urlHelper,
-                (redirect) =>
+                (redirect, accountIdMaybe) =>
                 {
                     return onRedirectResponse(redirect);
                 },

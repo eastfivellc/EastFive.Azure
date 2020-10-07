@@ -175,8 +175,8 @@ namespace EastFive.Azure.Auth
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
                 [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
-                [Resource]Authorization authorization,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                Api.Azure.AzureApplication application,
+                IInvokeApplication endpoints,
                 HttpRequestMessage request,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
@@ -187,17 +187,86 @@ namespace EastFive.Azure.Auth
             return await await Auth.Method.ById(methodRef, application,
                 (method) =>
                 {
+                    var paramsUpdated = parameters
+                        .Append(
+                            authorizationRef.id.ToString().PairWithKey("state"))
+                        .ToDictionary();
                     var authorizationRequestManager = application.AuthorizationRequestManager;
                     return Redirection.AuthenticationAsync(
-                        method,
-                        parameters,
-                        request.RequestUri,
-                        application,
-                        authorizationRef.Optional(),
-                        (redirect) => onCreated(),
+                            method,
+                            paramsUpdated,
+                            application, endpoints, request.RequestUri,
+                            authorizationRef.Optional(),
+                        (redirect, accountIdMaybe) => onCreated(),
                         () => onAuthorizationFailed().AddReason("Authorization was not found"), // Bad credentials
                         why => onServericeUnavailable().AddReason(why),
                         why => onAuthorizationFailed().AddReason(why));
+                },
+                () => onInvalidMethod().AddReason("The method was not found.").AsTask());
+        }
+
+        [Api.HttpPost]
+        public async static Task<HttpResponseMessage> CreateAuthorizedAsync(
+                [QueryParameter(Name = "session")] IRef<Session> sessionRef,
+                [UpdateId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
+                [Property(Name = MethodPropertyName)] IRef<Method> methodRef,
+                [Property(Name = ParametersPropertyName)] IDictionary<string, string> parameters,
+                Api.Azure.AzureApplication application,
+                IInvokeApplication endpoints,
+                HttpRequestMessage request,
+            CreatedBodyResponse<Session> onCreated,
+            AlreadyExistsResponse onAlreadyExists,
+            ForbiddenResponse onAuthorizationFailed,
+            ServiceUnavailableResponse onServericeUnavailable,
+            ForbiddenResponse onInvalidMethod,
+            GeneralConflictResponse onFailure)
+        {
+            return await await Auth.Method.ById(methodRef, application,
+                async (method) =>
+                {
+                    var paramsUpdated = parameters
+                        .Append(
+                            authorizationRef.id.ToString().PairWithKey("state"))
+                        .ToDictionary();
+                    var authorizationRequestManager = application.AuthorizationRequestManager;
+                    return await await Redirection.AuthenticationAsync(
+                            method,
+                            paramsUpdated,
+                            application,
+                            endpoints,
+                            request.RequestUri,
+                            authorizationRef.Optional(),
+                        (redirect, accountIdMaybe) =>
+                        {
+                            var session = new Session()
+                            {
+                                sessionId = sessionRef,
+                                account = accountIdMaybe,
+                                authorization = authorizationRef.Optional(),
+                            };
+                            return Session.CreateAsync(sessionRef, authorizationRef.Optional(),
+                                    session,
+                                    application,
+                                (sessionCreated, contentType) =>
+                                {
+                                    var response = onCreated(sessionCreated, contentType: contentType);
+                                    response.Headers.Location = redirect;
+                                    return response;
+                                },
+                                onAlreadyExists,
+                                onAuthorizationFailed,
+                                (why1, why2) => onServericeUnavailable(),
+                                onFailure);
+                        },
+                        () => onAuthorizationFailed()
+                            .AddReason("Authorization was not found")
+                            .AsTask(), // Bad credentials
+                        why => onServericeUnavailable()
+                            .AddReason(why)
+                            .AsTask(),
+                        why => onAuthorizationFailed()
+                            .AddReason(why)
+                            .AsTask());
                 },
                 () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }

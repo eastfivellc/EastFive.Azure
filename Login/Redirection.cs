@@ -27,7 +27,8 @@ namespace EastFive.Azure.Login
 
         [HttpGet(MatchAllParameters = false)]
         public static async Task<HttpResponseMessage> Get(
-                AzureApplication application, UrlHelper urlHelper,
+                AzureApplication application, 
+                IInvokeApplication urlHelper,
                 HttpRequestMessage request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
@@ -36,14 +37,14 @@ namespace EastFive.Azure.Login
         {
             var parameters = request.RequestUri.ParseQuery();
             parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var authentication = await Auth.Method.ByMethodName(
                 CredentialProvider.IntegrationName, application);
 
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
                     parameters,
                     application,
                     request, urlHelper,
-                (redirect) => onRedirectResponse(redirect).AddReason("success"),
+                (redirect, accountIdMaybe) => onRedirectResponse(redirect).AddReason("success"),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));

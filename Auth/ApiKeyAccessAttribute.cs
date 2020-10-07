@@ -6,13 +6,15 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.UI;
+using EastFive.Api;
+using EastFive.Api.Auth;
 using EastFive.Azure.Auth.CredentialProviders.Voucher;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
 
-namespace EastFive.Api.Auth
+namespace EastFive.Azure.Auth
 {
     public class ApiKeyAccessAttribute : Attribute, IHandleRoutes
     {

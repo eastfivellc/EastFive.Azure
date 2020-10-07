@@ -307,6 +307,7 @@
     <Compile Include="Api\Resources\Monitoring.cs" />
     <Compile Include="Api\Resources\Queries\MonitoringQuery.cs" />
     <Compile Include="Attributes\ASTFVCPropertyAttribute.cs" />
+    <Compile Include="Auth\AccessTokenAccessAttribute.cs" />
     <Compile Include="Auth\ApiKeyAccessAttribute.cs" />
     <Compile Include="Auth\CredentialProviders\Voucher\VoucherToken.cs" />
     <Compile Include="Auth\Login.cs" />

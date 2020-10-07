@@ -363,7 +363,9 @@ namespace EastFive.Api.Azure
 
         public virtual async Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
-                EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
+                EastFive.Azure.Auth.Method method,
+                EastFive.Azure.Auth.Authorization authorization,
+                IInvokeApplication endpoints,
                 Uri baseUri,
                 IProvideAuthorization authorizationProvider,
             Func<Uri, TResult> onSuccess,
@@ -372,25 +374,29 @@ namespace EastFive.Api.Azure
         {
             if(!(authorizationProvider is Credentials.IProvideRedirection))
                 return await ComputeRedirectAsync(accountIdMaybe, authParams, 
-                        method, authorization,
-                        baseUri, authorizationProvider,
+                        method, authorization, endpoints,
+                        authorizationProvider,
                     onSuccess,
                     onInvalidParameter,
                     onFailure);
 
             var redirectionProvider = authorizationProvider as Credentials.IProvideRedirection;
-            return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, authorizationProvider, authParams,
+            return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, 
+                        authorizationProvider, authParams,
                         method, authorization,
-                        baseUri, this,
+                        this, endpoints, baseUri,
                     async (redirectUri) =>
                     {
-                        var fullUri = await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
+                        var fullUri = redirectUri.IsAbsoluteUri?
+                            redirectUri
+                            :
+                            await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
                         var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
                         return onSuccess(redirectDecorated);
                     },
                     () => ComputeRedirectAsync(accountIdMaybe, authParams,
-                            method, authorization,
-                            baseUri, authorizationProvider,
+                            method, authorization, endpoints,
+                            authorizationProvider,
                         onSuccess,
                         onInvalidParameter,
                         onFailure),
@@ -407,8 +413,8 @@ namespace EastFive.Api.Azure
 
         private async Task<TResult> ComputeRedirectAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
-                EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
-                Uri baseUri,
+                EastFive.Azure.Auth.Method method,
+                EastFive.Azure.Auth.Authorization authorization, IInvokeApplication endpoints,
                 IProvideAuthorization authorizationProvider,
             Func<Uri, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
