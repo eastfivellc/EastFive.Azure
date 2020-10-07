@@ -21,6 +21,8 @@ using EastFive.Azure.Functions;
 using EastFive.Analytics;
 using EastFive.Web.Configuration;
 using BlackBarLabs.Persistence.Azure.Attributes;
+using EastFive.Azure.Auth;
+using EastFive.Api.Auth;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -86,6 +88,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         #region Http Methods
 
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            ClaimValues.Roles.SuperAdmin)]
         [HttpPost]
         public static async Task<HttpResponseMessage> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<TableBackupOperation> tableBackupOperationRef,
@@ -94,6 +99,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 [Property(Name = OperationSetPropertyName)]string operationSet,
                 [Resource]TableBackupOperation tableBackup,
                 RequestMessage<TableBackupOperation> requestQuery,
+                EastFive.Api.Security security,
                 HttpRequestMessage request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onCreated,

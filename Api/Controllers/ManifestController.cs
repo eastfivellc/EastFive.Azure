@@ -13,15 +13,21 @@ using EastFive.Linq;
 using EastFive.Extensions;
 using System.Collections.Generic;
 using System.Reflection;
+using EastFive.Api.Auth;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Api.Azure.Controllers
 {
     [FunctionViewController(Route = "Manifest")]
     public static class ManifestController
     {
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            ClaimValues.Roles.SuperAdmin)]
         [EastFive.Api.HttpGet]
         public static HttpResponseMessage FindAsync(
                 HttpApplication application, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security,
             ContentResponse onFound,
             ContentTypeResponse<Api.Resources.Manifest> onContent,
             ViewFileResponse onHtml)

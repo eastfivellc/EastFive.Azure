@@ -128,7 +128,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [ApiKeyAccess]
         [RequiredClaim(
             System.Security.Claims.ClaimTypes.Role,
-            "admin")]
+            ClaimValues.Roles.SuperAdmin)]
         public static HttpResponseMessage WhoAmI(
                 EastFive.Api.Security security,
             ContentTypeResponse<Guid> onFound)

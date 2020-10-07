@@ -49,6 +49,9 @@ namespace EastFive.Security.SessionServer
         {
             if (!integrationOnly)
                 return GetAllAsync(onSuccess, onFailure);
+
+            if (ServiceConfiguration.loginProviders.IsDefaultOrNull())
+                return onFailure("System not initialized").ToTask();
             return onSuccess(ServiceConfiguration.loginProviders
                 .Where(x => x.Value is IProvideIntegration)
                 .ToArray()
