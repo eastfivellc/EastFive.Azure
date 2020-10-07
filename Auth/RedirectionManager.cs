@@ -28,7 +28,6 @@ namespace EastFive.Azure.Auth
 {
     [FunctionViewController(
         Route = "RedirectionManager",
-        Resource = typeof(RedirectionManager),
         ContentType = "x-application/auth-redirection-manager",
         ContentTypeVersion = "0.1")]
     public struct RedirectionManager : IReferenceable
@@ -209,6 +208,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
                 AzureApplication application,
+                IInvokeApplication endpoints,
                 HttpRequestMessage request,
             RedirectResponse onRedirection,
             GeneralFailureResponse onFailure,
@@ -239,8 +239,8 @@ namespace EastFive.Azure.Auth
                                                     return Auth.Redirection.ProcessAsync(authorization, 
                                                             updatedAuth => 1.AsTask(),
                                                             method, externalId, requestParams,
-                                                            request.RequestUri, application, loginProvider,
-                                                        (uri) =>
+                                                            application, endpoints, loginProvider, request.RequestUri,
+                                                        (uri, accountIdMaybe) =>
                                                         {
                                                             return uri;
                                                         },
@@ -274,6 +274,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
                 AzureApplication application,
+                IInvokeApplication endpoints,
                 IHttpRequest request,
             MultipartAsyncResponse<Authorization> onContent,
             RedirectResponse onSuccess,
@@ -294,8 +295,8 @@ namespace EastFive.Azure.Auth
                                             {
 
                                             }, method, externalId, authorization.parameters,
-                                            request.RequestUri, application, loginProvider,
-                                        (uri) => onSuccess(uri),
+                                            application, endpoints, loginProvider, request.RequestUri,
+                                        (uri, accountIdMaybe) => onSuccess(uri),
                                         (why) => onFailure().AddReason(why),
                                         application.Telemetry);
                                 },

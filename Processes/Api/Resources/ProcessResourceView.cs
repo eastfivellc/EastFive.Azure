@@ -96,23 +96,23 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByResourceTypeAsync(
+        public static Task<IHttpResponse> FindByResourceTypeAsync(
                 [EastFive.Api.QueryParameter(Name = ActorPropertyName)]Guid actorId,
                 [EastFive.Api.QueryParameter(Name = Resources.ProcessStageType.ResourceTypePropertyName)]Type resourceType,
                 EastFive.Api.Security security, AzureApplication application, IProvideUrl url,
-            [Display(Name = "Found")]MultipartAcceptArrayResponseAsync onMultipart,
+            [Display(Name = "Found")]MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessResourceViews.FindByResourceAsync(actorId, resourceType,
+            return EastFive.Azure.ProcessResourceViews.FindByResourceAsync(actorId, resourceType,
                     security,
                 (views) =>
                 {
                     var viewResources = views.Select(ps => GetResource(ps, application, url)).ToArray();
                     return onMultipart(viewResources);
                 },
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
         internal static Resources.ProcessResourceView GetResource(

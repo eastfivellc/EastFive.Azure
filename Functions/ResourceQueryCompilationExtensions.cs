@@ -17,10 +17,11 @@ namespace EastFive.Azure.Functions
 {
     public static class ResourceQueryCompilationExtensions
     {
-        public static async Task<InvocationMessage> FunctionAsync(this IHttpRequest request)
+        public static async Task<InvocationMessage> FunctionAsync(this IHttpRequest request,
+            string serviceBusTriggerNameOverride = default)
         {
             var invocationMessage = await request.CreateInvocationMessageAsync();
-            return await invocationMessage.SendToFunctionsAsync();
+            return await invocationMessage.SendToFunctionsAsync(serviceBusTriggerNameOverride);
         }
 
         public static async Task<InvocationMessage> CreateInvocationMessageAsync(this IHttpRequest request,
@@ -36,18 +37,19 @@ namespace EastFive.Azure.Functions
                 () => throw new Exception());
         }
 
-        public static async Task<InvocationMessage> SendToFunctionsAsync(this InvocationMessage invocationMessage)
+        public static async Task<InvocationMessage> SendToFunctionsAsync(this InvocationMessage invocationMessage, 
+            string serviceBusTriggerNameOverride = default)
         {
             var invocationMessageRef = invocationMessage.invocationRef;
             var byteContent = invocationMessageRef.id.ToByteArray();
-            return await AppSettings.FunctionProcessorServiceBusTriggerName.ConfigurationString(
-                async (serviceBusTriggerName) =>
-                {
-                    await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName,
-                        byteContent.AsEnumerable());
-                    return invocationMessage;
-                },
-                (why) => throw new Exception(why));
+
+            var serviceBusTriggerName = serviceBusTriggerNameOverride.HasBlackSpace() ?
+                serviceBusTriggerNameOverride :
+                AppSettings.FunctionProcessorServiceBusTriggerName.ConfigurationString(value => value, (why) => throw new Exception(why));
+
+            await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName,
+                byteContent.AsEnumerable());
+            return invocationMessage;
         }
     }
 }

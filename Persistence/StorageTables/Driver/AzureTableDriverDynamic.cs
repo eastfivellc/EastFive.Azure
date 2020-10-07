@@ -1718,12 +1718,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 IRefAst[] rowKeys,
             CloudTable table = default(CloudTable),
             AzureStorageDriver.RetryDelegate onTimeout =
-                default(AzureStorageDriver.RetryDelegate))
+                default(AzureStorageDriver.RetryDelegate),
+            int? readAhead = default)
             where TEntity : IReferenceable
         {
             if (table.IsDefaultOrNull())
                 table = GetTable<TEntity>();
-            return rowKeys
+            var tasks = rowKeys
                 .Select(
                     rowKey =>
                     {
@@ -1732,8 +1733,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             () => default,
                             table: table,
                             onTimeout: onTimeout);
-                    })
-                .AsyncEnumerable()
+                    });
+            var enumAsync = readAhead.HasValue ?
+                tasks.AsyncEnumerable(readAhead.Value) :
+                tasks.AsyncEnumerable();
+
+            return enumAsync
                 .SelectWhereHasValue()
                 .SelectValues();
         }

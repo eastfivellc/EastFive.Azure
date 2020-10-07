@@ -15,7 +15,6 @@ namespace EastFive.Azure.Login
 {
     [FunctionViewController(
         Route = "LoginRedirection",
-        Resource = typeof(Redirection),
         ContentType = "x-application/login-redirection",
         ContentTypeVersion = "0.1")]
     public class Redirection
@@ -29,6 +28,7 @@ namespace EastFive.Azure.Login
         public static async Task<IHttpResponse> Get(
                 IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,
+                IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,
@@ -42,8 +42,8 @@ namespace EastFive.Azure.Login
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
                     parameters,
                     application,
-                    request, urlHelper,
-                (redirect) => onRedirectResponse(redirect).AddReason("success"),
+                    request, endpoints, urlHelper,
+                (redirect, accountIdMaybe) => onRedirectResponse(redirect).AddReason("success"),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));

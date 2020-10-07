@@ -23,7 +23,7 @@ namespace EastFive.Api.Azure.Controllers
         {
 
             //var indexFile = SpaHandlerModule.indexHTML;
-            var indexFile = Modules.SpaHandler.indexHTML;
+            var indexFile = Modules.SpaHandler.IndexHTML;
 
             var doc = new HtmlDocument();
             //doc.LoadHtml(indexFile.ToString());

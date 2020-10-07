@@ -58,6 +58,7 @@ namespace EastFive.Azure.Auth
                 AzureApplication application,
                 IHttpRequest request,
                 IProvideUrl urlHelper,
+                IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -78,8 +79,8 @@ namespace EastFive.Azure.Auth
 
             return await ProcessRequestAsync(method,
                     requestParams,
-                    application, request, urlHelper,
-                (redirect) =>
+                    application, request, endpoints, urlHelper,
+                (redirect, accountIdMaybe) =>
                 {
                     return onRedirectResponse(redirect);
                 },

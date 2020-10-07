@@ -25,7 +25,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
     [FunctionViewController(
         Namespace = "aadb2c",
         Route="PingResponse",
-        Resource = typeof(PingResponse),
         ContentType = "x-application/ping-response",
         ContentTypeVersion = "0.1")]
     public class PingResponse : EastFive.Azure.Auth.Redirection
@@ -48,6 +47,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 AzureApplication application,
                 IHttpRequest request,
                 IProvideUrl urlHelper,
+                IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -90,8 +90,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
                             return await Redirection.ProcessRequestAsync(method, 
                                     requestParams,
-                                    application, request, urlHelper,
-                                (redirect) =>
+                                    application, request, endpoints, urlHelper,
+                                (redirect, accountIdMaybe) =>
                                 {
                                     return onRedirectResponse(redirect);
                                 },

@@ -83,35 +83,35 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByResourceAsync(
+        public static Task<IHttpResponse> FindByResourceAsync(
                 [QueryParameter]Guid resourceId,
                 EastFive.Api.Security security, IProvideUrl url,
-            MultipartAcceptArrayResponseAsync onMultipart,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessStages.FindByResourceAsync(resourceId, security,
+            return EastFive.Azure.ProcessStages.FindByResourceAsync(resourceId, security,
                 (processStages) => onMultipart(processStages.Select(ps => GetResource(ps, url))),
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByFirstStepByActorAndTypeAsync(
+        public static Task<IHttpResponse> FindByFirstStepByActorAndTypeAsync(
                 [QueryParameter(Name = Resources.ProcessStage.OwnerPropertyName)]Guid ownerId,
                 [QueryParameter(Name = Resources.ProcessStage.TypePropertyName)]Type resourceType,
                 [QueryParameter(Name = "processstage." + Resources.ProcessStage.ConfirmablePropertyName + "." + Resources.ProcessStage.ConfirmableResource.ProcessStageNextPropertyName)]
                     IRefOptional<IReferenceable> nextStage,
-                AzureApplication application, EastFive.Api.Security security, IProvideUrl url,
-            MultipartAcceptArrayResponseAsync onMultipart,
+                EastFive.Api.Security security, IProvideUrl url,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessStages.FindStartByActorAndResourceTypeAsync(ownerId, resourceType,
+            return EastFive.Azure.ProcessStages.FindStartByActorAndResourceTypeAsync(ownerId, resourceType,
                     security,
                 (processStages) => onMultipart(processStages.Select(ps => GetResource(ps, url))),
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
         internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage,

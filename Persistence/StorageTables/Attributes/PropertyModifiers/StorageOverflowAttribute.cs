@@ -1,20 +1,22 @@
-﻿using BlackBarLabs.Persistence.Azure;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Reflection;
-using EastFive.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Text;
+using System.Reflection;
 using System.Threading.Tasks;
+
+using Microsoft.WindowsAzure.Storage.Table;
+
+using EastFive;
+using EastFive.Linq;
+using EastFive.Extensions;
+using EastFive.Reflection;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Linq;
+using EastFive.Collections.Generic;
+using EastFive.Serialization;
 
 namespace EastFive.Persistence
 {

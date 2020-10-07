@@ -75,9 +75,9 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static Task<IHttpResponse> FindAllAsync(
+        public static IHttpResponse FindAll(
                 EastFive.Api.Security security,
-            MultipartAcceptArrayResponseAsync onMultipart)
+            MultipartAcceptArrayResponse onMultipart)
         {
             return onMultipart(stages);
         }

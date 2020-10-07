@@ -59,22 +59,22 @@ namespace EastFive.Azure.Synchronization
 
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByRelatedAsync(
+        public static Task<IHttpResponse> FindByRelatedAsync(
                 [QueryParameter]Guid relatedTo, [QueryParameter]Guid integration, // int top, int skip
                 Api.Security security,
-            MultipartAcceptArrayResponseAsync onMultipart,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onReferenceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.Synchronization.Connections.FindAdaptersByRelatedAsync(relatedTo, integration,
+            return EastFive.Azure.Synchronization.Connections.FindAdaptersByRelatedAsync(relatedTo, integration,
                     security.claims,
                 synchronizations =>
                 {
                     var r = onMultipart(synchronizations.Cast<object>());
                     return r;
                 },
-                () => onReferenceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
         }
 
         [EastFive.Api.HttpGet]
@@ -144,22 +144,22 @@ namespace EastFive.Azure.Synchronization
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByAdapterAsync(
+        public static Task<IHttpResponse> FindByAdapterAsync(
                 [QueryParameter(Name = "adapter")]Guid adapterId,
                 Api.Security security,
-            MultipartAcceptArrayResponseAsync onMultipart,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onReferenceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.Synchronization.Connectors.FindByAdapterAsync(adapterId,
+            return EastFive.Azure.Synchronization.Connectors.FindByAdapterAsync(adapterId,
                     security.performingAsActorId, security.claims,
                 connectors =>
                 {
                     var r = onMultipart(connectors.Cast<object>());
                     return r;
                 },
-                () => onReferenceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
         }
 
         #endregion
@@ -282,21 +282,21 @@ namespace EastFive.Azure.Synchronization
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindByAdapterAsync([QueryParameter]Guid adapter,
+        public static Task<IHttpResponse> FindByAdapterAsync([QueryParameter]Guid adapter,
                 Api.Security security,
-            MultipartAcceptArrayResponseAsync onMultipart,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onReferenceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.Synchronization.Connectors.FindConnectionByAdapterAsync(adapter,
+            return EastFive.Azure.Synchronization.Connectors.FindConnectionByAdapterAsync(adapter,
                     security.performingAsActorId, security.claims,
                 connectors =>
                 {
                     var r = onMultipart(connectors.Cast<object>());
                     return r;
                 },
-                () => onReferenceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
         }
 
         #endregion

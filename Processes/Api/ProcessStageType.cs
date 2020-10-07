@@ -75,14 +75,14 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<IHttpResponse> FindAllAsync(
+        public static Task<IHttpResponse> FindAllAsync(
                 EastFive.Api.Security security, IProvideUrl url,
-            MultipartAcceptArrayResponseAsync onMultipart,
+            MultipartAcceptArrayResponse onMultipart,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await ProcessStageTypes.FindAllAsync(security,
+            return ProcessStageTypes.FindAllAsync(security,
                 types => onMultipart(types.Select(type => GetResource(type, url))),
-                () => onUnauthorized().ToTask());
+                () => onUnauthorized());
         }
 
         internal static Resources.ProcessStageType GetResource(

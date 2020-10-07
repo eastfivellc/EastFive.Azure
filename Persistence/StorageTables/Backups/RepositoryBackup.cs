@@ -19,12 +19,13 @@ using System.Collections.Concurrent;
 using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Azure.Auth;
+using EastFive.Api.Auth;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
     [FunctionViewController(
         Route = "RepositoryBackup",
-        Resource = typeof(RepositoryBackup),
         ContentType = "x-application/repository-backup",
         ContentTypeVersion = "0.1")]
     [StorageResourceNoOp]
@@ -71,6 +72,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         #region Http Methods
 
+        [RequiredClaim(
+            System.Security.Claims.ClaimTypes.Role,
+            ClaimValues.Roles.SuperAdmin)]
         [HttpPost]
         public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
@@ -78,6 +82,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 [Property(Name = StorageSettingCopyToPropertyName)]string storageSettingCopyTo,
                 [Resource]RepositoryBackup repositoryBackup,
                 AzureApplication application,
+                EastFive.Api.Security security,
                 RequestMessage<TableBackup> requestQuery,
                 IHttpRequest request,
                 EastFive.Analytics.ILogger logger,

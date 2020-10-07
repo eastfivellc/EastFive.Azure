@@ -76,6 +76,7 @@ namespace EastFive.Azure.Monitoring
                         () => new MessageCard.Section
                         {
                             title = "Request/Response Information",
+                            markdown = false, // so that underscores are not stripped
                             facts = new MessageCard.Section.Fact[]
                             {
                                 new MessageCard.Section.Fact
@@ -212,6 +213,7 @@ namespace EastFive.Azure.Monitoring
                 () => new MessageCard.Section
                 {
                     title = "Request Information",
+                    markdown = false, // so that underscores are not stripped
                     facts = new MessageCard.Section.Fact[]
                         {
                             new MessageCard.Section.Fact
@@ -278,6 +280,7 @@ namespace EastFive.Azure.Monitoring
                 new MessageCard.Section
                 {
                         title = "Headers",
+                        markdown = false, // so that underscores are not stripped
                         facts =  request.Headers
                             .Select(
                                 header => new MessageCard.Section.Fact

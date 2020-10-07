@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using EastFive.Linq;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,7 +36,7 @@ namespace EastFive.AzureADB2C.Resources
 
         public SecurityKey[] GetKeys()
         {
-            return this.keys.Select(key => key.GetKey()).ToArray();
+            return this.keys.NullToEmpty().Select(key => key.GetKey()).ToArray();
         }
 
         private static byte[] KeyParamDecode(string base64UrlText)

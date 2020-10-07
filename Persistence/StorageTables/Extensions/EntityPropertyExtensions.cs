@@ -200,6 +200,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var ep = new EntityProperty(dateTimeValue);
                 return onValue(ep);
             }
+            if (typeof(TimeSpan).IsInstanceOfType(value))
+            {
+                var timeSpanValue = (TimeSpan)value;
+                var ep = new EntityProperty(timeSpanValue.TotalSeconds);
+                return onValue(ep);
+            }
             if (typeof(Guid).IsInstanceOfType(value))
             {
                 var guidValue = (Guid)value;
@@ -351,6 +357,15 @@ namespace EastFive.Persistence.Azure.StorageTables
             {
                 var dtValue = value.DateTime;
                 return onBound(dtValue);
+            }
+            if (typeof(TimeSpan) == type)
+            {
+                if (value.DoubleValue.HasValue)
+                {
+                    var seconds = value.DoubleValue.Value;
+                    var tsValue = TimeSpan.FromSeconds(seconds);
+                    return onBound(tsValue);
+                }
             }
             if (typeof(TimeZoneInfo) == type)
             {

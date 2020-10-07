@@ -44,9 +44,11 @@ namespace EastFive.Azure.Auth
         public static async Task<TResult> ProcessRequestAsync<TResult>(
                 EastFive.Azure.Auth.Method method,
                 IDictionary<string, string> values,
-                IAzureApplication application, IHttpRequest request,
+                IAzureApplication application, 
+                IHttpRequest request,
+                IInvokeApplication endpoints,
                 IProvideUrl urlHelper,
-            Func<Uri, TResult> onRedirect,
+            Func<Uri, Guid?, TResult> onRedirect,
             Func<string, TResult> onBadCredentials,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onFailure)
@@ -71,7 +73,8 @@ namespace EastFive.Azure.Auth
                 {
                     var baseUri = request.RequestUri;
                     return AuthenticationAsync(
-                            method, values, baseUri, application,
+                            method, values, application, endpoints,
+                            request.RequestUri,
                             RefOptional<Authorization>.Empty(),
                         onRedirect,
                         () => onFailure("Authorization not found"),
@@ -82,10 +85,11 @@ namespace EastFive.Azure.Auth
         }
 
         public async static Task<TResult> AuthenticationAsync<TResult>(
-                EastFive.Azure.Auth.Method authentication, IDictionary<string, string> values, Uri baseUri,
+                EastFive.Azure.Auth.Method authentication, IDictionary<string, string> values,
                 IAzureApplication application,
+                IInvokeApplication endpoints, Uri baseUri,
                 IRefOptional<Authorization> authorizationRefToCreate,
-            Func<Uri, TResult> onRedirect,
+            Func<Uri, Guid?, TResult> onRedirect,
             Func<TResult> onAuthorizationNotFound,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onGeneralFailure)
@@ -119,7 +123,7 @@ namespace EastFive.Azure.Auth
                                         () => throw new Exception("Secure guid not unique"));
                                 },
                                 authentication, externalAccountKey, extraParams,
-                                baseUri, application, loginProvider,
+                                application, endpoints, loginProvider, baseUri,
                             onRedirect,
                             onGeneralFailure,
                                 telemetry);
@@ -134,7 +138,7 @@ namespace EastFive.Azure.Auth
                             return await ProcessAsync(authorization,
                                     saveAsync,
                                     authentication, externalAccountKey, extraParams,
-                                    baseUri, application, loginProvider,
+                                    application, endpoints, loginProvider, baseUri,
                                 onRedirect,
                                 onGeneralFailure,
                                     telemetry);
@@ -153,13 +157,15 @@ namespace EastFive.Azure.Auth
                 Func<Authorization, Task> saveAsync,
                 Method authentication, string externalAccountKey,
                 IDictionary<string, string> extraParams,
-                Uri baseUri, IAzureApplication application, IProvideLogin loginProvider,
-            Func<Uri, TResult> onRedirect,
+                IAzureApplication application, IInvokeApplication endpoints, IProvideLogin loginProvider,
+                Uri baseUri,
+            Func<Uri, Guid?, TResult> onRedirect,
             Func<string, TResult> onGeneralFailure,
             TelemetryClient telemetry)
         {
             authorization.authorized = true;
             authorization.LocationAuthentication = null;
+
             var result = await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
                     authorization,
 
@@ -172,40 +178,48 @@ namespace EastFive.Azure.Auth
                     return await CreateLoginResponseAsync(
                                 internalAccountId, extraParams,
                                 authentication, authorization,
-                                baseUri,
-                                application, loginProvider,
-                            onRedirect,
+                                application, endpoints, baseUri, loginProvider,
+                            (url) => onRedirect(url, internalAccountId),
                             onGeneralFailure,
                             telemetry);
                 },
+                OnNotFound);
+            return result;
 
-                // Not found
-                async () =>
-                {
-                    return await await UnmappedCredentialAsync(externalAccountKey, extraParams,
+            async Task<TResult> OnNotFound()
+            {
+                return await await UnmappedCredentialAsync(externalAccountKey, extraParams,
                             authentication, authorization,
                             loginProvider, application, baseUri,
-                            
+
                         // Create mapping
                         async (internalAccountId) =>
                         {
                             authorization.parameters = extraParams;
                             authorization.accountIdMaybe = internalAccountId;
                             await saveAsync(authorization);
-                            return await await AccountMapping.CreateByMethodAndKeyAsync(authorization, externalAccountKey,
-                                internalAccountId,
+                            return await await AccountMapping.CreateByMethodAndKeyAsync(
+                                    authorization, externalAccountKey, internalAccountId,
                                 () =>
                                 {
                                     return CreateLoginResponseAsync(
                                             internalAccountId, extraParams,
                                             authentication, authorization,
-                                            baseUri,
-                                            application, loginProvider,
-                                        onRedirect,
+                                            application, endpoints, baseUri, loginProvider,
+                                        (url) => onRedirect(url, internalAccountId),
                                         onGeneralFailure,
                                         telemetry);
                                 },
-                                (why) => onGeneralFailure(why).AsTask());
+                                () =>
+                                {
+                                    return CreateLoginResponseAsync(
+                                            internalAccountId, extraParams,
+                                            authentication, authorization,
+                                            application, endpoints, baseUri, loginProvider,
+                                        (url) => onRedirect(url, internalAccountId),
+                                        onGeneralFailure,
+                                        telemetry);
+                                });
                         },
 
                         // Allow self serve
@@ -216,9 +230,8 @@ namespace EastFive.Azure.Auth
                             return await CreateLoginResponseAsync(
                                     default(Guid?), extraParams,
                                     authentication, authorization,
-                                    baseUri, 
-                                    application, loginProvider,
-                                onRedirect,
+                                    application, endpoints, baseUri, loginProvider,
+                                (url) => onRedirect(url, default(Guid?)),
                                 onGeneralFailure,
                                     telemetry);
                         },
@@ -228,7 +241,7 @@ namespace EastFive.Azure.Auth
                         {
                             authorization.parameters = extraParams;
                             await saveAsync(authorization);
-                            return onRedirect(interceptionUrl);
+                            return onRedirect(interceptionUrl, default);
                         },
 
                         // Failure
@@ -240,12 +253,12 @@ namespace EastFive.Azure.Auth
                             return onGeneralFailure(why);
                         },
                         telemetry);
-                });
-            return result;
+            }
         }
 
         public static async Task<TResult> MapAccountAsync<TResult>(Authorization authorization,
             Guid internalAccountId, string externalAccountKey,
+            IInvokeApplication endpoints,
             Uri baseUri,
             AzureApplication application,
             Func<Uri, TResult> onRedirect,
@@ -254,9 +267,12 @@ namespace EastFive.Azure.Auth
         {
             return await await AccountMapping.CreateByMethodAndKeyAsync(authorization, externalAccountKey,
                 internalAccountId,
-                async () =>
-                {
-                    return await await Method.ById(authorization.Method, application,
+                ProcessAsync,
+                ProcessAsync);
+
+            async Task<TResult> ProcessAsync()
+            {
+                return await await Method.ById(authorization.Method, application,
                         async method =>
                         {
                             return await await method.GetLoginProviderAsync(application,
@@ -265,9 +281,8 @@ namespace EastFive.Azure.Auth
                                     return CreateLoginResponseAsync(
                                            internalAccountId, authorization.parameters,
                                            method, authorization,
-                                           baseUri, 
-                                           application, loginProvider,
-                                       (url) => onRedirect(url),
+                                           application, endpoints, baseUri, loginProvider,
+                                       onRedirect,
                                        onFailure,
                                        telemetry);
                                 },
@@ -277,23 +292,25 @@ namespace EastFive.Azure.Auth
                                 });
                         },
                         () => onFailure("Method no longer suppored.").AsTask());
-                },
-                (why) => onFailure(why).AsTask());
+            }
         }
 
         private static Task<TResult> CreateLoginResponseAsync<TResult>(
                 Guid? accountId, IDictionary<string, string> extraParams,
                 Method method, Authorization authorization,
-                Uri baseUri,
-                IAuthApplication application, IProvideAuthorization authorizationProvider,
+                IAuthApplication application,
+                IInvokeApplication endpoints,
+                Uri baseUrl,
+                IProvideAuthorization authorizationProvider,
             Func<Uri, TResult> onRedirect,
             Func<string, TResult> onBadResponse,
             TelemetryClient telemetry)
         {
-            return application.GetRedirectUriAsync( 
+            return application.GetRedirectUriAsync(
                     accountId, extraParams,
                     method, authorization,
-                    baseUri,
+                    endpoints,
+                    baseUrl,
                     authorizationProvider,
                 (redirectUrlSelected) =>
                 {

@@ -19,7 +19,7 @@ using EastFive.Api;
 namespace EastFive.Azure.Auth.CredentialProviders
 {
     [IntegrationName(IntegrationName)]
-    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement, IProvideSession
+    public class AzureADB2CProvider : IProvideLogin, IProvideLoginManagement
     {
         private static readonly string clientId;
         private static readonly Lazy<Task<Endpoints>> endpointsAsync;
@@ -382,11 +382,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
 
         #endregion
-
-        public Task<bool> SupportsSessionAsync(EastFive.Azure.Auth.Session session)
-        {
-            return true.AsTask();
-        }
     }
 
 }
