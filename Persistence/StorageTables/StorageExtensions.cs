@@ -1097,8 +1097,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region BLOB
 
+        public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            var blobId = Guid.NewGuid();
+            return content.BlobCreateAsync(blobId, containerName,
+                () => blobId,
+                () => throw new Exception("Guid not unique."),
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+        }
+
         public static Task<TResult> BlobCreateAsync<TResult>(this byte[] content, string containerName,
-            Func<Guid, TResult> onSuccess,
+            Func<Guid, TResult> onSuccess = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
