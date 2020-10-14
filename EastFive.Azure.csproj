@@ -347,6 +347,7 @@
     <Compile Include="Login\CredentialProvider.cs" />
     <Compile Include="Login\Redirection.cs" />
     <Compile Include="Media\ContentExtensions.cs" />
+    <Compile Include="Modules\ClientCurrencyCheckAttribute.cs" />
     <Compile Include="Monitoring\ApplicationInsights.cs" />
     <Compile Include="Monitoring\ApplicationInsightsRouteHandlerAttribute.cs" />
     <Compile Include="Monitoring\MessageCard.cs" />
