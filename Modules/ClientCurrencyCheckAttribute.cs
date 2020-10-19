@@ -56,6 +56,7 @@ namespace EastFive.Azure.Modules
                 return response;
 
             response.Headers.Add(clientVersionResponseHeader, clientMinimumVersion.ToString());
+            response.Headers.Add("Access-Control-Expose-Headers", clientVersionResponseHeader);
             return response;
         }
     }
