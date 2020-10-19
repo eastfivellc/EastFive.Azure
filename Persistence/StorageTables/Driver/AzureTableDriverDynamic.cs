@@ -953,8 +953,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         private async Task<TResult> UpdateIfNotModifiedAsync<TData, TResult>(TData data,
                 IAzureStorageTableEntity<TData> currentDocument,
-            Func<TResult> success,
-            Func<TResult> documentModified,
+            Func<TResult> onUpdated,
+            Func<TResult> onDocumentHasBeenModified,
+            Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             AzureStorageDriver.RetryDelegate onTimeout = null,
@@ -970,11 +971,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     try
                     {
                         await table.ExecuteAsync(update);
-                        return success();
+                        return onUpdated();
                     }
                     catch (StorageException ex)
                     {
                         await rollback();
+
+                        if (ex.IsProblemDoesNotExist())
+                            if (!onNotFound.IsDefaultOrNull())
+                                return onNotFound();
+
                         return await ex.ParseStorageException(
                             async (errorCode, errorMessage) =>
                             {
@@ -989,8 +995,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                                 async () =>
                                                 {
                                                     timeoutResult = await UpdateIfNotModifiedAsync(data, currentDocument,
-                                                        success,
-                                                        documentModified,
+                                                        onUpdated:onUpdated,
+                                                        onDocumentHasBeenModified:onDocumentHasBeenModified,
+                                                        onNotFound: onNotFound,
                                                         onFailure:onFailure,
                                                         onModificationFailures: onModificationFailures, 
                                                         onTimeout:onTimeout,
@@ -1000,7 +1007,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                         }
                                     case ExtendedErrorInformationCodes.UpdateConditionNotSatisfied:
                                         {
-                                            return documentModified();
+                                            return onDocumentHasBeenModified();
                                         }
                                     default:
                                         {
@@ -1617,7 +1624,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 table = this.TableClient.GetTableReference(tableName);
             return this.UpdateAsyncAsync<TData, TResult>(rowKey, partitionKey,
                 (doc, saveAsync) => onUpdate(false, doc, saveAsync),
-                async () =>
+                onNotFound: async () =>
                 {
                     var doc = Activator.CreateInstance<TData>();
                     doc = doc
@@ -1662,6 +1669,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     return result;
                 },
                 onModificationFailures:onModificationFailures,
+                onFailure: onFailure.AsAsyncFunc(),
                 table: table);
         }
 
@@ -1965,6 +1973,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TData, Func<TData, Task>, Task<TResult>> onUpdate,
             Func<TResult> onNotFound = default(Func<TResult>),
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             CloudTable table = default(CloudTable),
             AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync = 
                 default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
@@ -1973,6 +1982,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onUpdate, 
                 onNotFound.AsAsyncFunc(),
                 onModificationFailures: onModificationFailures,
+                onFailure: onFailure,
                     table:table, onTimeoutAsync:onTimeoutAsync);
         }
 
@@ -1997,6 +2007,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> UpdateAsyncAsync<TData, TResult>(Guid documentId,
             Func<TData, Func<TData, Task>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default(Func<Task<TResult>>),
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
             where TData : IReferenceable
@@ -2004,7 +2015,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var entityRef = documentId.AsRef<TData>();
             var rowKey = entityRef.StorageComputeRowKey();
             var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
-            return await UpdateAsyncAsync(rowKey, partitionKey, onUpdate, onNotFound);
+            return await UpdateAsyncAsync(rowKey, partitionKey,
+                onUpdate,
+                onNotFound,
+                onFailure: onFailure);
         }
 
         private class UpdateModificationFailure<TResult> : IHandleFailedModifications<Task<bool>>
@@ -2039,6 +2053,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TData, Func<TData, Task>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default(Func<Task<TResult>>),
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             CloudTable table = default(CloudTable),
             AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>)) 
@@ -2062,11 +2077,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             var entity = GetEntity(currentStorage);
                             useResultGlobal = await await UpdateIfNotModifiedAsync(documentToSave,
                                     entity,
-                                () =>
+                                onUpdated:() =>
                                 {
                                     return false.AsTask();
                                 },
-                                async () =>
+                                onDocumentHasBeenModified: async () =>
                                 {
                                     if (onTimeoutAsync.IsDefaultOrNull())
                                         onTimeoutAsync = AzureStorageDriver.GetRetryDelegateContentionAsync<Task<TResult>>();
@@ -2078,6 +2093,20 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                             onModificationFailures: onModificationFailures,
                                                 table:table, onTimeoutAsync:onTimeoutAsync),
                                         (numberOfRetries) => { throw new Exception("Failed to gain atomic access to document after " + numberOfRetries + " attempts"); });
+                                    return true;
+                                },
+                                onNotFound: async () =>
+                                {
+                                    if (onNotFound.IsDefaultOrNull())
+                                        throw new Exception($"Document [{partitionKey}/{rowKey}] of type {documentToSave.GetType().FullName} was not found.");
+                                    resultGlobal = await onNotFound();
+                                    return true;
+                                },
+                                onFailure: async (errorCodes, why) =>
+                                {
+                                    if (onFailure.IsDefaultOrNull())
+                                        throw new Exception(why);
+                                    resultGlobal = await onFailure(errorCodes, why);
                                     return true;
                                 },
                                 onModificationFailures: modificationFailure.AsArray(),

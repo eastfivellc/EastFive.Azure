@@ -23,6 +23,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Analytics;
 using System.Threading;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -627,6 +628,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
             where TEntity : IReferenceable
         {
@@ -771,6 +773,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static Task<TResult> StorageUpdateAsyncAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, Func<TEntity, Task>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
             where TEntity : struct, IReferenceable
