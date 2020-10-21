@@ -28,7 +28,6 @@ namespace EastFive.Azure.Persistence
 {
     [FunctionViewController(
         Route = "PropertyLookupInformation",
-        Resource = typeof(PropertyLookupInformation),
         ContentType = "x-application/eastfive.azure.storage.property-lookup-info",
         ContentTypeVersion = "0.1")]
     public class PropertyLookupInformation

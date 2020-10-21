@@ -28,7 +28,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "Invite",
-        Resource = typeof(Invite),
         ContentType = "x-application/auth-invite",
         ContentTypeVersion = "0.1")]
     [StorageTable]

@@ -18,6 +18,12 @@ namespace EastFive.Persistence.Azure.StorageTables
             KeyValuePair<MemberInfo, object>[] queries,
             ILogger logger = default);
 
+        Task<TResult> GetLookupInfoAsync<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound,
+            Func<TResult> onNoLookupInfo);
+
         Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo);
     }

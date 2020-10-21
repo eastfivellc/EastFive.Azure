@@ -65,6 +65,30 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .SelectMany();
         }
 
+        public Task<TResult> GetLookupInfoAsync<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound,
+            Func<TResult> onNoLookupInfo)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            var lookupGeneratorAttr = (IGenerateLookupKeys)this;
+            var lookupRef = lookupGeneratorAttr
+                .GetLookupKeys(memberInfo, queries)
+                .First();
+            return repository.FindByIdAsync<StorageLookupTable, TResult>(
+                    lookupRef.RowKey, lookupRef.PartitionKey,
+                (dictEntity, etag) =>
+                {
+                    return onEtagLastModifedFound(etag, 
+                        dictEntity.lastModified,
+                        dictEntity.rowAndPartitionKeys
+                            .NullToEmpty().Count());
+                },
+                () => onNoLookupInfo(),
+                tableName: tableName);
+        }
+
         public Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo)
         {
@@ -83,6 +107,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             [ETag]
             public string eTag;
+
+            [LastModified]
+            public DateTime lastModified;
 
             [Storage]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;

@@ -44,7 +44,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
-            var lookupGeneratorAttr = (IGenerateLookupKeys)this;
+            var lookupGeneratorAttr = this;
             var scopedLogger = logger.CreateScope("GetKeys");
             var lookupRefs = lookupGeneratorAttr
                 .GetLookupKeys(memberInfo, queries)
@@ -76,6 +76,51 @@ namespace EastFive.Persistence.Azure.StorageTables
                     })
                 .AsyncEnumerable() // lookupRefs.Length)
                 .SelectMany(logger: scopedLogger);
+        }
+
+        public Task<TResult> GetLookupInfoAsync<TResult>(
+                MemberInfo memberInfo, AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound,
+            Func<TResult> onNoLookupInfo)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            var lookupGeneratorAttr = this;
+            var lookupRefs = lookupGeneratorAttr
+                .GetLookupKeys(memberInfo, queries)
+                .ToArray();
+            return lookupRefs
+                .Select(
+                    lookupRef =>
+                    {
+                        return repository.FindByIdAsync<StorageLookupTable, (bool, string, DateTime, int)>(
+                                lookupRef.RowKey, lookupRef.PartitionKey,
+                            (dictEntity, etag) =>
+                            {
+                                var lastModified = dictEntity.lastModified;
+                                var count = dictEntity
+                                    .rowAndPartitionKeys
+                                    .NullToEmpty()
+                                    .Count();
+                                return (true, etag,
+                                    lastModified,
+                                    count);
+                            },
+                            () =>
+                            {
+                                var etag = default(string);
+                                var count = default(int);
+                                var lastModified = default(DateTime);
+                                return (false, etag, lastModified, count);
+                            },
+                            tableName: tableName);
+                    })
+                .AsyncEnumerable()
+                .Where(tpl => tpl.Item1)
+                .FirstAsync(
+                    tpl => onEtagLastModifedFound(
+                        tpl.Item2, tpl.Item3, tpl.Item4),
+                    () => onNoLookupInfo());
         }
 
         public async Task<PropertyLookupInformation[]> GetInfoAsync(
@@ -127,6 +172,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             [ETag]
             public string eTag;
+
+            [LastModified]
+            public DateTime lastModified;
 
             [StorageOverflow]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;

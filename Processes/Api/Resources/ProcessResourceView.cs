@@ -18,7 +18,6 @@ namespace EastFive.Api.Azure.Resources
     [DataContract]
     [FunctionViewController(
         Route = "ProcessResourceView",
-        Resource = typeof(Resources.ProcessResourceView),
         ContentType = "x-application/process-resource-view",
         ContentTypeVersion = "0.1")]
     public class ProcessResourceView : ResourceBase

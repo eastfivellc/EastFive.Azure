@@ -20,7 +20,6 @@ namespace EastFive.Azure.Auth
 {
     [FunctionViewController(
         Route = "OpenIdResponse",
-        Resource = typeof(OpenIdResponse),
         ContentType = "x-application/open-id-response",
         ContentTypeVersion = "0.1")]
     public class OpenIdResponse : EastFive.Azure.Auth.Redirection

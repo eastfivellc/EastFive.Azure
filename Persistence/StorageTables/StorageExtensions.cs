@@ -23,6 +23,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Analytics;
 using System.Threading;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -474,12 +475,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 Expression<Func<TEntity, TProperty>> propertyExpr,
                 Expression<Func<TEntity, bool>> query1 = default,
                 Expression<Func<TEntity, bool>> query2 = default,
+                int readAhead = -1,
                 ILogger logger = default)
             where TEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy(propertyValue, propertyExpr, query1, query2, logger:logger);
+                .FindBy(propertyValue, propertyExpr, query1, query2,
+                    readAhead: readAhead,
+                    logger:logger);
         }
 
         public static IEnumerableAsync<IRef<TEntity>> StorageGetIdsBy<TProperty, TEntity>(this TProperty propertyValue,
@@ -503,6 +507,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                             .id;
                         return (IRef<TEntity>) new Ref<TEntity>(entityId);
                     });
+        }
+
+        public static Task<TResult> StorageGetLastModifiedBy<TProperty, TEntity, TResult>(this TProperty propertyValue,
+                Expression<Func<TEntity, TProperty>> propertyExpr,
+                Expression<Func<TEntity, bool>> query1 = default,
+                Expression<Func<TEntity, bool>> query2 = default,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound = default,
+            Func<TResult> onNoLookupInfo = default)
+            where TEntity : IReferenceable
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .FindModifiedByAsync(propertyValue, propertyExpr,
+                    new[] { query1, query2 },
+                    onEtagLastModifedFound,
+                    onNoLookupInfo);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
@@ -679,6 +699,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
             where TEntity : IReferenceable
         {
@@ -823,6 +844,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static Task<TResult> StorageUpdateAsyncAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, Func<TEntity, Task>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
             where TEntity : struct, IReferenceable
@@ -911,6 +933,16 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<TEntity> entities,
+            Func<Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> onSuccess)
+            where TEntity : IReferenceable
+        {
+            var documentIds = entities.Select(entity => entity.id);
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteBatch<TEntity, TResult>(documentIds, onSuccess);
+        }
+
+        public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,
             Func<Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
         {

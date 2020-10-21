@@ -72,6 +72,37 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .FoldTask();
         }
 
+        public Task<TResult> GetLookupInfoAsync<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound,
+            Func<TResult> onNoLookupInfo)
+        {
+            if (queries.IsDefaultNullOrEmpty())
+                throw new ArgumentException("Exactly one query param is required for StorageLinkAttribute.");
+            if (queries.Length != 1)
+                throw new ArgumentException("Exactly one query param is valid for StorageLinkAttribute.");
+
+            var tableName = GetLookupTableName(memberInfo);
+            var memberValue = queries.First().Value;
+            var queryMemberInfo = queries.First().Key;
+            var rowKey = queryMemberInfo.StorageComputeRowKey(memberValue,
+                onMissing: () => new RowKeyAttribute());
+            var partitionKey = queryMemberInfo.StorageComputePartitionKey(memberValue, rowKey,
+                onMissing: () => new RowKeyPrefixAttribute());
+            return repository.FindByIdAsync<StorageLookupTable, TResult>(
+                    rowKey, partitionKey,
+                (dictEntity, etag) =>
+                {
+                    return onEtagLastModifedFound(etag,
+                        dictEntity.lastModified,
+                        dictEntity.rowAndPartitionKeys
+                            .NullToEmpty().Count());
+                },
+                () => onNoLookupInfo(),
+                tableName: tableName);
+        }
+
         public Task<PropertyLookupInformation[]> GetInfoAsync(
             MemberInfo memberInfo)
         {
@@ -86,6 +117,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             [ParititionKey]
             public string partitionKey;
+
+            [LastModified]
+            public DateTime lastModified;
 
             [Storage]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;

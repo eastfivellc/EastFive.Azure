@@ -46,6 +46,7 @@ namespace EastFive.Azure
         public const string SpaSiteLocation = "EastFive.Azure.SpaSiteLocation";
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
+        public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
 
         public const string FunctionProcessorServiceBusTriggerName = "EastFive.Azure.Functions.ServiceBusTriggerName";
         public const string FunctionProcessorServiceBusTriggerNamePercent = "%" + FunctionProcessorServiceBusTriggerName + "%";

@@ -13,8 +13,7 @@ namespace EastFive.Security.SessionServer.Api.Controllers
 {
     [FunctionViewController(
         Namespace = "/",
-        Route= "apple-app-site-association", 
-        Resource = typeof(AppleAppSiteAssociationController))]
+        Route= "apple-app-site-association")]
     public class AppleAppSiteAssociationController
     {
         [EastFive.Api.HttpGet]
