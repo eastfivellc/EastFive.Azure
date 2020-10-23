@@ -31,6 +31,10 @@ namespace EastFive.Azure.Modules
             RouteHandlingDelegate continueExecution)
         {
             var response = await continueExecution(controllerType, httpApp, request, routeName);
+            
+            if (Api.Azure.Modules.SpaHandler.SpaMinimumVersion.HasValue)
+                this.clientMinimumVersionMaybe = Api.Azure.Modules.SpaHandler.SpaMinimumVersion.Value;
+
             if (!clientMinimumVersionMaybe.HasValue)
                 return response;
             var clientMinimumVersion = clientMinimumVersionMaybe.Value;

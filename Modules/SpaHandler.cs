@@ -14,12 +14,15 @@ using EastFive.Linq;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Api.Azure.Controllers;
+using RestSharp.Extensions;
+using RestSharp.Serialization.Json;
 
 namespace EastFive.Api.Azure.Modules
 {
     public class SpaHandler : EastFive.Api.Modules.ApplicationHandler
     {
         private const string IndexHTMLFileName = "index.html";
+        private const string BuildJsonFileName = "content/build.json";
         private static byte[] indexHTML;
         private static ManualResetEvent signal = new ManualResetEvent(false);
 
@@ -81,6 +84,8 @@ namespace EastFive.Api.Azure.Modules
 
             ExtractSpaFiles(httpApp);
         }
+
+        public static int? SpaMinimumVersion = default;
         
         private void ExtractSpaFiles(AzureApplication application)
         {
@@ -105,7 +110,20 @@ namespace EastFive.Api.Azure.Modules
                                     .Open()
                                     .ToBytes();
 
-                                lookupSpaFile = ConfigurationContext.Instance.GetSettingValue(EastFive.Azure.AppSettings.SpaSiteLocation,
+                                var buildJsonEntries = zipArchive.Entries
+                                    .Where(item => string.Compare(item.FullName, BuildJsonFileName, true) == 0);
+                                if (buildJsonEntries.Any())
+                                {
+                                    var buildJsonString = buildJsonEntries
+                                        .First()
+                                        .Open()
+                                        .ToBytes()
+                                        .AsString();
+                                    dynamic buildJson = Newtonsoft.Json.JsonConvert.DeserializeObject(buildJsonString);
+                                    SpaMinimumVersion = (int)buildJson.buildTimeInSeconds;
+                                }
+                                
+                                lookupSpaFile = EastFive.Azure.AppSettings.SpaSiteLocation.ConfigurationString(
                                     (siteLocation) =>
                                     {
                                         application.Telemetry.TrackEvent($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
@@ -127,7 +145,7 @@ namespace EastFive.Api.Azure.Modules
                                                 })
                                             .ToDictionary();
                                     },
-                                    () =>
+                                    (why) =>
                                     {
                                         application.Telemetry.TrackException(new ArgumentNullException("Could not find SpaSiteLocation - is this key set in app settings?"));
                                         return new Dictionary<string, byte[]>();
