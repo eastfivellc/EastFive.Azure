@@ -557,6 +557,15 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var dateTimeValueMaybe = value.DateTime;
                         return onBound(dateTimeValueMaybe);
                     }
+                    if (typeof(TimeSpan) == nullableType)
+                    {
+                        if (value.DoubleValue.HasValue)
+                        {
+                            var seconds = value.DoubleValue.Value;
+                            var tsValue = TimeSpan.FromSeconds(seconds);
+                            return onBound(tsValue);
+                        }
+                    }
                     return onFailedToBind();
                 },
                 () => onFailedToBind());
