@@ -411,6 +411,7 @@ namespace EastFive.Api.Azure
             Func<HttpResponseMessage, HttpResponseMessage> noModifications = m => m;
             return this.GetType()
                 .GetAttributesInterface<IResolveRedirection>(inherit: true, multiple: true)
+                .Distinct(attr => attr.GetType().FullName) // Issue with duplicate attributes due to Global.asax class
                 .OrderBy(attr => attr.Order)
                 .Aggregate((noModifications, fullUriStart).AsTask(),
                     async (relUriTask, redirResolver) =>

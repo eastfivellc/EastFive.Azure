@@ -75,63 +75,59 @@ namespace EastFive.Azure.Auth
             var userAgent = userAgents.First();
             var name = userAgent.Product.Name;
             var version = userAgent.Product.Version;
-            var unique = $"{name}++++{version}";
-            var browserId = unique.MD5HashGuid();
-            return await browserId
-                .AsRef<BrowserIdentity>()
-                .StorageCreateOrUpdateAsync(
-                    async (created, browserIdentity, saveAsync) =>
-                    {
-                        var matchedRedirections = redirections
-                            .Select(
-                                redirAvailable =>
+            return await redirections.First(
+                (redirAvailable, next) =>
+                {
+                    var unique = $"{name}++++{version}++++{redirAvailable.Key}";
+                    var browserId = unique.MD5HashGuid();
+                    return browserId
+                        .AsRef<BrowserIdentity>()
+                        .StorageCreateOrUpdateAsync(
+                            async (created, browserIdentity, saveAsync) =>
+                            {
+                                var limit = limits[redirAvailable.Key];
+                                if(created)
                                 {
-                                    var limit = limits[redirAvailable.Key];
-                                    return browserIdentity.redirections
+                                    browserIdentity.limit = limit;
+                                    browserIdentity.count = 0;
+                                    browserIdentity.name = name;
+                                    browserIdentity.version = version;
+                                    browserIdentity.redirection = redirAvailable.Key;
+                                }
+
+                                if (browserIdentity.count >= browserIdentity.limit)
+                                    if (browserIdentity.limit >= 0)
+                                        return await next();
+
+                                if (accountIdMaybe.HasValue)
+                                {
+                                    var accountCount = browserIdentity.accounts
                                         .NullToEmpty()
-                                        .Where(redir => redirAvailable.Key == redir.redirection)
-                                        .First(
-                                            (redir, next) => redir,
-                                            () => new BrowserIdentity.Redirection()
-                                            {
-                                                limit = limit,
-                                                count = 0,
-                                                redirection = redirAvailable.Key,
-                                            });
-                                })
-                            .ToArray();
-                        var (valid, availableRedirection) = matchedRedirections
-                            .Where(redir => redir.count < redir.limit)
-                            .First(
-                                (redir, next) =>
+                                        .Count();
+                                    browserIdentity.accounts = browserIdentity.accounts
+                                        .NullToEmpty()
+                                        .Append(accountIdMaybe.Value)
+                                        .Distinct()
+                                        .ToArray();
+                                    if(accountCount < browserIdentity.accounts.Length)
+                                        browserIdentity.count++;
+                                }
+                                else
                                 {
-                                    return (true, redir);
-                                },
-                                () => (false, default(BrowserIdentity.Redirection)));
-                        if(!valid)
-                            return (emptyModifier, defaultUri);
+                                    browserIdentity.count++;
+                                }
 
-                        if (accountIdMaybe.HasValue)
-                        {
+                                await saveAsync(browserIdentity);
 
-                        }
-                        else
-                        {
-                            availableRedirection.count++;
-                        }
-                        browserIdentity.redirections = matchedRedirections
-                            .Where(matchedRedirection =>
-                                matchedRedirection.redirection != availableRedirection.redirection)
-                            .Append(availableRedirection)
-                            .ToArray();
-                        await saveAsync(browserIdentity);
-
-                        var baseUri = redirections
-                            .Where(redir => redir.Key == availableRedirection.redirection)
-                            .First().Value;
-                        var overriddenUrl = defaultUri.ReplaceBase(baseUri);
-                        return (emptyModifier, overriddenUrl);
-                    });
+                                var baseUri = redirAvailable.Value;
+                                var overriddenUrl = defaultUri.ReplaceBase(baseUri);
+                                return (emptyModifier, overriddenUrl);
+                            });
+                },
+                () =>
+                {
+                    return (emptyModifier, defaultUri).AsTask();
+                });
         }
 
         [StorageTable]
@@ -161,28 +157,25 @@ namespace EastFive.Azure.Auth
             [Storage]
             public string version;
 
-            private const string RedirectionsPropertyName = "redirections";
-            [JsonProperty(PropertyName = RedirectionsPropertyName)]
+            private const string RedirectionPropertyName = "redirection";
+            [JsonProperty(PropertyName = RedirectionPropertyName)]
             [Storage]
-            public Redirection[] redirections;
+            public string redirection;
 
-            public struct Redirection
-            {
-                private const string RedirectionPropertyName = "redirection";
-                [JsonProperty(PropertyName = RedirectionPropertyName)]
-                [Storage]
-                public string redirection;
+            private const string LimitPropertyName = "limit";
+            [JsonProperty(PropertyName = LimitPropertyName)]
+            [Storage]
+            public long limit;
 
-                private const string LimitPropertyName = "limit";
-                [JsonProperty(PropertyName = LimitPropertyName)]
-                [Storage]
-                public long limit;
+            private const string CountPropertyName = "count";
+            [JsonProperty(PropertyName = CountPropertyName)]
+            [Storage]
+            public long count;
 
-                private const string CountPropertyName = "count";
-                [JsonProperty(PropertyName = CountPropertyName)]
-                [Storage]
-                public long count;
-            }
+            private const string AccountsPropertyName = "accounts";
+            [JsonProperty(PropertyName = AccountsPropertyName)]
+            [Storage]
+            public Guid[] accounts;
         }
     }
 }
