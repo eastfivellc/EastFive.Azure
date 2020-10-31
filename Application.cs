@@ -364,11 +364,12 @@ namespace EastFive.Api.Azure
         public virtual async Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
                 EastFive.Azure.Auth.Method method,
-                EastFive.Azure.Auth.Authorization authorization,
+                EastFive.Azure.Auth.Authorization authorization, 
+                HttpRequestMessage request,
                 IInvokeApplication endpoints,
                 Uri baseUri,
                 IProvideAuthorization authorizationProvider,
-            Func<Uri, TResult> onSuccess,
+            Func<Uri, Func<HttpResponseMessage, HttpResponseMessage>, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
             Func<string, TResult> onFailure)
         {
@@ -376,7 +377,7 @@ namespace EastFive.Api.Azure
                 return await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization, endpoints,
                         authorizationProvider,
-                    onSuccess,
+                    (uri) => onSuccess(uri, x => x),
                     onInvalidParameter,
                     onFailure);
 
@@ -384,20 +385,18 @@ namespace EastFive.Api.Azure
             return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, 
                         authorizationProvider, authParams,
                         method, authorization,
-                        this, endpoints, baseUri,
+                        this, request, endpoints, baseUri,
                     async (redirectUri) =>
                     {
-                        var fullUri = redirectUri.IsAbsoluteUri?
-                            redirectUri
-                            :
-                            await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
+                        var (modifier, fullUri) = await ResolveAbsoluteUrlAsync(redirectUri, 
+                                request, accountIdMaybe, authParams);
                         var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
-                        return onSuccess(redirectDecorated);
+                        return onSuccess(redirectDecorated, modifier);
                     },
                     () => ComputeRedirectAsync(accountIdMaybe, authParams,
                             method, authorization, endpoints,
                             authorizationProvider,
-                        onSuccess,
+                        (uri) => onSuccess(uri, x => x),
                         onInvalidParameter,
                         onFailure),
                     onInvalidParameter.AsAsyncFunc(),
@@ -405,10 +404,27 @@ namespace EastFive.Api.Azure
             
         }
 
-        public virtual Task<Uri> ResolveAbsoluteUrlAsync(Uri requestUri, Uri relativeUri, Guid? accountIdMaybe)
+        public virtual Task<(Func<HttpResponseMessage, HttpResponseMessage>, Uri)> ResolveAbsoluteUrlAsync(Uri relativeUri,
+            HttpRequestMessage request, Guid? accountIdMaybe, IDictionary<string, string> authParams)
         {
-            var fullUri = new Uri(requestUri, relativeUri);
-            return fullUri.AsTask();
+            var fullUriStart = new Uri(request.RequestUri, relativeUri);
+            Func<HttpResponseMessage, HttpResponseMessage> noModifications = m => m;
+            return this.GetType()
+                .GetAttributesInterface<IResolveRedirection>(inherit: true, multiple: true)
+                .OrderBy(attr => attr.Order)
+                .Aggregate((noModifications, fullUriStart).AsTask(),
+                    async (relUriTask, redirResolver) =>
+                    {
+                        var (modifier, fullUri) = await relUriTask;
+                        var (nextModifier, nextfullUri) = await redirResolver.ResolveAbsoluteUrlAsync(fullUri, 
+                            request, accountIdMaybe, authParams);
+                        Func<HttpResponseMessage, HttpResponseMessage> combinedModifier = (response) =>
+                        {
+                            var nextResponse = nextModifier(response);
+                            return modifier(nextResponse);
+                        };
+                        return (combinedModifier, nextfullUri);
+                    });
         }
 
         private async Task<TResult> ComputeRedirectAsync<TResult>(

@@ -141,6 +141,9 @@ namespace EastFive.Azure
                 MoreInfo = "This can only be accessed when the Key is created")]
             public const string ClientSecret = "EastFive.Azure.AzureADB2C.ClientSecret";
         }
+
+        public const string Redirections = "EastFive.Azure.Auth.Redirections";
+        public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
     }
 }
 

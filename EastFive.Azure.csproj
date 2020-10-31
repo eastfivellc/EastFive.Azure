@@ -310,6 +310,7 @@
     <Compile Include="Auth\AccessTokenAccessAttribute.cs" />
     <Compile Include="Auth\ApiKeyAccessAttribute.cs" />
     <Compile Include="Auth\CredentialProviders\Voucher\VoucherToken.cs" />
+    <Compile Include="Auth\IResolveRedirection.cs" />
     <Compile Include="Auth\Login.cs" />
     <Compile Include="Auth\Claim.cs" />
     <Compile Include="Auth\Token.cs" />
@@ -347,7 +348,9 @@
     <Compile Include="Login\CredentialProvider.cs" />
     <Compile Include="Login\Redirection.cs" />
     <Compile Include="Media\ContentExtensions.cs" />
+    <Compile Include="Modules\BrowserIdentitySplitterAttribute.cs" />
     <Compile Include="Modules\ClientCurrencyCheckAttribute.cs" />
+    <Compile Include="Modules\PreserverRedirectionHandler.cs" />
     <Compile Include="Monitoring\ApplicationInsights.cs" />
     <Compile Include="Monitoring\ApplicationInsightsRouteHandlerAttribute.cs" />
     <Compile Include="Monitoring\MessageCard.cs" />
