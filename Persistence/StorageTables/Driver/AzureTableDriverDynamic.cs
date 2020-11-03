@@ -2605,7 +2605,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             .Select(
                                 async partitionDocsGrp =>
                                 {
-                                    var results = await this.DeleteBatchAsync<TData>(partitionDocsGrp.Key, partitionDocsGrp.ToArray());
+                                    var results = await this.DeleteBatchAsync<TData>(
+                                        partitionDocsGrp.Key, partitionDocsGrp.ToArray());
                                     return results.Select(tr => result(tr));
                                 })
                             .AsyncEnumerable()
@@ -2625,7 +2626,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .Select(
                     async partitionDocsGrp =>
                     {
-                        var results = await this.DeleteBatchAsync<TData>(partitionDocsGrp.Key, partitionDocsGrp.ToArray());
+                        var results = await this.DeleteBatchAsync<TData>(
+                            partitionDocsGrp.Key, partitionDocsGrp.ToArray());
                         return results.Select(tr => result(tr));
                     })
                 .AsyncEnumerable()

@@ -29,7 +29,6 @@ namespace EastFive.Azure
 {
     [FunctionViewController(
          ContentType = "application/x-redirect",
-         Resource = typeof(Redirect),
          Route = "redirect")]
     [StorageTable]
     public struct Redirect : IReferenceable

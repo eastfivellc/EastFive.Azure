@@ -94,7 +94,9 @@ namespace EastFive.Azure
                 Location = "Apple developer portal -> Login with apple",
                 DeploymentSecurityConcern = false)]
             public const string DeveloperSiteAssociation = "EastFive.Azure.Apple.DeveloperSiteAssociation";
-	}
+
+            public const string AppleAppSiteAssociationId = "EastFive.Azure.Apple.AppleAppSiteAssociation.AppId";
+        }
 
         public static class AzureADB2C
         {
@@ -161,7 +163,6 @@ namespace EastFive.Security.SessionServer.Configuration
             DeploymentSecurityConcern = false,
             Location = "The URL that the webUI is deployed")]
         public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
-        public const string AppleAppSiteAssociationId = "EastFive.Security.SessionServer.AppleAppSiteAssociation.AppId";
 
         [ConfigKey("Connection string that is used for the service bus.",
             DeploymentOverrides.Suggested,

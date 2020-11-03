@@ -31,8 +31,12 @@ namespace EastFive.Azure.Monitoring
                     return await continueExecution(ex, method, queryParameters,
                         httpApp, routeData);
                 },
-                (why) => continueExecution(ex, method, queryParameters,
-                        httpApp, routeData));
+                onFailure:
+                    (why) => continueExecution(ex, method, queryParameters,
+                        httpApp, routeData),
+                onNotSpecified:
+                    () => continueExecution(ex, method, queryParameters,
+                         httpApp, routeData));
         }
 
         public Task<IHttpResponse> HandleRouteAsync(Type controllerType,
@@ -110,9 +114,8 @@ namespace EastFive.Azure.Monitoring
                     string messageId = await message.SendAsync(teamsHookUrl);
                     return response;
                 },
-                (why) => continueExecution(controllerType, httpApp, request));
-
-            
+                onFailure: (why) => continueExecution(controllerType, httpApp, request),
+                onNotSpecified: () => continueExecution(controllerType, httpApp, request));
         }
 
 
