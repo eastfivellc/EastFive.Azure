@@ -1181,7 +1181,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> BlobCreateAsync<TResult>(this Stream content, Guid blobId, string containerName,
             Func<TResult> onSuccess,
-            Func<TResult> onAlreadyExists,
+            Func<TResult> onAlreadyExists = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
@@ -1191,6 +1191,27 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FromSettings()
                 .BlobCreateAsync(content, blobId, containerName,
                     onSuccess,
+                    onAlreadyExists: onAlreadyExists,
+                    onFailure: onFailure,
+                    contentType: contentType,
+                    metadata: metadata,
+                    onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> BlobCreateAsync<TResult>(this Guid blobId, string containerName,
+                Func<Stream, Task> writeAsync,
+            Func<TResult> onSuccess,
+            Func<TResult> onAlreadyExists = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(blobId, containerName,
+                        writeAsync,
+                    onSuccess: onSuccess,
                     onAlreadyExists: onAlreadyExists,
                     onFailure: onFailure,
                     contentType: contentType,

@@ -2908,7 +2908,26 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        public async Task<TResult> BlobCreateAsync<TResult>(Stream content, Guid blobId, string containerName,
+        public Task<TResult> BlobCreateAsync<TResult>(Stream content, Guid blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<TResult> onAlreadyExists = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+        {
+            return BlobCreateAsync(blobId, containerName,
+                    stream => content.CopyToAsync(stream),
+                onSuccess: onSuccess,
+                onAlreadyExists: onAlreadyExists,
+                onFailure: onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+        }
+
+        public async Task<TResult> BlobCreateAsync<TResult>(Guid blobId, string containerName,
+                Func<Stream, Task> writeAsync,
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -2937,7 +2956,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 }
                 using (var stream = await blockBlob.OpenWriteAsync())
                 {
-                    await content.CopyToAsync(stream);
+                    await writeAsync(stream);
                 }
                 return onSuccess();
             }
