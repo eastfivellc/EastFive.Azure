@@ -144,6 +144,12 @@ namespace EastFive.Azure
 
         public const string Redirections = "EastFive.Azure.Auth.Redirections";
         public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
+
+        [ConfigKey("Expiration in days for immutable spa files.",
+            DeploymentOverrides.Optional,
+            DeploymentSecurityConcern = false,
+            Location = "Discressionary")]
+        public const string SpaFilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
     }
 }
 

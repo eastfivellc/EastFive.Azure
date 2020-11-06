@@ -192,6 +192,51 @@ namespace EastFive.Api.Azure.Modules
 
             if (lookupSpaFile.ContainsKey(fileName))
             {
+                var response = await ServeFromSpaZip(fileName);
+                var immutableDays = EastFive.Azure.AppSettings.SpaFilesExpirationInDays.ConfigurationDouble(
+                    d => d,
+                    (why) => 1.0);
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromDays(immutableDays),
+                    SharedMaxAge = TimeSpan.FromDays(immutableDays),
+                    MustRevalidate = false,
+                    NoCache = false,
+                    NoStore = false,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+                return response;
+            }
+            
+            var requestStart = request.RequestUri.AbsolutePath.ToLower();
+            if (!firstSegments
+                    .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
+                    .Any())
+            {
+                var response = await ServeFromSpaZip("index.html");
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromSeconds(0.0),
+                    SharedMaxAge = TimeSpan.FromSeconds(0.0),
+                    MustRevalidate = true,
+                    NoCache = true,
+                    NoStore = true,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+                response.Headers.Add("Expires", "-1");
+                response.Headers.Pragma.Add(
+                    new System.Net.Http.Headers.NameValueHeaderValue("no-cache"));
+                return response;
+            }
+
+            return await continuation(request, cancellationToken);
+
+            async Task<HttpResponseMessage> ServeFromSpaZip(string spaFileName)
+            {
                 var controllerType = typeof(SpaServeController);
                 var routeName = "spaservecontroller";
                 return await httpApp.GetType()
@@ -199,11 +244,11 @@ namespace EastFive.Api.Azure.Modules
                     .Aggregate<IHandleRoutes, RouteHandlingDelegate>(
                         (controllerTypeFinal, httpAppFinal, requestFinal, routeNameFinal) =>
                         {
-                            return request.CreateContentResponse(lookupSpaFile[fileName],
-                                fileName.EndsWith(".js") ?
+                            return request.CreateContentResponse(lookupSpaFile[spaFileName],
+                                spaFileName.EndsWith(".js") ?
                                     "text/javascript"
                                     :
-                                    fileName.EndsWith(".css") ?
+                                    spaFileName.EndsWith(".css") ?
                                         "text/css"
                                         :
                                         request.Headers.Accept.Any() ?
@@ -220,13 +265,6 @@ namespace EastFive.Api.Azure.Modules
                         })
                     .Invoke(controllerType, httpApp, request, routeName);
             }
-            var requestStart = request.RequestUri.AbsolutePath.ToLower();
-            if (!firstSegments
-                    .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
-                    .Any())
-                return request.CreateHtmlResponse(EastFive.Azure.Properties.Resources.indexPage);
-
-            return await continuation(request, cancellationToken);
         }
     }
 }
