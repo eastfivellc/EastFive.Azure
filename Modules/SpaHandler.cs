@@ -193,11 +193,13 @@ namespace EastFive.Api.Azure.Modules
             if (lookupSpaFile.ContainsKey(fileName))
             {
                 var response = await ServeFromSpaZip(fileName);
+                var immutableDays = EastFive.Azure.AppSettings.SpaFilesExpirationInDays.ConfigurationDouble(
+                    d => d,
+                    (why) => 1.0);
                 response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
                 {
-                    MaxAge = TimeSpan.FromDays(100.0),
-                    SharedMaxAge = TimeSpan.FromDays(100.0),
-                    MinFresh = TimeSpan.FromDays(60.0),
+                    MaxAge = TimeSpan.FromDays(immutableDays),
+                    SharedMaxAge = TimeSpan.FromDays(immutableDays),
                     MustRevalidate = false,
                     NoCache = false,
                     NoStore = false,
@@ -218,9 +220,6 @@ namespace EastFive.Api.Azure.Modules
                 {
                     MaxAge = TimeSpan.FromSeconds(0.0),
                     SharedMaxAge = TimeSpan.FromSeconds(0.0),
-                    MaxStale = true,
-                    MaxStaleLimit = TimeSpan.FromSeconds(60.0),
-                    MinFresh = TimeSpan.FromSeconds(60.0),
                     MustRevalidate = true,
                     NoCache = true,
                     NoStore = true,
