@@ -325,7 +325,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         {
             var driver = AzureTableDriverDynamic.FromSettings();
             var tableInformationTaskObj = typeof(AzureTableDriverDynamic)
-                .GetMethod("TableInformationAsync", BindingFlags.Instance | BindingFlags.Public)
+                .GetMethod(nameof(AzureTableDriverDynamic.TableInformationAsync), BindingFlags.Instance | BindingFlags.Public)
                 .MakeGenericMethod(entityType.AsArray())
                 .Invoke(driver, new object[] { table, tableName, numberOfTimesToRetry, default(CancellationToken) });
 
@@ -548,6 +548,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .FindEntityBypartition<TEntity>(partition);
+        }
+
+        public static IEnumerableAsync<TEntity> StorageFindbyQuery<TEntity>(
+            this string whereClause,
+            ICacheEntites cache = default)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .FindByQuery<TEntity>(whereClause, cache: cache);
         }
 
         #endregion
