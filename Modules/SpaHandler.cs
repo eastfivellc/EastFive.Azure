@@ -191,6 +191,35 @@ namespace EastFive.Api.Azure.Modules
                 return await continuation(request, cancellationToken);
 
             if (lookupSpaFile.ContainsKey(fileName))
+                return await ServeFromSpaZip(fileName);
+            
+            var requestStart = request.RequestUri.AbsolutePath.ToLower();
+            if (!firstSegments
+                    .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
+                    .Any())
+            {
+                var response = await ServeFromSpaZip("index.html");
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromSeconds(0.0),
+                    SharedMaxAge = TimeSpan.FromSeconds(0.0),
+                    MaxStale = true,
+                    MaxStaleLimit = TimeSpan.FromSeconds(60.0),
+                    MinFresh = TimeSpan.FromSeconds(60.0),
+                    MustRevalidate = true,
+                    NoCache = true,
+                    NoStore = true,
+                    NoTransform = true,
+                    OnlyIfCached = true,
+                    Private = false,
+                    Public = true,
+                };
+                return response;
+            }
+
+            return await continuation(request, cancellationToken);
+
+            async Task<HttpResponseMessage> ServeFromSpaZip(string spaFileName)
             {
                 var controllerType = typeof(SpaServeController);
                 var routeName = "spaservecontroller";
@@ -199,11 +228,11 @@ namespace EastFive.Api.Azure.Modules
                     .Aggregate<IHandleRoutes, RouteHandlingDelegate>(
                         (controllerTypeFinal, httpAppFinal, requestFinal, routeNameFinal) =>
                         {
-                            return request.CreateContentResponse(lookupSpaFile[fileName],
-                                fileName.EndsWith(".js") ?
+                            return request.CreateContentResponse(lookupSpaFile[spaFileName],
+                                spaFileName.EndsWith(".js") ?
                                     "text/javascript"
                                     :
-                                    fileName.EndsWith(".css") ?
+                                    spaFileName.EndsWith(".css") ?
                                         "text/css"
                                         :
                                         request.Headers.Accept.Any() ?
@@ -220,13 +249,6 @@ namespace EastFive.Api.Azure.Modules
                         })
                     .Invoke(controllerType, httpApp, request, routeName);
             }
-            var requestStart = request.RequestUri.AbsolutePath.ToLower();
-            if (!firstSegments
-                    .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
-                    .Any())
-                return request.CreateHtmlResponse(EastFive.Azure.Properties.Resources.indexPage);
-
-            return await continuation(request, cancellationToken);
         }
     }
 }
