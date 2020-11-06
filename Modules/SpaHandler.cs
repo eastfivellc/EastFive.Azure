@@ -191,7 +191,22 @@ namespace EastFive.Api.Azure.Modules
                 return await continuation(request, cancellationToken);
 
             if (lookupSpaFile.ContainsKey(fileName))
-                return await ServeFromSpaZip(fileName);
+            {
+                var response = await ServeFromSpaZip(fileName);
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromDays(100.0),
+                    SharedMaxAge = TimeSpan.FromDays(100.0),
+                    MinFresh = TimeSpan.FromDays(60.0),
+                    MustRevalidate = false,
+                    NoCache = false,
+                    NoStore = false,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+                return response;
+            }
             
             var requestStart = request.RequestUri.AbsolutePath.ToLower();
             if (!firstSegments
@@ -210,10 +225,12 @@ namespace EastFive.Api.Azure.Modules
                     NoCache = true,
                     NoStore = true,
                     NoTransform = true,
-                    OnlyIfCached = true,
                     Private = false,
                     Public = true,
                 };
+                response.Headers.Add("Expires", "-1");
+                response.Headers.Pragma.Add(
+                    new System.Net.Http.Headers.NameValueHeaderValue("no-cache"));
                 return response;
             }
 
