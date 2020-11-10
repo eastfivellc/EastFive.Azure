@@ -14,7 +14,7 @@ namespace EastFive.Api.Azure.Credentials
                 EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
                 EastFive.Api.Azure.AzureApplication application, HttpRequestMessage request,
                 IInvokeApplication endpoints, Uri baseUrl,
-            Func<Uri, TResult> onSuccess,
+            Func<Uri, KeyValuePair<string,string>[], TResult> onSuccess,
             Func<TResult> onIgnored,
             Func<string, string, TResult> onInvalidParameter,
             Func<string, TResult> onFailure);
