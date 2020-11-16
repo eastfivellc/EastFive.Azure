@@ -386,10 +386,13 @@ namespace EastFive.Api.Azure
                         authorizationProvider, authParams,
                         method, authorization,
                         this, request, endpoints, baseUri,
-                    async (redirectUri) =>
+                    async (redirectUri, kvps) =>
                     {
                         var (modifier, fullUri) = await ResolveAbsoluteUrlAsync(redirectUri, 
                                 request, accountIdMaybe, authParams);
+			foreach (var kvp in kvps.NullToEmpty())
+				fullUri = fullUri.SetQueryParam(kvp.Key, kvp.Value);
+
                         var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
                         return onSuccess(redirectDecorated, modifier);
                     },
