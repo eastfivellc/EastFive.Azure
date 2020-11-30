@@ -128,7 +128,6 @@ namespace EastFive.Api.Azure.Modules
                                     {
                                         application.Telemetry.TrackEvent($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
                                         return zipArchive.Entries
-                                            .Where(item => string.Compare(item.FullName, IndexHTMLFileName, true) != 0)
                                             .Select(
                                                 entity =>
                                                 {
@@ -227,7 +226,7 @@ namespace EastFive.Api.Azure.Modules
                     Private = false,
                     Public = true,
                 };
-                response.Headers.Add("Expires", "-1");
+                response.Content.Headers.Expires = DateTime.UtcNow.AddDays(-1);
                 response.Headers.Pragma.Add(
                     new System.Net.Http.Headers.NameValueHeaderValue("no-cache"));
                 return response;
@@ -251,10 +250,13 @@ namespace EastFive.Api.Azure.Modules
                                     spaFileName.EndsWith(".css") ?
                                         "text/css"
                                         :
-                                        request.Headers.Accept.Any() ?
-                                            request.Headers.Accept.First().MediaType
+                                        spaFileName.EndsWith(".html") ?
+                                            "text/html"
                                             :
-                                            string.Empty).AsTask();
+                                            request.Headers.Accept.Any() ?
+                                                request.Headers.Accept.First().MediaType
+                                                :
+                                                string.Empty).AsTask();
                         },
                         (callback, routeHandler) =>
                         {
