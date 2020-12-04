@@ -19,6 +19,7 @@ using EastFive.Linq;
 using EastFive.Api.Azure.Controllers;
 using EastFive.Security.SessionServer;
 using EastFive.Extensions;
+using System.IO;
 
 namespace EastFive.Api.Azure.Credentials.Controllers
 {
@@ -43,20 +44,30 @@ namespace EastFive.Api.Azure.Credentials.Controllers
         {
             try
             {
-                var doc = XDocument.Parse(samlResponse); //or XDocument.Load(path)
-                string jsonText = JsonConvert.SerializeXNode(doc);
-                var dyn = JsonConvert.DeserializeObject<ExpandoObject>(jsonText);
+                var settings = new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Ignore, // prevents XXE attacks, such as Billion Laughs
+                    MaxCharactersFromEntities = 1024,
+                    XmlResolver = null,                   // prevents external entity DoS attacks, such as slow loading links or large file requests
+                };
+                using (var strReader = new StringReader(samlResponse))
+                using (var xmlReader = XmlReader.Create(strReader, settings))
+                {
+                    var doc = XDocument.Load(xmlReader);
+                    string jsonText = JsonConvert.SerializeXNode(doc);
+                    var dyn = JsonConvert.DeserializeObject<ExpandoObject>(jsonText);
 
-                var response = ((IDictionary<string, object>)dyn)[SAMLProvider.SamlpResponseKey];
-                var assertion = (IDictionary<string, object>)(((IDictionary<string, object>)response)[SAMLProvider.SamlAssertionKey]);
-                var subject = assertion[SAMLProvider.SamlSubjectKey];
-                var nameIdNode = ((IDictionary<string, object>)subject)[SAMLProvider.SamlNameIDKey];
-                var nameId = (string)((IDictionary<string, object>)nameIdNode)["#text"];
-                return onSuccess(
-                    assertion
-                        .Select(kvp => kvp.Key.PairWithValue(kvp.Value.ToString()))
-                        .Append(SAMLProvider.SamlNameIDKey.PairWithValue(nameId))
-                        .ToDictionary());
+                    var response = ((IDictionary<string, object>)dyn)[SAMLProvider.SamlpResponseKey];
+                    var assertion = (IDictionary<string, object>)(((IDictionary<string, object>)response)[SAMLProvider.SamlAssertionKey]);
+                    var subject = assertion[SAMLProvider.SamlSubjectKey];
+                    var nameIdNode = ((IDictionary<string, object>)subject)[SAMLProvider.SamlNameIDKey];
+                    var nameId = (string)((IDictionary<string, object>)nameIdNode)["#text"];
+                    return onSuccess(
+                        assertion
+                            .Select(kvp => kvp.Key.PairWithValue(kvp.Value.ToString()))
+                            .Append(SAMLProvider.SamlNameIDKey.PairWithValue(nameId))
+                            .ToDictionary());
+                }
             }
             catch (Exception ex)
             {
