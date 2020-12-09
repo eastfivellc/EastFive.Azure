@@ -28,6 +28,7 @@ namespace EastFive.Api.Azure.Modules
 
         private Dictionary<string, byte[]> lookupSpaFile;
         private string[] firstSegments;
+        private bool dynamicServe = false;
 
         protected override void Dispose(bool disposing)
         {
@@ -57,6 +58,10 @@ namespace EastFive.Api.Azure.Modules
         public SpaHandler(AzureApplication httpApp, System.Web.Http.HttpConfiguration config)
             : base(config)
         {
+            dynamicServe = EastFive.Azure.AppSettings.SpaServeEnabled.ConfigurationBoolean(
+                ds => ds,
+                onFailure: why => false,
+                onNotSpecified: () => false);
             // TODO: A better job of matching that just grabbing the first segment
             firstSegments = System.Web.Routing.RouteTable.Routes
                 .Where(route => route is System.Web.Routing.Route)
@@ -73,6 +78,10 @@ namespace EastFive.Api.Azure.Modules
             HttpMessageHandler handler)
             : base(config, handler)
         {
+            dynamicServe = EastFive.Azure.AppSettings.SpaServeEnabled.ConfigurationBoolean(
+                ds => ds,
+                onFailure: why => false,
+                onNotSpecified: () => false);
             // TODO: A better job of matching that just grabbing the first segment
             firstSegments = System.Web.Routing.RouteTable.Routes
                 .Where(route => route is System.Web.Routing.Route)
@@ -128,6 +137,13 @@ namespace EastFive.Api.Azure.Modules
                                     {
                                         application.Telemetry.TrackEvent($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
                                         return zipArchive.Entries
+                                            .Where(
+                                                item =>
+                                                {
+                                                    if (dynamicServe)
+                                                        return string.Compare(item.FullName, IndexHTMLFileName, true) != 0;
+                                                    return true;
+                                                })
                                             .Select(
                                                 entity =>
                                                 {
@@ -214,6 +230,9 @@ namespace EastFive.Api.Azure.Modules
                     .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
                     .Any())
             {
+                if(dynamicServe)
+                    return request.CreateHtmlResponse(EastFive.Azure.Properties.Resources.indexPage);
+
                 var response = await ServeFromSpaZip("index.html");
                 response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
                 {

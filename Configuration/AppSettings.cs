@@ -150,6 +150,12 @@ namespace EastFive.Azure
             DeploymentSecurityConcern = false,
             Location = "Discressionary")]
         public const string SpaFilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
+
+        [ConfigKey("Enable dynamic serving of the SPA.",
+            DeploymentOverrides.Optional,
+            DeploymentSecurityConcern = false,
+            Location = "Discressionary")]
+        public const string SpaServeEnabled = "EastFive.Azure.SpaServeEnabled";
     }
 }
 
