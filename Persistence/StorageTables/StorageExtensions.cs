@@ -680,6 +680,31 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        //public static Task<TResult> StorageInsertOrReplaceAsync<TEntity, TResult>(this TEntity entity,
+        //    Func<bool, TResult> onSuccess,
+        //    IHandleFailedModifications<TResult>[] onModificationFailures = default,
+        //    Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+        //    AzureStorageDriver.RetryDelegate onTimeout = null)
+        //    where TEntity : IReferenceable
+        //{
+        //    var driver = AzureTableDriverDynamic
+        //        .FromSettings();
+        //    driver.CreateAsync(entity,
+        //        tableEntity => onSuccess(true),
+        //        onAlreadyExists:
+        //            () =>
+        //            {
+        //                var rowKey = entity.StorageGetRowKey();
+        //                var partitionKey = entity.StorageGetPartitionKey();
+        //                driver.UpdateOrCreateAsync(rowKey, partitionKey,);
+        //            });
+        //        .InsertOrReplaceAsync(entity,
+        //            onSuccess,
+        //            onModificationFailures: onModificationFailures,
+        //            onFailure: onFailure,
+        //            onTimeout: onTimeout);
+        //}
+
         public static IEnumerableAsync<TResult> StorageCreateOrUpdateBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,
             Func<TEntity, Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> perItemCallback,
             string tableName = default(string),
