@@ -232,9 +232,18 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             if (continuationToken.HasBlackSpace())
             {
                 token = JsonConvert.DeserializeObject<TableContinuationToken>(continuationToken);
+                //var settings = new XmlReaderSettings
+                //{
+                //    DtdProcessing = DtdProcessing.Ignore, // prevents XXE attacks, such as Billion Laughs
+                //    MaxCharactersFromEntities = 1024,
+                //    XmlResolver = null,                   // prevents external entity DoS attacks, such as slow loading links or large file requests
+                //};
                 //token = new TableContinuationToken();
-                //var tokenReader = XmlReader.Create(new StringReader(continuationToken));
-                //token.ReadXml(tokenReader);
+                //using (var strReader = new StringReader(continuationToken))
+                //using (var xmlReader = XmlReader.Create(strReader, settings))
+                //{
+                //    token.ReadXml(xmlReader);
+                //}
             }
 
             var timer = Stopwatch.StartNew();

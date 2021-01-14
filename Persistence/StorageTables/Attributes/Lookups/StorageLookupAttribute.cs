@@ -74,7 +74,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             },
                             tableName: tableName);
                     })
-                .AsyncEnumerable() // lookupRefs.Length)
+                .AsyncEnumerable(startAllTasks:true)
                 .SelectMany(logger: scopedLogger);
         }
 

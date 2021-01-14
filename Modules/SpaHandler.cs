@@ -10,6 +10,9 @@ using System.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
+using RestSharp.Extensions;
+using RestSharp.Serialization.Json;
+
 using EastFive;
 using EastFive.Collections.Generic;
 using EastFive.Serialization;
@@ -36,6 +39,11 @@ namespace EastFive.Api.Azure.Modules
         private Dictionary<string, byte[]> lookupSpaFile;
         //private string[] firstSegments;
 
+        private const string BuildJsonFileName = "content/build.json";
+
+        private string[] firstSegments;
+        private bool dynamicServe = false;
+
         public void Dispose()
         {
             if (signal != null)
@@ -61,39 +69,25 @@ namespace EastFive.Api.Azure.Modules
         {
             this.continueAsync = next;
             this.app = app;
+
+            dynamicServe = EastFive.Azure.AppSettings.SpaServeEnabled.ConfigurationBoolean(
+                ds => ds,
+                onFailure: why => false,
+                onNotSpecified: () => false);
+            // TODO: A better job of matching that just grabbing the first segment
+            firstSegments = app.Resources
+                .Where(route => !route.invokeResourceAttr.Namespace.IsNullOrWhiteSpace())
+                .Select(
+                    route => route.invokeResourceAttr.Namespace)
+                .Distinct()
+                .ToArray();
+
             ExtractSpaFiles(app);
+
         }
 
-        //public SpaHandler(AzureApplication httpApp, System.Web.Http.HttpConfiguration config)
-        //{
-        //    // TODO: A better job of matching that just grabbing the first segment
-        //    firstSegments = System.Web.Routing.RouteTable.Routes
-        //        .Where(route => route is System.Web.Routing.Route)
-        //        .Select(route => route as System.Web.Routing.Route)
-        //        .Where(route => !route.Url.IsNullOrWhiteSpace())
-        //        .Select(
-        //            route => route.Url.Split(new char[] { '/' }).First())
-        //        .ToArray();
-
-        //    ExtractSpaFiles(httpApp);
-        //}
-
-        //public SpaHandler(AzureApplication httpApp, System.Web.Http.HttpConfiguration config,
-        //    HttpMessageHandler handler)
-        //    : base(config, handler)
-        //{
-        //    // TODO: A better job of matching that just grabbing the first segment
-        //    firstSegments = System.Web.Routing.RouteTable.Routes
-        //        .Where(route => route is System.Web.Routing.Route)
-        //        .Select(route => route as System.Web.Routing.Route)
-        //        .Where(route => !route.Url.IsNullOrWhiteSpace())
-        //        .Select(
-        //            route => route.Url.Split(new char[] { '/' }).First())
-        //        .ToArray();
-
-        //    ExtractSpaFiles(httpApp);
-        //}
-
+        public static int? SpaMinimumVersion = default;
+        
         private void ExtractSpaFiles(IApplication application)
         {
             try
@@ -118,12 +112,31 @@ namespace EastFive.Api.Azure.Modules
                                     .ToBytesAsync()
                                     .Result;
 
+                                var buildJsonEntries = zipArchive.Entries
+                                    .Where(item => string.Compare(item.FullName, BuildJsonFileName, true) == 0);
+                                if (buildJsonEntries.Any())
+                                {
+                                    var buildJsonString = buildJsonEntries
+                                        .First()
+                                        .Open()
+                                        .ToBytes(b => b)
+                                        .GetString();
+                                    dynamic buildJson = Newtonsoft.Json.JsonConvert.DeserializeObject(buildJsonString);
+                                    SpaMinimumVersion = (int)buildJson.buildTimeInSeconds;
+                                }
+                                
                                 lookupSpaFile = EastFive.Azure.AppSettings.SpaSiteLocation.ConfigurationString(
                                     (siteLocation) =>
                                     {
                                         application.Logger.Trace($"SpaHandlerModule - ExtractSpaFiles   siteLocation: {siteLocation}");
                                         return zipArchive.Entries
-                                            .Where(item => string.Compare(item.FullName, IndexHTMLFileName, true) != 0)
+                                            .Where(
+                                                item =>
+                                                {
+                                                    if (dynamicServe)
+                                                        return string.Compare(item.FullName, IndexHTMLFileName, true) != 0;
+                                                    return true;
+                                                })
                                             .Select(
                                                 entity =>
                                                 {
@@ -187,23 +200,78 @@ namespace EastFive.Api.Azure.Modules
             var request = context.GetHttpRequestMessage();
             if (lookupSpaFile.ContainsKey(fileName))
             {
-                var response = request
-                    .CreateContentResponse(lookupSpaFile[fileName],
-                        fileName.EndsWith(".js") ?
-                            "text/javascript"
-                            :
-                            fileName.EndsWith(".css") ?
-                                "text/css"
-                                :
-                                request.Headers.Accept.Any() ?
-                                    request.Headers.Accept.First().MediaType
-                                    :
-                                    string.Empty);
+                var response = await ServeFromSpaZip(fileName);
+                var immutableDays = EastFive.Azure.AppSettings.SpaFilesExpirationInDays.ConfigurationDouble(
+                    d => d,
+                    (why) => 1.0);
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromDays(immutableDays),
+                    SharedMaxAge = TimeSpan.FromDays(immutableDays),
+                    MustRevalidate = false,
+                    NoCache = false,
+                    NoStore = false,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+
+                await response.WriteToContextAsync(context);
+                return;
+            }
+            
+            var requestStart = request.RequestUri.AbsolutePath.ToLower();
+            if (!firstSegments
+                    .Where(firstSegment => requestStart.StartsWith($"/{firstSegment}"))
+                    .Any())
+            {
+                if (dynamicServe)
+                {
+                    var responseHtml = request.CreateHtmlResponse(EastFive.Azure.Properties.Resources.indexPage);
+                    await responseHtml.WriteToContextAsync(context);
+                    return;
+                }
+
+                var response = await ServeFromSpaZip("index.html");
+                response.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromSeconds(0.0),
+                    SharedMaxAge = TimeSpan.FromSeconds(0.0),
+                    MustRevalidate = true,
+                    NoCache = true,
+                    NoStore = true,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+                response.Content.Headers.Expires = DateTime.UtcNow.AddDays(-1);
+                response.Headers.Pragma.Add(
+                    new System.Net.Http.Headers.NameValueHeaderValue("no-cache"));
                 await response.WriteToContextAsync(context);
                 return;
             }
 
-            await continueAsync(context);
+            await this.continueAsync(context);
+            return;
+
+            async Task<HttpResponseMessage> ServeFromSpaZip(string spaFileName)
+            {
+                return await request.CreateContentResponse(lookupSpaFile[spaFileName],
+                            spaFileName.EndsWith(".js") ?
+                                "text/javascript"
+                                :
+                                spaFileName.EndsWith(".css") ?
+                                    "text/css"
+                                    :
+                                    spaFileName.EndsWith(".html") ?
+                                        "text/html"
+                                        :
+                                        request.Headers.Accept.Any() ?
+                                            request.Headers.Accept.First().MediaType
+                                            :
+                                            string.Empty).AsTask();
+            }
+
         }
     }
 

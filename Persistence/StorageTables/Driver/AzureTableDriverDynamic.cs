@@ -207,7 +207,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 //selectColumns:new List<string> { "PartitionKey" });
             var tableEntityTypes = tableQuery.GetType().GetGenericArguments();
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
-                .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
+                .GetMethod(nameof(AzureTableDriverDynamic.FindAllInternal), BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
                 .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry, cancellationToken });
 
@@ -1848,6 +1848,28 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             nextPartOfQuery);
                     });
 
+            return cache
+                .ByQueryEx(whereFilter,
+                    () =>
+                    {
+                        return RunQuery<TEntity>(whereFilter, table,
+                            numberOfTimesToRetry: numberOfTimesToRetry);
+                    })
+                .Where(f => postFilter(f));
+        }
+
+        public IEnumerableAsync<TEntity> FindByQuery<TEntity>(
+            string whereFilter,
+            CloudTable table = default,
+            string tableName = default,
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            ICacheEntites cache = default)
+        {
+            if (table.IsDefaultOrNull())
+                if (tableName.HasBlackSpace())
+                    table = this.TableClient.GetTableReference(tableName);
+            Func<TEntity, bool> postFilter = (e) => true;
+            
             return cache
                 .ByQueryEx(whereFilter,
                     () =>

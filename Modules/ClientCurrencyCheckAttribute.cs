@@ -31,6 +31,10 @@ namespace EastFive.Azure.Modules
             RouteHandlingDelegate continueExecution)
         {
             var response = await continueExecution(controllerType, httpApp, request);
+            
+            if (Api.Azure.Modules.SpaHandler.SpaMinimumVersion.HasValue)
+                this.clientMinimumVersionMaybe = Api.Azure.Modules.SpaHandler.SpaMinimumVersion.Value;
+
             if (!clientMinimumVersionMaybe.HasValue)
                 return response;
             var clientMinimumVersion = clientMinimumVersionMaybe.Value;
@@ -48,6 +52,7 @@ namespace EastFive.Azure.Modules
                 return response;
 
             response.SetHeader(clientVersionResponseHeader, clientMinimumVersion.ToString());
+            response.SetHeader("Access-Control-Expose-Headers", clientVersionResponseHeader);
             return response;
         }
     }

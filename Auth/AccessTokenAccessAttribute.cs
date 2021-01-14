@@ -52,11 +52,32 @@ namespace EastFive.Azure.Auth
                         (why) => continueExecution(controllerType, httpApp, request),
                         () => continueExecution(controllerType, httpApp, request));
                 },
-                () => continueExecution(controllerType, httpApp, request),
-                () => continueExecution(controllerType, httpApp, request),
-                () => continueExecution(controllerType, httpApp, request),
-                () => continueExecution(controllerType, httpApp, request),
-                () => continueExecution(controllerType, httpApp, request));
+                onAccessTokenNotProvided: () => continueExecution(controllerType, httpApp, request),
+                onAccessTokenInvalid:
+                    () =>
+                    {
+                        return request
+                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .AddReason("Access token is invalid")
+                            .AsTask();
+                    },
+                onAccessTokenExpired:
+                    () =>
+                    {
+                        return request
+                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .AddReason("Access token is expired")
+                            .AsTask();
+                    },
+                onInvalidSignature:
+                    () =>
+                    {
+                        return request
+                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .AddReason("Access token has an invalid signature")
+                            .AsTask();
+                    },
+                onSystemNotConfigured: () => continueExecution(controllerType, httpApp, request));
         }
     }
 }

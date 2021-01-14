@@ -1,11 +1,4 @@
-﻿using EastFive.Api;
-using EastFive.Api.Core;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Web.Configuration;
-using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -14,80 +7,109 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
+using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Api;
+using EastFive.Api.Core;
+using EastFive.Linq;
+using EastFive.Web.Configuration;
+
 namespace EastFive.Azure.Monitoring
 {
     public class TeamsNotificationExceptionHandlerAttribute : Attribute, IHandleExceptions, IHandleRoutes
     {
+        bool deactivated;
+        Uri teamsHookUrl;
+
+        public TeamsNotificationExceptionHandlerAttribute() : base()
+        {
+            deactivated = AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
+                teamsHookUrl =>
+                {
+                    this.teamsHookUrl = teamsHookUrl;
+                    return false;
+                },
+                (why) => true,
+                () => true);
+        }
+
         public async Task<IHttpResponse> HandleExceptionAsync(Exception ex, 
             MethodInfo method, KeyValuePair<ParameterInfo, object>[] queryParameters, 
             IApplication httpApp, IHttpRequest routeData,
             HandleExceptionDelegate continueExecution)
         {
-            return await AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
-                async teamsHookUrl =>
-                {
-                    var message = await CreateMessageCardAsync(ex, method, httpApp, routeData);
-                    string response = await message.SendAsync(teamsHookUrl);
-                    return await continueExecution(ex, method, queryParameters,
+            if (deactivated)
+                return await continueExecution(ex, method, queryParameters,
                         httpApp, routeData);
-                },
-                onFailure:
-                    (why) => continueExecution(ex, method, queryParameters,
-                        httpApp, routeData),
-                onNotSpecified:
-                    () => continueExecution(ex, method, queryParameters,
-                         httpApp, routeData));
+
+            var message = await CreateMessageCardAsync(ex, method, httpApp, routeData);
+            var response = await message.SendAsync(teamsHookUrl);
+            return await continueExecution(ex, method, queryParameters,
+                httpApp, routeData);
         }
 
-        public Task<IHttpResponse> HandleRouteAsync(Type controllerType,
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
-            var routeName = string.Empty; //
-            return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
-                async teamsHookUrl =>
+            var response = await continueExecution(controllerType, httpApp, request);
+            if (deactivated)
+                return response;
+
+            string teamsNotifyParam = default;
+            var teamsNotifyHeaders = request.Headers
+                .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase));
+            
+            if (teamsNotifyHeaders.Any())
+            {
+                var teamsNotifyParams = teamsNotifyHeaders.First().Value;
+                if (teamsNotifyParams.Any())
+                    teamsNotifyParam = teamsNotifyParams.First();
+            }
+
+
+            bool HasReportableError() =>
+                ((int)response.StatusCode) >= 400 &&
+                response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+            
+            bool RequestTeamsNotify() => teamsNotifyParam != default;
+            bool ShouldNotify()
+            {
+                if (RequestTeamsNotify())
+                    return true;
+                if (HasReportableError())
+                    return true;
+                return false;
+            }
+            
+            if (!ShouldNotify())
+                return response;
+            
+            string messageId = await TeamsNotifyAsync(response, teamsNotifyParam,
+                httpApp, request);
+            return response;
+        }
+
+        public async Task<string> TeamsNotifyAsync(IHttpResponse response, string teamsNotifyParam,
+            IApplication httpApp, IHttpRequest request)
+        {
+            var message = await CreateMessageCardAsync(
+                teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
+                httpApp, request,
+                () => new MessageCard.Section
                 {
-                    string teamsNotifyParam = default;
-                    var teamsNotifyHeaders = request.Headers
-                        .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase));
-
-                    if (teamsNotifyHeaders.Any())
+                    title = "Request/Response Information",
+                    markdown = false, // so that underscores are not stripped
+                    facts = new MessageCard.Section.Fact[]
                     {
-                        var teamsNotifyParams = teamsNotifyHeaders.First().Value;
-                        if (teamsNotifyParams.Any())
-                            teamsNotifyParam = teamsNotifyParams.First();
-                    }
-
-                    var response = await continueExecution(controllerType, httpApp, request);
-                    
-                    bool HasReportableError() => ((int)response.StatusCode) >= 400 && response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
-                    bool RequestTeamsNotify() => teamsNotifyParam != default;
-                    bool ShouldNotify()
-                    {
-                        if (RequestTeamsNotify())
-                            return true;
-                        if (HasReportableError())
-                            return true;
-                        return false;
-                    }
-
-                    if (!ShouldNotify())
-                        return response;
-
-                    var message = await CreateMessageCardAsync(
-                        teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
-                        httpApp, request,
-                        () => new MessageCard.Section
+                        new MessageCard.Section.Fact
                         {
-                            title = "Request/Response Information",
-                            markdown = false, // so that underscores are not stripped
-                            facts = new MessageCard.Section.Fact[]
-                            {
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Route Name:",
-                                    value = routeName,
-                                },
+                            name = "Route Name:",
+                            value = "TODO",
+                        },
                                 new MessageCard.Section.Fact
                                 {
                                     name = "Http Method:",
@@ -108,14 +130,10 @@ namespace EastFive.Azure.Monitoring
                                     name = "Reason:",
                                     value = response.ReasonPhrase,
                                 },
-                            }
-                        });
+                    }
+                });
 
-                    string messageId = await message.SendAsync(teamsHookUrl);
-                    return response;
-                },
-                onFailure: (why) => continueExecution(controllerType, httpApp, request),
-                onNotSpecified: () => continueExecution(controllerType, httpApp, request));
+            return await message.SendAsync(teamsHookUrl);
         }
 
 

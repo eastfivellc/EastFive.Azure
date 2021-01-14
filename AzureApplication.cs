@@ -38,11 +38,10 @@ namespace EastFive.Azure
 
         Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams,
-                EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
-                IInvokeApplication endpoints,
-                Uri baseUri,
-                IProvideAuthorization authorizationProvider,
-            Func<Uri, TResult> onSuccess,
+                Method method, EastFive.Azure.Auth.Authorization authorization,
+                IHttpRequest request, IInvokeApplication endpoints,
+                Uri baseUri, IProvideAuthorization authorizationProvider,
+            Func<Uri, Func<IHttpResponse, IHttpResponse>, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
             Func<string, TResult> onFailure);
 
@@ -421,9 +420,9 @@ namespace EastFive.Api.Azure
         public virtual async Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IDictionary<string, string> authParams, 
                 Method method, EastFive.Azure.Auth.Authorization authorization,
-                IInvokeApplication endpoints,
-                Uri baseUri, IProvideAuthorization authorizationProvider, 
-            Func<Uri, TResult> onSuccess, 
+                IHttpRequest request, IInvokeApplication endpoints,
+                Uri baseUri, IProvideAuthorization authorizationProvider,
+            Func<Uri, Func<IHttpResponse, IHttpResponse>, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
             Func<string, TResult> onFailure)
         {
@@ -431,7 +430,7 @@ namespace EastFive.Api.Azure
                 return await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization, endpoints,
                         authorizationProvider,
-                    onSuccess,
+                    (uri) => onSuccess(uri, x => x),
                     onInvalidParameter,
                     onFailure);
 
@@ -439,20 +438,28 @@ namespace EastFive.Api.Azure
             return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, 
                     authorizationProvider, authParams,
                     method, authorization,
-                    this, endpoints, baseUri,
-                async (redirectUri) =>
+                    this, request, endpoints, baseUri,
+                async (redirectUri, kvps) =>
                 {
-                    var fullUri = redirectUri.IsAbsoluteUri?
-                            redirectUri
-                            :
-                            await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
+                    var (modifier, fullUri) = await ResolveAbsoluteUrlAsync(redirectUri,
+                            request, accountIdMaybe, authParams);
+                    foreach (var kvp in kvps.NullToEmpty())
+                        fullUri = fullUri.SetQueryParam(kvp.Key, kvp.Value);
+
                     var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
-                    return onSuccess(redirectDecorated);
+                    return onSuccess(redirectDecorated, modifier);
+
+                    //var fullUri = redirectUri.IsAbsoluteUri?
+                    //        redirectUri
+                    //        :
+                    //        await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
+                    //var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
+                    //return onSuccess(redirectDecorated);
                 },
                 () => ComputeRedirectAsync(accountIdMaybe, authParams,
                             method, authorization, endpoints,
                             authorizationProvider,
-                        onSuccess,
+                        (uri) => onSuccess(uri, x => x),
                         onInvalidParameter,
                         onFailure),
                 onInvalidParameter.AsAsyncFunc(),
@@ -460,10 +467,28 @@ namespace EastFive.Api.Azure
             
         }
 
-        public virtual Task<Uri> ResolveAbsoluteUrlAsync(Uri requestUri, Uri relativeUri, Guid? accountIdMaybe)
+        public virtual Task<(Func<IHttpResponse, IHttpResponse>, Uri)> ResolveAbsoluteUrlAsync(Uri relativeUri,
+            IHttpRequest request, Guid? accountIdMaybe, IDictionary<string, string> authParams)
         {
-            var fullUri = new Uri(requestUri, relativeUri);
-            return fullUri.AsTask();
+            var fullUriStart = new Uri(request.RequestUri, relativeUri);
+            Func<IHttpResponse, IHttpResponse> noModifications = m => m;
+            return this.GetType()
+                .GetAttributesInterface<IResolveRedirection>(inherit: true, multiple: true)
+                .Distinct(attr => attr.GetType().FullName) // Issue with duplicate attributes due to Global.asax class
+                .OrderBy(attr => attr.Order)
+                .Aggregate((noModifications, fullUriStart).AsTask(),
+                    async (relUriTask, redirResolver) =>
+                    {
+                        var (modifier, fullUri) = await relUriTask;
+                        var (nextModifier, nextfullUri) = await redirResolver.ResolveAbsoluteUrlAsync(fullUri, 
+                            request, accountIdMaybe, authParams);
+                        Func<IHttpResponse, IHttpResponse> combinedModifier = (response) =>
+                        {
+                            var nextResponse = nextModifier(response);
+                            return modifier(nextResponse);
+                        };
+                        return (combinedModifier, nextfullUri);
+                    });
         }
 
         private async Task<TResult> ComputeRedirectAsync<TResult>(

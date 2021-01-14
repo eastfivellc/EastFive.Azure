@@ -7,12 +7,12 @@ using System.Threading.Tasks;
 
 
 
-namespace EastFive.Azure.Auth
-{
-    [Config]
-    public class AppSettings
-    {
+//namespace EastFive.Azure.Auth
+//{
+//    [Config]
+//    public class AppSettings
+//    {
         
 
-    }
-}
+//    }
+//}

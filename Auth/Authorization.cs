@@ -176,7 +176,7 @@ namespace EastFive.Azure.Auth
                 [Resource]Authorization authorization,
                 Api.Azure.AzureApplication application, IProvideUrl urlHelper,
                 IInvokeApplication endpoints,
-                HttpRequestMessage request,
+                IHttpRequest request,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onAuthorizationFailed,
@@ -194,9 +194,9 @@ namespace EastFive.Azure.Auth
                     return Redirection.AuthenticationAsync(
                             method,
                             paramsUpdated,
-                            application, endpoints, request.RequestUri,
+                            application, request, endpoints, request.RequestUri,
                             authorizationRef.Optional(),
-                        (redirect, accountIdMaybe) => onCreated(),
+                        (redirect, accountIdMaybe, discardModifier) => onCreated(),
                         () => onAuthorizationFailed().AddReason("Authorization was not found"), // Bad credentials
                         why => onServericeUnavailable().AddReason(why),
                         why => onAuthorizationFailed().AddReason(why));
@@ -212,7 +212,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = ParametersPropertyName)] IDictionary<string, string> parameters,
                 Api.Azure.AzureApplication application,
                 IInvokeApplication endpoints,
-                HttpRequestMessage request,
+                IHttpRequest request,
             CreatedBodyResponse<Session> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onAuthorizationFailed,
@@ -231,11 +231,11 @@ namespace EastFive.Azure.Auth
                     return await await Redirection.AuthenticationAsync(
                             method,
                             paramsUpdated,
-                            application,
+                            application, request,
                             endpoints,
                             request.RequestUri,
                             authorizationRef.Optional(),
-                        (redirect, accountIdMaybe) =>
+                        async (redirect, accountIdMaybe, modifier) =>
                         {
                             var session = new Session()
                             {
@@ -243,7 +243,7 @@ namespace EastFive.Azure.Auth
                                 account = accountIdMaybe,
                                 authorization = authorizationRef.Optional(),
                             };
-                            return Session.CreateAsync(sessionRef, authorizationRef.Optional(),
+                            var responseCreated = await Session.CreateAsync(sessionRef, authorizationRef.Optional(),
                                     session,
                                     application,
                                 (sessionCreated, contentType) =>
@@ -256,6 +256,8 @@ namespace EastFive.Azure.Auth
                                 onAuthorizationFailed,
                                 (why1, why2) => onServericeUnavailable(),
                                 onFailure);
+                            var modifiedResponse = modifier(responseCreated);
+                            return modifiedResponse;
                         },
                         () => onAuthorizationFailed()
                             .AddReason("Authorization was not found")

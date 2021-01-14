@@ -1,15 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
-using BlackBarLabs.Api;
-using BlackBarLabs.Extensions;
 using EastFive.Api;
+using EastFive.Api.Auth;
 using EastFive.Api.Azure;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
@@ -67,11 +62,12 @@ namespace EastFive.Azure.Auth
         public Uri redirection { get; set; }
 
         [Api.HttpGet]
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public async static Task<IHttpResponse> GetAllSecureAsync(
-                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
                 AzureApplication application,
+                EastFive.Api.Security security,
                 IHttpRequest request,
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
@@ -146,7 +142,7 @@ namespace EastFive.Azure.Auth
                                         authorization = id.AsRef<Authorization>().Optional(),
                                         redirection = new Uri(
                                             request.RequestUri,
-                                            $"/api/RedirectionManager?ApiKeySecurity={apiSecurity.key}&authorization={id}"),
+                                            $"/api/RedirectionManager?authorization={id}"),
                                     };
                                 },
                                 (why) => Failure(why));
@@ -204,12 +200,13 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<IHttpResponse> GetRedirection(
-                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
                 AzureApplication application,
                 IInvokeApplication endpoints,
-                HttpRequestMessage request,
+                EastFive.Api.Security security,
+                IHttpRequest request,
             RedirectResponse onRedirection,
             GeneralFailureResponse onFailure,
             UnauthorizedResponse onUnauthorized,
@@ -239,8 +236,8 @@ namespace EastFive.Azure.Auth
                                                     return Auth.Redirection.ProcessAsync(authorization, 
                                                             updatedAuth => 1.AsTask(),
                                                             method, externalId, requestParams,
-                                                            application, endpoints, loginProvider, request.RequestUri,
-                                                        (uri, accountIdMaybe) =>
+                                                            application, request, endpoints, loginProvider, request.RequestUri,
+                                                        (uri, accountIdMaybe, modifier) =>
                                                         {
                                                             return uri;
                                                         },
@@ -270,8 +267,8 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static async Task<IHttpResponse> GetAllSecureAsync(
-                [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
                 AzureApplication application,
                 IInvokeApplication endpoints,
@@ -295,8 +292,8 @@ namespace EastFive.Azure.Auth
                                             {
 
                                             }, method, externalId, authorization.parameters,
-                                            application, endpoints, loginProvider, request.RequestUri,
-                                        (uri, accountIdMaybe) => onSuccess(uri),
+                                            application, request, endpoints, loginProvider, request.RequestUri,
+                                        (uri, accountIdMaybe, modifier) => onSuccess(uri),
                                         (why) => onFailure().AddReason(why),
                                         application.Telemetry);
                                 },

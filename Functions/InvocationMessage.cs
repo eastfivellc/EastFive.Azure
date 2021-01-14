@@ -362,8 +362,8 @@ namespace EastFive.Azure.Functions
                                 bool saved = await invocationMessageRef.StorageUpdateAsync(
                                     async (invocationMessageToSave, saveInvocationMessage) =>
                                     {
-                                        invocationMessage.lastExecuted = lastExecuted;
-                                        invocationMessage.executionHistory = invocationMessage.executionHistory
+                                        invocationMessageToSave.lastExecuted = lastExecuted;
+                                        invocationMessageToSave.executionHistory = invocationMessageToSave.executionHistory
                                             .Select(
                                                 exHi =>
                                                 {
@@ -374,7 +374,7 @@ namespace EastFive.Azure.Functions
                                                     return exHi;
                                                 })
                                             .ToArray();
-                                        await saveInvocationMessage(invocationMessage);
+                                        await saveInvocationMessage(invocationMessageToSave);
                                         return true;
                                     });
                                 return await await GetContents(

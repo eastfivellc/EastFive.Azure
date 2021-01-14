@@ -14,7 +14,8 @@ using System.Threading.Tasks;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class PartitionByDayAttribute : Attribute,
-        IModifyAzureStorageTablePartitionKey, 
+        IModifyAzureStorageTablePartitionKey,
+        IComputeAzureStorageTablePartitionKey,
         IProvideTableQuery
     {
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
@@ -25,16 +26,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         public static string ComputePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
             var dateTimeValueObj = memberInfo.GetValue(value);
-            if (dateTimeValueObj.IsDefaultOrNull())
-                return "1_1";
-            if (dateTimeValueObj.GetType().IsNullable())
-            {
-                if (!dateTimeValueObj.NullableHasValue())
-                    return "1_1";
-                dateTimeValueObj = dateTimeValueObj.GetNullableValue();
-            }
-            var dateTimeValue = (DateTime)dateTimeValueObj;
-            return $"{dateTimeValue.Year}_{dateTimeValue.DayOfYear}";
+            return ComputePartitionKey(dateTimeValueObj);
         }
 
         public EntityType ParsePartitionKey<EntityType>(EntityType entity, string yearDayString, MemberInfo memberInfo)
@@ -98,6 +90,29 @@ namespace EastFive.Persistence.Azure.StorageTables
                 });
         }
 
+        public string ComputePartitionKey(object memberValue, MemberInfo memberInfo, string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues)
+        {
+            return ComputePartitionKey(memberValue);
+        }
+
+        public IEnumerable<string> GeneratePartitionKeys(Type type, int skip, int top)
+        {
+            return new string[] { };
+        }
+
+        public static string ComputePartitionKey(object dateTimeValueObj)
+        {
+            if (dateTimeValueObj.IsDefaultOrNull())
+                return "1_1";
+            if (dateTimeValueObj.GetType().IsNullable())
+            {
+                if (!dateTimeValueObj.NullableHasValue())
+                    return "1_1";
+                dateTimeValueObj = dateTimeValueObj.GetNullableValue();
+            }
+            var dateTimeValue = (DateTime)dateTimeValueObj;
+            return $"{dateTimeValue.Year}_{dateTimeValue.DayOfYear}";
+        }
     }
 
 }
