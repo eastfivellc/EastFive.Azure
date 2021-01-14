@@ -16,21 +16,34 @@ namespace EastFive.Azure.Monitoring
 {
     public class TeamsNotificationExceptionHandlerAttribute : Attribute, IHandleExceptions, IHandleRoutes
     {
+        bool deactivated;
+        Uri teamsHookUrl;
+
+        public TeamsNotificationExceptionHandlerAttribute() : base()
+        {
+            deactivated = AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
+                teamsHookUrl =>
+                {
+                    this.teamsHookUrl = teamsHookUrl;
+                    return false;
+                },
+                (why) => true,
+                () => true);
+        }
+
         public async Task<HttpResponseMessage> HandleExceptionAsync(Exception ex, 
             MethodInfo method, KeyValuePair<ParameterInfo, object>[] queryParameters, 
             IApplication httpApp, HttpRequestMessage request,
             HandleExceptionDelegate continueExecution)
         {
-            return await AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
-                async teamsHookUrl =>
-                {
-                    var message = await CreateMessageCardAsync(ex, method, httpApp, request);
-                    string response = await message.SendAsync(teamsHookUrl);
-                    return await continueExecution(ex, method, queryParameters,
-                        httpApp, request);
-                },
-                (why) => continueExecution(ex, method, queryParameters,
-                        httpApp, request));
+            if (deactivated)
+                return await continueExecution(ex, method, queryParameters,
+                    httpApp, request);
+            
+            var message = await CreateMessageCardAsync(ex, method, httpApp, request);
+            string response = await message.SendAsync(teamsHookUrl);
+            return await continueExecution(ex, method, queryParameters,
+                httpApp, request);
         }
 
         public async Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
@@ -38,7 +51,12 @@ namespace EastFive.Azure.Monitoring
             RouteHandlingDelegate continueExecution)
         {
             var response = await continueExecution(controllerType, httpApp, request, routeName);
-            bool HasReportableError() => ((int)response.StatusCode) >= 400 && response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+            if (deactivated)
+                return response;
+            
+            bool HasReportableError() => 
+                ((int)response.StatusCode) >= 400 && 
+                response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
 
             string teamsNotifyParam = default;
             if (request.Headers.Contains("X-Teams-Notify"))
@@ -55,52 +73,47 @@ namespace EastFive.Azure.Monitoring
             return response;
         }
 
-        public Task<string> TeamsNotifyAsync(HttpResponseMessage response, string teamsNotifyParam,
+        public async Task<string> TeamsNotifyAsync(HttpResponseMessage response, string teamsNotifyParam,
             IApplication httpApp, HttpRequestMessage request, string routeName)
         {
-            return AppSettings.ApplicationInsights.TeamsHook.ConfigurationUri(
-                async teamsHookUrl =>
+            var message = await CreateMessageCardAsync(
+                teamsNotifyParam ?? string.Empty, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
+                httpApp, request,
+                () => new MessageCard.Section
                 {
-                    var message = await CreateMessageCardAsync(
-                        teamsNotifyParam ?? string.Empty, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
-                        httpApp, request,
-                        () => new MessageCard.Section
+                    title = "Request/Response Information",
+                    markdown = false, // so that underscores are not stripped
+                    facts = new MessageCard.Section.Fact[]
+                    {
+                        new MessageCard.Section.Fact
                         {
-                            title = "Request/Response Information",
-                            markdown = false, // so that underscores are not stripped
-                            facts = new MessageCard.Section.Fact[]
-                            {
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Route Name:",
-                                    value = routeName,
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Http Method:",
-                                    value = request.Method.Method,
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "URL:",
-                                    value = request.RequestUri.OriginalString,
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Status Code:",
-                                    value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Reason:",
-                                    value = response.ReasonPhrase,
-                                },
-                            }
-                        });
-
-                    return await message.SendAsync(teamsHookUrl);
-                },
-                (why) => why.AsTask());
+                            name = "Route Name:",
+                            value = routeName,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Http Method:",
+                            value = request.Method.Method,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "URL:",
+                            value = request.RequestUri.OriginalString,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Status Code:",
+                            value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Reason:",
+                            value = response.ReasonPhrase,
+                        },
+                    }
+                });
+            
+            return await message.SendAsync(teamsHookUrl);
         }
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
