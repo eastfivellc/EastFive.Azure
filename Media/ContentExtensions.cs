@@ -129,6 +129,8 @@ namespace EastFive.Azure.Media
                                                 .Append(VisualFeatureTypes.Objects)
                                                 .Append(VisualFeatureTypes.Tags)
                                                 .Append(VisualFeatureTypes.Brands)
+                                                .Append(VisualFeatureTypes.Color)
+                                                .Append(VisualFeatureTypes.Faces)
                                                 .ToList();
                                         try
                                         {

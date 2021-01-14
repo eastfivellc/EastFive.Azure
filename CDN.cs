@@ -19,12 +19,9 @@ using EastFive.Azure.Auth;
 using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
 using EastFive.Api;
-using Microsoft.AspNetCore.Http;
 
 namespace EastFive.Azure
 {
-
-
     [CDN]
     public class CDN : IInvokeApplication
     {
