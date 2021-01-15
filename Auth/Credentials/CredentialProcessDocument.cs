@@ -1,19 +1,18 @@
 ﻿using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.StorageTables;
-using BlackBarLabs.Web;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
 using System.Collections.Generic;
-using EastFive.Serialization;
 using System.Linq;
-using BlackBarLabs.Extensions;
+
+using Microsoft.Azure.Cosmos.Table;
+
+using EastFive.Serialization;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Extensions;
+using BlackBarLabs.Persistence.Azure;
+using BlackBarLabs.Persistence.Azure.StorageTables;
+using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Api.Azure.Credentials
 {

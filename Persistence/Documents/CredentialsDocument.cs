@@ -1,6 +1,8 @@
-﻿namespace EastFive.Security.CredentialProvider.ImplicitCreation
+﻿using Microsoft.Azure.Cosmos.Table;
+
+namespace EastFive.Security.CredentialProvider.ImplicitCreation
 {
-    internal class CredentialsDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    internal class CredentialsDocument : TableEntity
     {
         public string AccessToken { get; set; }
     }

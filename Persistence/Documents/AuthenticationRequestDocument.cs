@@ -4,17 +4,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
+using BlackBarLabs.Persistence.Azure.Attributes;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using EastFive.Azure;
-using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
     [StorageResourceNoOp]
-    public class AuthenticationRequestDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    public class AuthenticationRequestDocument : TableEntity
     {
         [IgnoreDataMember]
         [IgnoreProperty]
@@ -52,6 +52,7 @@ namespace EastFive.Security.SessionServer.Persistence.Documents
         }
 
         #endregion
+
         public static Task<TResult> UpdateAsync<TResult>(Guid integrationId,
             Func<Integration, Func<Integration, Task<string>>, Task<TResult>> onFound,
             Func<TResult> onNotFound)

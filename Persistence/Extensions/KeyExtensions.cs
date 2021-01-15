@@ -7,7 +7,7 @@ using System.Runtime.Serialization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.InteropServices;
 

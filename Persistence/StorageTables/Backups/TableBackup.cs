@@ -2,8 +2,8 @@
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

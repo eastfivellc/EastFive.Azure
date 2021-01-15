@@ -2,10 +2,11 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+
+using Microsoft.Azure.Cosmos.Table;
+
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace EastFive.Azure.StorageTables.Driver
 {
@@ -111,7 +112,7 @@ namespace EastFive.Azure.StorageTables.Driver
         #endregion
 
         public static Task<TResult> ResolveCreate<TResult>(this StorageException exception, 
-            Microsoft.WindowsAzure.Storage.Table.CloudTable table,
+            CloudTable table,
             Func<TResult> retry,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             Func<TResult> onAlreadyExists = default,

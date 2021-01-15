@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Runtime.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Linq;
@@ -14,7 +14,7 @@ using BlackBarLabs.Persistence.Azure.Attributes;
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
     [StorageResourceNoOp]
-    public class ActorMappingsDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    public class ActorMappingsDocument : TableEntity
     {
         #region Constructors
 

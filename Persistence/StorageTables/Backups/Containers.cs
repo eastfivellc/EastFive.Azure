@@ -132,7 +132,8 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
         }
 
 
-        private static async Task ThrowIfContainerIsMissingStorageResourceAttribute(string sourceConnectionString, ContainerResourceInfo[] configuredContainers)
+        private static async Task ThrowIfContainerIsMissingStorageResourceAttribute(string sourceConnectionString,
+            ContainerResourceInfo[] configuredContainers)
         {
             var configuredNames = configuredContainers
                 .Select(configuredContainer => configuredContainer.name.ToLower())
@@ -140,11 +141,13 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
 
             var queryResult = await BackupFunction.GetRepository(sourceConnectionString)
                 .BlobClient
-                .ListContainersSegmentedAsync(null);
+                .GetBlobContainersAsync()
+                .AsPages()
+                .ToListAsync();
             var containersMissingAttribute = queryResult
-                .Results
+                .SelectMany(x => x.Values)
                 .Select(queryContainer => queryContainer.Name.ToLower())
-                .Where(queryName => !ignoreContainerNames.Contains(queryName))
+                //.Where(queryName => !ignoreContainerNames.Contains(queryName))
                 .Where(queryName => !configuredNames.Contains(queryName))
                 .ToArray();
 

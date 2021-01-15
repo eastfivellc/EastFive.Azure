@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Microsoft.Azure.Cosmos.Table;
+using System;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
-    internal class ClaimDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    internal class ClaimDocument : TableEntity
     {
         #region Properties
         

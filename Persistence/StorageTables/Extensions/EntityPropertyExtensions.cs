@@ -3,7 +3,7 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Reflection;
 using EastFive.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections;
 using System.Collections.Generic;

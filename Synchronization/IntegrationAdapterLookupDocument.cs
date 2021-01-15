@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using EastFive.Serialization;
 using System.Linq;
 using BlackBarLabs.Extensions;

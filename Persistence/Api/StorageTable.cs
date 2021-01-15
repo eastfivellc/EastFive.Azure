@@ -20,19 +20,17 @@ using EastFive.Linq.Async;
 using EastFive.Api.Serialization;
 using System.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Microsoft.WindowsAzure.Storage.Table;
 using EastFive.Persistence;
 using EastFive.Linq.Expressions;
 using EastFive.Linq;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
-
+using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Azure.Persistence
 {
     [FunctionViewController(
         Route = "StorageTable",
-        Resource = typeof(StorageTable),
         ContentType = "x-application/eastfive.azure.storage.table",
         ContentTypeVersion = "0.1")]
     [DataContract]

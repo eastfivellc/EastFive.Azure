@@ -100,8 +100,8 @@ namespace EastFive.Api.Azure.Modules
                         {
                             var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
                             var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
-                            var container = blobClient.GetContainerReference(containerName);
-                            var blobRef = container.GetBlockBlobReference("spa.zip");
+                            var container = blobClient.GetBlobContainerClient(containerName);
+                            var blobRef = container.GetBlobClient("spa.zip");
                             var blobStream = blobRef.OpenReadAsync().Result;
 
                             using (zipArchive = new ZipArchive(blobStream))

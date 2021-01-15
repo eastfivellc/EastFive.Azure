@@ -29,7 +29,7 @@ namespace EastFive.Net.Http
             this.repository = repository;
         }
 
-        public class CacheDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+        public class CacheDocument : Microsoft.Azure.Cosmos.Table.TableEntity
         {
             public byte[] Data1 { get; set; }
             public byte[] Data2 { get; set; }

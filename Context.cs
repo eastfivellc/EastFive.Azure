@@ -23,38 +23,38 @@ namespace EastFive.Security.SessionServer
 {
     public class Context
     {
-        private Security.SessionServer.Persistence.DataContext dataContext;
-        private readonly Func<Security.SessionServer.Persistence.DataContext> dataContextCreateFunc;
+        //private Security.SessionServer.Persistence.DataContext dataContext;
+        //private readonly Func<Security.SessionServer.Persistence.DataContext> dataContextCreateFunc;
         
-        public Context(Func<Security.SessionServer.Persistence.DataContext> dataContextCreateFunc)
-        {
-            this.dataContextCreateFunc = dataContextCreateFunc;
-        }
+        //public Context(Func<Security.SessionServer.Persistence.DataContext> dataContextCreateFunc)
+        //{
+        //    this.dataContextCreateFunc = dataContextCreateFunc;
+        //}
 
-        public static Context LoadFromConfiguration()
-        {
-            var context = new EastFive.Security.SessionServer.Context(
-                () => new EastFive.Security.SessionServer.Persistence.DataContext(EastFive.Azure.AppSettings.ASTConnectionStringKey));
-            return context;
-        }
+        //public static Context LoadFromConfiguration()
+        //{
+        //    var context = new EastFive.Security.SessionServer.Context(
+        //        () => new EastFive.Security.SessionServer.Persistence.DataContext(EastFive.Azure.AppSettings.ASTConnectionStringKey));
+        //    return context;
+        //}
 
-        public Security.SessionServer.Persistence.DataContext DataContext
-        {
-            get { return dataContext ?? (dataContext = dataContextCreateFunc.Invoke()); }
-        }
+        //public Security.SessionServer.Persistence.DataContext DataContext
+        //{
+        //    get { return dataContext ?? (dataContext = dataContextCreateFunc.Invoke()); }
+        //}
 
         #region Services
         
-        public async Task<TResult> CreateOrUpdateClaim<TResult>(Guid accountId, string claimType, string claimValue,
-            Func<TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            var claimId = (accountId + claimType).MD5HashGuid();
-            return await this.Claims.CreateOrUpdateAsync(accountId, claimId, claimType, claimValue,
-                onSuccess,
-                () => onFailure("Account was not found"),
-                () => onFailure("Claim is already in use"));
-        }
+        //public async Task<TResult> CreateOrUpdateClaim<TResult>(Guid accountId, string claimType, string claimValue,
+        //    Func<TResult> onSuccess,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    var claimId = (accountId + claimType).MD5HashGuid();
+        //    return await this.Claims.CreateOrUpdateAsync(accountId, claimId, claimType, claimValue,
+        //        onSuccess,
+        //        () => onFailure("Account was not found"),
+        //        () => onFailure("Claim is already in use"));
+        //}
 
 
         //internal TResult GetAccessProvider<TResult>(CredentialValidationMethodTypes method,
@@ -82,50 +82,50 @@ namespace EastFive.Security.SessionServer
         
         #endregion
 
-        private Sessions sessions;
-        public Sessions Sessions
-        {
-            get
-            {
-                if (default(Sessions) == sessions)
-                    sessions = new Sessions(this, this.DataContext);
-                return sessions;
-            }
-        }
+        //private Sessions sessions;
+        //public Sessions Sessions
+        //{
+        //    get
+        //    {
+        //        if (default(Sessions) == sessions)
+        //            sessions = new Sessions(this, this.DataContext);
+        //        return sessions;
+        //    }
+        //}
 
 
-        private EastFive.Azure.Integrations integrations;
-        public EastFive.Azure.Integrations Integrations
-        {
-            get
-            {
-                if (default(EastFive.Azure.Integrations) == integrations)
-                    integrations = new EastFive.Azure.Integrations(this, this.DataContext);
-                return integrations;
-            }
-        }
+        //private EastFive.Azure.Integrations integrations;
+        //public EastFive.Azure.Integrations Integrations
+        //{
+        //    get
+        //    {
+        //        if (default(EastFive.Azure.Integrations) == integrations)
+        //            integrations = new EastFive.Azure.Integrations(this, this.DataContext);
+        //        return integrations;
+        //    }
+        //}
 
-        public Credentials invites;
-        public Credentials Invites
-        {
-            get
-            {
-                if (default(Credentials) == invites)
-                    invites = new Credentials(this, this.DataContext);
-                return invites;
-            }
-        }
+        //public Credentials invites;
+        //public Credentials Invites
+        //{
+        //    get
+        //    {
+        //        if (default(Credentials) == invites)
+        //            invites = new Credentials(this, this.DataContext);
+        //        return invites;
+        //    }
+        //}
 
-        private Claims claims;
-        public Claims Claims
-        {
-            get
-            {
-                if (default(Claims) == claims)
-                    claims = new Claims(this, this.DataContext);
-                return claims;
-            }
-        }
+        //private Claims claims;
+        //public Claims Claims
+        //{
+        //    get
+        //    {
+        //        if (default(Claims) == claims)
+        //            claims = new Claims(this, this.DataContext);
+        //        return claims;
+        //    }
+        //}
 
 
         #region Authorizations

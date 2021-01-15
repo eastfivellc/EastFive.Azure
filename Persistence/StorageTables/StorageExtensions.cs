@@ -14,7 +14,6 @@ using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Persistence.Azure;
-using Microsoft.WindowsAzure.Storage.Table;
 using EastFive.Persistence.Azure;
 using EastFive.Azure.StorageTables.Driver;
 using System.Reflection;
@@ -24,6 +23,7 @@ using EastFive.Persistence;
 using EastFive.Analytics;
 using System.Threading;
 using EastFive.Azure.Persistence.StorageTables;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -644,24 +644,24 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .Select(dictTableEntity => dictTableEntity.values);
         }
 
-        public static Microsoft.WindowsAzure.Storage.Table.ITableEntity ToTableEntity<TValue>(this IDictionary<string, TValue> dictionary,
+        public static ITableEntity ToTableEntity<TValue>(this IDictionary<string, TValue> dictionary,
             string rowKey, string partitionKey)
         {
             return new EastFive.Persistence.Azure.StorageTables.DictionaryTableEntity<TValue>(
                 rowKey, partitionKey, dictionary);
         }
 
-        [Obsolete("Use string row/partition keys")]
-        public static Microsoft.WindowsAzure.Storage.Table.ITableEntity ToTableEntity<TValue>(this IDictionary<string, TValue> dictionary,
-            Guid id)
-        {
-            var key = id.AsRowKey();
-            var partition = key.GeneratePartitionKey();
-            return new EastFive.Persistence.Azure.StorageTables.DictionaryTableEntity<TValue>(
-                key, partition, dictionary);
-        }
+        //[Obsolete("Use string row/partition keys")]
+        //public static ITableEntity ToTableEntity<TValue>(this IDictionary<string, TValue> dictionary,
+        //    Guid id)
+        //{
+        //    var key = id.AsRowKey();
+        //    var partition = key.GeneratePartitionKey();
+        //    return new EastFive.Persistence.Azure.StorageTables.DictionaryTableEntity<TValue>(
+        //        key, partition, dictionary);
+        //}
 
-        public static IEnumerableAsync<Microsoft.WindowsAzure.Storage.Table.TableResult> StorageQueryDelete<TEntity>(
+        public static IEnumerableAsync<TableResult> StorageQueryDelete<TEntity>(
             this Expression<Func<TEntity, bool>> query)
             where TEntity : IReferenceable
         {
@@ -777,11 +777,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         //}
 
         public static IEnumerableAsync<TResult> StorageCreateOrUpdateBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,
-            Func<TEntity, Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> perItemCallback,
+            Func<TEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
-            where TEntity : class, Microsoft.WindowsAzure.Storage.Table.ITableEntity
+            where TEntity : class, ITableEntity
         {
             return AzureTableDriverDynamic
                 .FromSettings()
@@ -797,11 +797,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TResult> StorageCreateOrUpdateBatch<TEntity, TResult>(this IEnumerableAsync<TEntity> entities,
-            Func<TEntity, Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> perItemCallback,
+            Func<TEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
-            where TEntity : class, Microsoft.WindowsAzure.Storage.Table.ITableEntity
+            where TEntity : class, ITableEntity
         {
             return AzureTableDriverDynamic
                 .FromSettings()
@@ -818,7 +818,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static IEnumerableAsync<TResult> StorageCreateOrReplaceBatch<TEntity, TResult>(
             this IEnumerableAsync<TEntity> entities,
-            Func<TEntity, Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> perItemCallback,
+            Func<TEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
@@ -957,7 +957,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<IRef<TEntity>> entityRefs,
-            Func<Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> onSuccess)
+            Func<TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
         {
             var documentIds = entityRefs.Select(entity => entity.id);
@@ -967,7 +967,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<TEntity> entities,
-            Func<Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> onSuccess)
+            Func<TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
         {
             var documentIds = entities.Select(entity => entity.id);
@@ -977,7 +977,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,
-            Func<Microsoft.WindowsAzure.Storage.Table.TableResult, TResult> onSuccess)
+            Func<TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
         {
             var documentIds = entities.Select(entity => entity.id);
@@ -1270,6 +1270,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> BlobLoadStreamAsync<TResult>(this Guid blobId, string containerName,
             Func<System.IO.Stream, string, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobLoadStreamAsync(blobId, containerName,
+                    onSuccess,
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> BlobLoadStreamAsync<TResult>(this Guid blobId, string containerName,
+            Func<System.IO.Stream, string, IDictionary<string, string>, TResult> onSuccess,
             Func<TResult> onNotFound = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)

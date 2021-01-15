@@ -15,8 +15,7 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth

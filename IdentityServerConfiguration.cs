@@ -59,7 +59,7 @@ namespace EastFive.Security.SessionServer
             return onActorNotFound();
         }
 
-        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(Context context,
+        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(//Context context,
                 string validationType,
                 AuthenticationActions action,
                 Guid requestId,

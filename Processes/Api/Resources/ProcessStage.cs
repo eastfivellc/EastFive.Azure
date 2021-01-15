@@ -210,7 +210,7 @@ namespace EastFive.Api.Azure.Resources
                     Guid [] editableIds,
                 [PropertyOptional(Name = Resources.ProcessStage.ConfirmablePropertyName)]
                     Resources.ProcessStage.ConfirmableResource [] confirmables,
-                EastFive.Api.Security security, Context context,
+                EastFive.Api.Security security,// Context context,
             NoContentResponse onUpdated,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,

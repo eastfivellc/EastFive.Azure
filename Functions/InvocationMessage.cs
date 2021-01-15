@@ -1,39 +1,36 @@
-﻿using EastFive;
-using EastFive.Extensions;
-using EastFive.Api;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Persistence;
-using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using System.Threading;
+using System.Security.Claims;
+using System.Linq.Expressions;
 using System.Web.Http;
-using EastFive.Api.Controllers;
-using EastFive.Api.Azure;
+
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Api;
+using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Persistence;
+using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Collections.Generic;
-using Microsoft.WindowsAzure.Storage.Queue;
 using EastFive.Linq.Async;
 using EastFive.Linq;
 using EastFive.Analytics;
-using System.Linq.Expressions;
 using EastFive.Api.Auth;
 using EastFive.Azure.Auth;
-using System.Net.Http.Headers;
 using EastFive.Azure.Persistence.StorageTables;
-using System.Threading;
-using System.Security.Claims;
-using System.IO;
 
 namespace EastFive.Azure.Functions
 {
     [FunctionViewController(
         Route = "InvocationMessage",
-        Resource = typeof(InvocationMessage),
         ContentType = "x-application/eastfive.azure.invocation-message",
         ContentTypeVersion = "0.1")]
     [DataContract]

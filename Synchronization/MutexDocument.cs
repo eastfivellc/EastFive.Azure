@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using EastFive.Serialization;
 using EastFive.Extensions;
 using BlackBarLabs.Persistence.Azure.StorageTables;

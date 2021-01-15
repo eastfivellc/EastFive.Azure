@@ -6,12 +6,10 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
-
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {

@@ -1,9 +1,7 @@
 ﻿using System;
 using BlackBarLabs.Persistence.Azure.StorageTables;
-using Microsoft.WindowsAzure;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
+using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage.Blobs;
 
 using System.Linq;
 using System.Threading.Tasks;
@@ -22,7 +20,7 @@ namespace BlackBarLabs.Persistence.Azure
         private CloudStorageAccount cloudStorageAccount;
 
         // Contexts
-        private CloudBlobClient blobClient;
+        private BlobServiceClient blobClient;
         private AzureStorageRepository azureStorageRepository;
 
         public DataStores(string azureKey, string documentDbEndpointUri = null, string documentDbPrimaryKey = null, string documentDbDatabaseName = null)
@@ -47,10 +45,12 @@ namespace BlackBarLabs.Persistence.Azure
                 lock (AstLock)
                     if (azureStorageRepository == null)
                     {
-                        cloudStorageAccount = azureKey.ConfigurationString(
-                            storageSetting => CloudStorageAccount.Parse(storageSetting));
-                        
-                        azureStorageRepository = new AzureStorageRepository(cloudStorageAccount);
+                        var connectionString = azureKey.ConfigurationString(
+                            storageSetting => storageSetting);
+                        var cloudStorageAccount = CloudStorageAccount.Parse(connectionString);
+
+                        azureStorageRepository = new AzureStorageRepository(
+                            cloudStorageAccount, connectionString);
                     }
 
                 return azureStorageRepository;
@@ -58,37 +58,37 @@ namespace BlackBarLabs.Persistence.Azure
             private set { azureStorageRepository = value; }
         }
 
-        private static readonly object BlobStoreLock = new object();
-        public CloudBlobClient BlobStore
-        {
-            get
-            {
-                if (blobClient != null) return blobClient;
+        //private static readonly object BlobStoreLock = new object();
+        //public BlobServiceClient BlobStore
+        //{
+        //    get
+        //    {
+        //        if (blobClient != null) return blobClient;
 
-                lock (BlobStoreLock)
-                    if (blobClient == null)
-                    {
-                        if (cloudStorageAccount == null)
-                        {
-                            cloudStorageAccount = azureKey.ConfigurationString(
-                                storageSetting => CloudStorageAccount.Parse(storageSetting));
-                        }
-                        blobClient = cloudStorageAccount.CreateCloudBlobClient();
-                        blobClient.DefaultRequestOptions.RetryPolicy = new ExponentialRetry(TimeSpan.FromSeconds(1), 10);
-                        blobClient.GetContainerReference("media")
-                            .CreateIfNotExistsAsync(BlobContainerPublicAccessType.Container,
-                                new BlobRequestOptions
-                                {
+        //        lock (BlobStoreLock)
+        //            if (blobClient == null)
+        //            {
+        //                if (cloudStorageAccount == null)
+        //                {
+        //                    cloudStorageAccount = azureKey.ConfigurationString(
+        //                        storageSetting => CloudStorageAccount.Parse(storageSetting));
+        //                }
+        //                blobClient = cloudStorageAccount.CreateCloudBlobClient();
+        //                blobClient.DefaultRequestOptions.RetryPolicy = new ExponentialRetry(TimeSpan.FromSeconds(1), 10);
+        //                blobClient.GetContainerReference("media")
+        //                    .CreateIfNotExistsAsync(BlobContainerPublicAccessType.Container,
+        //                        new BlobRequestOptions
+        //                        {
 
-                                },
-                                new OperationContext
-                                { });
+        //                        },
+        //                        new OperationContext
+        //                        { });
 
-                    }
+        //            }
 
-                return blobClient;
-            }
-        }
+        //        return blobClient;
+        //    }
+        //}
     }
 }
 

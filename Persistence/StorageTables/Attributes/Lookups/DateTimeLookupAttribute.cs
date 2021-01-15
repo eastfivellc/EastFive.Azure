@@ -7,8 +7,8 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 using EastFive.Extensions;
 using EastFive.Linq;

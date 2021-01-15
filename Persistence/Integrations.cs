@@ -12,7 +12,7 @@ using System.IdentityModel;
 using System.Net.Http;
 using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Security.SessionServer;
@@ -102,7 +102,9 @@ namespace EastFive.Azure.Persistence.Persistence
 
                             authRequestDoc.LinkedAuthenticationId = actorId;
                             authRequestDoc.SetExtraParams(updatedParams);
-                            return await repository.UpdateIfNotModifiedAsync(authRequestDoc, ()=> accessDoc.LookupId, ()=> accessDoc.LookupId); 
+                            return await repository.UpdateIfNotModifiedAsync(authRequestDoc,
+                                ()=> accessDoc.LookupId,
+                                ()=> accessDoc.LookupId); 
                         });
                 },
                 ()=>

@@ -1,12 +1,12 @@
 ﻿using BlackBarLabs.Persistence.Azure.Attributes;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Runtime.Serialization;
 
 namespace EastFive.Security.SessionServer.Persistence.Azure.Documents
 {
     [StorageResourceNoOp]
-    public class CredentialMappingLookupDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    public class CredentialMappingLookupDocument : TableEntity
     {
         #region Properties
         

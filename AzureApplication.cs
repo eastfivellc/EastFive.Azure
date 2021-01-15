@@ -10,10 +10,7 @@ using System.Web;
 using System.Web.Http;
 using System.Reflection;
 
-using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.ApplicationInsights;
-using Microsoft.WindowsAzure.Storage.Queue;
-using Microsoft.WindowsAzure.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
@@ -29,6 +26,8 @@ using EastFive.Web.Configuration;
 using EastFive.Api;
 using EastFive.Azure.Auth.CredentialProviders;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Azure.Storage.Queues.Models;
+using Azure.Storage.Queues;
 
 namespace EastFive.Azure
 {
@@ -97,8 +96,8 @@ namespace EastFive.Api.Azure
 
             Telemetry = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
 
-            this.AddInstigator(typeof(EastFive.Security.SessionServer.Context),
-                (httpApp, request, parameterInfo, onCreatedSessionContext) => onCreatedSessionContext(this.AzureContext));
+            //this.AddInstigator(typeof(EastFive.Security.SessionServer.Context),
+            //    (httpApp, request, parameterInfo, onCreatedSessionContext) => onCreatedSessionContext(this.AzureContext));
             this.AddInstigator(typeof(EastFive.Azure.Functions.InvokeFunction),
                 (httpApp, request, parameterInfo, onCreated) =>
                 {
@@ -296,22 +295,19 @@ namespace EastFive.Api.Azure
             }
         }
 
-        public virtual async Task<CloudQueueMessage> SendQueueMessageAsync(string queueName, byte[] byteContent)
+        public virtual async Task<SendReceipt> SendQueueMessageAsync(string queueName, byte[] byteContent)
         {
             var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
                 async (connString) =>
                 {
-                    var storageAccount = CloudStorageAccount.Parse(connString);
-                    var queueClient = storageAccount.CreateCloudQueueClient();
-                    var queue = queueClient.GetQueueReference(queueName);
-                    await queue.CreateIfNotExistsAsync();
-                    return queue;
+                    var queueClient = new QueueClient(connString, queueName);
+                    await queueClient.CreateIfNotExistsAsync();
+                    return queueClient;
                 },
                 (why) => throw new Exception(why));
 
-            var message = new CloudQueueMessage(byteContent.ToBase64String());
-            await appQueue.AddMessageAsync(message);
-            return message;
+            var receipt = await appQueue.SendMessageAsync(byteContent.ToBase64String());
+            return receipt.Value;
         }
 
         public virtual async Task<TResult> GetNextQueueMessageAsync<TResult>(string queueName,
@@ -320,24 +316,25 @@ namespace EastFive.Api.Azure
                 Task<TResult>> onNextMessage,
             Func<TResult> onEmpty)
         {
-            var appQueue = await EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
+            var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
                 async (connString) =>
                 {
-                    var storageAccount = CloudStorageAccount.Parse(connString);
-                    var queueClient = storageAccount.CreateCloudQueueClient();
-                    var queue = queueClient.GetQueueReference(queueName);
-                    await queue.CreateIfNotExistsAsync();
-                    return queue;
+                    var queueClient = new QueueClient(connString, queueName);
+                    await queueClient.CreateIfNotExistsAsync();
+                    return queueClient;
                 },
                 (why) => throw new Exception(why));
-            
-            var message = await appQueue.GetMessageAsync();
-            if (null == message)
+
+            var response = await appQueue.ReceiveMessageAsync();
+            if (null == response)
+                return onEmpty();
+            if (response.Value.IsDefaultOrNull())
                 return onEmpty();
 
+            var message = response.Value;
             return await onNextMessage(
-                message.AsBytes,
-                () => appQueue.DeleteMessageAsync(message));
+                message.Body.ToArray(),
+                () => appQueue.DeleteMessageAsync(message.MessageId, message.PopReceipt));
         }
 
         protected override async Task<Initialized> InitializeAsync()
@@ -345,13 +342,13 @@ namespace EastFive.Api.Azure
             return await base.InitializeAsync();
         }
 
-        internal virtual IManageAuthorizationRequests AuthorizationRequestManager
-        {
-            get
-            {
-                return new AzureStorageTablesLogAuthorizationRequestManager();
-            }
-        }
+        //internal virtual IManageAuthorizationRequests AuthorizationRequestManager
+        //{
+        //    get
+        //    {
+        //        return new AzureStorageTablesLogAuthorizationRequestManager();
+        //    }
+        //}
 
         internal async Task<TResult> GetAuthorizationProviderAsync<TResult>(string method,
             Func<IProvideAuthorization, TResult> onSuccess,
@@ -539,15 +536,15 @@ namespace EastFive.Api.Azure
             return redirectUrl;
         }
 
-        public EastFive.Security.SessionServer.Context AzureContext
-        {
-            get
-            {
-                return new EastFive.Security.SessionServer.Context(
-                    () => new EastFive.Security.SessionServer.Persistence.DataContext(
-                        EastFive.Azure.AppSettings.ASTConnectionStringKey));
-            }
-        }
+        //public EastFive.Security.SessionServer.Context AzureContext
+        //{
+        //    get
+        //    {
+        //        return new EastFive.Security.SessionServer.Context(
+        //            () => new EastFive.Security.SessionServer.Persistence.DataContext(
+        //                EastFive.Azure.AppSettings.ASTConnectionStringKey));
+        //    }
+        //}
         
         public TResult StoreMonitoring<TResult>(
             Func<StoreMonitoringDelegate, TResult> onMonitorUsingThisCallback,
@@ -556,7 +553,6 @@ namespace EastFive.Api.Azure
             StoreMonitoringDelegate callback = (monitorRecordId, authenticationId, when, method, controllerName, queryString) =>
                 EastFive.Api.Azure.Monitoring.MonitoringDocument.CreateAsync(monitorRecordId, authenticationId,
                         when, method, controllerName, queryString, 
-                        AzureContext.DataContext.AzureStorageRepository,
                         () => true);
             return onMonitorUsingThisCallback(callback);
         }

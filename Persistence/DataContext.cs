@@ -4,31 +4,32 @@ namespace EastFive.Security.SessionServer.Persistence
 {
     public class DataContext : BlackBarLabs.Persistence.Azure.DataStores
     {
-        public DataContext(string appAzureTableStorageSettingsKey) : base(appAzureTableStorageSettingsKey)
+        public DataContext(string appAzureTableStorageSettingsKey) 
+            : base(appAzureTableStorageSettingsKey)
         {
         }
         
-        private Sessions sessions = null;
-        public Sessions Sessions
-        {
-            get
-            {
-                if (default(Sessions) == sessions)
-                    sessions = new Sessions(this.AzureStorageRepository);
-                return sessions;
-            }
-        }
+        //private Sessions sessions = null;
+        //public Sessions Sessions
+        //{
+        //    get
+        //    {
+        //        if (default(Sessions) == sessions)
+        //            sessions = new Sessions(this.AzureStorageRepository);
+        //        return sessions;
+        //    }
+        //}
 
-        private CredentialMappings credentialMappings = null;
-        public CredentialMappings CredentialMappings
-        {
-            get
-            {
-                if (default(CredentialMappings) == credentialMappings)
-                    credentialMappings = new CredentialMappings(this.AzureStorageRepository);
-                return credentialMappings;
-            }
-        }
+        //private CredentialMappings credentialMappings = null;
+        //public CredentialMappings CredentialMappings
+        //{
+        //    get
+        //    {
+        //        if (default(CredentialMappings) == credentialMappings)
+        //            credentialMappings = new CredentialMappings(this.AzureStorageRepository);
+        //        return credentialMappings;
+        //    }
+        //}
 
         private Claims claims = null;
         public Claims Claims

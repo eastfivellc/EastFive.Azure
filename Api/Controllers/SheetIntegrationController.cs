@@ -24,31 +24,30 @@ namespace EastFive.Api.Controllers
             return await onLoadUploadPage("SheetIntegration/UploadSheet.cshtml", default).AsTask();
         }
 
-        [HttpPost]
-        public async static Task<IHttpResponse> XlsPostAsync(EastFive.Security.SessionServer.Context context,
-                ContentBytes sheet, [QueryParameter]Guid integration, IDictionary<string, bool> resourceTypes,
-            RedirectResponse onSuccess,
-            NotFoundResponse onNotFound,
-            GeneralConflictResponse onError)
-        {
-            var sheetId = Guid.NewGuid();
-            return await await context.Integrations.UpdateAsync(integration,
-                sheet.content.MD5HashGuid().ToString("N"),
-                new Dictionary<string, string>()
-                {
-                    { "resource_types",  resourceTypes.SelectKeys().Join(",") },
-                    { "sheet_id", sheetId.ToString("N") },
-                },
-                (redirectUrl) =>
-                {
-                    //return Sheets.SaveAsync(sheetId, sheet.contentType.MediaType,  sheet.content, integration,
-                    //        context.DataContext,
-                    //    () => onSuccess(redirectUrl),
-                    //    "Guid not unique".AsFunctionException<IHttpResponse>());
-                    throw new NotImplementedException();
-                },
-                () => onNotFound().AsTask(),
-                () => onError("The provided integration ID has not been connected to an authorization.").AsTask());
-        }
+        //[HttpPost]
+        //public async static Task<IHttpResponse> XlsPostAsync(EastFive.Security.SessionServer.Context context,
+        //        ContentBytes sheet, [QueryParameter]IRef<EastFive.Azure.Integration> integrationRef, IDictionary<string, bool> resourceTypes,
+        //    RedirectResponse onSuccess,
+        //    NotFoundResponse onNotFound,
+        //    GeneralConflictResponse onError)
+        //{
+        //    var sheetId = Guid.NewGuid();
+        //    return await await integrationRef.UpdateAsync(
+        //        sheet.content.MD5HashGuid().ToString("N"),
+        //        new Dictionary<string, string>()
+        //        {
+        //            { "resource_types",  resourceTypes.SelectKeys().Join(",") },
+        //            { "sheet_id", sheetId.ToString("N") },
+        //        },
+        //        (integration, saveAsync) =>
+        //        {
+        //            if (!integration.authorizationId.HasValue)
+        //                return onUnauthenticatedAuthenticationRequest();
+
+        //            await saveAsync(authRequestStorage.authorizationId.Value, authRequestStorage.name, token, updatedUserParameters);
+        //        },
+        //        () => onNotFound().AsTask(),
+        //        () => onError("The provided integration ID has not been connected to an authorization.").AsTask());
+        //}
     }
 }
