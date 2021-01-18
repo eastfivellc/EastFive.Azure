@@ -7,14 +7,15 @@ using Microsoft.Azure.Cosmos.Table;
 
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
+using System.Collections.Generic;
 
 namespace EastFive.Azure.StorageTables.Driver
 {
-    public static class ResponseHandlingExtensions
+    public static class AzureResponseHandlingExtensions
     {
         #region Case specific boolean checks
 
-        public static bool IsProblemPreconditionFailed(this StorageException exception)
+        public static bool IsProblemPreconditionFailed(this global::Azure.RequestFailedException exception)
         {
             if (exception.InnerException is System.Net.WebException)
             {
@@ -28,39 +29,41 @@ namespace EastFive.Azure.StorageTables.Driver
             return false;
         }
 
-        public static bool IsProblemPropertyValueTooLarge(this StorageException exception)
+        public static bool IsProblemPropertyValueTooLarge(this global::Azure.RequestFailedException exception)
         {
             return exception.ParseExtendedErrorInformation(
                 (errorCode, errorMessage) => errorCode == ExtendedErrorInformationCodes.PropertyValueTooLarge,
                 () => false);
         }
         
-        public static bool IsProblemTimeout(this StorageException exception)
+        public static bool IsProblemTimeout(this global::Azure.RequestFailedException exception)
         {
             if (exception.InnerException is System.Net.WebException)
             {
                 var webEx = (System.Net.WebException)exception.InnerException;
                 return (webEx.Status == System.Net.WebExceptionStatus.Timeout);
             }
-            if (408 == exception.RequestInformation.HttpStatusCode)
+            if (408 == (int)exception.GetHttpStatusCode()) // RequestInformation.HttpStatusCode)
                 return true;
 
             return false;
         }
 
-        public static bool IsProblemResourceAlreadyExists(this StorageException exception)
+        public static bool IsProblemResourceAlreadyExists(this global::Azure.RequestFailedException exception)
         {
             return exception.ParseExtendedErrorInformation(
                 (errorCode, errorMessage) => errorCode == ExtendedErrorInformationCodes.EntityAlreadyExists,
                 () => false);
         }
 
-        public static bool IsProblemTableDoesNotExist(this StorageException exception)
+        public static bool IsProblemTableDoesNotExist(this global::Azure.RequestFailedException exception)
         {
             return exception.ParseExtendedErrorInformation(
                 (errorCode, message) =>
                 {
                     if (errorCode == ExtendedErrorInformationCodes.TableNotFound)
+                        return true;
+                    if (errorCode == ExtendedErrorInformationCodes.BlobNotFound)
                         return true;
                     return ExtendedErrorCodeNotProvided();
                 },
@@ -82,7 +85,7 @@ namespace EastFive.Azure.StorageTables.Driver
             }
         }
 
-        public static bool IsProblemDoesNotExist(this StorageException exception)
+        public static bool IsProblemDoesNotExist(this global::Azure.RequestFailedException exception)
         {
             return exception.ParseExtendedErrorInformation(
                 (errorCode, message) =>
@@ -95,7 +98,7 @@ namespace EastFive.Azure.StorageTables.Driver
                 },
                 () =>
                 {
-                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.NotFound)
+                    if (exception.GetHttpStatusCode() == HttpStatusCode.NotFound)
                         return true;
                     if (exception.InnerException is System.Net.WebException)
                     {
@@ -113,7 +116,7 @@ namespace EastFive.Azure.StorageTables.Driver
 
         #endregion
 
-        public static Task<TResult> ResolveCreate<TResult>(this StorageException exception, 
+        public static Task<TResult> ResolveCreate<TResult>(this global::Azure.RequestFailedException exception, 
             CloudTable table,
             Func<TResult> retry,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -134,7 +137,7 @@ namespace EastFive.Azure.StorageTables.Driver
                         await table.CreateIfNotExistsAsync();
                         return retry();
                     }
-                    catch (StorageException createEx)
+                    catch (global::Azure.RequestFailedException createEx)
                     {
                         // Catch bug with azure storage table client library where
                         // if two resources attempt to create the table at the same
@@ -149,7 +152,7 @@ namespace EastFive.Azure.StorageTables.Driver
                     if (onTimeout.IsDefaultOrNull())
                         onTimeout = AzureStorageDriver.GetRetryDelegate();
                     bool shouldRetry = false;
-                    await onTimeout(exception.RequestInformation.HttpStatusCode, exception,
+                    await onTimeout((int)exception.GetHttpStatusCode(), exception,
                         () =>
                         {
                             shouldRetry = true;
@@ -168,7 +171,15 @@ namespace EastFive.Azure.StorageTables.Driver
                 });
         }
 
-        public static TResult ParseStorageException<TResult>(this StorageException storageException,
+        private static HttpStatusCode GetHttpStatusCode(this global::Azure.RequestFailedException storageException)
+        {
+            //if (storageException.Status)
+            //    return HttpStatusCode.Ambiguous;
+
+            return (HttpStatusCode)storageException.Status;
+        }
+
+        public static TResult ParseStorageException<TResult>(this global::Azure.RequestFailedException storageException,
             Func<string, TResult> onDuplicatePropertiesSpecified = default,
             Func<string, TResult> onEntityAlreadyExists = default,
             Func<string, TResult> onEntityTooLarge = default,
@@ -288,7 +299,7 @@ namespace EastFive.Azure.StorageTables.Driver
             }
         }
 
-        public static TResult ParseStorageException<TResult>(this StorageException storageException,
+        public static TResult ParseStorageException<TResult>(this global::Azure.RequestFailedException storageException,
             Func<ExtendedErrorInformationCodes, string, TResult> onParsed,
             Func<TResult> onUnableToParse)
         {
@@ -330,22 +341,24 @@ namespace EastFive.Azure.StorageTables.Driver
         /// <param name="onExtendedErrorInformation">Invoked with the RequestInformation.ExtendedErrorInformation. (ErrorCode and ErrorMessage, respectively) from the exception.</param>
         /// <param name="onExtendedErrorInformationNotProvided">Invoked when extended error information is not available</param>
         /// <returns></returns>
-        public static TResult ParseExtendedErrorInformation<TResult>(this StorageException storageException,
+        public static TResult ParseExtendedErrorInformation<TResult>(this global::Azure.RequestFailedException storageException,
             Func<ExtendedErrorInformationCodes, string, TResult> onExtendedErrorInformation,
             Func<TResult> onExtendedErrorInformationNotProvided)
         {
-            if (storageException.RequestInformation.IsDefaultOrNull())
-                return onExtendedErrorInformationNotProvided();
-            if (storageException.RequestInformation.ExtendedErrorInformation.IsDefaultOrNull())
-                return onExtendedErrorInformationNotProvided();
+            var errorCode = storageException.ErrorCode;
+            var errorMessage = storageException.Message.TryMatchRegex(
+                        "Status: (?<statusCode>[0-9]{3}) \\((?<message>.*)\\)",
+                    (statusCode, message) => statusCode.PairWithValue(message),
+                    out KeyValuePair<string, string> statusCodeMessageStr)?
+                statusCodeMessageStr.Value
+                :
+                "Message could not be parsed";
 
-            var errorCode = storageException.RequestInformation.ExtendedErrorInformation.ErrorCode;
-            var errorMessage = storageException.RequestInformation.ExtendedErrorInformation.ErrorMessage;
-            System.Diagnostics.Debug.WriteLine($"AST Error [{errorCode}]:{errorMessage}");
+            System.Diagnostics.Debug.WriteLine($"AST Error [{errorCode}]:{errorMessage})");
 
             var matchingCodes = Enum.GetNames(typeof(ExtendedErrorInformationCodes))
                 .Where(errorCodeName => String.Compare(errorCodeName, errorCode) == 0);
-            
+
             if (!matchingCodes.Any())
                 return onExtendedErrorInformation(ExtendedErrorInformationCodes.Other, errorMessage);
 
