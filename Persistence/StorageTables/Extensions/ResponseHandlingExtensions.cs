@@ -89,6 +89,8 @@ namespace EastFive.Azure.StorageTables.Driver
                 {
                     if (errorCode == ExtendedErrorInformationCodes.TableNotFound)
                         return true;
+                    if (errorCode == ExtendedErrorInformationCodes.BlobNotFound)
+                        return true;
                     return false;
                 },
                 () =>
@@ -215,6 +217,7 @@ namespace EastFive.Azure.StorageTables.Driver
                         case ExtendedErrorInformationCodes.TableBeingDeleted:
                             return ExecuteIfNotDefault(onTableBeingDeleted);
                         case ExtendedErrorInformationCodes.TableNotFound:
+                        case ExtendedErrorInformationCodes.BlobNotFound:
                             return ExecuteIfNotDefault(onNotFound);
                         case ExtendedErrorInformationCodes.TooManyProperties:
                             return ExecuteIfNotDefault(onTooManyProperties);

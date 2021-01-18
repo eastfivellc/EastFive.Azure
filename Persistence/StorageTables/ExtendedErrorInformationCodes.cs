@@ -97,10 +97,14 @@ namespace EastFive.Azure.Persistence.StorageTables
         /// </summary>
         General,
 
-
         /// <summary>
         /// Bad Request (400): The value specified is invalid.
         /// </summary>
         InvalidValueGeneral,
+
+        /// <summary>
+        /// Status: 404 (The specified blob does not exist.)
+        /// </summary>
+        BlobNotFound,
     }
 }

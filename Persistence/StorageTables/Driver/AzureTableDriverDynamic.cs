@@ -2889,7 +2889,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             var container = BlobClient.GetBlobContainerClient(containerReference);
             var createResponse = await container.CreateIfNotExistsAsync();
-            global::Azure.ETag created = createResponse.Value.ETag;
             return container.GetBlobClient(blockId);
         }
 
@@ -3027,7 +3026,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     return onFound(bytes, properties.Value.ContentType);
                 }
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (ex.IsProblemDoesNotExist())
                     if(!onNotFound.IsDefaultOrNull())
