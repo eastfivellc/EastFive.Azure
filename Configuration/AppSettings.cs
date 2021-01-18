@@ -78,8 +78,8 @@ namespace EastFive.Azure
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false)]
             public const string SAMLCertificate = "EastFive.Security.CredentialProvider.SAML.Certificate";
-            
-            [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " + 
+
+            [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " +
                 "This value is used to lookup the user in the local system.",
                 DeploymentOverrides.Optional,
                 DeploymentSecurityConcern = false)]
@@ -113,7 +113,7 @@ namespace EastFive.Azure
                 Location = "Azure Portal | Azure Active Directory | App Registrations | Application ID",
                 PrivateRepositoryOnly = false)]
             public const string ApplicationId = "EastFive.Azure.AzureADB2C.ApplicationId";
-            
+
             [ConfigKey("The audience used for token validation.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false,
@@ -158,6 +158,35 @@ namespace EastFive.Azure
             DeploymentSecurityConcern = false,
             Location = "Discressionary")]
         public const string SpaServeEnabled = "EastFive.Azure.SpaServeEnabled";
+
+        [Config]
+        public static class Auth
+        {
+            [Config]
+            public static class Apple
+            {
+                [ConfigKey("ID used to identify the application to apple.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientId = "EastFive.Apple.ClientId";
+
+                [ConfigKey("Key used to redeem a token code to Apple.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = true,
+                    PrivateRepositoryOnly = true)]
+                public const string AppSecret = "EastFive.Apple.ClientSecret";
+
+                [ConfigKey("This is the list of audiences that are valid for the Apple JWT. This should include the ClientID.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ValidAudiences = "EastFive.Apple.ValidAudiences";
+            }
+        }
     }
 }
 
