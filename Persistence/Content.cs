@@ -45,7 +45,7 @@ namespace EastFive.Api.Azure.Persistence
             var blobClient = BlobStore();
             var container = blobClient.GetBlobContainerClient(containerReference);
             var createResponse = await container.CreateIfNotExistsAsync();
-            global::Azure.ETag created = createResponse.Value.ETag;
+            //global::Azure.ETag created = createResponse.Value.ETag;
             return container.GetBlobClient(blockId);
         }
 

@@ -711,13 +711,6 @@ namespace EastFive.Persistence
             var storageMembers = valueType.GetPersistenceAttributes();
             if (storageMembers.Any())
             {
-                var rowKeyKey = $"_rowKey_";
-                var rowKeyValue = value.StorageGetRowKeyForType(valueType);
-                var rowKeyProperty = new EntityProperty(rowKeyValue);
-                var partitionKeyKey = $"_partitionKey_";
-                var partitionKeyValue = value.StorageGetPartitionKeyForType(rowKeyValue, valueType);
-                var partitionKeyProperty = new EntityProperty(partitionKeyValue);
-
                 var storageArrays = storageMembers
                     .Select(
                         storageMemberKvp =>
@@ -734,9 +727,26 @@ namespace EastFive.Persistence
 
                             return epValue.PairWithKey(propName);
                         })
-                    .Append(rowKeyProperty.PairWithKey(rowKeyKey))
-                    .Append(partitionKeyProperty.PairWithKey(partitionKeyKey))
                     .ToArray();
+
+                if(value.StorageTryGetRowKeyForType(valueType, out string rowKeyValue))
+                {
+                    var rowKeyKey = $"_rowKey_";
+                    var rowKeyProperty = new EntityProperty(rowKeyValue);
+                    storageArrays = storageArrays
+                        .Append(rowKeyProperty.PairWithKey(rowKeyKey))
+                        .ToArray();
+                }
+
+                if (value.StorageTryGetPartitionKeyForType(rowKeyValue, valueType, out string partitionKeyValue))
+                {
+                    var partitionKeyKey = $"_partitionKey_";
+                    var partitionKeyProperty = new EntityProperty(partitionKeyValue);
+                    storageArrays = storageArrays
+                        .Append(partitionKeyProperty.PairWithKey(partitionKeyKey))
+                        .ToArray();
+                }
+
                 return onValues(storageArrays);
             }
 
@@ -896,26 +906,6 @@ namespace EastFive.Persistence
                 .Cast<object>()
                 .ToArray();
 
-            var rowKeyKey = $"_rowKey_";
-            var partitionKeyKey = $"_partitionKey_";
-            var keyValues = items
-                .Select(
-                    item =>
-                    {
-                        var itemType = item.GetType();
-                        var rowKeyValue = item.StorageGetRowKeyForType(itemType);
-                        var partitionKeyValue = item.StorageGetPartitionKeyForType(rowKeyValue, itemType);
-                        return (rowKeyValue, partitionKeyValue);
-                    });
-            var rowKeyValue = keyValues
-                .Select(kv => kv.rowKeyValue)
-                .ToUTF8ByteArrayOfStrings();
-            var rowKeyEp = new EntityProperty(rowKeyValue);
-            var partitionKeyValue = keyValues
-                .Select(kv => kv.partitionKeyValue)
-                .ToUTF8ByteArrayOfStrings();
-            var partitionKeyEp = new EntityProperty(partitionKeyValue);
-
             var epsArray = storageMembers
                 .SelectMany(
                     storageMember =>
@@ -936,11 +926,53 @@ namespace EastFive.Persistence
                         var entityProperties = this.CastValue(type, arrayOfPropertyValues, propertyNameDefault);
                         return entityProperties;
                     })
-                .Append(rowKeyEp.PairWithKey(rowKeyKey))
-                .Append(partitionKeyEp.PairWithKey(partitionKeyKey))
                 .ToArray();
-            return epsArray;
 
+            var keyValues = items
+                .Select(
+                    item =>
+                    {
+                        var itemType = item.GetType();
+                        var rowKeyValue = item.StorageTryGetRowKeyForType(
+                                itemType, out string rkValue)?
+                            rkValue
+                            :
+                            string.Empty;
+                        var partitionKeyValue = item.StorageTryGetPartitionKeyForType(
+                                rowKeyValue, itemType, out string pkValue) ?
+                            pkValue
+                            :
+                            string.Empty;
+                        return (rowKeyValue, partitionKeyValue);
+                    });
+            
+            var hasRowKeys = items.Any(item => item.GetType().StorageHasRowKey());
+            if (hasRowKeys)
+            {
+                var rowKeyKey = $"_rowKey_";
+                var rowKeyValue = keyValues
+                .Select(kv => kv.rowKeyValue)
+                .ToUTF8ByteArrayOfStrings();
+                var rowKeyEp = new EntityProperty(rowKeyValue);
+                epsArray = epsArray
+                    .Append(rowKeyEp.PairWithKey(rowKeyKey))
+                    .ToArray();
+            }
+
+            var hasPartitionKeys = items.Any(item => item.GetType().StorageHasPartitionKey());
+            if (hasPartitionKeys)
+            {
+                var partitionKeyKey = $"_partitionKey_";
+                var partitionKeyValue = keyValues
+                    .Select(kv => kv.partitionKeyValue)
+                    .ToUTF8ByteArrayOfStrings();
+                var partitionKeyEp = new EntityProperty(partitionKeyValue);
+                epsArray = epsArray
+                    .Append(partitionKeyEp.PairWithKey(partitionKeyKey))
+                    .ToArray();
+            }
+
+            return epsArray;
         }
 
         #endregion

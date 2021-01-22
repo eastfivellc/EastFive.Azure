@@ -91,7 +91,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         {
             var container = BlobClient.GetBlobContainerClient(containerReference);
             var createResponse = await container.CreateIfNotExistsAsync();
-            global::Azure.ETag created = createResponse.Value.ETag;
+            //global::Azure.ETag created = createResponse.Value.ETag;
             return container.GetBlobClient(blockId);
         }
 
