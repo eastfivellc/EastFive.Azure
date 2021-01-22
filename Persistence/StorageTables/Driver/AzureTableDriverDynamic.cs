@@ -2965,7 +2965,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             var container = this.BlobClient.GetBlobContainerClient(containerName);
             var createResponse = await container.CreateIfNotExistsAsync();
-            global::Azure.ETag created = createResponse.Value.ETag;
+            //global::Azure.ETag created = createResponse.Value.ETag;
             var blockClient = container.GetBlobClient(blobId.ToString("N"));
             try
             {
