@@ -20,7 +20,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "XSession",
-        Resource = typeof(Session),
         ContentType = "x-application/auth-session",
         ContentTypeVersion = "0.1")]
     [StorageResource(typeof(StandardPartitionKeyGenerator))]

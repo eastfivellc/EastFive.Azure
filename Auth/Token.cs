@@ -18,13 +18,14 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
 using Newtonsoft.Json;
+using EastFive.Api.Auth;
+using System.Security.Claims;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
     [FunctionViewController(
         Route = "Token",
-        Resource = typeof(Token),
         ContentType = "x-application/auth-token",
         ContentTypeVersion = "0.1")]
     public struct Token
@@ -72,6 +73,15 @@ namespace EastFive.Azure.Auth
             };
 
             return onFound(token);
+        }
+
+        [Api.HttpAction("Generate")]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse Generate(
+            TextResponse onFound)
+        {
+            return EastFive.Security.RSA.Generate(
+                (key, keyPrivate) => onFound(keyPrivate));
         }
     }
 }

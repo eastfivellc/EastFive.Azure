@@ -12,7 +12,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OrderOwl.Auth
+namespace EastFive.Apple
 {
     [FunctionViewController(
         Namespace = ".well-known",
