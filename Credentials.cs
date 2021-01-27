@@ -222,8 +222,12 @@ namespace EastFive.Security.SessionServer
             Func<string, TResult> onFailure)
         {
             // TODO: Verify that the logged in user is the admin
-            var tokenBytes = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
-            var loginId = new Guid(tokenBytes.Take(16).ToArray());
+            Guid loginId = default;
+            using (var algorithm = SHA512.Create())
+            {
+                var tokenBytes = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
+                loginId = new Guid(tokenBytes.Take(16).ToArray());
+            }
             var token = Guid.NewGuid(); // This creates a "user" in the "Token system"
 
             // TODO: Check other error conditions

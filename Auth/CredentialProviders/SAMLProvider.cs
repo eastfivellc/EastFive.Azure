@@ -60,11 +60,12 @@ namespace EastFive.Api.Azure.Credentials
             return await EastFive.Web.Configuration.Settings.GetBase64Bytes(EastFive.Azure.AppSettings.SAML.SAMLCertificate,
                 async (certBuffer) =>
                 {
-                    var certificate = new X509Certificate2(certBuffer);
-                    var m = ((RSACryptoServiceProvider)certificate.PrivateKey);
-                    AsymmetricAlgorithm trustedSigner = m; // AsymmetricAlgorithm.Create(certificate.GetKeyAlgorithm()
-                    var trustedSigners = default(AsymmetricAlgorithm) == trustedSigner ? null : trustedSigner.AsEnumerable();
-                    
+                    using (var certificate = new X509Certificate2(certBuffer))
+                    {
+                        var m = ((RSACryptoServiceProvider)certificate.PrivateKey);
+                        AsymmetricAlgorithm trustedSigner = m; // AsymmetricAlgorithm.Create(certificate.GetKeyAlgorithm()
+                        var trustedSigners = default(AsymmetricAlgorithm) == trustedSigner ? null : trustedSigner.AsEnumerable();
+                    }
                     try
                     {
                         var nameId = tokens[SAMLProvider.SamlNameIDKey];
@@ -81,10 +82,12 @@ namespace EastFive.Api.Azure.Credentials
                                 //if (!Guid.TryParse(attributes[0].AttributeValue.First(), out authId))
                                 //    return invalidCredentials("User's auth identifier is not a guid.");
 
-                                var hash = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
-                                var loginId = new Guid(hash.Take(16).ToArray());
-
-                                return onSuccess(nameId, default(Guid?), loginId, tokens);
+                                using (var algorithm = SHA512.Create())
+                                {
+                                    var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
+                                    var loginId = new Guid(hash.Take(16).ToArray());
+                                    return onSuccess(nameId, default(Guid?), loginId, tokens);
+                                }
                             },
                             (why) => onUnspecifiedConfiguration(why));
                     } catch(Exception ex)
@@ -99,14 +102,14 @@ namespace EastFive.Api.Azure.Credentials
             Func<string, Guid?, Guid?, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-
             var nameId = tokens[SAMLProvider.SamlNameIDKey];
-            var hash = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
-            var loginId = new Guid(hash.Take(16).ToArray());
-
-            return onSuccess(nameId, default(Guid?), loginId);
+            using (var algorithm = SHA512.Create())
+            {
+                var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
+                var loginId = new Guid(hash.Take(16).ToArray());
+                return onSuccess(nameId, default(Guid?), loginId);
+            }
         }
-
 
         #region IProvideLogin
 

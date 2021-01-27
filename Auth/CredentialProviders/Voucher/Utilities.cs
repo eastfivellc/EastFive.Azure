@@ -22,9 +22,12 @@ namespace EastFive.Azure.Auth.Voucher
             return EastFive.Security.RSA.FromConfig(EastFive.Security.AppSettings.CredentialProviderVoucherKey,
                 (trustedVoucherPrivateKey) =>
                 {
-                    var signature = trustedVoucherPrivateKey.SignHash(hashedData, CryptoConfig.MapNameToOID("SHA256"));
-                    var tokenBytes = signatureData.Concat(signature).ToArray();
-                    return Convert.ToBase64String(tokenBytes);
+                    using (trustedVoucherPrivateKey)
+                    {
+                        var signature = trustedVoucherPrivateKey.SignHash(hashedData, CryptoConfig.MapNameToOID("SHA256"));
+                        var tokenBytes = signatureData.Concat(signature).ToArray();
+                        return Convert.ToBase64String(tokenBytes);
+                    }
                 },
                 (setting) => { throw new Exception(); },
                 (setting, issue) => { throw new Exception(); });
@@ -74,13 +77,16 @@ namespace EastFive.Azure.Auth.Voucher
             var result = EastFive.Security.RSA.FromConfig(EastFive.Security.AppSettings.CredentialProviderVoucherKey,
                 (trustedVoucher) =>
                 {
-                    if (!trustedVoucher.VerifyHash(hashedData, CryptoConfig.MapNameToOID("SHA256"), providedSignature))
-                        return invalidSignature("Cannot verify hash - authId: " + authId +
-                            "   validUntilUtc: " + validUntilUtc +
-                            "   hashedData: " + hashedData +
-                            "   providedSignature: " + providedSignature);
+                    using (trustedVoucher)
+                    {
+                        if (!trustedVoucher.VerifyHash(hashedData, CryptoConfig.MapNameToOID("SHA256"), providedSignature))
+                            return invalidSignature("Cannot verify hash - authId: " + authId +
+                                "   validUntilUtc: " + validUntilUtc +
+                                "   hashedData: " + hashedData +
+                                "   providedSignature: " + providedSignature);
 
-                    return success(authId);
+                        return success(authId);
+                    }
                 },
                 (missing) => unspecifiedConfiguration(missing),
                 (missing, issue) => unspecifiedConfiguration(missing + ":" + issue));
@@ -93,10 +99,11 @@ namespace EastFive.Azure.Auth.Voucher
             var validUntilUtcData = BitConverter.GetBytes(validUntilUtc.Ticks);
             signatureData = authIdData.Concat(validUntilUtcData).ToArray();
 
-            var hash = new SHA256Managed();
-
-            var hashedData = hash.ComputeHash(signatureData);
-            return hashedData;
+            using (var algorithm = new SHA256Managed())
+            {
+                var hashedData = algorithm.ComputeHash(signatureData);
+                return hashedData;
+            }
         }
     }
 }

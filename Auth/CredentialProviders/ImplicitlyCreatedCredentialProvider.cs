@@ -89,17 +89,24 @@ namespace EastFive.Api.Azure.Credentials
             Func<string, TResult> couldNotConnect)
         {
             // create hashed version of the password
-            var tokenHashBytes = SHA512.Create().ComputeHash(Encoding.UTF8.GetBytes(token));
-            var tokenHash = Convert.ToBase64String(tokenHashBytes);
+            string tokenHash = default;
+            using (var algorithm = SHA512.Create())
+            {
+                var tokenHashBytes = algorithm.ComputeHash(Encoding.UTF8.GetBytes(token));
+                tokenHash = Convert.ToBase64String(tokenHashBytes);
+            }
             
             #region User MD5 hash to create a unique key for each providerId and username combination
 
             var providerId = ConfigurationManager.AppSettings.Get("BlackBarLabs.Security.CredentialProvider.ImplicitCreation.ProviderId");
 
             var concatination = providerId + username;
-            var md5 = MD5.Create();
-            byte[] md5data = md5.ComputeHash(Encoding.UTF8.GetBytes(concatination));
-            var authId = new Guid(md5data);
+            Guid authId = default;
+            using (var algorithm = MD5.Create())
+            {
+                byte[] md5data = algorithm.ComputeHash(Encoding.UTF8.GetBytes(concatination));
+                authId = new Guid(md5data);
+            }
 
             #endregion
 
