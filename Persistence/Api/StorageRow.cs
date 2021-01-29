@@ -14,7 +14,6 @@ namespace EastFive.Azure.Persistence
 {
     [FunctionViewController(
         Route = "StorageRow",
-        Resource = typeof(StorageRow),
         ContentType = "x-application/eastfive.azure.storage-row",
         ContentTypeVersion = "0.1")]
     [DataContract]

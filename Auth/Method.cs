@@ -27,7 +27,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "AuthenticationMethod",
-        Resource = typeof(Method),
         ContentType = "x-application/auth-authentication-method",
         ContentTypeVersion = "0.1")]
     public struct Method : IReferenceable

@@ -26,7 +26,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "AccountMapping",
-        Resource = typeof(AccountMapping),
         ContentType = "x-application/auth-account-mapping",
         ContentTypeVersion = "0.1")]
     [StorageResource(typeof(StandardPartitionKeyGenerator))]

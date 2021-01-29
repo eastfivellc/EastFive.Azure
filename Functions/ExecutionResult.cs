@@ -19,7 +19,6 @@ namespace EastFive.Azure.Functions
 {
     [FunctionViewController(
         Route = "ExecutionResult",
-        Resource = typeof(ExecutionResult),
         ContentType = "x-application/eastfive.azure.execution-result",
         ContentTypeVersion = "0.1")]
     [StorageTable]

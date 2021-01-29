@@ -28,7 +28,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "XIntegration",
-        Resource = typeof(XIntegration),
         ContentType = "x-application/auth-xintegration",
         ContentTypeVersion = "0.1")]
     [StorageResource(typeof(RowKeyPrefixAttribute))]

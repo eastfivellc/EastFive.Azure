@@ -3,7 +3,6 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

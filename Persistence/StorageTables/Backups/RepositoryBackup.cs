@@ -2,7 +2,6 @@
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Linq;
 using System.Threading.Tasks;

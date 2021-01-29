@@ -23,7 +23,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "Whoami",
-        Resource = typeof(Whoami),
         ContentType = "x-application/auth-whoami",
         ContentTypeVersion = "0.1")]
     [DisplayEntryPoint]
