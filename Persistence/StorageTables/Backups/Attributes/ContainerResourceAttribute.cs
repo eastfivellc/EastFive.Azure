@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlackBarLabs.Persistence.Azure.Attributes
+namespace EastFive.Azure.Persistence.Attributes
 {
     public interface PrefixGenerator
     {

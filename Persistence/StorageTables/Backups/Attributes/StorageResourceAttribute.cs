@@ -8,7 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BlackBarLabs.Persistence.Azure.Attributes
+namespace EastFive.Azure.Persistence.Attributes
 {
     public struct StringKey
     {
