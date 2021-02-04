@@ -26,7 +26,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
-        public double Order => 0.0;
+        private double? orderMaybe;
+        public double Order
+        {
+            get
+            {
+                if (!orderMaybe.HasValue)
+                    return 0d;
+                return orderMaybe.Value;
+            }
+            set
+            {
+                orderMaybe = value;
+            }
+        }
 
         public string Scope { get; set; }
 
