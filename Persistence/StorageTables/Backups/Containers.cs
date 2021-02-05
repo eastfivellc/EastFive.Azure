@@ -6,13 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Api.Azure;
 using EastFive.Web.Configuration;
+using EastFive.Azure.Persistence.Attributes;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {

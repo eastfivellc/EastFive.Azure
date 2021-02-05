@@ -1,19 +1,15 @@
 ﻿using System;
 using System.Runtime.Serialization;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using EastFive.Azure;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
-    [StorageResourceNoOp]
     public class AuthenticationRequestDocument : TableEntity
     {
         [IgnoreDataMember]

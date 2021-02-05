@@ -1,25 +1,12 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-
-using Newtonsoft.Json;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Analytics;
-using EastFive.Api.Azure;
-using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Persistence;
-using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using EastFive.Serialization;
 using EastFive.Web.Configuration;
-using EastFive.Extensions;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {

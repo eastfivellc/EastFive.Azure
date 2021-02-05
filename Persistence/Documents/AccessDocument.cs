@@ -1,6 +1,4 @@
-﻿using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Azure.Persistence.StorageTables.Backups;
-using EastFive.Serialization;
+﻿using EastFive.Serialization;
 using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
@@ -8,7 +6,6 @@ using System.Runtime.Serialization;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
-    [StorageResourceNoOp]
     public class AccessDocument : TableEntity
     {
         [IgnoreDataMember]
