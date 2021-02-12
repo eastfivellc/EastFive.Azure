@@ -2,26 +2,21 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
-
-using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.ApplicationInsights;
 
 using Newtonsoft.Json;
 
 using EastFive.Extensions;
-using EastFive.Security.SessionServer;
 using EastFive.Security.SessionServer.Exceptions;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
 using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
     [StorageTable]
     public class Redirection : IReferenceable
     {

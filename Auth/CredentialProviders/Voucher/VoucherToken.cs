@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Api;
+﻿using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
@@ -14,9 +13,6 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Security.AccessControl;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Auth.CredentialProviders.Voucher

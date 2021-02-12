@@ -3,17 +3,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Web.Configuration;
-using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using EastFive.Extensions;
 using EastFive.Reflection;
-using BlackBarLabs.Extensions;
 using EastFive.Linq.Expressions;
 using System.Linq;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -22,7 +16,6 @@ namespace EastFive.Api.Azure.Monitoring
 {
     [Serializable]
     [DataContract]
-    [StorageResource(typeof(TwoThousandEighteenYearMonthGenerator))]
     [StorageTable]
     public class MonitoringDocument : IReferenceable
     {

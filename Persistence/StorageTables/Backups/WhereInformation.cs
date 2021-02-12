@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
+using EastFive.Azure.Persistence.Attributes;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {

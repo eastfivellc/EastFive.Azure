@@ -4,28 +4,17 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using Microsoft.Azure.Cosmos.Table;
-
-using BlackBarLabs;
 using EastFive.Collections.Generic;
-
-using BlackBarLabs.Persistence;
-using BlackBarLabs.Extensions;
 using EastFive.Serialization;
-using BlackBarLabs.Persistence.Azure;
 using EastFive.Extensions;
 using EastFive;
 using EastFive.Linq;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
 using EastFive.Linq.Async;
-using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Synchronization.Persistence
 {
-    [StorageResource(
-        typeof(StandardPartitionKeyGenerator), 
-        typeof(ThreePlaceHexadecimalKeyGenerator),
-        SortKey = "2")]
     public class AdapterDocument : TableEntity
     {
         [IgnoreDataMember]

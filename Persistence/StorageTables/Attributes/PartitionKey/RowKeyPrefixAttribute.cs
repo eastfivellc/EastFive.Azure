@@ -1,19 +1,14 @@
-﻿using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Linq.Expressions;
-using EastFive.Reflection;
+﻿using EastFive.Azure.Persistence.Attributes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class RowKeyPrefixAttribute : Attribute,
         IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey,
-        BlackBarLabs.Persistence.Azure.Attributes.StringKeyGenerator
+        StringKeyGenerator
     {
         private uint? charactersMaybe;
         public uint Characters

@@ -9,7 +9,6 @@ using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq;
 using BlackBarLabs;
-using EastFive.Collections.Generic;
 using BlackBarLabs.Persistence;
 using BlackBarLabs.Extensions;
 using EastFive.Serialization;
@@ -17,15 +16,10 @@ using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
 using EastFive.Linq.Async;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Analytics;
 
 namespace EastFive.Azure.Synchronization.Persistence
 {
-    [StorageResource(
-        typeof(BackupConnectorStringKeyGenerator),
-        typeof(OnePlaceHexadecimalKeyGenerator))]
     public class ConnectorSynchronizationDocument : TableEntity
     {
         [IgnoreDataMember]
@@ -36,22 +30,7 @@ namespace EastFive.Azure.Synchronization.Persistence
 
         public bool Locked { get; set; }
     }
-    public class BackupConnectorStringKeyGenerator : StringKeyGenerator
-    {
-        public IEnumerable<StringKey> GetKeys()
-        {
-            var prefix = ConnectorDocument.GetMutatePartitionKey("patient_token");
-            var standardPkg = new StandardPartitionKeyGenerator();
-            return standardPkg
-                .GetKeys()
-                .Select(key => new StringKey() { Equal = prefix(key.Equal) });
-        }
-    }
 
-
-
-    [StorageResource(typeof(StandardPartitionKeyGenerator), typeof(ThreePlaceHexadecimalKeyGenerator),
-        SortKey = "1")]
     public class ConnectorDocument : TableEntity
     {
         [IgnoreDataMember]

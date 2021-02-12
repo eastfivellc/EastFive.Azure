@@ -17,15 +17,21 @@ using EastFive.Security;
 using EastFive.Linq.Async;
 using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Api;
-using BlackBarLabs;
 using EastFive.Azure.Auth;
+using Newtonsoft.Json;
 
 namespace EastFive.Azure
 {
     public struct Integration : IReferenceable
     {
-        public Guid id => integrationId;
 
+        [JsonIgnore]
+        public Guid id => integrationRef.id;
+
+        private const string IdPropertyName = "id";
+        [ApiProperty(PropertyName = IdPropertyName)]
+        [JsonProperty(PropertyName = IdPropertyName)]
+        public IRef<Integration> integrationRef;
 
         public string method;
         public Guid integrationId;

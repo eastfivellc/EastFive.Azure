@@ -12,13 +12,11 @@ using EastFive.Linq;
 using EastFive.Extensions;
 using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
-using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Api.Azure.Credentials
 {
     [Serializable]
     [DataContract]
-    [StorageResourceNoOp]
     public class CredentialProcessDocument : TableEntity
     {
         public CredentialProcessDocument()
