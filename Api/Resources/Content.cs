@@ -18,7 +18,6 @@ namespace EastFive.Api.Azure.Resources
 {
     [FunctionViewController(
         Route = "Content",
-        Resource = typeof(Content),
         ContentType = "x-application/content",
         ContentTypeVersion = "0.1")]
     public class Content : IReferenceable

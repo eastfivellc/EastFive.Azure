@@ -13,6 +13,24 @@ namespace EastFive.Azure
         public const string ASTConnectionStringKey = "EastFive.Azure.StorageTables.ConnectionString";
         public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
 
+        public static class SPA
+        {
+            public const string IndexHtmlPath = "EastFive.Azure.SPA.IndexHtmlPath";
+            public const string SiteLocation = "EastFive.Azure.SpaSiteLocation";
+
+            [ConfigKey("Expiration in days for immutable spa files.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Discressionary")]
+            public const string FilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
+
+            [ConfigKey("Enable dynamic serving of the SPA.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Discressionary")]
+            public const string ServeEnabled = "EastFive.Azure.SpaServeEnabled";
+        }
+
         public static class ApplicationInsights
         {
             [ConfigKey("Identifies the application insights endpoint to which data is posted.",
@@ -41,9 +59,24 @@ namespace EastFive.Azure
             public const string TeamsAppImage = "EastFive.Azure.ApplicationInsights.TeamsAppImage";
         }
 
+        public static class Search
+        {
+            [ConfigKey("Identifies the search endpoint to use.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false,
+                PrivateRepositoryOnly = true,
+                Location = "Home > Search > {Index Name} > Dashboard / Instrumentation Key")]
+            public const string EndPoint = "EastFive.Azure.Search.SearchServiceEndPoint";
+
+            [ConfigKey("Key for API access.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = true,
+                Location = "Home > Search > {Index Name} > API Access / AdminKey")]
+            public const string AdminApiKey = "EastFive.Azure.Search.SearchServiceAdminApiKey";
+        }
+
         public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
 
-        public const string SpaSiteLocation = "EastFive.Azure.SpaSiteLocation";
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
         public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
@@ -146,18 +179,6 @@ namespace EastFive.Azure
 
         public const string Redirections = "EastFive.Azure.Auth.Redirections";
         public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
-
-        [ConfigKey("Expiration in days for immutable spa files.",
-            DeploymentOverrides.Optional,
-            DeploymentSecurityConcern = false,
-            Location = "Discressionary")]
-        public const string SpaFilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
-
-        [ConfigKey("Enable dynamic serving of the SPA.",
-            DeploymentOverrides.Optional,
-            DeploymentSecurityConcern = false,
-            Location = "Discressionary")]
-        public const string SpaServeEnabled = "EastFive.Azure.SpaServeEnabled";
 
         [Config]
         public static class Auth
