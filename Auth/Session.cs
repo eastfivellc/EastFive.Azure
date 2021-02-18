@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -22,7 +17,6 @@ namespace EastFive.Azure.Auth
         Route = "XSession",
         ContentType = "x-application/auth-session",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
     [StorageTable]
     public struct Session : IReferenceable
     {

@@ -1,18 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
-using BlackBarLabs.Api;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -20,7 +12,6 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
-using EastFive.Serialization;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
@@ -28,10 +19,8 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "XIntegration",
-        Resource = typeof(XIntegration),
         ContentType = "x-application/auth-xintegration",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(RowKeyPrefixAttribute))]
     [StorageTable]
     public struct XIntegration : IReferenceable
     {

@@ -29,7 +29,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "AuthLogin",
-        Resource = typeof(Login),
         ContentType = "x-application/auth-login",
         ContentTypeVersion = "0.1")]
     public struct Login

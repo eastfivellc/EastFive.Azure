@@ -1,23 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
-using BlackBarLabs.Api;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections.Generic;
 using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Security;
 using EastFive.Serialization;
 using Newtonsoft.Json;
 
@@ -26,10 +14,8 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "AccountMapping",
-        Resource = typeof(AccountMapping),
         ContentType = "x-application/auth-account-mapping",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
     [StorageTable]
     public struct AccountMapping : IReferenceable
     {
@@ -69,7 +55,6 @@ namespace EastFive.Azure.Auth
         [Storage(Name = AccountPropertyName)]
         public Guid accountId { get; set; }
 
-        [StorageResource(typeof(StandardPartitionKeyGenerator))]
         [StorageTable]
         public struct AccountMappingLookup : IReferenceable
         {
@@ -113,7 +98,6 @@ namespace EastFive.Azure.Auth
             }
         }
 
-        [StorageResource(typeof(StandardPartitionKeyGenerator))]
         [StorageTable]
         public struct AuthorizationLookup : IReferenceable
         {

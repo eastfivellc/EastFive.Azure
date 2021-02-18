@@ -65,6 +65,8 @@ namespace EastFive.Azure.Auth
         public async static Task<IHttpResponse> GetAllSecureAsync(
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
+                [OptionalQueryParameter(Name = "search")]string search,
+                [OptionalQueryParameter(Name = "months")]int? monthsMaybe,
                 AzureApplication application,
                 EastFive.Api.Security security,
                 IHttpRequest request,
@@ -73,19 +75,20 @@ namespace EastFive.Azure.Auth
             ConfigurationFailureResponse onConfigFailure,
             BadRequestResponse onBadRequest)
         {
-            // this is faster than the version commented out below
+            // this query is faster than the version commented out below
             var methodMaybe = await Method.ById(methodRef, application, (m) => m, () => default(Method?));
             if (methodMaybe.IsDefault())
                 return onBadRequest().AddReason("Method no longer supported");
             var method = methodMaybe.Value;
 
-            var oneMonthAgo = DateTime.UtcNow.AddMonths(-1);
+            var months = monthsMaybe.HasValue ? Math.Abs(monthsMaybe.Value) : 1;
+            var since = DateTime.UtcNow.Date.AddMonths(-months);
             var query = new TableQuery<GenericTableEntity>().Where(
             TableQuery.CombineFilters(
                 TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
                 TableOperators.And,
                 TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, oneMonthAgo),
+                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, since),
                     TableOperators.And,
                     TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
                     )
@@ -117,6 +120,15 @@ namespace EastFive.Azure.Auth
                             var paramKeys = props["parameters__keys"].BinaryValue.ToStringsFromUTF8ByteArray();
                             var paramValues = props["parameters__values"].BinaryValue.ToStringsFromUTF8ByteArray();
                             var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
+
+                            if (search.HasBlackSpace())
+                            {
+                                var match = parameters.Values
+                                    .SelectWhereNotNull()
+                                    .Any(val => val.IndexOf(search, StringComparison.OrdinalIgnoreCase) != -1);
+                                if (!match)
+                                    return default(RedirectionManager?);
+                            }
 
                             RedirectionManager? Failure(string why)
                             {

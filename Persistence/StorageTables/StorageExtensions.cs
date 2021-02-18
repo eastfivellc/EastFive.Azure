@@ -24,6 +24,7 @@ using EastFive.Analytics;
 using System.Threading;
 using EastFive.Azure.Persistence.StorageTables;
 using Microsoft.Azure.Cosmos.Table;
+using EastFive.Api;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -469,6 +470,28 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     cache:cache);
         }
 
+        public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+            Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, TResult> onFound,
+            Func<TResult> onDoesNotExists = default)
+            where TEntity : IReferenceable
+        {
+            if (entityRef.IsDefaultOrNull())
+                return onDoesNotExists();
+            var rowKey = entityRef.StorageComputeRowKey();
+
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryById = query.StorageQueryById(entityRef);
+            var queryFull = additionalProperties(queryById);
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .FindByIdAsync(rowKey, partitionKey,
+                    onFound: (TEntity entity, string eTag) => onFound(entity),
+                    onNotFound: onDoesNotExists);
+        }
+
         [Obsolete]
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             string partitionKey,
@@ -745,6 +768,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         {
             var rowKey = entityRef.StorageComputeRowKey();
             var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onCreated,
+                    default);
+        }
+
+        public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+                Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var rowKey = entityRef.StorageComputeRowKey();
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryById = query.StorageQueryById(entityRef);
+            var queryFull = additionalProperties(queryById);
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
             return AzureTableDriverDynamic
                 .FromSettings()
                 .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,

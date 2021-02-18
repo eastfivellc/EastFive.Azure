@@ -34,10 +34,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EastFive.Api\EastFive.Api.csproj" />
     <ProjectReference Include="..\EastFive.Core\EastFive.Core.csproj" />
+    <ProjectReference Include="..\EastFive.Sheets\EastFive.Sheets.csproj" />
     <ProjectReference Include="..\EastFive.Web\EastFive.Web.csproj" />
-	<ProjectReference Include="..\EastFive.Sheets\EastFive.Sheets.csproj" />
-	<ProjectReference Include="..\EastFive.Api\EastFive.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>

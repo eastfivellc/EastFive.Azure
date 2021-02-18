@@ -3,18 +3,14 @@ using System.Runtime.Serialization;
 using Microsoft.Azure.Cosmos.Table;
 using EastFive.Serialization;
 using System.Linq;
-using BlackBarLabs.Extensions;
 using EastFive.Linq;
 using EastFive.Collections.Generic;
-using BlackBarLabs.Linq;
 using System.Collections.Generic;
-using BlackBarLabs.Persistence.Azure.Attributes;
 
 namespace EastFive.Azure.Persistence.Documents
 {
     [Serializable]
     [DataContract]
-    [StorageResource(typeof(StandardPartitionKeyGenerator), typeof(OnePlaceHexadecimalKeyGenerator))]
     public class LookupDocument : TableEntity
     {
         [IgnoreDataMember]

@@ -3,24 +3,18 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Xml;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence;
 using Newtonsoft.Json;
 using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
-using System.Net.Http;
 using EastFive.Azure.Functions;
 using EastFive.Analytics;
-using EastFive.Web.Configuration;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using System.Collections.Concurrent;
 using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
@@ -31,7 +25,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         Route = "TableBackup",
         ContentType = "x-application/table-backup",
         ContentTypeVersion = "0.1")]
-    [StorageResourceNoOp]
     [StorageTable]
     public struct TableBackup : IReferenceable
     {

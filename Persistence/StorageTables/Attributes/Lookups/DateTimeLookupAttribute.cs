@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Table;
 
 using EastFive.Extensions;
 using EastFive.Linq;

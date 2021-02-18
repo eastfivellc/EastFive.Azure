@@ -29,7 +29,6 @@ namespace EastFive.Azure.Auth
     [DataContract]
     [FunctionViewController(
         Route = "Claim",
-        Resource = typeof(Claim),
         ContentType = "x-application/auth-claim",
         ContentTypeVersion = "0.1")]
     public struct Claim : IReferenceable

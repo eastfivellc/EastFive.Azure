@@ -56,7 +56,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
         {
             return onProvideAuthorization(new PingProvider()).AsTask();
         }
-        
 
         public Type CallbackController => typeof(PingResponse);
 
@@ -87,7 +86,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
                         var request = new HttpRequestMessage(
                             new HttpMethod("GET"), tokenUrl);
                         request.Headers.Add("Cookie", "agentid=" + agentId);
-                        //request.Content.Headers.ContentType = new MediaTypeHeaderValue("text/plain;charset=utf-8");
                         try
                         {
                             var response = await httpClient.SendAsync(request);
@@ -104,10 +102,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                     return onCouldNotConnect($"PING Returned non-json response:{content}");
                                 }
                                 string subject = (string)stuff[Subject];
-                                //string subject = stuff.pingone.subject;
-                                var hash = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(subject));
-                                var loginId = new Guid(hash.Take(16).ToArray());
-                                loginId = Guid.NewGuid();  //KDH - Take out
+                                var loginId = Guid.NewGuid();
                                 var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
                                 foreach (var item in stuff)
                                 {
@@ -141,10 +136,13 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 return onFailure("Missing pingone.subject");
 
             string subject = responseParams[Subject];
-            var hash = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(subject));
-            var loginId = new Guid(hash.Take(16).ToArray());
+            using (var algorithm = SHA512.Create())
+            {
+                var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(subject));
+                var loginId = new Guid(hash.Take(16).ToArray());
 
-            return onSuccess(subject, default(Guid?), loginId);
+                return onSuccess(subject, default(Guid?), loginId);
+            }
         }
 
         #region IProvideLogin

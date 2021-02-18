@@ -1,29 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Net;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
-using BlackBarLabs.Api;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
-using EastFive.Api.Auth;
 using EastFive.Api.Azure;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
-using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Security;
-using EastFive.Security.SessionServer;
-using EastFive.Security.SessionServer.Exceptions;
-using Microsoft.ApplicationInsights;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
@@ -33,7 +20,6 @@ namespace EastFive.Azure.Auth
         Route = "XAuthorization",
         ContentType = "x-application/auth-authorization",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
     [StorageTable]
     public struct Authorization : IReferenceable
     {

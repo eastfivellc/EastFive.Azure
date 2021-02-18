@@ -1725,6 +1725,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 onFailure:
                                     (code, why) =>
                                     {
+                                        if (onFailure.IsDefaultOrNull())
+                                            throw new Exception($"Storage Exception:{code} -- {why}");
                                         global = onFailure(code, why);
                                         return true.AsTask();
                                     },

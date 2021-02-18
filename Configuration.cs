@@ -31,7 +31,6 @@ namespace EastFive.Azure.Configuration
     [DataContract]
     [FunctionViewController(
         Route = "Configuration",
-        Resource = typeof(Configuration),
         ContentType = "x-application/auth-configuration",
         ContentTypeVersion = "0.1")]
     public struct Configuration

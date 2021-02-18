@@ -25,7 +25,6 @@ namespace EastFive.Azure.Login
 {
     [FunctionViewController(
         Route = "Authentication",
-        Resource = typeof(Authentication),
         ContentType = "x-application/login-authentication",
         ContentTypeVersion = "0.1")]
     [StorageTable]

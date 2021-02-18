@@ -1,14 +1,14 @@
-﻿using EastFive;
+﻿using BlackBarLabs.Persistence.Azure;
+using EastFive;
 using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace BlackBarLabs.Persistence.Azure.Attributes
+namespace EastFive.Azure.Persistence.Attributes
 {
     public struct StringKey
     {

@@ -1,23 +1,13 @@
-﻿using BlackBarLabs;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using BlackBarLabs.Persistence.Azure.StorageTables;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
+﻿using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using Microsoft.Azure.Cosmos.Table;
-using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables

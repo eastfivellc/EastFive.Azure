@@ -84,7 +84,7 @@ namespace EastFive.Security.SessionServer
         //            var templateName = ConfigurationManager.AppSettings[Configuration.EmailTemplateDefinitions.InviteNewAccount];
         //            if (string.IsNullOrEmpty(templateName))
         //                return onFailed($"Email template setting not found.  Expected template value for key {Configuration.EmailTemplateDefinitions.InviteNewAccount}");
-                    
+
         //            var resultMail = await application.SendMessageService.SendEmailMessageAsync(templateName, 
         //                email, string.Empty,
         //                "newaccounts@orderowl.com", "New Account Services",
@@ -104,7 +104,7 @@ namespace EastFive.Security.SessionServer
         //        () => { throw new Exception("Login Id generated was not unique"); });
         //    return result;
         //}
-        
+
         //internal Task<TResult> GetInviteAsync<TResult>(Guid inviteId,
         //    Func<Invite, TResult> success,
         //    Func<TResult> notFound)
@@ -134,7 +134,7 @@ namespace EastFive.Security.SessionServer
         //        {
         //            if (loginId.HasValue)
         //                return success(actorId, new Dictionary<string, string>());
-                    
+
         //            return redirect(token);
         //        },
         //        () => notFound());
@@ -153,7 +153,7 @@ namespace EastFive.Security.SessionServer
         //}
 
         #endregion
-        
+
 
         //public async Task<TResult> CreateSamlCredentialAsync<TResult>(Guid samlCredentialId,
         //    Guid actorId, string nameId,
@@ -166,7 +166,7 @@ namespace EastFive.Security.SessionServer
         //    Func<string, TResult> onFailure)
         //{
         //    // TODO: Verify that the logged in user is the admin
-            
+
         //    // TODO: Check other error conditions
         //    var result = await this.CreateSamlCredentialAsync(samlCredentialId, actorId, nameId,
         //        onSuccess, onCredentialAlreadyExist, (fetchActorIdAsync) => onNameIdAlreadyInUse(), onRelationshipAlreadyExist, onFailure);
@@ -202,6 +202,24 @@ namespace EastFive.Security.SessionServer
         //    var tokenBytes = SHA512.Create().ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
         //    var loginId = new Guid(tokenBytes.Take(16).ToArray());
         //    var token = Guid.NewGuid(); // This creates a "user" in the "Token system"
+
+        //public Task<TResult> CreateSamlCredentialInnerAsync<TResult>(Guid samlCredentialId,
+        //    Guid actorId, string nameId, bool overrideLogin,
+        //    Func<TResult> onSuccess,
+        //    Func<TResult> onCredentialAlreadyExist,
+        //    Func<Func<Task<TResult>>, TResult> onLoginIdAlreadyInUse,
+        //    Func<TResult> onRelationshipAlreadyExist,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    // TODO: Verify that the logged in user is the admin
+        //    Guid loginId = default;
+        //    using (var algorithm = SHA512.Create())
+        //    {
+        //        var tokenBytes = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
+        //        loginId = new Guid(tokenBytes.Take(16).ToArray());
+        //    }
+        //    var token = Guid.NewGuid(); // This creates a "user" in the "Token system"
+        //}
 
         //    // TODO: Check other error conditions
         //    var result = await this.dataContext.CredentialMappings.CreateCredentialMappingAsync(samlCredentialId,
