@@ -46,7 +46,13 @@ namespace EastFive.Azure.Monitoring
                         httpApp, routeData);
 
             var message = await CreateMessageCardAsync(ex, method, httpApp, routeData);
-            var response = await message.SendAsync(teamsHookUrl);
+            try
+            {
+                var response = await message.SendAsync(teamsHookUrl);
+            } catch (HttpRequestException)
+            {
+
+            }
             return await continueExecution(ex, method, queryParameters,
                 httpApp, routeData);
         }
@@ -87,9 +93,15 @@ namespace EastFive.Azure.Monitoring
             
             if (!ShouldNotify())
                 return response;
-            
-            string messageId = await TeamsNotifyAsync(response, teamsNotifyParam,
-                httpApp, request);
+
+            try
+            {
+                string messageId = await TeamsNotifyAsync(response, teamsNotifyParam,
+                    httpApp, request);
+            } catch(HttpRequestException)
+            {
+
+            }
             return response;
         }
 

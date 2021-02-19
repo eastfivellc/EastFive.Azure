@@ -11,7 +11,7 @@ namespace EastFive.Azure.Spa
         public static IApplicationBuilder UseSpaHandler(
             this IApplicationBuilder builder, IApplication app)
         {
-            var success = SpaHandler.SetupSpaAsync(app).Result;
+            var success = SpaHandler.SetupSpa(app);
             if (!success)
                 return builder;
             return builder.UseMiddleware<SpaHandler>(app);

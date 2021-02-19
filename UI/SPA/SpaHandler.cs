@@ -35,6 +35,7 @@ namespace EastFive.Azure.Spa
         private readonly RequestDelegate continueAsync;
         private IApplication app;
 
+        private static Task loadTask;
         private static ManualResetEvent signal = new ManualResetEvent(false);
 
         private static Dictionary<string, byte[]> lookupSpaFile;
@@ -70,28 +71,34 @@ namespace EastFive.Azure.Spa
 
         }
 
-        public static async Task<bool> SetupSpaAsync(IApplication application)
+        public static bool SetupSpa(IApplication application)
         {
             try
             {
-                return await EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
+                return EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
                     connectionString =>
                     {
                         return EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(
-                            async indexHtmlPath =>
+                            indexHtmlPath =>
                             {
                                 dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
                                     ds => ds,
                                     onFailure: why => false,
                                     onNotSpecified: () => false);
-                                bool success;
-                                (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
-                                        application, connectionString, indexHtmlPath, dynamicServe);
-                                return success;
+
+                                loadTask = Task.Run(
+                                    async () =>
+                                    {
+                                        bool success;
+                                        (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
+                                                application, connectionString, indexHtmlPath, dynamicServe);
+                                        signal.Set();
+                                    });
+                                return true;
                             },
-                            (why) => false.AsTask());
+                            (why) => false);
                     },
-                    why => false.AsTask());
+                    why => false);
             }
             catch(Exception)
             {
@@ -99,7 +106,6 @@ namespace EastFive.Azure.Spa
             }
             finally
             {
-                signal.Set();
             }
         }
 
@@ -140,6 +146,7 @@ namespace EastFive.Azure.Spa
                                 var buildJsonString = buildJsonEntryBytes.GetString();
                                 var buildJson = JsonConvert.DeserializeObject<SpaBuild>(buildJsonString);
                                 var defaultRoute = buildJson.routes
+                                    .NullToEmpty()
                                     .Where(route => route.routePrefix == "*")
                                     .First(
                                         (rt, nx) => rt,
@@ -209,9 +216,11 @@ namespace EastFive.Azure.Spa
                 await this.continueAsync(context);
                 return;
             }
+
             var requestPath = context.Request.Path.Value;
 
             var taskToProcess = SpaHandler.routes
+                .NullToEmpty()
                 .First(
                     (aliasPath, next) =>
                     {
@@ -345,6 +354,7 @@ namespace EastFive.Azure.Spa
             {
                 if (lookupSpaFile.IsDefaultNullOrEmpty())
                     return true;
+
                 if (!(this.app is IAzureApplication))
                     return true;
 
@@ -352,7 +362,11 @@ namespace EastFive.Azure.Spa
                 var isApiRequest = firstSegments
                     .Where(firstSegment => requestPath.StartsWith($"/{firstSegment}"))
                     .Any();
-                return isApiRequest;
+                if (isApiRequest)
+                    return true;
+
+                var systemReady = signal.WaitOne();
+                return !systemReady;
             }
         }
 

@@ -21,12 +21,12 @@ namespace EastFive.Azure.Spa
     {
         public const string BoundAction = "bounce";
         [HttpAction(method: BoundAction)]
-        public static async Task<IHttpResponse> RedeemAsync(
+        public static IHttpResponse RedeemAsync(
                 IApplication app,
                 //Security security,
             NoContentResponse onBounced)
         {
-            await SpaHandler.SetupSpaAsync(app);
+            SpaHandler.SetupSpa(app);
             return onBounced();
         }
 
