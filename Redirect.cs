@@ -72,7 +72,7 @@ namespace EastFive.Azure
             NotFoundResponse onRedirectNotFound,
             ConfigurationFailureResponse onConfigurationFailure)
         {
-            return AppSettings.SpaSiteLocation.ConfigurationUri(
+            return AppSettings.SPA.SiteLocation.ConfigurationUri(
                 siteUrl =>
                 {
                     var resourceName = application.GetResourceMime(resourceType);

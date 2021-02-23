@@ -1,5 +1,6 @@
 ﻿using EastFive.Api;
 using EastFive.Extensions;
+using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Reflection;
 using System;
 using System.Collections.Generic;

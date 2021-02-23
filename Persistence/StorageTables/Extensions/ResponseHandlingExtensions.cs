@@ -185,6 +185,7 @@ namespace EastFive.Azure.StorageTables.Driver
             Func<string, TResult> onTooManyProperties = default,
             Func<string, TResult> onUpdateConditionNotSatisfied = default,
             Func<string, TResult> onTimeout = default,
+            Func<string, TResult> onNetworkUnavailable = default,
             Func<string, TResult> onOther = default,
             Func<string, TResult> onGeneral = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onDefaultCallback = default)
@@ -268,6 +269,17 @@ namespace EastFive.Azure.StorageTables.Driver
                             throw ExHandleMsg("HttpResponse status code", httpStatusCode);
                         }
                         throw ExHandleMsg("inner exception response types", webEx.Response);
+                    }
+                    if(!storageException.InnerException.InnerException.IsDefaultOrNull())
+                    {
+                        if(storageException.InnerException.InnerException is System.Net.Sockets.SocketException)
+                        {
+                            if(onNetworkUnavailable.IsDefaultOrNull())
+                                return onTimeout(
+                                    storageException.InnerException.InnerException.Message);
+                            return onNetworkUnavailable(
+                                storageException.InnerException.InnerException.Message);
+                        }
                     }
                     throw ExHandleMsg("inner exceptions", storageException.InnerException);
 

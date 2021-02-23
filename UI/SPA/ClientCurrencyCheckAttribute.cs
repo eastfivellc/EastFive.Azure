@@ -9,6 +9,7 @@ using EastFive;
 using EastFive.Extensions;
 using EastFive.Api;
 using EastFive.Web.Configuration;
+using EastFive.Azure.Spa;
 
 namespace EastFive.Azure.Modules
 {
@@ -32,8 +33,8 @@ namespace EastFive.Azure.Modules
         {
             var response = await continueExecution(controllerType, httpApp, request);
             
-            if (Api.Azure.Modules.SpaHandler.SpaMinimumVersion.HasValue)
-                this.clientMinimumVersionMaybe = Api.Azure.Modules.SpaHandler.SpaMinimumVersion.Value;
+            if (SpaHandler.SpaMinimumVersion.HasValue)
+                this.clientMinimumVersionMaybe = SpaHandler.SpaMinimumVersion.Value;
 
             if (!clientMinimumVersionMaybe.HasValue)
                 return response;
