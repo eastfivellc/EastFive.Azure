@@ -98,21 +98,52 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
     }
 
-    public class StorageQueryInvocationAttribute : Attribute, IInstigatableGeneric
+    public class StorageQueryInvocationAttribute : Attribute, IInstigatableGeneric, IInstigateGeneric
     {
+        public bool CanInstigate(ParameterInfo parameterInfo)
+        {
+            if (!parameterInfo.ParameterType.IsSubClassOfGeneric(typeof(IQueryable<>)))
+                return false;
+            if (parameterInfo.ParameterType.Name.Contains("RequestMessage"))
+                return false;
+            return true;
+        }
+
         public virtual Task<IHttpResponse> InstigatorDelegateGeneric(Type type,
                 IApplication httpApp, IHttpRequest routeData, ParameterInfo parameterInfo,
             Func<object, Task<IHttpResponse>> onSuccess)
         {
-            return type
+            var constructor = typeof(StorageQuery<>)
+                .MakeGenericType(type.GenericTypeArguments)
+                .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
+                .First();
+            var parameter = AzureTableDriverDynamic.FromSettings();
+            var sq = constructor.Invoke(parameter.AsArray());
+            return onSuccess(sq);
+        }
+    }
+
+    public class InstigateIQueryableAttribute : Attribute, IInstigateGeneric
+    {
+        public bool CanInstigate(ParameterInfo parameterInfo)
+        {
+            return parameterInfo.ParameterType.IsSubClassOfGeneric(typeof(IQueryable<>));
+        }
+
+        public Task<IHttpResponse> InstigatorDelegateGeneric(Type type,
+            IApplication httpApp, IHttpRequest routeData, ParameterInfo parameterInfo,
+            Func<object, Task<IHttpResponse>> onSuccess)
+        {
+            return typeof(StorageQuery<>)
+                .MakeGenericType(type.GenericTypeArguments)
                 .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                 .First()
                 .GetParameters()
-                .Aggregate<ParameterInfo, Func<object [], Task<IHttpResponse>>>(
+                .Aggregate<ParameterInfo, Func<object[], Task<IHttpResponse>>>(
                     (invocationParameterValues) =>
                     {
-                        var StorageQuery = Activator.CreateInstance(type, invocationParameterValues);
-                        return onSuccess(StorageQuery);
+                        var requestMessage = Activator.CreateInstance(type, invocationParameterValues);
+                        return onSuccess(requestMessage);
                     },
                     (next, invocationParameterInfo) =>
                     {

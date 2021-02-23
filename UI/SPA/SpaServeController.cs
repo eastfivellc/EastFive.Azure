@@ -11,6 +11,8 @@ using System.Linq;
 using EastFive.Extensions;
 using EastFive.Api.Azure.Modules;
 using EastFive.Api;
+using EastFive.Web.Configuration;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.Spa
 {
@@ -28,6 +30,25 @@ namespace EastFive.Azure.Spa
         {
             SpaHandler.SetupSpa(app);
             return onBounced();
+        }
+
+        public const string DownloadAction = "download";
+        [HttpAction(method: DownloadAction)]
+        public static Task<IHttpResponse> DownloadAsync(
+            StreamResponse onFound,
+            NotFoundResponse onNotFound)
+        {
+            return EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
+                async connectionString =>
+                {
+                    var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
+                    var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
+                    var container = blobClient.GetBlobContainerClient(containerName);
+                    var blobRef = container.GetBlobClient("spa.zip");
+                    var blobStream = await blobRef.OpenReadAsync();
+                    return onFound(blobStream);
+                },
+                why => onNotFound().AsTask());
         }
 
         //[HttpGet]
