@@ -57,155 +57,155 @@ namespace EastFive.Azure.Persistence.Persistence
             return await rollback.ExecuteAsync(onSuccess);
         }
 
-        public async Task<TResult> CreateAuthenticatedAsync<TResult>(Guid integrationId, Guid authenticationId,
-                string methodName, IDictionary<string, string> paramSet,
-            Func<TResult> onSuccess,
-            Func<TResult> onAlreadyExists)
-        {
-            var rollback = new RollbackAsync<TResult>();
+        //public async Task<TResult> CreateAuthenticatedAsync<TResult>(Guid integrationId, Guid authenticationId,
+        //        string methodName, IDictionary<string, string> paramSet,
+        //    Func<TResult> onSuccess,
+        //    Func<TResult> onAlreadyExists)
+        //{
+        //    var rollback = new RollbackAsync<TResult>();
 
-            var docByMethod = new AccessDocument
-            {
-                LookupId = integrationId,
-                Method = methodName,
-            };
-            rollback.AddTaskCreate(authenticationId, methodName, docByMethod, onAlreadyExists, this.repository);
+        //    var docByMethod = new AccessDocument
+        //    {
+        //        LookupId = integrationId,
+        //        Method = methodName,
+        //    };
+        //    rollback.AddTaskCreate(authenticationId, methodName, docByMethod, onAlreadyExists, this.repository);
 
-            var integrationDoc = new AuthenticationRequestDocument
-            {
-                LinkedAuthenticationId = authenticationId,
-                Method = methodName,
-                Action = Enum.GetName(typeof(AuthenticationActions), AuthenticationActions.access)
-            };
-            integrationDoc.SetExtraParams(paramSet);
-            rollback.AddTaskCreate(integrationId, integrationDoc, onAlreadyExists, this.repository);
+        //    var integrationDoc = new AuthenticationRequestDocument
+        //    {
+        //        LinkedAuthenticationId = authenticationId,
+        //        Method = methodName,
+        //        Action = Enum.GetName(typeof(AuthenticationActions), AuthenticationActions.access)
+        //    };
+        //    integrationDoc.SetExtraParams(paramSet);
+        //    rollback.AddTaskCreate(integrationId, integrationDoc, onAlreadyExists, this.repository);
 
-            return await rollback.ExecuteAsync(onSuccess);
-        }
+        //    return await rollback.ExecuteAsync(onSuccess);
+        //}
 
 
-        internal async Task<TResult> CreateOrUpdateAsync<TResult>(Guid actorId, string methodName,
-            Func<Guid?, IDictionary<string, string>, Func<IDictionary<string, string>, Task<Guid>>, Task<TResult>> onFound)
-        {
-            return await await repository.FindLinkedDocumentAsync(actorId, methodName,
-                accessDoc => accessDoc.LookupId,
-                (AccessDocument accessDoc, AuthenticationRequestDocument authRequestDoc) =>
-                {
-                    return onFound(authRequestDoc.Id, authRequestDoc.GetExtraParams(),
-                        async (updatedParams)=>
-                        {
-							var same = authRequestDoc.LinkedAuthenticationId == actorId &&
-								authRequestDoc.GetExtraParams().OrderBy(pair => pair.Key)
-									.SequenceEqual(updatedParams.OrderBy(pair => pair.Key));
-							if (same)
-								return accessDoc.LookupId;
+       // internal async Task<TResult> CreateOrUpdateAsync<TResult>(Guid actorId, string methodName,
+       //     Func<Guid?, IDictionary<string, string>, Func<IDictionary<string, string>, Task<Guid>>, Task<TResult>> onFound)
+       // {
+       //     return await await repository.FindLinkedDocumentAsync(actorId, methodName,
+       //         accessDoc => accessDoc.LookupId,
+       //         (AccessDocument accessDoc, AuthenticationRequestDocument authRequestDoc) =>
+       //         {
+       //             return onFound(authRequestDoc.Id, authRequestDoc.GetExtraParams(),
+       //                 async (updatedParams)=>
+       //                 {
+							//var same = authRequestDoc.LinkedAuthenticationId == actorId &&
+							//	authRequestDoc.GetExtraParams().OrderBy(pair => pair.Key)
+							//		.SequenceEqual(updatedParams.OrderBy(pair => pair.Key));
+							//if (same)
+							//	return accessDoc.LookupId;
 
-                            authRequestDoc.LinkedAuthenticationId = actorId;
-                            authRequestDoc.SetExtraParams(updatedParams);
-                            return await repository.UpdateIfNotModifiedAsync(authRequestDoc,
-                                ()=> accessDoc.LookupId,
-                                ()=> accessDoc.LookupId); 
-                        });
-                },
-                ()=>
-                {
-                    return onFound(default(Guid?), default(IDictionary<string, string>),
-                        async (parameters) =>
-                        {
-                            var integrationId = Guid.NewGuid();
-                            return await CreateAuthenticatedAsync(integrationId, actorId, methodName, parameters,
-                                ()=> integrationId,
-                                "Guid not unique".AsFunctionException<Guid>());
-                        });
-                },
-                async (parentDoc) =>
-                {
-                    await repository.DeleteAsync(parentDoc, ()=> true, ()=> false);
-                    return await CreateOrUpdateAsync(actorId, methodName, onFound);
-                });
-        }
+       //                     authRequestDoc.LinkedAuthenticationId = actorId;
+       //                     authRequestDoc.SetExtraParams(updatedParams);
+       //                     return await repository.UpdateIfNotModifiedAsync(authRequestDoc,
+       //                         ()=> accessDoc.LookupId,
+       //                         ()=> accessDoc.LookupId); 
+       //                 });
+       //         },
+       //         ()=>
+       //         {
+       //             return onFound(default(Guid?), default(IDictionary<string, string>),
+       //                 async (parameters) =>
+       //                 {
+       //                     var integrationId = Guid.NewGuid();
+       //                     return await CreateAuthenticatedAsync(integrationId, actorId, methodName, parameters,
+       //                         ()=> integrationId,
+       //                         "Guid not unique".AsFunctionException<Guid>());
+       //                 });
+       //         },
+       //         async (parentDoc) =>
+       //         {
+       //             await repository.DeleteAsync(parentDoc, ()=> true, ()=> false);
+       //             return await CreateOrUpdateAsync(actorId, methodName, onFound);
+       //         });
+       // }
 
-        public async Task<EastFive.Azure.Integration[]> FindAsync(Guid actorId)
-        {
-            try
-            {
-                var query = new TableQuery<AccessDocument>()
-                    .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, actorId.AsRowKey()));
-                var accessDocs = await repository.FindByQueryAsync(query);
-                return await accessDocs
-                    .FlatMap(
-                        async (accessDoc, next, skip) => await await repository.FindByIdAsync(
-                            accessDoc.LookupId,
-                                (AuthenticationRequestDocument integrationDoc) =>
-                                    next(
-                                        new EastFive.Azure.Integration
-                                        {
-                                            integrationId = integrationDoc.Id,
-                                            method = integrationDoc.Method,
-                                            parameters = integrationDoc.GetExtraParams(),
-                                            authorizationId = actorId,
-                                        }),
-                        () => skip()),
-                    (IEnumerable<EastFive.Azure.Integration> integrations) =>
-                        integrations.ToArray().ToTask());
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
+        //public async Task<EastFive.Azure.Integration[]> FindAsync(Guid actorId)
+        //{
+        //    try
+        //    {
+        //        var query = new TableQuery<AccessDocument>()
+        //            .Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, actorId.AsRowKey()));
+        //        var accessDocs = await repository.FindByQueryAsync(query);
+        //        return await accessDocs
+        //            .FlatMap(
+        //                async (accessDoc, next, skip) => await await repository.FindByIdAsync(
+        //                    accessDoc.LookupId,
+        //                        (AuthenticationRequestDocument integrationDoc) =>
+        //                            next(
+        //                                new EastFive.Azure.Integration
+        //                                {
+        //                                    integrationId = integrationDoc.Id,
+        //                                    method = integrationDoc.Method,
+        //                                    parameters = integrationDoc.GetExtraParams(),
+        //                                    authorizationId = actorId,
+        //                                }),
+        //                () => skip()),
+        //            (IEnumerable<EastFive.Azure.Integration> integrations) =>
+        //                integrations.ToArray().ToTask());
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return null;
+        //    }
+        //}
 
-        public async Task<KeyValuePair<EastFive.Azure.Integration, Security.SessionServer.Persistence.AuthenticationRequest?>[]> FindAllAsync()
-        {
-            try
-            {
-                return await await repository.FindAllAsync(
-                    async (AccessDocument[] accessDocs) =>
-                    {
-                        return await accessDocs
-                            .Select(
-                                async (accessDoc) =>
-                                {
-                                    var integration = new EastFive.Azure.Integration
-                                    {
-                                        integrationId = accessDoc.Id,
-                                        method = accessDoc.Method,
-                                        parameters = accessDoc.GetExtraParams(),
-                                    };
-                                    return await this.dataContext.AuthenticationRequests.FindByIdAsync(accessDoc.LookupId,
-                                        (authorization) => integration.PairWithValue(authorization.AsOptional()),
-                                        () => integration.PairWithValue(default(Security.SessionServer.Persistence.AuthenticationRequest?)));
-                                })
-                            .AsyncEnumerable()
-                            .ToArrayAsync();
-                    });
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
+        //public async Task<KeyValuePair<EastFive.Azure.Integration, Security.SessionServer.Persistence.AuthenticationRequest?>[]> FindAllAsync()
+        //{
+        //    try
+        //    {
+        //        return await await repository.FindAllAsync(
+        //            async (AccessDocument[] accessDocs) =>
+        //            {
+        //                return await accessDocs
+        //                    .Select(
+        //                        async (accessDoc) =>
+        //                        {
+        //                            var integration = new EastFive.Azure.Integration
+        //                            {
+        //                                integrationId = accessDoc.Id,
+        //                                method = accessDoc.Method,
+        //                                parameters = accessDoc.GetExtraParams(),
+        //                            };
+        //                            return await this.dataContext.AuthenticationRequests.FindByIdAsync(accessDoc.LookupId,
+        //                                (authorization) => integration.PairWithValue(authorization.AsOptional()),
+        //                                () => integration.PairWithValue(default(Security.SessionServer.Persistence.AuthenticationRequest?)));
+        //                        })
+        //                    .AsyncEnumerable()
+        //                    .ToArrayAsync();
+        //            });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return null;
+        //    }
+        //}
 
-        public Task<TResult> FindAuthorizedAsync<TResult>(Guid integrationId,
-            Func<EastFive.Azure.Integration, TResult> onSuccess,
-            Func<TResult> onNotFoundOrUnauthorized)
-        {
-            return repository.FindByIdAsync(integrationId,
-                (AuthenticationRequestDocument integrationDoc) =>
-                {
-                    if (!integrationDoc.LinkedAuthenticationId.HasValue)
-                        return onNotFoundOrUnauthorized();
-                    return onSuccess(
-                        new EastFive.Azure.Integration
-                        {
-                            integrationId = integrationDoc.Id,
-                            method = integrationDoc.Method,
-                            parameters = integrationDoc.GetExtraParams(),
-                            authorizationId = integrationDoc.LinkedAuthenticationId.Value,
-                        });
-                },
-                onNotFoundOrUnauthorized);
-        }
+        //public Task<TResult> FindAuthorizedAsync<TResult>(Guid integrationId,
+        //    Func<EastFive.Azure.Integration, TResult> onSuccess,
+        //    Func<TResult> onNotFoundOrUnauthorized)
+        //{
+        //    return repository.FindByIdAsync(integrationId,
+        //        (AuthenticationRequestDocument integrationDoc) =>
+        //        {
+        //            if (!integrationDoc.LinkedAuthenticationId.HasValue)
+        //                return onNotFoundOrUnauthorized();
+        //            return onSuccess(
+        //                new EastFive.Azure.Integration
+        //                {
+        //                    integrationId = integrationDoc.Id,
+        //                    method = integrationDoc.Method,
+        //                    parameters = integrationDoc.GetExtraParams(),
+        //                    authorizationId = integrationDoc.LinkedAuthenticationId.Value,
+        //                });
+        //        },
+        //        onNotFoundOrUnauthorized);
+        //}
 
         public async Task<TResult> FindAsync<TResult>(Guid actorId, string methodName,
             Func<Guid, TResult> found,
