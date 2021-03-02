@@ -207,6 +207,8 @@ namespace EastFive.Azure
                     PrivateRepositoryOnly = true)]
                 public const string ValidAudiences = "EastFive.Apple.ValidAudiences";
             }
+
+            public const string OpenApiCollectionName = "EastFive.Azure.Auth";
         }
     }
 }

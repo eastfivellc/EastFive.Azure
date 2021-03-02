@@ -2,6 +2,7 @@
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using EastFive.Api;
+using EastFive.Api.Meta.OpenApi;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -16,6 +17,7 @@ namespace EastFive.Azure.Auth
         Route = "AccountMapping",
         ContentType = "x-application/auth-account-mapping",
         ContentTypeVersion = "0.1")]
+    [OpenApiRoute(Collection = AppSettings.Auth.OpenApiCollectionName)]
     [StorageTable]
     public struct AccountMapping : IReferenceable
     {
