@@ -64,15 +64,15 @@ namespace EastFive.Security.SessionServer.Persistence
             }
         }
 
-        private AuthenticationRequests authenticationRequests = default(AuthenticationRequests);
-        public AuthenticationRequests AuthenticationRequests
-        {
-            get
-            {
-                if (default(AuthenticationRequests) == authenticationRequests)
-                    authenticationRequests = new AuthenticationRequests(this, this.AzureStorageRepository);
-                return authenticationRequests;
-            }
-        }
+        //private AuthenticationRequests authenticationRequests = default(AuthenticationRequests);
+        //public AuthenticationRequests AuthenticationRequests
+        //{
+        //    get
+        //    {
+        //        if (default(AuthenticationRequests) == authenticationRequests)
+        //            authenticationRequests = new AuthenticationRequests(this, this.AzureStorageRepository);
+        //        return authenticationRequests;
+        //    }
+        //}
     }
 }

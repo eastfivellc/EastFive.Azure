@@ -140,7 +140,7 @@ namespace EastFive.Persistence
             return CastValue(valueType, value, propertyName);
         }
 
-        public KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object value, string propertyName)
+        public virtual KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object value, string propertyName)
         {
             if (value.IsDefaultOrNull())
                 return new KeyValuePair<string, EntityProperty>[] { };
