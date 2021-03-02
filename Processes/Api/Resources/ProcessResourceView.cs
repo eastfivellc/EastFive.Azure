@@ -20,8 +20,14 @@ namespace EastFive.Api.Azure.Resources
         Route = "ProcessResourceView",
         ContentType = "x-application/process-resource-view",
         ContentTypeVersion = "0.1")]
-    public class ProcessResourceView : ResourceBase
+    public class ProcessResourceView
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         #region identification of the view resources
         public const string ActorPropertyName = "actor";
         [JsonProperty(PropertyName = ActorPropertyName)]
