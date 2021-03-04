@@ -13,7 +13,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public static class StorageQueryExtensions
     {
-        [MutateIdQuery]
+        [MutateRefQuery]
         public static IQueryable<TResource> StorageQueryById<TResource>(this IQueryable<TResource> query, IRef<TResource> resourceRef)
             where TResource : IReferenceable
         {
@@ -22,8 +22,24 @@ namespace EastFive.Persistence.Azure.StorageTables
             var storageQuery = query as StorageQuery<TResource>;
 
             var condition = Expression.Call(
-                typeof(ResourceQueryExtensions), nameof(StorageQueryExtensions.StorageQueryById), new Type[] { typeof(TResource) },
-                query.Expression, Expression.Constant(resourceRef.id));
+                typeof(StorageQueryExtensions), nameof(StorageQueryExtensions.StorageQueryById), new Type[] { typeof(TResource) },
+                query.Expression, Expression.Constant(resourceRef, typeof(IRef<TResource>)));
+
+            var requestMessageNewQuery = storageQuery.FromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [MutateIdQuery]
+        public static IQueryable<TResource> StorageQueryById<TResource>(this IQueryable<TResource> query, Guid resourceId)
+            where TResource : IReferenceable
+        {
+            if (!typeof(StorageQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(StorageQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var storageQuery = query as StorageQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(StorageQueryExtensions), nameof(StorageQueryExtensions.StorageQueryById), new Type[] { typeof(TResource) },
+                query.Expression, Expression.Constant(resourceId));
 
             var requestMessageNewQuery = storageQuery.FromExpression(condition);
             return requestMessageNewQuery;
@@ -32,11 +48,13 @@ namespace EastFive.Persistence.Azure.StorageTables
         [AttributeUsage(AttributeTargets.Method)]
         public class MutateIdQueryAttribute : Attribute, IProvideQueryValues, IBuildStorageQueries
         {
-            public (MemberInfo, object)[] BindStorageQueryValue(
+            public virtual (MemberInfo, object)[] BindStorageQueryValue(
                 MethodInfo method,
                 Expression[] arguments)
             {
-                var idMember = method.DeclaringType
+                var idMember = method
+                    .GetGenericArguments()
+                    .First()
                     .GetPropertyOrFieldMembers()
                     .Where(field => field.ContainsAttributeInterface<IComputeAzureStorageTableRowKey>())
                     .First();
@@ -60,6 +78,23 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
-
+        public class MutateRefQueryAttribute : MutateIdQueryAttribute
+        {
+            public override (MemberInfo, object)[] BindStorageQueryValue(
+                MethodInfo method,
+                Expression[] arguments)
+            {
+                var resType = method
+                    .GetGenericArguments()
+                    .First();
+                var idMember = resType
+                    .GetPropertyOrFieldMembers()
+                    .Where(field => field.ContainsAttributeInterface<IComputeAzureStorageTableRowKey>())
+                    .First();
+                var idValue = arguments.First().ResolveExpression();
+                var value = (idMember, idValue);
+                return value.AsArray();
+            }
+        }
     }
 }

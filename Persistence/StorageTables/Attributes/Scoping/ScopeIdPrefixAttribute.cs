@@ -77,12 +77,22 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
             if (typeof(IReferenceableOptional).IsAssignableFrom(propertyValueType))
             {
-                var referenceableOptional = (IReferenceableOptional)rowKeyValue;
-                if (referenceableOptional.IsDefaultOrNull())
-                    return null;
-                if (!referenceableOptional.HasValue)
-                    return null;
-                return referenceableOptional.id.Value.ToString("N");
+                if (rowKeyValue is IReferenceableOptional)
+                {
+                    var referenceableOptional = (IReferenceableOptional)rowKeyValue;
+                    if (referenceableOptional.IsDefaultOrNull())
+                        return null;
+                    if (!referenceableOptional.HasValue)
+                        return null;
+                    return referenceableOptional.id.Value.ToString("N");
+                }
+                if (rowKeyValue is IReferenceable)
+                {
+                    var referenceable = (IReferenceable)rowKeyValue;
+                    if (referenceable.IsDefaultOrNull())
+                        return null;
+                    return referenceable.id.ToString("N");
+                }
             }
             if (typeof(string).IsAssignableFrom(propertyValueType))
             {
