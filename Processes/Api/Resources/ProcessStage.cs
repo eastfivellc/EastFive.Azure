@@ -18,8 +18,14 @@ namespace EastFive.Api.Azure.Resources
 {
     [DataContract]
     [FunctionViewController(Route = "ProcessStage")]
-    public class ProcessStage : ResourceBase
+    public class ProcessStage
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         #region Properties
 
         public class ConfirmableResource
@@ -170,7 +176,7 @@ namespace EastFive.Api.Azure.Resources
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStageType> onTypeDoesNotExist,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStage> onConfirmationStageDoesNotExist,
-            ReferencedDocumentDoesNotExistsResponse<BlackBarLabs.Api.ResourceBase> onActorDoesNotExists,
+            ReferencedDocumentNotFoundResponse onActorDoesNotExists,
             UnauthorizedResponse onUnauthorized,
             GeneralConflictResponse onFailure)
         {

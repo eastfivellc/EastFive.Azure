@@ -16,8 +16,14 @@ namespace EastFive.Api.Azure.Resources
 {
     [DataContract]
     [FunctionViewController(Route = "ProcessStep")]
-    public class ProcessStep : ResourceBase
+    public class ProcessStep
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         public const string StagePropertyName = "stage";
         [JsonProperty(PropertyName = StagePropertyName)]
         public WebId Stage { get; set; }
