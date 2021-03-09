@@ -219,6 +219,7 @@ namespace EastFive.Azure.Auth
                 EastFive.Api.Security security,
                 IHttpRequest request,
             RedirectResponse onRedirection,
+            NotFoundResponse onNotFound,
             GeneralFailureResponse onFailure,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure)
@@ -274,7 +275,8 @@ namespace EastFive.Azure.Auth
                     authorization.expired = false;
                     await saveAsync(authorization);
                     return onRedirection(url);
-                });
+                },
+                () => onNotFound());
         }
 
         [Api.HttpGet]
