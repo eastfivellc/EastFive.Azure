@@ -15,6 +15,7 @@ namespace EastFive.Azure
 
         public static class SPA
         {
+            public const string BuildConfigPath = "EastFive.Azure.SPA.BuildConfigPath";
             public const string IndexHtmlPath = "EastFive.Azure.SPA.IndexHtmlPath";
             public const string SiteLocation = "EastFive.Azure.SpaSiteLocation";
 
