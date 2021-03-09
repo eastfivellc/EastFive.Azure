@@ -42,8 +42,6 @@ namespace EastFive.Azure.Spa
         private static Route? defaultRoute;
         private static bool dynamicServe = false;
 
-        private const string BuildJsonFileName = "build.json";
-
         private static IDictionary<string, string> extensionsMimeTypes =
             new Dictionary<string, string>()
             {
@@ -90,20 +88,25 @@ namespace EastFive.Azure.Spa
                         return EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(
                             indexHtmlPath =>
                             {
-                                dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
-                                    ds => ds,
-                                    onFailure: why => false,
-                                    onNotSpecified: () => false);
-
-                                loadTask = Task.Run(
-                                    async () =>
+                                return EastFive.Azure.AppSettings.SPA.BuildConfigPath.ConfigurationString(
+                                    buildJsonPath =>
                                     {
-                                        bool success;
-                                        (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
-                                                application, connectionString, indexHtmlPath, dynamicServe);
-                                        signal.Set();
-                                    });
-                                return true;
+                                        dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
+                                            ds => ds,
+                                            onFailure: why => false,
+                                            onNotSpecified: () => false);
+
+                                        loadTask = Task.Run(
+                                            async () =>
+                                            {
+                                                bool success;
+                                                (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
+                                                        application, connectionString, indexHtmlPath, buildJsonPath, dynamicServe);
+                                                signal.Set();
+                                            });
+                                        return true;
+                                    },
+                                    (why) => false);
                             },
                             (why) => false);
                     },
@@ -119,7 +122,9 @@ namespace EastFive.Azure.Spa
         }
 
         private static async Task<(bool, int?, Dictionary<string, byte[]>, Route[], Route?)> LoadSpaAsync(
-            IApplication application, string connectionString, string indexHtmlPath, bool dynamicServe)
+            IApplication application, string connectionString, 
+            string indexHtmlPath, string buildJsonPath, 
+            bool dynamicServe)
         {
             try
             {
@@ -147,7 +152,7 @@ namespace EastFive.Azure.Spa
                         .First(
                             async (item, next) =>
                             {
-                                if (string.Compare(item.FullName, BuildJsonFileName, true) != 0)
+                                if (string.Compare(item.FullName, buildJsonPath, true) != 0)
                                     return await next();
                                 var buildJsonEntryBytes = await item
                                     .Open()
@@ -187,7 +192,7 @@ namespace EastFive.Azure.Spa
                                 .Where(
                                     item =>
                                     {
-                                        if (string.Compare(item.FullName, BuildJsonFileName) == 0)
+                                        if (string.Compare(item.FullName, buildJsonPath) == 0)
                                             return false;
                                         if (dynamicServe)
                                             return string.Compare(item.FullName, indexHtmlPath, true) != 0;
