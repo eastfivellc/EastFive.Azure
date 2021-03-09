@@ -38,17 +38,9 @@ namespace EastFive.Azure.Spa
             StreamResponse onFound,
             NotFoundResponse onNotFound)
         {
-            return EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
-                async connectionString =>
-                {
-                    var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
-                    var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
-                    var container = blobClient.GetBlobContainerClient(containerName);
-                    var blobRef = container.GetBlobClient("spa.zip");
-                    var blobStream = await blobRef.OpenReadAsync();
-                    return onFound(blobStream);
-                },
-                why => onNotFound().AsTask());
+            return SpaHandler.LoadSpaFile(
+                (blobStream) => onFound(blobStream),
+                () => onNotFound());
         }
 
         //[HttpGet]
