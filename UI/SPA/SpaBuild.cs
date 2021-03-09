@@ -6,7 +6,7 @@ namespace EastFive.Azure.Spa
 {
     public class SpaBuild
     {
-        public int buildTimeInSeconds;
+        public double buildTimeInSeconds;
         public Route[] routes;
 
         public MimeType[] mimeTypes;
