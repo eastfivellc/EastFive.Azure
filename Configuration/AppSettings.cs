@@ -30,6 +30,12 @@ namespace EastFive.Azure
                 DeploymentSecurityConcern = false,
                 Location = "Discressionary")]
             public const string ServeEnabled = "EastFive.Azure.SpaServeEnabled";
+
+            [ConfigKey("Default azure spa connection string",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = true,
+                PrivateRepositoryOnly = true)]
+            public const string SpaStorage = "EastFive.Azure.Spa.ConnectionString";
         }
 
         public static class ApplicationInsights
