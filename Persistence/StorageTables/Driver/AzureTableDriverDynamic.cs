@@ -2350,6 +2350,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TData : IReferenceable
         {
+            var tableNameDefault = tableName.HasBlackSpace() ?
+                tableName :
+                GetTable<TData>().Name;
             return datas
                 .Select(data => GetEntity(data))
                 .Batch()
@@ -2359,7 +2362,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         return CreateOrReplaceBatch(rows, 
                             row => row.RowKey,
                             row => row.PartitionKey,
-                            perItemCallback, tableName,
+                            perItemCallback, tableNameDefault,
                             onTimeout:onTimeout,
                             diagnostics:diagnostics);
                     })
