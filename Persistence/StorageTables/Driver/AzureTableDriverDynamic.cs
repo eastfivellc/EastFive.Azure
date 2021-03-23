@@ -2374,6 +2374,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         tableName: tableName);
                 },
                 onNotFound.AsAsyncFunc(),
+                onFailure.AsAsyncFunc(),
                 onTimeout: onTimeout,
                 tableName: tableName);
         }
@@ -2402,7 +2403,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         });
                 },
                 onNotFound.AsAsyncFunc(),
-                onFailure: onFailure.AsAsyncFunc(),
+                onFailure.AsAsyncFunc(),
                 onTimeout: onTimeout,
                 tableName: tableName);
         }
@@ -2458,7 +2459,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         onTimeout:onTimeout);
                 },
                 onNotFound.AsAsyncFunc(),
-                onFailure: onFailure.AsAsyncFunc(),
+                onFailure.AsAsyncFunc(),
                 onTimeout: onTimeout,
                 tableName: tableName);
         }

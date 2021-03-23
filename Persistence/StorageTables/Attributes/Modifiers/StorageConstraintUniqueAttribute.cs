@@ -180,6 +180,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     () => true,
                                     () => false,
+                                    (codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -230,6 +231,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     () => true,
                                     () => false,
+                                    (codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -294,6 +296,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     () => true,
                                     () => false,
+                                    (codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
