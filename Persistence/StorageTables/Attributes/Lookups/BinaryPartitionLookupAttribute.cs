@@ -50,7 +50,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     {
                         return repository.FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(
                                 lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, etag) =>
+                            (dictEntity, tableResult) =>
                             {
                                 var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                                     .NullToEmpty()
@@ -77,9 +77,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .First();
             return repository.FindByIdAsync<StorageLookupTable, TResult>(
                     lookupRef.RowKey, lookupRef.PartitionKey,
-                (dictEntity, etag) =>
+                (dictEntity, tableResult) =>
                 {
-                    return onEtagLastModifedFound(etag, 
+                    return onEtagLastModifedFound(tableResult.Etag, 
                         dictEntity.lastModified,
                         dictEntity.rowAndPartitionKeys
                             .NullToEmpty().Count());
@@ -248,7 +248,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     async astKey =>
                     {
                         var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
-                            (lookup, etag) =>
+                            (lookup, tableResult) =>
                             {
                                 var rowAndParitionKeys = lookup.rowAndPartitionKeys;
                                 var rowKeyFound = rowAndParitionKeys

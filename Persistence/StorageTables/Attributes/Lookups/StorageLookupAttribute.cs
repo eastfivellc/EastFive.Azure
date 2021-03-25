@@ -56,11 +56,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                         scopedLogger.Trace($"Fetching... {lookupRef.PartitionKey}/{lookupRef.RowKey}");
                         return repository.FindByIdAsync<StorageLookupTable, IRefAst[]>(
                                 lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, etag) =>
+                            (dictEntity, tableResult) =>
                             {
                                 scopedLogger.Trace($"Fetched {lookupRef.PartitionKey}/{lookupRef.RowKey}");
                                 var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                                     .NullToEmpty()
+                                    .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                                     .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
                                     .ToArray();
                                 scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndParitionKeys.Length} lookups");
@@ -94,14 +95,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                     {
                         return repository.FindByIdAsync<StorageLookupTable, (bool, string, DateTime, int)>(
                                 lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, etag) =>
+                            (dictEntity, tableResult) =>
                             {
                                 var lastModified = dictEntity.lastModified;
                                 var count = dictEntity
                                     .rowAndPartitionKeys
                                     .NullToEmpty()
                                     .Count();
-                                return (true, etag,
+                                return (true, tableResult.Etag,
                                     lastModified,
                                     count);
                             },
@@ -233,8 +234,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                     // store for rollback
                     var orignalRowAndPartitionKeys = lookup.rowAndPartitionKeys
                         .NullToEmpty()
+                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                         .ToArray();
                     var updatedRowAndPartitionKeys = mutateCollection(orignalRowAndPartitionKeys)
+                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                         .ToArray();
 
                     if (Unmodified(orignalRowAndPartitionKeys, updatedRowAndPartitionKeys))
@@ -253,11 +256,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                                 async (currentDoc, saveRollbackAsync) =>
                                 {
                                     var currentLookups = currentDoc.rowAndPartitionKeys
+                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                                         .NullToEmpty()
                                         .ToArray();
                                     var rolledBackRowAndPartitionKeys = currentLookups
                                         .Concat(removed)
                                         .Except(added, rk => $"{rk.Key}|{rk.Value}")
+                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                                         .ToArray();
                                     if (Unmodified(rolledBackRowAndPartitionKeys, currentLookups))
                                         return true;
@@ -318,11 +323,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                     async astKey =>
                     {
                         var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
-                            (lookup, etag) =>
+                            (lookup, tableResult) =>
                             {
                                 var rowAndParitionKeys = lookup.rowAndPartitionKeys;
                                 var rowKeyFound = rowAndParitionKeys
                                     .NullToEmpty()
+                                    .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                                     .Where(kvp => kvp.Key == rowKeyRef)
                                     .Any();
                                 var partitionKeyFound = rowAndParitionKeys
@@ -465,6 +471,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var rollbacks = await lookupTable
                             .rowAndPartitionKeys
                             .NullToEmpty()
+                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                             .Select(rowParitionKeyKvp =>
                                 repository.DeleteAsync<Func<Task>>(rowParitionKeyKvp.Key, rowParitionKeyKvp.Value, memberInfo.DeclaringType,
                                     (entity, data) => 

@@ -465,7 +465,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
-                    onFound:(TEntity entity, string eTag) => onFound(entity),
+                    onFound:(TEntity entity, TableResult tableResult) => onFound(entity),
                     onNotFound: onDoesNotExists,
                     cache:cache);
         }
@@ -488,7 +488,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
-                    onFound: (TEntity entity, string eTag) => onFound(entity),
+                    onFound: (TEntity entity, TableResult tableResult) => onFound(entity),
                     onNotFound: onDoesNotExists);
         }
 
@@ -505,7 +505,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .FindByIdAsync(rowKey, partitionKey,
-                    onFound: (TEntity entity, string eTag) => onFound(entity),
+                    onFound: (TEntity entity, TableResult tableResult) => onFound(entity),
                     onNotFound: onDoesNotExists);
         }
 
@@ -752,8 +752,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .CreateAsync(entity,
-                    onCreated,
-                    onAlreadyExists,
+                    onSuccess: (entity, tr) => onCreated(entity),
+                    onAlreadyExists:onAlreadyExists,
                     onModificationFailures: onModificationFailures);
         }
 
@@ -762,7 +762,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         #region CreateOrUpdate
 
         public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<bool, TEntity, Func<TEntity, Task<ITableResult>>, Task<TResult>> onCreated,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
             where TEntity : IReferenceable
         {
@@ -771,7 +771,16 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
-                    onCreated,
+                    onUpdate:
+                        (created, entity, callback) =>
+                        {
+                            return onCreated(created, entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageTableResult(tr);
+                                });
+                        },
                     default);
         }
 
@@ -944,7 +953,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            Func<TEntity, Func<TEntity, Task>, Task<TResult>> onUpdate,
+            Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
             Func<TResult> onNotFound = default,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
@@ -954,17 +963,26 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var rowKey = entityRef.StorageComputeRowKey();
             return AzureTableDriverDynamic
                 .FromSettings()
-                .UpdateAsync(
+                .UpdateAsync<TEntity, TResult>(
                         rowKey,
                         entityRef.StorageComputePartitionKey(rowKey),
-                    onUpdate,
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageUpdateTableResult(tr);
+                                });
+                        },
                     onNotFound: onNotFound,
                     onModificationFailures: onModificationFailures,
                     onTimeoutAsync: onTimeoutAsync);
         }
 
         public static Task<TResult> StorageUpdateAsyncAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            Func<TEntity, Func<TEntity, Task>, Task<TResult>> onUpdate,
+            Func<TEntity, Func<TEntity, Task<ITableResult>>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
@@ -974,8 +992,17 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var rowKey = entityRef.StorageComputeRowKey();
             return AzureTableDriverDynamic
                 .FromSettings()
-                .UpdateAsyncAsync(rowKey, entityRef.StorageComputePartitionKey(rowKey),
-                    onUpdate,
+                .UpdateAsyncAsync<TEntity, TResult>(rowKey, entityRef.StorageComputePartitionKey(rowKey),
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageTableResult(tr);
+                                });
+                        },
                     onNotFound: onNotFound,
                     onTimeoutAsync: onTimeoutAsync);
         }
@@ -986,6 +1013,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TResult> onSuccess,
+            Func<TResult> onNotFound = default)
+            where TEntity : IReferenceable
+        {
+            var rowKey = entityRef.StorageComputeRowKey();
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteAsync<TEntity, TResult>(
+                        rowKey,
+                        entityRef.StorageComputePartitionKey(rowKey),
+                    (discard) => onSuccess(),
+                    onNotFound);
+        }
+
+        public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+            Func<TEntity, TResult> onSuccess,
             Func<TResult> onNotFound = default)
             where TEntity : IReferenceable
         {
@@ -1040,7 +1082,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         entityRef.StorageComputeRowKey(),
                         partitionKey,
-                    onSuccess,
+                    (discard) => onSuccess(),
                     onNotFound);
         }
 
@@ -1234,12 +1276,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FromSettings();
             return await driver
                 .CreateAsync(entity,
-                    (tableEntity) =>
+                    (tableEntity, tableResult) =>
                     {
                         Func<Task> rollback = (() =>
                         {
                             return driver.DeleteAsync<TEntity, bool>(tableEntity.RowKey, tableEntity.PartitionKey,
-                                () => true,
+                                (discard) => true,
                                 () => false);
                         });
                         return rollback.TransactionResultSuccess<TResult>();
