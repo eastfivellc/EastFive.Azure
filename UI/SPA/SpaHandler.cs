@@ -25,6 +25,7 @@ using EastFive.Azure;
 using EastFive.Api.Core;
 using EastFive.Linq.Async;
 using EastFive.Api;
+using System.IO;
 
 namespace EastFive.Azure.Spa
 {
@@ -41,8 +42,6 @@ namespace EastFive.Azure.Spa
         private static Route[] routes;
         private static Route? defaultRoute;
         private static bool dynamicServe = false;
-
-        private const string BuildJsonFileName = "build.json";
 
         private static IDictionary<string, string> extensionsMimeTypes =
             new Dictionary<string, string>()
@@ -84,30 +83,36 @@ namespace EastFive.Azure.Spa
         {
             try
             {
-                return EastFive.Azure.Persistence.AppSettings.SpaStorage.ConfigurationString(
-                    connectionString =>
+                return EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(
+                    indexHtmlPath =>
                     {
-                        return EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(
-                            indexHtmlPath =>
+                        return EastFive.Azure.AppSettings.SPA.BuildConfigPath.ConfigurationString(
+                            buildJsonPath =>
                             {
                                 dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
                                     ds => ds,
                                     onFailure: why => false,
                                     onNotSpecified: () => false);
-
+                        
                                 loadTask = Task.Run(
                                     async () =>
                                     {
-                                        bool success;
-                                        (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
-                                                application, connectionString, indexHtmlPath, dynamicServe);
-                                        signal.Set();
+                                        return await await LoadSpaFile(
+                                            async spaStream =>
+                                            {
+                                                bool success;
+                                                (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
+                                                    application, spaStream, indexHtmlPath, buildJsonPath, dynamicServe);
+                                                signal.Set();
+                                                return success;
+                                            },
+                                            () => false.AsTask());
                                     });
                                 return true;
                             },
                             (why) => false);
                     },
-                    why => false);
+                    (why) => false);
             }
             catch(Exception)
             {
@@ -118,17 +123,37 @@ namespace EastFive.Azure.Spa
             }
         }
 
+        public static Task<TResult> LoadSpaFile<TResult>(
+            Func<Stream, TResult> onFound,
+            Func<TResult> onNotFound)
+        {
+            return EastFive.Azure.AppSettings.SPA.SpaStorage.ConfigurationString(
+                async connectionString =>
+                {
+                    try
+                    {
+                        var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
+                        var containerName = Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
+                        var container = blobClient.GetBlobContainerClient(containerName);
+                        var blobRef = container.GetBlobClient("spa.zip");
+                        var blobStream = await blobRef.OpenReadAsync();
+                        return onFound(blobStream);
+                    }
+                    catch
+                    {
+                        return onNotFound();
+                    }
+                },
+                why => onNotFound().AsTask());
+        }
+
         private static async Task<(bool, int?, Dictionary<string, byte[]>, Route[], Route?)> LoadSpaAsync(
-            IApplication application, string connectionString, string indexHtmlPath, bool dynamicServe)
+            IApplication application, Stream blobStream,
+            string indexHtmlPath, string buildJsonPath, 
+            bool dynamicServe)
         {
             try
             {
-                var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
-                var containerName = EastFive.Azure.Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
-                var container = blobClient.GetBlobContainerClient(containerName);
-                var blobRef = container.GetBlobClient("spa.zip");
-                var blobStream = await blobRef.OpenReadAsync();
-
                 using (var zipArchive = new ZipArchive(blobStream))
                 {
                     var indexHTML = await zipArchive.Entries
@@ -147,7 +172,7 @@ namespace EastFive.Azure.Spa
                         .First(
                             async (item, next) =>
                             {
-                                if (string.Compare(item.FullName, BuildJsonFileName, true) != 0)
+                                if (string.Compare(item.FullName, buildJsonPath, true) != 0)
                                     return await next();
                                 var buildJsonEntryBytes = await item
                                     .Open()
@@ -187,7 +212,7 @@ namespace EastFive.Azure.Spa
                                 .Where(
                                     item =>
                                     {
-                                        if (string.Compare(item.FullName, BuildJsonFileName) == 0)
+                                        if (string.Compare(item.FullName, buildJsonPath) == 0)
                                             return false;
                                         if (dynamicServe)
                                             return string.Compare(item.FullName, indexHtmlPath, true) != 0;

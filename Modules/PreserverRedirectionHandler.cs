@@ -15,13 +15,20 @@ using EastFive.Web.Configuration;
 using EastFive.Azure;
 using System.Net.Http.Headers;
 using EastFive.Api;
+using System.Runtime.Serialization;
 
 namespace EastFive.Azure.Auth
 {
+    [DataContract]
     public class RedirectionConfiguration
     {
+        [DataMember]
         public string Key;
+
+        [DataMember]
         public string Value;
+
+        [DataMember]
         public long Limit;
     }
 
@@ -32,7 +39,7 @@ namespace EastFive.Azure.Auth
         public PreserverRedirectionAttribute()
         {
             redirections = AppSettings.Redirections.ConfigurationJson(
-                (KeyValuePair<string, string>[] kvps) =>
+                (RedirectionConfiguration[] kvps) =>
                 {
                     return kvps
                         .Select(
