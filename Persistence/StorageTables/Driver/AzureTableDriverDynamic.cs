@@ -2333,12 +2333,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : class, ITableEntity
         {
+            var table = tableName.HasBlackSpace() ?
+                TableClient.GetTableReference(tableName)
+                :
+                default(CloudTable);
             return entities
                 .Batch()
                 .Select(
                     rows =>
                     {
-                        return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, perItemCallback, tableName, onTimeout);
+                        return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, perItemCallback, table:table, onTimeout);
                     })
                 .SelectAsyncMany();
         }
@@ -2350,16 +2354,20 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TData : IReferenceable
         {
+            var table = tableName.HasBlackSpace() ?
+                this.TableClient.GetTableReference(tableName)
+                :
+                GetTable<TData>();
             return datas
                 .Select(data => GetEntity(data))
                 .Batch()
                 .Select(
                     rows =>
                     {
-                        return CreateOrReplaceBatch(rows, 
+                        return CreateOrReplaceBatch(rows,
                             row => row.RowKey,
                             row => row.PartitionKey,
-                            perItemCallback, tableName,
+                            perItemCallback, table,
                             onTimeout:onTimeout,
                             diagnostics:diagnostics);
                     })
@@ -2372,11 +2380,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
         {
+            var table = tableName.HasBlackSpace() ?
+                TableClient.GetTableReference(tableName)
+                :
+                default(CloudTable);
             return CreateOrReplaceBatch<ITableEntity, TResult>(entities,
                 entity => entity.RowKey,
                 entity => entity.PartitionKey,
                 perItemCallback,
-                tableName:tableName,
+                table:table,
                 onTimeout: onTimeout,
                 diagnostics: diagnostics);
         }
@@ -2385,15 +2397,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<TDocument, string> getRowKey,
                 Func<TDocument, string> getPartitionKey,
                 Func<TDocument, TableResult, TResult> perItemCallback,
-                string tableName = default(string),
+                CloudTable table,
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : class, ITableEntity
         {
-            var table = tableName.HasBlackSpace() ?
-                TableClient.GetTableReference(tableName)
-                :
-                default(CloudTable);
             return entities
                 .Select(
                     row =>

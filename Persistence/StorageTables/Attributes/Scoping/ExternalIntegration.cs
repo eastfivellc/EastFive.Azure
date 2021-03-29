@@ -32,7 +32,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return null;
             }
             ignore = false;
-            return rowKey;
+            return rowKey; // return $"{currentKey}{dtPartition}";?
         }
 
     }
