@@ -177,7 +177,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         async () =>
                         {
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
                                     tableName: tableName);
                         };
@@ -227,7 +227,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         async () =>
                         {
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
                                     tableName: tableName);
                         };
@@ -291,7 +291,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             if (!rollbackMaybe.IsDefaultOrNull())
                                 await rollbackMaybe();
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
                                     tableName: tableName);
                         };
@@ -319,7 +319,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     await deleteAsync();
                     return onSuccessWithRollback(
-                        () => repository.CreateAsync(entity, (discardAgain) => true, () => false));
+                        () => repository.CreateAsync(entity, 
+                            (discardAgain, discard2x) => true, () => false));
                 },
                 () => onSuccessWithRollback(() => 1.AsTask()),
                 tableName: tableName);

@@ -58,7 +58,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onMissing: () => new RowKeyPrefixAttribute());
             return repository
                 .FindByIdAsync<StorageLookupTable, IEnumerableAsync<IRefAst>>(rowKey, partitionKey,
-                    (dictEntity, etag) =>
+                    (dictEntity, tableResult) =>
                     {
                         var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                             .NullToEmpty()
@@ -91,9 +91,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onMissing: () => new RowKeyPrefixAttribute());
             return repository.FindByIdAsync<StorageLookupTable, TResult>(
                     rowKey, partitionKey,
-                (dictEntity, etag) =>
+                (dictEntity, tableResult) =>
                 {
-                    return onEtagLastModifedFound(etag,
+                    return onEtagLastModifedFound(tableResult.Etag,
                         dictEntity.lastModified,
                         dictEntity.rowAndPartitionKeys
                             .NullToEmpty().Count());
@@ -200,7 +200,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                         fieldToModifyFieldInfo.SetValue(ref entity, valueMutated);
 
-                        await saveAsync(entity);
+                        var result = await saveAsync(entity);
                         Func<Task> rollback =
                             async () =>
                             {
