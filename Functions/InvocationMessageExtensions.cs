@@ -6,6 +6,7 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net.Http;
@@ -24,10 +25,8 @@ namespace EastFive.Azure.Functions
                     refererTmp
                     :
                     new Uri(System.Web.HttpUtility.UrlDecode(refererTmp.OriginalString));
-            var content = request.HasBody?
-                request.Body.IsDefaultOrNull()? new byte[] { } : await request.Body.ToBytesAsync()
-                :
-                new byte[] { };
+
+            var content = await GetContentAsync();
             var invocationMessage = new InvocationMessage
             {
                 invocationRef = invocationMessageRef,
@@ -54,6 +53,19 @@ namespace EastFive.Azure.Functions
                     return RefOptional<InvocationMessage>.Empty();
 
                 return invocationMessageSource.AsRefOptional<InvocationMessage>();
+            }
+
+            async Task<byte []> GetContentAsync()
+            {
+                if (!request.Body.IsDefaultOrNull())
+                    return await request.Body.ToBytesAsync();
+                if (request.WriteBody.IsDefaultOrNull())
+                    return new byte[] { };
+                using(var stream = new MemoryStream())
+                {
+                    await request.WriteBody(stream);
+                    return stream.ToArray();
+                }
             }
         }
 

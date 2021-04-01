@@ -30,7 +30,7 @@ namespace EastFive.Azure.Functions
 
                 return newApp;
             }
-            this.azureApplication = GetApplication();
+            this.azureApplication = application; //  GetApplication();
             this.executionLimit = executionLimit;
         }
 
