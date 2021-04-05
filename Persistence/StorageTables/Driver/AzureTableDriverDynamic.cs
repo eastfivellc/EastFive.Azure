@@ -2491,6 +2491,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         tableName: tableName);
                 },
                 onNotFound.AsAsyncFunc(),
+                onFailure.AsAsyncFunc(),
                 onTimeout: onTimeout,
                 tableName: tableName);
         }

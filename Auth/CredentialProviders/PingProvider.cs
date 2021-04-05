@@ -83,45 +83,49 @@ namespace EastFive.Azure.Auth.CredentialProviders
                         var credentials = Encoding.ASCII.GetBytes($"{restAuthUsername}:{restApiKey}");
                         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(credentials));
                         var tokenUrl = GetTokenServiceUrl(tokenId);
-                        var request = new HttpRequestMessage(
-                            new HttpMethod("GET"), tokenUrl);
-                        request.Headers.Add("Cookie", "agentid=" + agentId);
-                        try
+                        using (var request = new HttpRequestMessage(
+                            new HttpMethod("GET"), tokenUrl))
                         {
-                            var response = await httpClient.SendAsync(request);
-                            var content = await response.Content.ReadAsStringAsync();
-                            if (response.StatusCode == HttpStatusCode.OK)
+                            request.Headers.Add("Cookie", "agentid=" + agentId);
+                            try
                             {
-                                dynamic stuff = null;
-                                try
+                                using (var response = await httpClient.SendAsync(request))
                                 {
-                                    stuff = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(content);
+                                    var content = await response.Content.ReadAsStringAsync();
+                                    if (response.StatusCode == HttpStatusCode.OK)
+                                    {
+                                        dynamic stuff = null;
+                                        try
+                                        {
+                                            stuff = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(content);
+                                        }
+                                        catch (Newtonsoft.Json.JsonReaderException)
+                                        {
+                                            return onCouldNotConnect($"PING Returned non-json response:{content}");
+                                        }
+                                        string subject = (string)stuff[Subject];
+                                        var loginId = Guid.NewGuid();
+                                        var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
+                                        foreach (var item in stuff)
+                                        {
+                                            extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
+                                        }
+                                        return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
+                                    }
+                                    else
+                                    {
+                                        return onFailure($"{content} TokenId: {tokenId}, AgentId: {agentId}");
+                                    }
                                 }
-                                catch (Newtonsoft.Json.JsonReaderException)
-                                {
-                                    return onCouldNotConnect($"PING Returned non-json response:{content}");
-                                }
-                                string subject = (string)stuff[Subject];
-                                var loginId = Guid.NewGuid();
-                                var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
-                                foreach (var item in stuff)
-                                {
-                                    extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
-                                }
-                                return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
                             }
-                            else
+                            catch (System.Net.Http.HttpRequestException ex)
                             {
-                                return onFailure($"{content} TokenId: {tokenId}, AgentId: {agentId}");
+                                return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
                             }
-                        }
-                        catch (System.Net.Http.HttpRequestException ex)
-                        {
-                            return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
-                        }
-                        catch(Exception exGeneral)
-                        {
-                            return onCouldNotConnect(exGeneral.Message);
+                            catch (Exception exGeneral)
+                            {
+                                return onCouldNotConnect(exGeneral.Message);
+                            }
                         }
                     }
                 },
