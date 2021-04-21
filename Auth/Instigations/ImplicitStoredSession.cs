@@ -103,8 +103,8 @@ namespace EastFive.Azure.Auth.Instigations
                                 {
                                     var security = new ImplicitStoredSession
                                     {
-                                            //claims = claims,
-                                            sessionId = sessionId,
+                                        //claims = claims,
+                                        sessionId = sessionId,
                                         performingAsActorId = default(Guid?),
                                     };
                                     var result = await onSuccess(security);
