@@ -1383,6 +1383,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static async Task<TResult> BlobLoadBytesAsync<TResult>(this Guid? blobId, string containerName,
+            Func<byte[], string, TResult> onSuccess,
+            Func<TResult> onNotFound,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            if (!blobId.HasValue)
+                return onNotFound();
+            return await blobId.Value.BlobLoadBytesAsync(containerName, 
+                onSuccess,
+                onNotFound: onNotFound,
+                onFailure: onFailure,
+                onTimeout: onTimeout);
+        }
+
         public static Task<TResult> BlobLoadBytesAsync<TResult>(this Guid blobId, string containerName,
             Func<byte [], string, TResult> onSuccess,
             Func<TResult> onNotFound = default,

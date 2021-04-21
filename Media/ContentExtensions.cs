@@ -59,6 +59,16 @@ namespace EastFive.Azure.Media
                 onNotFound);
         }
 
+        public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
+            string contentType = default,
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return content.BlobCreateAsync("content",
+                (contentId) => contentId.AsRef<Content>(),
+                contentType: contentType,
+                onTimeout: onTimeout);
+        }
+
         public static Task<TResult> SaveBytesAsync<TResult>(this IRef<Content> contentRef, 
                 byte[] content,
             Func<TResult> onSuccess,
