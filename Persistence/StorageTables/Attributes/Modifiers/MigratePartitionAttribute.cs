@@ -101,7 +101,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                         if (created)
                             return repository.DeleteAsync<TEntity, bool>(newEntity,
                                 () => true,
-                                () => true);
+                                () => true,
+                                (codes, why) => false);
                         var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey, dictionaryExisting);
                         return repository.ReplaceAsync<TEntity, bool>(typeWrapperExisting,
                             () => true);
