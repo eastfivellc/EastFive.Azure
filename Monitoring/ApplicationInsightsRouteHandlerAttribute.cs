@@ -16,6 +16,7 @@ using EastFive.Api.Modules;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
+using EastFive.Linq;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -65,7 +66,7 @@ namespace EastFive.Azure.Monitoring
                 }
             }
 
-            foreach (var claim in claims)
+            foreach (var claim in claims.Distinct(claim => claim.Type))
                 telemetry.Properties.Add($"claim[{claim.Type}]", claim.Value);
 
             #endregion

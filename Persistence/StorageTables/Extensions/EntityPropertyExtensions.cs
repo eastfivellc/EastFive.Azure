@@ -368,7 +368,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                 if (value.PropertyType == EdmType.Guid)
                 {
                     var guidValue = value.GuidValue;
-                    return onBound(guidValue);
+                    if(guidValue.HasValue)
+                        return onBound(guidValue.Value);
+                }
+                if(value.PropertyType == EdmType.String)
+                {
+                    var guidStr = value.StringValue;
+                    if(Guid.TryParse(guidStr, out Guid guidValue))
+                        return onBound(guidValue);
                 }
                 return onBound(default(Guid)); // This seems to be the best move in case of data migration
                 // return onFailedToBind();
@@ -865,7 +872,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                 .First(
                                     (epSerializer, next) =>
                                     {
-                                        return epSerializer.Cast(v, arrayType,
+                                        return epSerializer.Cast(v, arrayType, default, default,
                                             ep => ep,
                                             () => throw new NotImplementedException(
                                                 $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
@@ -1201,7 +1208,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                         {
                                             var valueBytes = valueObject as byte[];
                                             var valueEp = new EntityProperty(valueBytes);
-                                            return epSerializer.Bind(valueEp, arrayType,
+                                            return epSerializer.Bind(valueEp, arrayType, string.Empty, default,
                                                 v => v,
                                                 () => arrayType.GetDefault());
                                         })

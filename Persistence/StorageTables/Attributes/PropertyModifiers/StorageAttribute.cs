@@ -230,18 +230,29 @@ namespace EastFive.Persistence
 
         public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
         {
-            var propertyName = this.GetTablePropertyName(memberInfo);
-
             var type = memberInfo.GetPropertyOrFieldType();
-
-            return GetMemberValue(type, propertyName, values,
-                (convertedValue) => convertedValue,
+            var propertyName = this.GetTablePropertyName(memberInfo);
+            if (type.TryGetAttributeInterface(
+                out ISerialize<IDictionary<string, EntityProperty>> serializer))
+            {
+                return serializer.Bind(values, type, propertyName, memberInfo,
+                    (convertedValue) => convertedValue,
                     () =>
                     {
                         var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
                             $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
                         throw new Exception(exceptionText);
                     });
+            }
+
+            return GetMemberValue(type, propertyName, values,
+                (convertedValue) => convertedValue,
+                () =>
+                {
+                    var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
+                        $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
+                    throw new Exception(exceptionText);
+                });
         }
 
         public virtual TResult GetMemberValue<TResult>(Type type, string propertyName, IDictionary<string, EntityProperty> values,

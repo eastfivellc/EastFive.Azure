@@ -114,15 +114,18 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
-                EastFive.Api.SessionToken security,
+                EastFive.Api.SessionTokenMaybe security,
                 IAuthApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigurationFailure)
         {
-            if (security.sessionId != sessionRef.id)
-                return onUnauthorized();
+            if (!IsAnonSessionAllowed())
+            {
+                if (security.sessionId != sessionRef.id)
+                    return onUnauthorized();
+            }
             return await await sessionRef.StorageGetAsync(
                 (session) =>
                 {
@@ -155,6 +158,14 @@ namespace EastFive.Azure.Auth
                         (why) => onConfigurationFailure("Missing", why).AsTask());
                 },
                 () => onNotFound().AsTask());
+
+            bool IsAnonSessionAllowed()
+            {
+                var appType = application.GetType();
+                if (!appType.TryGetAttributeInterface<IConfigureAuthorization>(out IConfigureAuthorization authConfig))
+                    return false;
+                return authConfig.IsAnonymousSessionAllowed;
+            }
         }
 
         [Api.HttpGet]
