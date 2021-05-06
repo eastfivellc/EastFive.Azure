@@ -15,10 +15,15 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public double Order { get; set; } = 0.0;
 
+        public bool IgnoreNullOrDefault { get; set; } = false;
+
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
-            ignore = false;
             var idValue = IdLookupAttribute.RowKey(this.GetType(), key.GetPropertyOrFieldType(), value);
+            ignore = idValue.IsNullOrWhiteSpace()?
+                IgnoreNullOrDefault
+                :
+                false;
             return $"{currentKey}{idValue}";
         }
 

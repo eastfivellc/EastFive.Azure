@@ -31,6 +31,10 @@ namespace EastFive.Azure.Auth
         [StandardParititionKey]
         public IRef<Session> sessionId;
 
+        public const string CreatedScopeName = "created";
+        [ScopeDateTime(CreatedScopeName, SpanUnits = TimeSpanUnits.years, IgnoreNull = true)]
+        public DateTime? created;
+
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
         [JsonProperty(PropertyName = AuthorizationPropertyName)]
@@ -40,6 +44,8 @@ namespace EastFive.Azure.Auth
         public const string AccountPropertyName = "account";
         [JsonProperty(PropertyName = AccountPropertyName)]
         [Storage(Name = AccountPropertyName)]
+        [ScopedLookup(AccountPropertyName, partitionScope: CreatedScopeName)]
+        [ScopeId(AccountPropertyName, IgnoreNullOrDefault = true)]
         public Guid? account { get; set; }
 
         /// <summary>

@@ -5,6 +5,7 @@ using System.Reflection;
 using EastFive.Azure.Persistence;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -70,9 +71,20 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return null;
                 return referenceableOptional.id.Value.ToString("N");
             }
-            var exMsg = $"{thisType.Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                $"Please override GetRowKeys on `{thisType.FullName}`.";
-            throw new NotImplementedException(exMsg);
+            return propertyValueType.IsNullable(
+                nullableBase =>
+                {
+                    if (!rowKeyValue.NullableHasValue())
+                        return null;
+                    var valueFromNullable = rowKeyValue.GetNullableValue();
+                    return RowKey(thisType, nullableBase, valueFromNullable);
+                },
+                () =>
+                {
+                    var exMsg = $"{thisType.Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                        $"Please override GetRowKeys on `{thisType.FullName}`.";
+                    throw new NotImplementedException(exMsg);
+                });
         }
 
         public abstract string GetPartitionKey(string rowKey);

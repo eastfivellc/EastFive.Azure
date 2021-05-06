@@ -237,6 +237,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                         .ToArray();
                     var updatedRowAndPartitionKeys = mutateCollection(orignalRowAndPartitionKeys)
+                        .Where(kvp => kvp.Key.HasBlackSpace() && kvp.Value.HasBlackSpace())
                         .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                         .ToArray();
 

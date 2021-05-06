@@ -1,5 +1,8 @@
-﻿using EastFive.Collections.Generic;
+﻿using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Azure.StorageTables.Driver;
+using EastFive.Collections.Generic;
 using EastFive.Extensions;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
 using Microsoft.Azure.Cosmos.Table;
 using System;
@@ -20,9 +23,23 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     public static class BlobRefExtensions
     {
-        public static Task<byte[]> ReadBytesAsync(this IBlobRef blobRef)
+        public static Task<(byte[], string)> ReadBytesAsync(this IBlobRef blobRef) =>
+            blobRef.ReadBytesAsync(
+                onSuccess:(bytes, contentType) => (bytes, contentType));
+
+        public static Task<TResult> ReadBytesAsync<TResult>(this IBlobRef blobRef,
+            Func<byte[], string, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
         {
-            throw new NotImplementedException();
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobLoadBytesAsync(blobRef.Id, blobRef.ContainerName,
+                    onSuccess,
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
         }
 
         public static Task<IBlobRef> WriteBytesAsync(byte[] bytes)

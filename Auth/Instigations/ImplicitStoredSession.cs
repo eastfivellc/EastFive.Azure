@@ -122,6 +122,7 @@ namespace EastFive.Azure.Auth.Instigations
                                     authorized = false,
                                     refreshToken = Security.SecureGuid.Generate().ToString("N"),
                                     token = tokenNew,
+                                    created = DateTime.UtcNow,
                                 };
                                 var storagedSession = await session.StorageCreateAsync(
                                     discard => session);
