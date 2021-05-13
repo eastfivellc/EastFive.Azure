@@ -110,6 +110,22 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                         {
                                             extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
                                         }
+
+                                        void ShimKey(string expectedName)
+                                        {
+                                            var alternateName = expectedName.ToLower();
+                                            if (!extraParamsWithTokenValues.ContainsKey(expectedName) && extraParamsWithTokenValues.TryGetValue(alternateName.ToLower(), out string value))
+                                            {
+                                                extraParamsWithTokenValues.Add(expectedName, value);
+                                                extraParamsWithTokenValues.Remove(alternateName);
+                                            }
+                                        }
+
+                                        // shim differences in casing of keys among connection setups
+                                        ShimKey(PracticeId);
+                                        ShimKey(DepartmentId);
+                                        ShimKey(PatientId);
+
                                         return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
                                     }
                                     else
