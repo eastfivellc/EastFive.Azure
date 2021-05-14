@@ -29,10 +29,10 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (rowKey.IsNullOrWhiteSpace())
             {
                 ignore = true;
-                return null;
+                return currentKey;
             }
             ignore = false;
-            return rowKey; // return $"{currentKey}{dtPartition}";?
+            return $"{currentKey}{rowKey}";
         }
 
     }

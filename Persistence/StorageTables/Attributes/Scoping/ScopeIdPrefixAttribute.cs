@@ -58,7 +58,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
 
             ignore = false;
-            return RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
+            var prefix = RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
+            return $"{currentKey}{prefix}";
         }
 
         internal static string RowKey(Type propertyValueType, object rowKeyValue, Type thisAttributeType)

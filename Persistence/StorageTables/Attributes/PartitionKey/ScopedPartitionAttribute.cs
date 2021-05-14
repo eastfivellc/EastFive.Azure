@@ -121,7 +121,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     
                                     var partitionNext = scoping.MutateKey(keyCurrent, 
                                         memberInfo, value, out allIgnored);
-                                    return $"{keyCurrent}{partitionNext}";
+                                    return partitionNext; // $"{keyCurrent}{partitionNext}";
                                 },
                                 () => throw new ArgumentException($"{member.DeclaringType}..{member.Name} " +
                                     " has not been included in the query."));
