@@ -978,6 +978,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
+            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var rowKey = entityQuery.StorageComputeRowKey();
+            var partitionKey = entityQuery.StorageComputePartitionKey(rowKey);
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .UpdateOrCreateAsync(rowKey, partitionKey,
+                    onCreated,
+                    onModificationFailures: onModificationFailures);
+        }
+
         public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
             Func<TResult> onNotFound = default,

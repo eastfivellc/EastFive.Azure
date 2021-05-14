@@ -283,10 +283,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             {
                 var modifierResults = await typeof(EntityType)
                     .GetPropertyOrFieldMembers()
-                    .Where(member => member.ContainsAttributeInterface<IModifyAzureStorageTableSave>())
                     .SelectMany(memberInfo =>
                         memberInfo
-                            .GetAttributesInterface<IModifyAzureStorageTableSave>()
+                            .GetAttributesAndPropertyAttributesInterface<IModifyAzureStorageTableSave>()
                             .Select(
                                storageModifier =>
                                {
@@ -294,14 +293,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                                             this.RowKey, this.PartitionKey,
                                             this.Entity, this.WriteEntity(null),
                                             repository,
-                                        rollback => 
+                                        rollback =>
                                             new ExecResult
                                             {
                                                 success = true,
                                                 rollback = rollback,
                                                 member = memberInfo,
                                             },
-                                        () => 
+                                        () =>
                                         new ExecResult
                                         {
                                             success = false,
