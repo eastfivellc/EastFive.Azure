@@ -118,7 +118,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 RequestMessage<TableBackup> requestQuery,
                 IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
-            CreatedBodyResponse<InvocationMessage> onContinued,
+            ContentTypeResponse<InvocationMessage> onContinued,
             NoContentResponse onComplete,
             NotFoundResponse onNotFound)
         {

@@ -452,6 +452,18 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onDoesNotExists);
         }
 
+        public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
+            Func<TEntity, TResult> onFound,
+            Func<TResult> onDoesNotExists = default)
+            where TEntity : IReferenceable
+        {
+            if (!entityRefMaybe.HasValue)
+                return onDoesNotExists();
+            return await entityRefMaybe.Ref.StorageGetAsync(
+                onFound,
+                onDoesNotExists: onDoesNotExists);
+        }
+
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, TResult> onFound,
             Func<TResult> onDoesNotExists = default,
