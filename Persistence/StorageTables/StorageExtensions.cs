@@ -452,16 +452,32 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onDoesNotExists);
         }
 
-        public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
+        //public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
+        //    Func<TEntity, TResult> onFound,
+        //    Func<TResult> onDoesNotExists = default)
+        //    where TEntity : IReferenceable
+        //{
+        //    if (!entityRefMaybe.HasValue)
+        //        return onDoesNotExists();
+        //    return await entityRefMaybe.Ref.StorageGetAsync(
+        //        onFound,
+        //        onDoesNotExists: onDoesNotExists);
+        //}
+
+        public static Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
             Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default)
-            where TEntity : IReferenceable
+            Func<TResult> onDoesNotExists = default,
+            ICacheEntites cache = default)
+            where TEntity : struct, IReferenceable
         {
-            if (!entityRefMaybe.HasValue)
-                return onDoesNotExists();
-            return await entityRefMaybe.Ref.StorageGetAsync(
+            if (!entityRefMaybe.HasValueNotNull())
+                return onDoesNotExists().AsTask();
+
+            var entityRef = entityRefMaybe.Ref;
+            return StorageGetAsync(entityRef,
                 onFound,
-                onDoesNotExists: onDoesNotExists);
+                onDoesNotExists,
+                cache: cache);
         }
 
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
@@ -641,22 +657,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .FindBy(entityRef, idsProperty);
-        }
-
-        public static Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
-            Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default,
-            ICacheEntites cache = default)
-            where TEntity : struct, IReferenceable
-        {
-            if (!entityRefMaybe.HasValueNotNull())
-                return onDoesNotExists().AsTask();
-
-            var entityRef = entityRefMaybe.Ref;
-            return StorageGetAsync(entityRef,
-                onFound,
-                onDoesNotExists,
-                cache:cache);
         }
 
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
