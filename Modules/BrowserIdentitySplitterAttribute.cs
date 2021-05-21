@@ -34,6 +34,7 @@ namespace EastFive.Azure.Auth
                    (RedirectionConfiguration[] kvps) =>
                    {
                        var redirs = kvps
+                           .NullToEmpty()
                            .Select(
                                kvp =>
                                {
@@ -45,6 +46,7 @@ namespace EastFive.Azure.Auth
                            .ToDictionary();
 
                        var lmts = kvps
+                           .NullToEmpty()
                            .Select(
                                kvp =>
                                {
