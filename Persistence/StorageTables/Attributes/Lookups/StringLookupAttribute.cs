@@ -80,6 +80,34 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     }
 
+    public class StringLookupHashXX32Attribute : StringLookupAttribute
+    {
+        /// <summary>
+        /// Limit 4
+        /// </summary>
+        private uint? charactersMaybe;
+        public uint Characters
+        {
+            get
+            {
+                if (!charactersMaybe.HasValue)
+                    return 2;
+                return charactersMaybe.Value;
+            }
+            set
+            {
+                charactersMaybe = value;
+            }
+        }
+
+        public override string GetPartitionKey(string rowKey)
+        {
+            var hash = rowKey.GetBytes().HashXX32();
+            var hashStr = hash.ToString("X");
+            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
+        }
+    }
+
     public class StringStandardPartitionLookupAttribute : StringLookupAttribute
     {
         public override string GetPartitionKey(string rowKey)

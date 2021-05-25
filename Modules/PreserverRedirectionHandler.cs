@@ -42,6 +42,7 @@ namespace EastFive.Azure.Auth
                 (RedirectionConfiguration[] kvps) =>
                 {
                     return kvps
+                        .NullToEmpty()
                         .Select(
                             kvp =>
                             {

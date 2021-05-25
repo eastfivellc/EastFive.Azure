@@ -452,18 +452,30 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onDoesNotExists);
         }
 
+        //public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
+        //    Func<TEntity, TResult> onFound,
+        //    Func<TResult> onDoesNotExists = default)
+        //    where TEntity : IReferenceable
+        //{
+        //    if (!entityRefMaybe.HasValue)
+        //        return onDoesNotExists();
+        //    return await entityRefMaybe.Ref.StorageGetAsync(
+        //        onFound,
+        //        onDoesNotExists: onDoesNotExists);
+        //}
+
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
             Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default)
-            where TEntity : IReferenceable
+            Func<TResult> onDoesNotExists = default,
+            ICacheEntites cache = default)
+            where TEntity : struct, IReferenceable
         {
-            if (entityRefMaybe.IsDefaultOrNull())
-                return onDoesNotExists();
-            if (!entityRefMaybe.HasValue)
+            if (!entityRefMaybe.HasValueNotNull())
                 return onDoesNotExists();
             return await entityRefMaybe.Ref.StorageGetAsync(
                 onFound,
-                onDoesNotExists: onDoesNotExists);
+                onDoesNotExists,
+                cache: cache);
         }
 
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
@@ -643,22 +655,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .FindBy(entityRef, idsProperty);
-        }
-
-        public static Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
-            Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default,
-            ICacheEntites cache = default)
-            where TEntity : struct, IReferenceable
-        {
-            if (!entityRefMaybe.HasValueNotNull())
-                return onDoesNotExists().AsTask();
-
-            var entityRef = entityRefMaybe.Ref;
-            return StorageGetAsync(entityRef,
-                onFound,
-                onDoesNotExists,
-                cache:cache);
         }
 
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
@@ -990,6 +986,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onSuccess,
                     onFailure: onFailure,
                     onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
+            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var rowKey = entityQuery.StorageComputeRowKey();
+            var partitionKey = entityQuery.StorageComputePartitionKey(rowKey);
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .UpdateOrCreateAsync(rowKey, partitionKey,
+                    onCreated,
+                    onModificationFailures: onModificationFailures);
         }
 
         public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
