@@ -110,6 +110,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return "1_1";
                 dateTimeValueObj = dateTimeValueObj.GetNullableValue();
             }
+
+            if (!(dateTimeValueObj is DateTime))
+                return "1_1";
+
             var dateTimeValue = (DateTime)dateTimeValueObj;
             return $"{dateTimeValue.Year}_{dateTimeValue.DayOfYear}";
         }

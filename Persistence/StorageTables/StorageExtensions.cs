@@ -457,6 +457,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TResult> onDoesNotExists = default)
             where TEntity : IReferenceable
         {
+            if (entityRefMaybe.IsDefaultOrNull())
+                return onDoesNotExists();
             if (!entityRefMaybe.HasValue)
                 return onDoesNotExists();
             return await entityRefMaybe.Ref.StorageGetAsync(

@@ -507,7 +507,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return default(Guid?);
                     }
 
-                    if (value.PropertyType == EdmType.Binary)
+                    if (value.PropertyType != EdmType.Guid)
                         return default(Guid?);
 
                     return value.GuidValue;
