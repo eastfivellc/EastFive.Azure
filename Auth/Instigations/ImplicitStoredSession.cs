@@ -133,7 +133,7 @@ namespace EastFive.Azure.Auth.Instigations
                                     performingAsActorId = default(Guid?),
                                 };
                                 var result = await onSuccess(security);
-                                result.WriteCookie("e5-session", tokenNew, TimeSpan.FromDays(365));
+                                result.AddCookie("e5-session", tokenNew, TimeSpan.FromDays(365));
                                 return result;
                             },
                             (missingConfig) => request

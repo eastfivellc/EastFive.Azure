@@ -83,7 +83,7 @@ namespace EastFive.Azure.Auth
                         return response;
                     
                     var lookupToken = matchingRedirection.Key;
-                    response.WriteCookie("e5-redirect-base", lookupToken, TimeSpan.FromDays(365));
+                    response.AddCookie("e5-redirect-base", lookupToken, TimeSpan.FromDays(365));
                     return response;
                 };
 

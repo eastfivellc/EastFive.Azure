@@ -316,6 +316,47 @@ namespace EastFive.Azure.Auth
 
         #endregion
 
+        public async static Task<Session> CreateAsync(
+            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe)
+        {
+            var session = new Session()
+            {
+                sessionId = Ref<Session>.SecureRef(),
+                refreshToken = Security.SecureGuid.Generate().ToString("N"),
+            };
+
+            return await Security.AppSettings.TokenScope.ConfigurationUri(
+                scope =>
+                {
+                    return Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes.ConfigurationDouble(
+                        async (tokenExpirationInMinutes) =>
+                        {
+                            return await await GetClaimsAsync(application, authorizationRefMaybe,
+                                (claims, accountIdMaybe, authorized) =>
+                                {
+                                    session.account = accountIdMaybe;
+                                    session.authorized = authorized;
+                                    return session.StorageCreateAsync(
+                                        (sessionIdCreated) =>
+                                        {
+                                            return Api.Auth.JwtTools.CreateToken(session.id,
+                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
+                                                (tokenNew) =>
+                                                {
+                                                    session.token = tokenNew;
+                                                    return session;
+                                                },
+                                                (missingConfig) => throw new Exception(missingConfig),
+                                                (configName, issue) => throw new Exception(issue));
+                                        });
+                                },
+                                (why) => throw new Exception(why));
+                        },
+                        (why) => throw new Exception(why));
+                },
+                (why) => throw new Exception(why));
+        }
+
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
                 IAuthApplication application,
             Func<Guid, bool, TResult> onSuccess,
