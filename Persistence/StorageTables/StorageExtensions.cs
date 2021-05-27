@@ -468,7 +468,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TEntity, TResult> onFound,
             Func<TResult> onDoesNotExists = default,
             ICacheEntites cache = default)
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             if (!entityRefMaybe.HasValueNotNull())
                 return onDoesNotExists();

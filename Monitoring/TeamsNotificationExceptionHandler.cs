@@ -295,7 +295,7 @@ namespace EastFive.Azure.Monitoring
             if (request.HasBody)
             {
                 //var contentData = await request.Content.ReadAsByteArrayAsync();
-                content = await request.Body.ReadAsStringAsync(); // .ReadAsStringAsync();
+                content = await request.Body.ReadAsStringAsync();
             }
             var utcOffset = TimeZoneInfo
                 .FindSystemTimeZoneById("Central Standard Time")

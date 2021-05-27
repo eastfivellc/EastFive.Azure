@@ -373,7 +373,7 @@ namespace EastFive.Azure.Spa
 
                 var expiresDefault = DateTime.UtcNow.AddDays(-1);
                 return onResolved(location,
-                    lookupSpaFile[fileNameSanitized], fileName.Split('/').Last(),
+                    lookupSpaFile[defaultFileName], fileName.Split('/').Last(),
                     defaultCacheControl, expiresDefault);
             }
 
