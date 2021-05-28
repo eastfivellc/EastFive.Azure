@@ -464,17 +464,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         //        onDoesNotExists: onDoesNotExists);
         //}
 
-        public static Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
+        public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
             Func<TEntity, TResult> onFound,
             Func<TResult> onDoesNotExists = default,
             ICacheEntites cache = default)
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             if (!entityRefMaybe.HasValueNotNull())
-                return onDoesNotExists().AsTask();
-
-            var entityRef = entityRefMaybe.Ref;
-            return StorageGetAsync(entityRef,
+                return onDoesNotExists();
+            return await entityRefMaybe.Ref.StorageGetAsync(
                 onFound,
                 onDoesNotExists,
                 cache: cache);
@@ -662,6 +660,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
             where TEntity : IReferenceable
         {
+            if (entityRefs.IsDefaultNullOrEmpty())
+                return EnumerableAsync.Empty<TEntity>();
+
             var partitionMember = typeof(TEntity).GetMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>())
                 .First();
@@ -686,6 +687,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 int? readAhead = default)
             where TEntity : IReferenceable
         {
+            if (entityRefs.IsDefaultNullOrEmpty())
+                return EnumerableAsync.Empty<TEntity>();
+
             var partitionMember = typeof(TEntity).GetMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>())
                 .First();

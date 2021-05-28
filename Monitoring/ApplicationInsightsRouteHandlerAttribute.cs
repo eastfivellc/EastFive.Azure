@@ -151,7 +151,7 @@ namespace EastFive.Azure.Monitoring
             {
                 try
                 {
-                    var contentData = await request.Body.ToBytesAsync();
+                    var contentData = await request.ReadContentAsync();
                     telemetryEx.Properties.Add("content", contentData.ToBase64String());
                 }
                 catch (Exception)
