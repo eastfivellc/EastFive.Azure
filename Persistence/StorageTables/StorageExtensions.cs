@@ -660,6 +660,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
             where TEntity : IReferenceable
         {
+            if (entityRefs.IsDefaultNullOrEmpty())
+                return EnumerableAsync.Empty<TEntity>();
+
             var partitionMember = typeof(TEntity).GetMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>())
                 .First();
@@ -684,6 +687,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 int? readAhead = default)
             where TEntity : IReferenceable
         {
+            if (entityRefs.IsDefaultNullOrEmpty())
+                return EnumerableAsync.Empty<TEntity>();
+
             var partitionMember = typeof(TEntity).GetMembers()
                 .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>())
                 .First();
