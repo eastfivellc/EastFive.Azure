@@ -26,7 +26,7 @@ namespace EastFive.Azure.Functions
                     :
                     new Uri(System.Web.HttpUtility.UrlDecode(refererTmp.OriginalString));
 
-            var content = await GetContentAsync();
+            var content = await request.ReadContentAsync();
             var invocationMessage = new InvocationMessage
             {
                 invocationRef = invocationMessageRef,
@@ -55,18 +55,6 @@ namespace EastFive.Azure.Functions
                 return invocationMessageSource.AsRefOptional<InvocationMessage>();
             }
 
-            async Task<byte []> GetContentAsync()
-            {
-                if (!request.Body.IsDefaultOrNull())
-                    return await request.Body.ToBytesAsync();
-                if (request.WriteBody.IsDefaultOrNull())
-                    return new byte[] { };
-                using(var stream = new MemoryStream())
-                {
-                    await request.WriteBody(stream);
-                    return stream.ToArray();
-                }
-            }
         }
 
         public static async Task<InvocationMessage> InvocationMessageCreateAsync(

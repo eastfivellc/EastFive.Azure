@@ -299,7 +299,7 @@ namespace EastFive.Azure.Functions
                         var lastExecuted = DateTime.UtcNow;
 
                         scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
-                        var httpRequest = new EastFive.Api.HttpRequest(invocationMessage.requestUri, cancellationToken)
+                        var httpRequest = new InvocationHttpRequest(invocationMessage.requestUri, cancellationToken)
                         {
                             Method = new HttpMethod(invocationMessage.method),
                         };
@@ -339,7 +339,7 @@ namespace EastFive.Azure.Functions
                         {
                             var contentJson = System.Text.Encoding.UTF8.GetString(invocationMessage.content);
                             scopedLogger.Trace(contentJson);
-                            httpRequest.Body = new MemoryStream(invocationMessage.content);
+                            httpRequest.Content = invocationMessage.content;
                             httpRequest.SetMediaType("application/json");
                         }
 
