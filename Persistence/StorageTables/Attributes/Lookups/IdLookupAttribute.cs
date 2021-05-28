@@ -6,6 +6,7 @@ using EastFive.Azure.Persistence;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
+using EastFive.Serialization;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -95,6 +96,34 @@ namespace EastFive.Persistence.Azure.StorageTables
         public override string GetPartitionKey(string rowKey)
         {
             return StandardParititionKeyAttribute.GetValue(rowKey);
+        }
+    }
+
+    public class IdHashXX32LookupAttribute : IdLookupAttribute
+    {
+        /// <summary>
+        /// Limit 4
+        /// </summary>
+        private uint? charactersMaybe;
+        public uint Characters
+        {
+            get
+            {
+                if (!charactersMaybe.HasValue)
+                    return 2;
+                return charactersMaybe.Value;
+            }
+            set
+            {
+                charactersMaybe = value;
+            }
+        }
+
+        public override string GetPartitionKey(string rowKey)
+        {
+            var hash = rowKey.GetBytes().HashXX32();
+            var hashStr = hash.ToString("X");
+            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
         }
     }
 
