@@ -249,157 +249,25 @@ namespace EastFive.Azure.Spa
             }
         }
 
-        public async Task InvokeAsync(HttpContext context,
+        public Task InvokeAsync(HttpContext context,
             Microsoft.AspNetCore.Hosting.IHostingEnvironment environment)
         {
             if (ShouldSkip())
-            {
-                await this.continueAsync(context);
-                return;
-            }
+                return this.continueAsync(context);
 
             var requestPath = context.Request.Path.Value;
 
-            var taskToProcess = SpaHandler.routes
-                .NullToEmpty()
-                .First(
-                    (aliasPath, next) =>
-                    {
-                        if (requestPath.StartsWith(aliasPath.routePrefix, StringComparison.OrdinalIgnoreCase))
-                            return ResolveFilePathAsync(aliasPath);
-
-                        if (!context.Request.Headers.ContainsKey("Referer"))
-                            return next();
-
-                        var referers = context.Request.Headers["Referer"];
-                        if (!referers.Any())
-                            return next();
-
-                        //var referer = referers.First();
-                        //if (referer.EndsWith(aliasPath.routePrefix, StringComparison.OrdinalIgnoreCase))
-                        //{
-                        //    var referrerBasedFileName = $"{aliasPath.contentPath}{requestPath.TrimStart('/')}";
-                        //    return ProcessAsync(referrerBasedFileName, aliasPath.defaultFile);
-                        //}
-
-                        return next();
-                    },
-                    () =>
-                    {
-                        if(!defaultRoute.HasValue)
-                            return this.continueAsync(context);
-                        return ResolveFilePathAsync(defaultRoute.Value);
-                    });
-            await taskToProcess;
-            return;
-
-            Task ResolveFilePathAsync(Route route)
-            {
-                var fileName = ResolvePathFromRoute(route);
-                return ProcessAsync(fileName, route.defaultFile);
-            }
-
-            string ResolvePathFromRoute(Route route)
-            {
-                var subPath = requestPath.Substring(route.routePrefix.Length);
-                if (subPath.IsDefaultNullOrEmpty())
-                    return route.indexFile;
-                if (subPath == "/")
-                    return route.indexFile;
-                return $"{route.contentPath}{subPath}";
-            }
-
-            async Task ProcessAsync(string fileName, string defaultFile)
-            {
-                var request = context.Request;
-                if (FileIsInSpa(out string fileNameSanitized))
+            return FileFromPath(requestPath,
+                onResolved: (prefix, fileData, fileName, cacheControl, expiration) =>
                 {
-                    var immutableDays = EastFive.Azure.AppSettings.SPA.FilesExpirationInDays.ConfigurationDouble(
-                        d => d,
-                        onNotSpecified: () => 1.0);
-                    context.Response.GetTypedHeaders().CacheControl = 
-                        new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
-                        {
-                            MaxAge = TimeSpan.FromDays(immutableDays),
-                            SharedMaxAge = TimeSpan.FromDays(immutableDays),
-                            MustRevalidate = false,
-                            NoCache = false,
-                            NoStore = false,
-                            NoTransform = true,
-                            Private = false,
-                            Public = true,
-                        };
-                    await ServeFromSpaZipAsync(lookupSpaFile[fileNameSanitized],
-                        fileNameSanitized, context, request);
-
-                    return;
-                }
-
-                //if (dynamicServe)
-                //{
-                //    var responseHtml = request.CreateHtmlResponse(EastFive.Azure.Properties.Resources.indexPage);
-                //    await responseHtml.WriteToContextAsync(context);
-                //    return;
-                //}
-
-                await ServerDefaultFile();
-
-                async Task ServerDefaultFile()
-                {
-                    context.Response.GetTypedHeaders().CacheControl = 
-                        new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
-                        {
-                            MaxAge = TimeSpan.FromSeconds(0.0),
-                            SharedMaxAge = TimeSpan.FromSeconds(0.0),
-                            MustRevalidate = true,
-                            NoCache = true,
-                            NoStore = true,
-                            NoTransform = true,
-                            Private = false,
-                            Public = true,
-                        };
-                    context.Response.GetTypedHeaders().Expires = DateTime.UtcNow.AddDays(-1);
-                    //context.Response.GetTypedHeaders().Pragma.Add(
-                    //    new System.Net.Http.Headers.NameValueHeaderValue("no-cache"));
-
-                    await ServeFromSpaZipAsync(lookupSpaFile[defaultFile], defaultFile, context, request);
-                    return;
-                }
-
-                bool FileIsInSpa(out string fileNameSanitized)
-                {
-                    if (fileName.IsDefaultNullOrEmpty())
-                    {
-                        fileNameSanitized = default;
-                        return false;
-                    }
-                    fileNameSanitized = fileName.Replace("//", "/");
-                    return lookupSpaFile.ContainsKey(fileNameSanitized);
-                }
-            }
-
-            async Task ServeFromSpaZipAsync(byte[] fileData, string spaFileName,
-                HttpContext context, Microsoft.AspNetCore.Http.HttpRequest request)
-            {
-                var acceptHeaders = request.GetTypedHeaders().Accept;
-
-                var mimeType = acceptHeaders.Any() ?
-                    extensionsMimeTypes
-                        .Where(kvp => spaFileName.EndsWith(kvp.Key))
-                        .First(
-                            (kvp, next) => kvp.Value,
-                            () =>
-                            {
-                                return acceptHeaders.First().MediaType.ToString();
-                            })
-                        :
-                        string.Empty;
-                context.Response.StatusCode = 200;
-                if(!mimeType.IsDefaultNullOrEmpty())
-                    context.Response.ContentType = mimeType;
-                context.Response.Headers.Add("Content-Disposition", $"filename=\"{spaFileName}\"");
-                await context.Response.Body.WriteAsync(fileData);
-            }
+                    context.Response.GetTypedHeaders().CacheControl = cacheControl;
+                    context.Response.GetTypedHeaders().Expires = expiration;
+                    return ServeFromSpaZipAsync(fileData, fileName, context);
+                },
+                onDidNotResolve: () =>
+                 {
+                     return this.continueAsync(context);
+                 });
 
             bool ShouldSkip()
             {
@@ -420,6 +288,119 @@ namespace EastFive.Azure.Spa
                 var isAzureApp = this.app is IAzureApplication;
                 return !isAzureApp;
             }
+            
+        }
+
+        public static TResult FileFromPath<TResult>(string requestPath,
+            Func<
+                    string,
+                    byte [], 
+                    string,
+                    Microsoft.Net.Http.Headers.CacheControlHeaderValue, 
+                    DateTimeOffset?,
+                TResult> onResolved,
+            Func<TResult> onDidNotResolve)
+        {
+            signal.WaitOne();
+            return SpaHandler.routes
+                .NullToEmpty()
+                .First(
+                    (aliasPath, next) =>
+                    {
+                        if (!requestPath.StartsWith(aliasPath.routePrefix, StringComparison.OrdinalIgnoreCase))
+                            return next();
+
+                        return LoadFile(aliasPath);
+                    },
+                    () =>
+                    {
+                        if (!defaultRoute.HasValue)
+                            return onDidNotResolve();
+
+                        return LoadFile(defaultRoute.Value);
+                    });
+
+            bool FileIsInSpa(string fileName, out string fileNameSanitized)
+            {
+                if (fileName.IsDefaultNullOrEmpty())
+                {
+                    fileNameSanitized = default;
+                    return false;
+                }
+                fileNameSanitized = fileName.Replace("//", "/");
+                return lookupSpaFile.ContainsKey(fileNameSanitized);
+            }
+
+            TResult LoadFile(Route route)
+            {
+                var fileName = route.ResolveRoute(requestPath);
+                var defaultFileName = route.defaultFile;
+                var location = route.ResolveLocation(fileName);
+                if (FileIsInSpa(fileName, out string fileNameSanitized))
+                {
+                    var immutableDays = EastFive.Azure.AppSettings.SPA.FilesExpirationInDays.ConfigurationDouble(
+                        d => d,
+                        onNotSpecified: () => 1.0);
+                    var cacheControl =
+                        new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+                        {
+                            MaxAge = TimeSpan.FromDays(immutableDays),
+                            SharedMaxAge = TimeSpan.FromDays(immutableDays),
+                            MustRevalidate = false,
+                            NoCache = false,
+                            NoStore = false,
+                            NoTransform = true,
+                            Private = false,
+                            Public = true,
+                        };
+                    
+                    return onResolved(location, 
+                        lookupSpaFile[fileNameSanitized], fileName.Split('/').Last(), 
+                        cacheControl, default);
+                }
+
+                var defaultCacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    MaxAge = TimeSpan.FromSeconds(0.0),
+                    SharedMaxAge = TimeSpan.FromSeconds(0.0),
+                    MustRevalidate = true,
+                    NoCache = true,
+                    NoStore = true,
+                    NoTransform = true,
+                    Private = false,
+                    Public = true,
+                };
+
+                var expiresDefault = DateTime.UtcNow.AddDays(-1);
+                return onResolved(location,
+                    lookupSpaFile[defaultFileName], fileName.Split('/').Last(),
+                    defaultCacheControl, expiresDefault);
+            }
+
+        }
+
+        public static async Task ServeFromSpaZipAsync(byte[] fileData, string spaFileName,
+            HttpContext context)
+        {
+            var request = context.Request;
+            var acceptHeaders = request.GetTypedHeaders().Accept;
+
+            var mimeType = acceptHeaders.Any() ?
+                extensionsMimeTypes
+                    .Where(kvp => spaFileName.EndsWith(kvp.Key))
+                    .First(
+                        (kvp, next) => kvp.Value,
+                        () =>
+                        {
+                            return acceptHeaders.First().MediaType.ToString();
+                        })
+                    :
+                    string.Empty;
+            context.Response.StatusCode = 200;
+            if (!mimeType.IsDefaultNullOrEmpty())
+                context.Response.ContentType = mimeType;
+            context.Response.Headers.Add("Content-Disposition", $"filename=\"{spaFileName}\"");
+            await context.Response.Body.WriteAsync(fileData);
         }
 
         public static byte[] GetSpaFile(string path)
