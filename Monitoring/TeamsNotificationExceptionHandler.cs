@@ -77,9 +77,16 @@ namespace EastFive.Azure.Monitoring
             }
 
 
-            bool HasReportableError() =>
-                ((int)response.StatusCode) >= 400 &&
-                response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+            bool HasReportableError()
+            {
+                if (((int)response.StatusCode) < 400)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                    return false;
+                return true;
+            }
             
             bool RequestTeamsNotify() => teamsNotifyParam != default;
             bool ShouldNotify()
@@ -291,12 +298,8 @@ namespace EastFive.Azure.Monitoring
                 .ConfigurationString(
                     x => new Uri(x),
                     (why) => default);
-            var content = string.Empty;
-            if (request.HasBody)
-            {
-                //var contentData = await request.Content.ReadAsByteArrayAsync();
-                content = await request.Body.ReadAsStringAsync();
-            }
+            var content = await ReadContentAsync();
+            
             var utcOffset = TimeZoneInfo
                 .FindSystemTimeZoneById("Central Standard Time")
                 .GetUtcOffset(DateTime.UtcNow);
@@ -424,7 +427,25 @@ namespace EastFive.Azure.Monitoring
                 }
             };
             return message;
-        }
 
+            async Task<string> ReadContentAsync()
+            {
+                if (!request.HasBody) 
+                    return string.Empty;
+
+                try
+                {
+                    if (request.RequestHeaders.ContentType.IsTextType())
+                        return await request.ReadContentAsStringAsync();
+
+                    var byteContent = await request.ReadContentAsync();
+                    return byteContent.ToBase64String();
+                }
+                catch (Exception)
+                {
+                    return string.Empty;
+                }
+            }
+        }
     }
 }
