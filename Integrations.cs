@@ -360,8 +360,8 @@ namespace EastFive.Azure.Auth
                     Guid accountId, IDictionary<string, string> parameters,
                 Func<Integration, Authorization, TResult> onCreated,
                 Func<TResult> onIntegrationAlreadyExists,
-                Func<TResult> onAuthorizationAlreadyExists,
-                Func<string, TResult> onFailure)
+                Func<TResult> onAuthorizationAlreadyExists = default,
+                Func<string, TResult> onFailure = default)
             {
                 var authorization = new Authorization
                 {
@@ -385,9 +385,19 @@ namespace EastFive.Azure.Auth
                                 accountId,
                             () => onCreated(integration, authorization),
                             () => onIntegrationAlreadyExists(),
-                            (why) => onFailure(why));
+                            (why) =>
+                            {
+                                if (why.IsDefaultOrNull())
+                                    throw new Exception(why);
+                                return onFailure(why);
+                            });
                     },
-                    () => onAuthorizationAlreadyExists().AsTask());
+                    () =>
+                    {
+                        if (onAuthorizationAlreadyExists.IsDefaultOrNull())
+                            throw new Exception("Could not create authorization that already exists.");
+                        return onAuthorizationAlreadyExists().AsTask();
+                    });
             }
 
             public static Task<TResult> CreateByMethodAndKeyAsync<TResult>(IRef<Method> methodRef,
