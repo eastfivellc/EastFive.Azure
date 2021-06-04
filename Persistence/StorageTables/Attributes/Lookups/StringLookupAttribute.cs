@@ -13,6 +13,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public bool IgnoreNull { get; set; }
 
+        public bool IgnoreNullWhiteSpace { get; set; }
+
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -28,6 +30,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var rowKey = (string)rowKeyValue;
                 
                 if (IgnoreNull && rowKey.IsDefaultOrNull())
+                    return Enumerable.Empty<IRefAst>();
+
+                if(IgnoreNullWhiteSpace && rowKey.IsNullOrWhiteSpace())
                     return Enumerable.Empty<IRefAst>();
 
                 var partitionKey = GetPartitionKey(rowKey);
@@ -117,5 +122,27 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     }
 
+    public class StringConstantPartitionLookupAttribute : StringLookupAttribute
+    {
+        private string partition;
+        public string Partition
+        {
+            get
+            {
+                if (partition.HasBlackSpace())
+                    return partition;
+                return "-";
+            }
+            set
+            {
+                partition = value;
+            }
+        }
+
+        public override string GetPartitionKey(string rowKey)
+        {
+            return Partition;
+        }
+    }
 
 }

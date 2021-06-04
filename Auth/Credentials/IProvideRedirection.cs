@@ -20,6 +20,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<Uri, KeyValuePair<string,string>[], TResult> onSuccess,
             Func<TResult> onIgnored,
             Func<string, string, TResult> onInvalidParameter,
+            Func<TResult> onInvalidAccount,
             Func<string, TResult> onFailure);
     }
 }
