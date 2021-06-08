@@ -52,6 +52,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var stringValue = (string)memberValue;
                 return stringValue;
             }
+            if(propertyValueType.IsEnum)
+            {
+                var stringValue = Enum.GetName(propertyValueType, memberValue);
+                return stringValue;
+            }
             var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
                 $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
             throw new NotImplementedException(exMsg);
