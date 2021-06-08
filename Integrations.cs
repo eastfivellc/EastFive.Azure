@@ -277,7 +277,7 @@ namespace EastFive.Azure.Auth
                 accountIntegrationLookup =>
                 {
                     var kvps = accountIntegrationLookup.integrationRefs
-                        .StorageGet()
+                        .StorageGet(readAhead: 10)
                         .Where(integration => integration.authorization.HasValue)
                         .Select(
                             integration =>
@@ -289,7 +289,7 @@ namespace EastFive.Azure.Auth
                                     },
                                     () => default(KeyValuePair<Integration, Authorization>?));
                             })
-                        .Await()
+                        .Await(readAhead: 10)
                         .SelectWhereHasValue();
                     return onSuccess(kvps);
                 },
