@@ -22,13 +22,17 @@ namespace EastFive.Azure.Persistence
         public static Task<IHttpResponse> HttpGetAsync<TResource>(
                 this IRef<TResource> resourceRef,
             ContentTypeResponse<TResource> onFound,
-            NotFoundResponse onNotFound)
+            NotFoundResponse onNotFound,
+                Func<TResource, TResource> mutation = default)
             where TResource : IReferenceable
         {
             return resourceRef.StorageGetAsync(
                 (resource) =>
                 {
-                    return onFound(resource);
+                    if(mutation.IsDefaultOrNull())
+                        return onFound(resource);
+                    var updatedResource = mutation(resource);
+                    return onFound(updatedResource);
                 },
                 () => onNotFound());
         }
@@ -44,6 +48,17 @@ namespace EastFive.Azure.Persistence
                 .IfThen(!select.IsDefaultOrNull(),
                         ress => ress.Select(select))
                 .HttpResponse(onFound);
+        }
+
+        public static Task<IHttpResponse> HttpPostAsync<TResource>(
+                this TResource resource,
+            CreatedResponse onCreated,
+            AlreadyExistsResponse onAlreadyExists)
+            where TResource : IReferenceable
+        {
+            return resource.StorageCreateAsync(
+                discard => onCreated(),
+                onAlreadyExists: () => onAlreadyExists());
         }
 
         public static Task<IHttpResponse> HttpPostAsync<TResource>(
@@ -75,6 +90,17 @@ namespace EastFive.Azure.Persistence
                     await saveAsync(resource);
                     return onUpdated(resource);
                 },
+                () => onNotFound());
+        }
+
+        public static Task<IHttpResponse> HttpDeleteAsync<TResource>(
+                this IRef<TResource> resourceRef,
+            NoContentResponse onDeleted,
+            NotFoundResponse onNotFound)
+            where TResource : IReferenceable
+        {
+            return resourceRef.StorageDeleteAsync(
+                () => onDeleted(),
                 () => onNotFound());
         }
     }
