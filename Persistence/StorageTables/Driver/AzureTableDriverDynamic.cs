@@ -2921,11 +2921,59 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #region BLOB
 
-        async Task<BlobClient> GetBlobClientAsync(string containerReference, string blockId)
+        async Task<BlobClient> GetBlobClientAsync(string containerReference, string blobName)
         {
             var container = BlobClient.GetBlobContainerClient(containerReference);
             var createResponse = await container.CreateIfNotExistsAsync();
-            return container.GetBlobClient(blockId);
+            return container.GetBlobClient(blobName);
+        }
+
+        public Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, Guid blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateOrUpdateAsync(
+                    content, blobId.ToString("N"), containerName,
+                onSuccess,
+                onFailure,
+                contentType,
+                metadata,
+                onTimeout);
+
+        public async Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, string blobName, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
+                using (var stream = new MemoryStream(content))
+                {
+                    var result = await blockClient.UploadAsync(stream,
+                        new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+                        {
+                            Metadata = metadata,
+                            HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                            {
+                                ContentType = contentType,
+                            }
+                        });
+                }
+                return onSuccess();
+            }
+            catch (StorageException ex)
+            {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseStorageException(
+                    (errorCode, errorMessage) =>
+                        onFailure(errorCode, errorMessage),
+                    () => throw ex);
+            }
         }
 
         public Task<TResult> BlobCreateAsync<TResult>(byte[] content, Guid blobId, string containerName,
@@ -2941,7 +2989,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     onFailure: onFailure,
                         contentType: contentType, metadata: metadata, onTimeout: onTimeout);
 
-        public async Task<TResult> BlobCreateAsync<TResult>(byte[] content, string blobId, string containerName,
+        public async Task<TResult> BlobCreateAsync<TResult>(byte[] content, string blobName, string containerName,
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -2951,7 +2999,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             try
             {
-                var blockClient = await GetBlobClientAsync(containerName, blobId);
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
 
                 if (await blockClient.ExistsAsync())
                 {
@@ -2991,9 +3039,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
-        {
-            return BlobCreateAsync(blobId, containerName,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobId, containerName,
                     stream => content.CopyToAsync(stream),
                 onSuccess: onSuccess,
                 onAlreadyExists: onAlreadyExists,
@@ -3001,7 +3047,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 contentType: contentType,
                 metadata: metadata,
                 onTimeout: onTimeout);
-        }
 
         public async Task<TResult> BlobCreateAsync<TResult>(Guid blobId, string containerName,
                 Func<Stream, Task> writeAsync,
@@ -3051,18 +3096,64 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
+        public Task<TResult> BlobInformationAsync<TResult>(Guid blobId, string containerName,
+            Func<BlobProperties, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobInformationAsync(
+                    blobId.ToString("N"), containerName,
+                onFound,
+                onNotFound,
+                onFailure,
+                onTimeout);
+
+        public async Task<TResult> BlobInformationAsync<TResult>(string blobName, string containerName,
+            Func<BlobProperties, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
+                var properties = await blockClient.GetPropertiesAsync();
+                return onFound(properties.Value);
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseExtendedErrorInformation(
+                    (codes, why) =>
+                    {
+                        return onFailure(codes, why);
+                    },
+                    () =>
+                    {
+                        var isNotFound = ex.Message
+                            .ToLower()
+                            .Contains("not found");
+                        if (isNotFound)
+                            return onNotFound();
+
+                        return onFailure(ExtendedErrorInformationCodes.Other, ex.Message);
+                    });
+            }
+        }
+
         public Task<TResult> BlobLoadBytesAsync<TResult>(Guid blobId, string containerName,
             Func<byte[], string, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadBytesAsync(
-                blobId.ToString("N"), containerName,
-                onFound, onNotFound,
+                    blobId.ToString("N"), containerName,
+                (bytes, properties) => onFound(bytes, properties.ContentType),
+                onNotFound,
                 onFailure: onFailure,
                 onTimeout: onTimeout);
 
         public async Task<TResult> BlobLoadBytesAsync<TResult>(string blobName, string containerName,
-            Func<byte[], string, TResult> onFound,
+            Func<byte[], BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
@@ -3080,9 +3171,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         }
                     }))
                 {
-                    var properties = await blockClient.GetPropertiesAsync();
+                    var propertiesTask = blockClient.GetPropertiesAsync();
                     var bytes = await returnStream.ToBytesAsync();
-                    return onFound(bytes, properties.Value.ContentType);
+                    var properties = await propertiesTask;
+                    return onFound(bytes, properties.Value);
                 }
             }
             catch (global::Azure.RequestFailedException ex)
@@ -3109,8 +3201,28 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         /// <param name="onFailure"></param>
         /// <param name="onTimeout"></param>
         /// <returns></returns>
-        public async Task<TResult> BlobLoadStreamAsync<TResult>(Guid blobId, string containerName,
+        public Task<TResult> BlobLoadStreamAsync<TResult>(Guid blobId, string containerName,
             Func<System.IO.Stream, string, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
+                (stream, properties) => onFound(stream, properties.ContentType),
+                onNotFound,
+                onFailure,
+                onTimeout);
+
+        public Task<TResult> BlobLoadStreamAsync<TResult>(Guid blobId, string containerName,
+            Func<System.IO.Stream, string, IDictionary<string, string>, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
+                (stream, properties) => onFound(stream, properties.ContentType, properties.Metadata),
+                onNotFound,
+                onFailure,
+                onTimeout);
+
+        public async Task<TResult> BlobLoadStreamAsync<TResult>(string blobName, string containerName,
+            Func<System.IO.Stream, BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
@@ -3118,8 +3230,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 var blockClient = await GetBlobClientAsync(
-                    containerName, blobId.ToString("N"));
-                var returnStream = await blockClient.OpenReadAsync(
+                    containerName, blobName);
+                var returnStreamTask = blockClient.OpenReadAsync(
                     new BlobOpenReadOptions(true)
                     {
                         Conditions = new BlobRequestConditions()
@@ -3127,7 +3239,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         }
                     });
                 var properties = await blockClient.GetPropertiesAsync();
-                return onFound(returnStream, properties.Value.ContentType);
+                var returnStream = await returnStreamTask;
+                return onFound(returnStream, properties.Value);
             }
             catch (StorageException ex)
             {
@@ -3142,32 +3255,26 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        public async Task<TResult> BlobLoadStreamAsync<TResult>(Guid blobId, string containerName,
-            Func<System.IO.Stream, string, IDictionary<string, string>, TResult> onFound,
-            Func<TResult> onNotFound = default,
-            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+        public Task<TResult> BlobDeleteIfExistsAsync<TResult>(Guid blobId, string containerName,
+            Func<bool, // existed
+                TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default) => BlobDeleteIfExistsAsync(blobId.ToString("N"), containerName,
+                onSuccess,
+                onFailure);
+
+        public async Task<TResult> BlobDeleteIfExistsAsync<TResult>(string blobName, string containerName,
+            Func<bool, // existed
+                TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
         {
             try
             {
-                var blockClient = await GetBlobClientAsync(
-                    containerName, blobId.ToString("N"));
-                var returnStream = await blockClient.OpenReadAsync(
-                    new BlobOpenReadOptions(true)
-                    {
-                        Conditions = new BlobRequestConditions()
-                        {
-                        }
-                    });
-                var properties = await blockClient.GetPropertiesAsync();
-                return onFound(returnStream, 
-                    properties.Value.ContentType, properties.Value.Metadata);
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
+                var result = await blockClient.DeleteIfExistsAsync();
+                return onSuccess(result.Value);
             }
             catch (StorageException ex)
             {
-                if (ex.IsProblemDoesNotExist())
-                    if (!onNotFound.IsDefaultOrNull())
-                        return onNotFound();
                 if (onFailure.IsDefaultOrNull())
                     throw;
                 return ex.ParseExtendedErrorInformation(
@@ -3180,4 +3287,3 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
     }
 }
-
