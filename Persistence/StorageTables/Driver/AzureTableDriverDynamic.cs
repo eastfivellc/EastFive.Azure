@@ -1785,7 +1785,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             if (table.IsDefaultOrNull())
                 table = GetTable<TEntity>();
-            var tasks = rowKeys
+            return rowKeys
                 .Select(
                     rowKey =>
                     {
@@ -1794,12 +1794,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             () => default,
                             table: table,
                             onTimeout: onTimeout);
-                    });
-            var enumAsync = readAhead.HasValue ?
-                tasks.AsyncEnumerable(readAhead.Value) :
-                tasks.AsyncEnumerable();
-
-            return enumAsync
+                    })
+                .AsyncEnumerable(readAhead.HasValue? readAhead.Value : 0)
                 .SelectWhereHasValue()
                 .SelectValues();
         }
