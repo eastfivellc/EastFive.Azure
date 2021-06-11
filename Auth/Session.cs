@@ -324,6 +324,7 @@ namespace EastFive.Azure.Auth
             {
                 sessionId = Ref<Session>.SecureRef(),
                 refreshToken = Security.SecureGuid.Generate().ToString("N"),
+                authorization = authorizationRefMaybe,
             };
 
             return await Security.AppSettings.TokenScope.ConfigurationUri(
