@@ -176,7 +176,7 @@ namespace EastFive.Azure.Auth
                         .Append(
                             authorizationRef.id.ToString().PairWithKey("state"))
                         .ToDictionary();
-                    //var authorizationRequestManager = application.AuthorizationRequestManager;
+
                     return Redirection.AuthenticationAsync(
                             method,
                             paramsUpdated,

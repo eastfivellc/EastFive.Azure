@@ -43,6 +43,7 @@ namespace EastFive.Azure.Auth
 
         public const string AccountPropertyName = "account";
         [JsonProperty(PropertyName = AccountPropertyName)]
+        [ApiProperty(PropertyName = AccountPropertyName)]
         [Storage(Name = AccountPropertyName)]
         [ScopedLookup(AccountPropertyName, partitionScope: CreatedScopeName)]
         [ScopeId(AccountPropertyName, IgnoreNullOrDefault = true)]

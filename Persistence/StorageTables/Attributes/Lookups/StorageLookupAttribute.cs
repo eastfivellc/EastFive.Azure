@@ -1,5 +1,4 @@
 ﻿using BlackBarLabs;
-using BlackBarLabs.Extensions;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;

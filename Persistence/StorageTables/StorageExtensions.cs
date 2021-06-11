@@ -511,8 +511,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var queryById = query.StorageQueryById(entityRef);
             var queryFull = additionalProperties(queryById);
             var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
-            return await AzureTableDriverDynamic
-                .FromSettings()
+            return await storageDriver
                 .FindByIdAsync(rowKey, partitionKey,
                     onFound: (TEntity entity, TableResult tableResult) => onFound(entity),
                     onNotFound: onDoesNotExists);
@@ -710,8 +709,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         return rowKey.AsAstRef(partitionKey);
                     })
                 .ToArray();
-            return AzureTableDriverDynamic
-                .FromSettings()
+            return storageDriver
                 .FindByIdsAsync<TEntity>(keys, readAhead: readAhead);
         }
 
@@ -838,8 +836,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var queryById = query.StorageQueryById(entityRef);
             var queryFull = additionalProperties(queryById);
             var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
-            return AzureTableDriverDynamic
-                .FromSettings()
+            return storageDriver
                 .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
                     onCreated,
                     default);
@@ -1332,7 +1329,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     return rollbackValues.TransactionResultSuccess<TResult>();
                 },
                 () => onNotFound().TransactionResultFailure());
-            
         }
 
         public static async Task<ITransactionResult<TResult>> StorageCreateTransactionAsync<TEntity, TResult>(this TEntity entity,

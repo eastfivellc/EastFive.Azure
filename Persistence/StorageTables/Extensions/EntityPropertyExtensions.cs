@@ -448,7 +448,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var stringValue = value.StringValue;
                 try
                 {
-                    var tzi = TimeZoneInfo.FindSystemTimeZoneById(stringValue);
+                    var tzi = stringValue.FindSystemTimeZone();
                     return onBound(tzi);
                 }
                 catch(Exception)

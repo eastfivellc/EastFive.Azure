@@ -33,10 +33,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = null)
         {
+            var blobName = blobRef.Id;
             return AzureTableDriverDynamic
                 .FromSettings()
-                .BlobLoadBytesAsync(blobRef.Id, blobRef.ContainerName,
-                    onSuccess,
+                .BlobLoadBytesAsync(blobName, blobRef.ContainerName,
+                    (bytes, properties) => onSuccess(bytes, properties.ContentType),
                     onNotFound,
                     onFailure: onFailure,
                     onTimeout: onTimeout);
