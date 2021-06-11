@@ -992,7 +992,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
-            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
+            Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
+            Func<TResult> onDoesNotExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
             where TEntity : IReferenceable
@@ -1001,9 +1002,54 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             var partitionKey = entityQuery.StorageComputePartitionKey(rowKey);
             return AzureTableDriverDynamic
                 .FromSettings()
-                .UpdateOrCreateAsync(rowKey, partitionKey,
-                    onCreated,
+                .UpdateAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageUpdateTableResult(tr);
+                                });
+                        },
+                    onNotFound: onDoesNotExists,
                     onModificationFailures: onModificationFailures);
+        }
+
+        public static async Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+            Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
+            Func<TResult> onDoesNotExists = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            if (entityRef.IsDefaultOrNull())
+                return onDoesNotExists();
+
+            var rowKey = entityRef.StorageComputeRowKey();
+
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryById = query.StorageQueryById(entityRef);
+            var queryFull = additionalProperties(queryById);
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+            return await storageDriver
+                .UpdateAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageUpdateTableResult(tr);
+                                });
+                        },
+                    onNotFound:onDoesNotExists,
+                    onModificationFailures:onModificationFailures,
+                    onFailure:onFailure);
         }
 
         public static Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
