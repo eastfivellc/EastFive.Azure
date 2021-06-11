@@ -171,14 +171,12 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onGeneralFailure,
             TelemetryClient telemetry)
         {
-            authorization.authorized = true;
-            authorization.LocationAuthentication = null;
-
-            var result = await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
-                    authorization,
+            return await await IdentifyAccountAsync(authorization,
+                authentication, externalAccountKey, extraParams,
+                application, loginProvider, baseUri,
 
                 // Found
-                async internalAccountId =>
+                async (internalAccountId, onRecreate) =>
                 {
                     authorization.parameters = extraParams;
                     authorization.accountIdMaybe = internalAccountId;
@@ -196,11 +194,199 @@ namespace EastFive.Azure.Auth
                                 await saveAsync(authorization);
                                 return onGeneralFailure(why);
                             },
-                            ()=> OnNotFound(true),
+                            async () =>
+                            {
+                                if (onRecreate.IsDefaultOrNull())
+                                {
+                                    await saveAsync(authorization);
+                                    return onGeneralFailure(
+                                        "System is mapped to an invalid account.");
+                                }
+                                return await await onRecreate(true);
+                            },
                             telemetry);
                 },
+
+                // Created
+                async (internalAccountId) =>
+                {
+                    authorization.parameters = extraParams;
+                    await saveAsync(authorization);
+                    return await CreateLoginResponseAsync(
+                                            internalAccountId, extraParams,
+                                            authentication, authorization,
+                                            application, request, endpoints, baseUri, loginProvider,
+                                        (url, modifier) => onRedirect(url, internalAccountId, modifier),
+                                        onGeneralFailure,
+                                        () => onGeneralFailure("An invalid account mapping was created."),
+                                        telemetry);
+                },
+
+                // Allow self serve
+                async () =>
+                {
+                    authorization.parameters = extraParams;
+                    await saveAsync(authorization);
+                    return await CreateLoginResponseAsync(
+                            default(Guid?), extraParams,
+                            authentication, authorization,
+                            application, request, endpoints, baseUri, loginProvider,
+                        (url, modifier) => onRedirect(url, default(Guid?), modifier),
+                        onGeneralFailure,
+                        () => onGeneralFailure("The system created an invalid account."),
+                            telemetry);
+                },
+
+                // Intercept process
+                async (interceptionUrl) =>
+                {
+                    authorization.parameters = extraParams;
+                    await saveAsync(authorization);
+                    return onRedirect(interceptionUrl, default, m => m);
+                },
+
+                // Failure
+                async (why) =>
+                {
+                    // Save params so they can be used later
+                    authorization.parameters = extraParams;
+                    await saveAsync(authorization);
+                    return onGeneralFailure(why);
+                },
+                    telemetry: telemetry);
+
+            //authorization.authorized = true;
+            //authorization.LocationAuthentication = null;
+
+            //var result = await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
+            //        authorization,
+
+            //    // Found
+            //    async internalAccountId =>
+            //    {
+            //        authorization.parameters = extraParams;
+            //        authorization.accountIdMaybe = internalAccountId;
+            //        return await await CreateLoginResponseAsync(
+            //                    internalAccountId, extraParams,
+            //                    authentication, authorization,
+            //                    application, request, endpoints, baseUri, loginProvider,
+            //                async (url, modifier) =>
+            //                {
+            //                    await saveAsync(authorization);
+            //                    return onRedirect(url, internalAccountId, modifier);
+            //                },
+            //                async (why) =>
+            //                {
+            //                    await saveAsync(authorization);
+            //                    return onGeneralFailure(why);
+            //                },
+            //                ()=> OnNotFound(true),
+            //                telemetry);
+            //    },
+            //    () => OnNotFound(false));
+            //return result;
+
+            //async Task<TResult> OnNotFound(bool isAccountInvalid)
+            //{
+            //    return await await UnmappedCredentialAsync(externalAccountKey, extraParams,
+            //                authentication, authorization,
+            //                loginProvider, application, baseUri,
+
+            //            // Create mapping
+            //            async (internalAccountId) =>
+            //            {
+            //                authorization.parameters = extraParams;
+            //                authorization.accountIdMaybe = internalAccountId;
+            //                await saveAsync(authorization);
+            //                return await await AccountMapping.CreateByMethodAndKeyAsync(
+            //                        authorization, externalAccountKey, internalAccountId,
+            //                    () =>
+            //                    {
+            //                        return CreateLoginResponseAsync(
+            //                                internalAccountId, extraParams,
+            //                                authentication, authorization,
+            //                                application, request, endpoints, baseUri, loginProvider,
+            //                            (url, modifier) => onRedirect(url, internalAccountId, modifier),
+            //                            onGeneralFailure,
+            //                            () => onGeneralFailure("An invalid account mapping was created."),
+            //                            telemetry);
+            //                    },
+            //                    () =>
+            //                    {
+            //                        return CreateLoginResponseAsync(
+            //                                internalAccountId, extraParams,
+            //                                authentication, authorization,
+            //                                application, request, endpoints, baseUri, loginProvider,
+            //                            (url, modifier) => onRedirect(url, internalAccountId, modifier),
+            //                            onGeneralFailure,
+            //                            () => onGeneralFailure("System is mapped to an invalid account."),
+            //                            telemetry);
+            //                    },
+            //                        isAccountInvalid);
+            //            },
+
+            //            // Allow self serve
+            //            async () =>
+            //            {
+            //                authorization.parameters = extraParams;
+            //                await saveAsync(authorization);
+            //                return await CreateLoginResponseAsync(
+            //                        default(Guid?), extraParams,
+            //                        authentication, authorization,
+            //                        application, request, endpoints, baseUri, loginProvider,
+            //                    (url, modifier) => onRedirect(url, default(Guid?), modifier),
+            //                    onGeneralFailure,
+            //                    () => onGeneralFailure("The system created an invalid account."),
+            //                        telemetry);
+            //            },
+
+            //            // Intercept process
+            //            async (interceptionUrl) =>
+            //            {
+            //                authorization.parameters = extraParams;
+            //                await saveAsync(authorization);
+            //                return onRedirect(interceptionUrl, default, m => m);
+            //            },
+
+            //            // Failure
+            //            async (why) =>
+            //            {
+            //                // Save params so they can be used later
+            //                authorization.parameters = extraParams;
+            //                await saveAsync(authorization);
+            //                return onGeneralFailure(why);
+            //            },
+            //            telemetry);
+            //}
+        }
+
+        public static async Task<TResult> IdentifyAccountAsync<TResult>(Authorization authorization,
+                Method authentication, string externalAccountKey,
+                IDictionary<string, string> extraParams,
+                IAzureApplication application,
+                IProvideLogin loginProvider,
+                Uri baseUri,
+            Func<Guid, Func<bool, Task<TResult>>, TResult> onLocated,
+            Func<Guid, TResult> onCreated,
+            Func<TResult> onSelfServe,
+            Func<Uri, TResult> onInterupted,
+            Func<string, TResult> onGeneralFailure,
+                TelemetryClient telemetry)
+        {
+            authorization.authorized = true;
+            authorization.LocationAuthentication = null;
+
+            return await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
+                    authorization,
+                // Found
+                internalAccountId =>
+                {
+                    return onLocated(
+                            internalAccountId, 
+                            (isAccountInvalid) => OnNotFound(isAccountInvalid))
+                        .AsTask();
+                },
                 () => OnNotFound(false));
-            return result;
 
             async Task<TResult> OnNotFound(bool isAccountInvalid)
             {
@@ -209,68 +395,37 @@ namespace EastFive.Azure.Auth
                             loginProvider, application, baseUri,
 
                         // Create mapping
-                        async (internalAccountId) =>
+                        (internalAccountId) =>
                         {
-                            authorization.parameters = extraParams;
-                            authorization.accountIdMaybe = internalAccountId;
-                            await saveAsync(authorization);
-                            return await await AccountMapping.CreateByMethodAndKeyAsync(
+                            return AccountMapping.CreateByMethodAndKeyAsync(
                                     authorization, externalAccountKey, internalAccountId,
                                 () =>
                                 {
-                                    return CreateLoginResponseAsync(
-                                            internalAccountId, extraParams,
-                                            authentication, authorization,
-                                            application, request, endpoints, baseUri, loginProvider,
-                                        (url, modifier) => onRedirect(url, internalAccountId, modifier),
-                                        onGeneralFailure,
-                                        () => onGeneralFailure("An invalid account mapping was created."),
-                                        telemetry);
+                                    return onCreated(internalAccountId);
                                 },
                                 () =>
                                 {
-                                    return CreateLoginResponseAsync(
-                                            internalAccountId, extraParams,
-                                            authentication, authorization,
-                                            application, request, endpoints, baseUri, loginProvider,
-                                        (url, modifier) => onRedirect(url, internalAccountId, modifier),
-                                        onGeneralFailure,
-                                        () => onGeneralFailure("System is mapped to an invalid account."),
-                                        telemetry);
+                                    return onLocated(internalAccountId, default);
                                 },
                                     isAccountInvalid);
                         },
 
                         // Allow self serve
-                        async () =>
+                        () =>
                         {
-                            authorization.parameters = extraParams;
-                            await saveAsync(authorization);
-                            return await CreateLoginResponseAsync(
-                                    default(Guid?), extraParams,
-                                    authentication, authorization,
-                                    application, request, endpoints, baseUri, loginProvider,
-                                (url, modifier) => onRedirect(url, default(Guid?), modifier),
-                                onGeneralFailure,
-                                () => onGeneralFailure("The system created an invalid account."),
-                                    telemetry);
+                            return onSelfServe().AsTask();
                         },
 
                         // Intercept process
-                        async (interceptionUrl) =>
+                        (interceptionUrl) =>
                         {
-                            authorization.parameters = extraParams;
-                            await saveAsync(authorization);
-                            return onRedirect(interceptionUrl, default, m => m);
+                            return onInterupted(interceptionUrl).AsTask();
                         },
 
                         // Failure
-                        async (why) =>
+                        (why) =>
                         {
-                            // Save params so they can be used later
-                            authorization.parameters = extraParams;
-                            await saveAsync(authorization);
-                            return onGeneralFailure(why);
+                            return onGeneralFailure(why).AsTask();
                         },
                         telemetry);
             }

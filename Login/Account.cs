@@ -141,9 +141,25 @@ namespace EastFive.Azure.Login
                 () => onNotFound());
         }
 
+        internal static IRef<Account> GetRef(string userIdentification)
+        {
+            var accountRef = userIdentification
+                .MD5HashGuid()
+                .AsRef<Account>();
+            return accountRef;
+        }
+
         internal static string GeneratePasswordHash(string userIdentification, string password)
         {
             return $"{userIdentification} {password}".SHAHash().ToBase64String();
+        }
+
+        internal bool IsPasswordValid(string password)
+        {
+            var passwordHash = Account.GeneratePasswordHash(this.userIdentification, password);
+            if (passwordHash != this.password)
+                return false;
+            return true;
         }
     }
 }

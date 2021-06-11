@@ -48,6 +48,5 @@ namespace EastFive.Azure.Login
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));
         }
-
     }
 }
