@@ -42,6 +42,7 @@ namespace EastFive.Azure
                 Uri baseUri, IProvideAuthorization authorizationProvider,
             Func<Uri, Func<IHttpResponse, IHttpResponse>, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
+            Func<TResult> onInvalidAccount,
             Func<string, TResult> onFailure);
 
         Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security);
@@ -421,6 +422,7 @@ namespace EastFive.Api.Azure
                 Uri baseUri, IProvideAuthorization authorizationProvider,
             Func<Uri, Func<IHttpResponse, IHttpResponse>, TResult> onSuccess,
             Func<string, string, TResult> onInvalidParameter,
+            Func<TResult> onInvalidAccount,
             Func<string, TResult> onFailure)
         {
             if(!(authorizationProvider is IProvideRedirection))
@@ -460,6 +462,7 @@ namespace EastFive.Api.Azure
                         onInvalidParameter,
                         onFailure),
                 onInvalidParameter.AsAsyncFunc(),
+                onInvalidAccount.AsAsyncFunc(),
                 onFailure.AsAsyncFunc());
             
         }

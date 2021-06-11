@@ -1,8 +1,10 @@
 ﻿using EastFive.Api;
+using EastFive.Extensions;
 using EastFive.Persistence.Azure.StorageTables;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -43,6 +45,67 @@ namespace EastFive.Azure.Persistence
             public string Id { get; private set; }
 
             public string ContainerName { get; private set; }
+        }
+    }
+
+    public class BlobRefProperty : PropertyAttribute
+    {
+        public override TResult Convert<TResult>(HttpApplication httpApp, Type type, object value,
+            Func<object, TResult> onCasted,
+            Func<string, TResult> onInvalid)
+        {
+            if (value is Guid?)
+            {
+                var guidMaybe = value as Guid?;
+                if (typeof(Guid).GUID == type.GUID)
+                {
+                    if (!guidMaybe.HasValue)
+                        return onInvalid("Value did not provide a UUID.");
+                    return onCasted(guidMaybe.Value);
+                }
+                if (typeof(Guid?).GUID == type.GUID)
+                {
+                    return onCasted(guidMaybe);
+                }
+            }
+
+            return onInvalid($"Could not convert `{value.GetType().FullName}` to `{type.FullName}`.");
+        }
+    }
+
+    public class BlobRefPropertyOptional : BlobRefProperty
+    {
+        public override SelectParameterResult TryCast(BindingData bindingData)
+        {
+            var parameterRequiringValidation = bindingData.parameterRequiringValidation;
+            var baseValue = base.TryCast(bindingData);
+            if (baseValue.valid)
+                return baseValue;
+
+            baseValue.valid = true;
+            baseValue.fromBody = true;
+            baseValue.value = GetValue();
+            return baseValue;
+
+            object GetValue()
+            {
+                var parameterType = parameterRequiringValidation.ParameterType;
+                if (parameterType.IsSubClassOfGeneric(typeof(EastFive.Api.Property<>)))
+                {
+                    var refType = parameterType.GenericTypeArguments.First();
+                    var parameterTypeGeneric = RefOptionalHelper.CreateEmpty(refType);
+                    return parameterTypeGeneric;
+                }
+
+                return parameterType.GetDefault();
+            }
+        }
+
+        public override Api.Resources.Parameter GetParameter(ParameterInfo paramInfo, HttpApplication httpApp)
+        {
+            var parameter = base.GetParameter(paramInfo, httpApp);
+            parameter.Required = false;
+            return parameter;
         }
     }
 }

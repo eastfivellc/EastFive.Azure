@@ -182,19 +182,27 @@ namespace EastFive.Azure.Auth
                 {
                     authorization.parameters = extraParams;
                     authorization.accountIdMaybe = internalAccountId;
-                    await saveAsync(authorization);
-                    return await CreateLoginResponseAsync(
+                    return await await CreateLoginResponseAsync(
                                 internalAccountId, extraParams,
                                 authentication, authorization,
                                 application, request, endpoints, baseUri, loginProvider,
-                            (url, modifier) => onRedirect(url, internalAccountId, modifier),
-                            onGeneralFailure,
+                            async (url, modifier) =>
+                            {
+                                await saveAsync(authorization);
+                                return onRedirect(url, internalAccountId, modifier);
+                            },
+                            async (why) =>
+                            {
+                                await saveAsync(authorization);
+                                return onGeneralFailure(why);
+                            },
+                            ()=> OnNotFound(true),
                             telemetry);
                 },
-                OnNotFound);
+                () => OnNotFound(false));
             return result;
 
-            async Task<TResult> OnNotFound()
+            async Task<TResult> OnNotFound(bool isAccountInvalid)
             {
                 return await await UnmappedCredentialAsync(externalAccountKey, extraParams,
                             authentication, authorization,
@@ -216,6 +224,7 @@ namespace EastFive.Azure.Auth
                                             application, request, endpoints, baseUri, loginProvider,
                                         (url, modifier) => onRedirect(url, internalAccountId, modifier),
                                         onGeneralFailure,
+                                        () => onGeneralFailure("An invalid account mapping was created."),
                                         telemetry);
                                 },
                                 () =>
@@ -226,8 +235,10 @@ namespace EastFive.Azure.Auth
                                             application, request, endpoints, baseUri, loginProvider,
                                         (url, modifier) => onRedirect(url, internalAccountId, modifier),
                                         onGeneralFailure,
+                                        () => onGeneralFailure("System is mapped to an invalid account."),
                                         telemetry);
-                                });
+                                },
+                                    isAccountInvalid);
                         },
 
                         // Allow self serve
@@ -241,6 +252,7 @@ namespace EastFive.Azure.Auth
                                     application, request, endpoints, baseUri, loginProvider,
                                 (url, modifier) => onRedirect(url, default(Guid?), modifier),
                                 onGeneralFailure,
+                                () => onGeneralFailure("The system created an invalid account."),
                                     telemetry);
                         },
 
@@ -273,6 +285,7 @@ namespace EastFive.Azure.Auth
                 IProvideAuthorization authorizationProvider,
             Func<Uri, Func<IHttpResponse, IHttpResponse>, TResult> onRedirect,
             Func<string, TResult> onBadResponse,
+            Func<TResult> onInvalidAccount,
             TelemetryClient telemetry)
         {
             return application.GetRedirectUriAsync(
@@ -292,6 +305,12 @@ namespace EastFive.Azure.Auth
                     var message = $"Invalid parameter while completing login: {paramName} - {why}";
                     telemetry.TrackException(new ResponseException(message));
                     return onBadResponse(message);
+                },
+                () =>
+                {
+                    var message = $"Invalid account while completing login";
+                    telemetry.TrackException(new ResponseException(message));
+                    return onInvalidAccount();
                 },
                 (why) =>
                 {
@@ -354,6 +373,7 @@ namespace EastFive.Azure.Auth
                                            application, request, endpoints, baseUri, loginProvider,
                                        (url, modifier) => onRedirect(url),
                                        onFailure,
+                                       () => onFailure("Account mapping created a broken account."),
                                        telemetry);
                                 },
                                 () =>

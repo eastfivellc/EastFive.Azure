@@ -33,18 +33,39 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = null)
         {
+            var blobName = blobRef.Id;
             return AzureTableDriverDynamic
                 .FromSettings()
-                .BlobLoadBytesAsync(blobRef.Id, blobRef.ContainerName,
-                    onSuccess,
+                .BlobLoadBytesAsync(blobName, blobRef.ContainerName,
+                    (bytes, properties) => onSuccess(bytes, properties.ContentType),
                     onNotFound,
                     onFailure: onFailure,
                     onTimeout: onTimeout);
         }
 
-        public static Task<IBlobRef> WriteBytesAsync(byte[] bytes)
+        public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef)
         {
-            throw new NotImplementedException();
+            var blobId = Guid.NewGuid().ToString("N");
+            var (bytes, contentType) = await blobRef.ReadBytesAsync();
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(bytes, blobId, blobRef.ContainerName,
+                    () =>
+                    {
+                        return (IBlobRef)new BlobRef
+                        {
+                            Id = blobId,
+                            ContainerName = blobRef.ContainerName,
+                        };
+                    },
+                    contentType: contentType);
+        }
+
+        private class BlobRef : IBlobRef
+        {
+            public string ContainerName { get; set; }
+
+            public string Id { get; set; }
         }
     }
 

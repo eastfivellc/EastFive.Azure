@@ -299,9 +299,9 @@ namespace EastFive.Azure.Monitoring
                     x => new Uri(x),
                     (why) => default);
             var content = await ReadContentAsync();
-            
-            var utcOffset = TimeZoneInfo
-                .FindSystemTimeZoneById("Central Standard Time")
+
+            var utcOffset = "Central Standard Time"
+                .FindSystemTimeZone()
                 .GetUtcOffset(DateTime.UtcNow);
 
             var sections = new MessageCard.Section[]
