@@ -10,7 +10,6 @@ using EastFive.Linq;
 using EastFive.Collections.Generic;
 using EastFive.Linq.Async;
 using BlackBarLabs.Persistence.Azure.StorageTables;
-using BlackBarLabs.Extensions;
 using EastFive.Analytics;
 using EastFive.Extensions;
 
@@ -18,68 +17,68 @@ namespace BlackBarLabs.Persistence
 {
     public static class DocumentExtensions
     {
-        public static async Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            TableQuery<TParentDoc> query,
-            Func<TParentDoc, Guid> getLinkedId,
-            Func<IDictionary<TParentDoc, TLinkedDoc>, TResult> found,
-            Func<TResult> parentDocNotFound)
-            where TParentDoc : class, ITableEntity, new()
-            where TLinkedDoc : class, ITableEntity
-        {
-            var parentDocs = await repo.FindByQueryAsync(query);
-            var results = await parentDocs
-                .Aggregate(
-                    (new Dictionary<TParentDoc, TLinkedDoc>()).ToTask(),
-                    async (docsTask, document) =>
-                    {
-                        var linkedDocId = getLinkedId(document);
-                        return await await repo.FindByIdAsync(linkedDocId,
-                            async (TLinkedDoc priceSheetDocument) =>
-                            {
-                                var docs = await docsTask;
-                                docs.Add(document, priceSheetDocument);
-                                return docs;
-                            },
-                            () => docsTask);
-                });
+        //public static async Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    TableQuery<TParentDoc> query,
+        //    Func<TParentDoc, Guid> getLinkedId,
+        //    Func<IDictionary<TParentDoc, TLinkedDoc>, TResult> found,
+        //    Func<TResult> parentDocNotFound)
+        //    where TParentDoc : class, ITableEntity, new()
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var parentDocs = await repo.FindByQueryAsync(query);
+        //    var results = await parentDocs
+        //        .Aggregate(
+        //            (new Dictionary<TParentDoc, TLinkedDoc>()).AsTask(),
+        //            async (docsTask, document) =>
+        //            {
+        //                var linkedDocId = getLinkedId(document);
+        //                return await await repo.FindByIdAsync(linkedDocId,
+        //                    async (TLinkedDoc priceSheetDocument) =>
+        //                    {
+        //                        var docs = await docsTask;
+        //                        docs.Add(document, priceSheetDocument);
+        //                        return docs;
+        //                    },
+        //                    () => docsTask);
+        //        });
 
-            return found(results);
-        }
+        //    return found(results);
+        //}
 
-        public static Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocRowKey, string parentDocPartitionKey,
-            Func<TParentDoc, Guid> getLinkedId,
-            Func<TParentDoc, TLinkedDoc, TResult> found,
-            Func<TResult> parentDocNotFound,
-            Func<TParentDoc, TResult> linkedDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            return repo.FindLinkedDocumentAsync(parentDocRowKey.AsRowKey(), parentDocPartitionKey, 
-                getLinkedId, found, parentDocNotFound, linkedDocNotFound);
-        }
+        //public static Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocRowKey, string parentDocPartitionKey,
+        //    Func<TParentDoc, Guid> getLinkedId,
+        //    Func<TParentDoc, TLinkedDoc, TResult> found,
+        //    Func<TResult> parentDocNotFound,
+        //    Func<TParentDoc, TResult> linkedDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    return repo.FindLinkedDocumentAsync(parentDocRowKey.AsRowKey(), parentDocPartitionKey, 
+        //        getLinkedId, found, parentDocNotFound, linkedDocNotFound);
+        //}
 
-        public static async Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            string parentDocRowKey, string parentDocPartitionKey,
-            Func<TParentDoc, Guid> getLinkedId,
-            Func<TParentDoc, TLinkedDoc, TResult> found,
-            Func<TResult> parentDocNotFound,
-            Func<TParentDoc, TResult> linkedDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            var result = await await repo.FindByIdAsync(parentDocRowKey, parentDocPartitionKey,
-                async (TParentDoc document) =>
-                {
-                    var linkedDocId = getLinkedId(document);
-                    return await repo.FindByIdAsync(linkedDocId,
-                        (TLinkedDoc priceSheetDocument) => found(document, priceSheetDocument),
-                        () => linkedDocNotFound(document));
-                },
-                () => parentDocNotFound().ToTask());
+        //public static async Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    string parentDocRowKey, string parentDocPartitionKey,
+        //    Func<TParentDoc, Guid> getLinkedId,
+        //    Func<TParentDoc, TLinkedDoc, TResult> found,
+        //    Func<TResult> parentDocNotFound,
+        //    Func<TParentDoc, TResult> linkedDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var result = await await repo.FindByIdAsync(parentDocRowKey, parentDocPartitionKey,
+        //        async (TParentDoc document) =>
+        //        {
+        //            var linkedDocId = getLinkedId(document);
+        //            return await repo.FindByIdAsync(linkedDocId,
+        //                (TLinkedDoc priceSheetDocument) => found(document, priceSheetDocument),
+        //                () => linkedDocNotFound(document));
+        //        },
+        //        () => parentDocNotFound().AsTask());
 
-            return result;
-        }
+        //    return result;
+        //}
 
         public static async Task<TResult> FindLinkedDocumentAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
             Guid parentDocId,
@@ -146,7 +145,7 @@ namespace BlackBarLabs.Persistence
                         .ToArray();
                     return found(document, linkedDocs);
                 },
-               () => parentDocNotFound().ToTask());
+               () => parentDocNotFound().AsTask());
 
             return result;
         }
@@ -181,7 +180,7 @@ namespace BlackBarLabs.Persistence
                         .ToArray();
                     return found(document, linkedDocs);
                 },
-               () => parentDocNotFound().ToTask());
+               () => parentDocNotFound().AsTask());
 
             return result;
         }
@@ -209,177 +208,177 @@ namespace BlackBarLabs.Persistence
                             },
                             (TLinkedDoc[] linkedDocs, Guid[] missingIds) =>
                             {
-                                return found(document, linkedDocs, missingIds).ToTask();
+                                return found(document, linkedDocs, missingIds).AsTask();
                             });
                 },
-               () => parentDocNotFound().ToTask());
+               () => parentDocNotFound().AsTask());
 
             return result;
         }
 
-        public static async Task<TResult> FindLinkedLinkedDocumentAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocId,
-            Func<TParentDoc, Guid> getMiddleDocumentId,
-            Func<TMiddleDoc, Guid> getLinkedId,
-            Func<TParentDoc, TMiddleDoc, TLinkedDoc, TResult> found,
-            Func<TResult> parentDocNotFound,
-            Func<TParentDoc, TResult> middleDocNotFound,
-            Func<TParentDoc, TMiddleDoc, TResult> linkedDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TMiddleDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            var result = await await repo.FindByIdAsync(parentDocId,
-                async (TParentDoc parentDoc) =>
-                {
-                    var middleDocId = getMiddleDocumentId(parentDoc);
-                    var middleAndLinkedDocs = await repo.FindLinkedDocumentAsync(middleDocId,
-                            (middleDoc) => getLinkedId(middleDoc),
-                            (TMiddleDoc middleDoc, TLinkedDoc linkedDoc) =>
-                        found(parentDoc, middleDoc, linkedDoc),
-                        () => middleDocNotFound(parentDoc),
-                        (middleDoc) => linkedDocNotFound(parentDoc, middleDoc));
-                    return middleAndLinkedDocs;
-                },
-                parentDocNotFound.AsAsyncFunc());
-            return result;
-        }
+        //public static async Task<TResult> FindLinkedLinkedDocumentAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocId,
+        //    Func<TParentDoc, Guid> getMiddleDocumentId,
+        //    Func<TMiddleDoc, Guid> getLinkedId,
+        //    Func<TParentDoc, TMiddleDoc, TLinkedDoc, TResult> found,
+        //    Func<TResult> parentDocNotFound,
+        //    Func<TParentDoc, TResult> middleDocNotFound,
+        //    Func<TParentDoc, TMiddleDoc, TResult> linkedDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TMiddleDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var result = await await repo.FindByIdAsync(parentDocId,
+        //        async (TParentDoc parentDoc) =>
+        //        {
+        //            var middleDocId = getMiddleDocumentId(parentDoc);
+        //            var middleAndLinkedDocs = await repo.FindLinkedDocumentAsync(middleDocId,
+        //                    (middleDoc) => getLinkedId(middleDoc),
+        //                    (TMiddleDoc middleDoc, TLinkedDoc linkedDoc) =>
+        //                found(parentDoc, middleDoc, linkedDoc),
+        //                () => middleDocNotFound(parentDoc),
+        //                (middleDoc) => linkedDocNotFound(parentDoc, middleDoc));
+        //            return middleAndLinkedDocs;
+        //        },
+        //        parentDocNotFound.AsAsyncFunc());
+        //    return result;
+        //}
 
-        public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocId,
-            Func<TParentDoc, Guid[]> getMiddleDocumentIds,
-            Func<TMiddleDoc, Guid[]> getLinkedIds,
-            Func<TParentDoc, IDictionary<TMiddleDoc, TLinkedDoc[]>, TResult> found,
-            Func<TResult> lookupDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TMiddleDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            var result = await await repo.FindByIdAsync(parentDocId,
-                async (TParentDoc parentDoc) =>
-                {
-                    var middleDocIds = getMiddleDocumentIds(parentDoc);
-                    var middleAndLinkedDocs = await middleDocIds
-                        .Select(
-                            middleDocId =>
-                                repo.FindLinkedDocumentsAsync(middleDocId,
-                                    (middleDoc) => getLinkedIds(middleDoc),
-                                    (TMiddleDoc middleDoc, TLinkedDoc[] linkedDocsByMiddleDoc) => 
-                                        new KeyValuePair<TMiddleDoc, TLinkedDoc[]>(middleDoc, linkedDocsByMiddleDoc),
-                                    () => default(KeyValuePair<TMiddleDoc, TLinkedDoc[]>?)))
-                        .WhenAllAsync()
-                        .SelectWhereHasValueAsync();
-                    return found(parentDoc, middleAndLinkedDocs.ToDictionary());
-                },
-                () =>
-                {
-                    // TODO: Log data inconsistency here
-                    return lookupDocNotFound().ToTask();
-                });
-            return result;
-        }
+        //public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocId,
+        //    Func<TParentDoc, Guid[]> getMiddleDocumentIds,
+        //    Func<TMiddleDoc, Guid[]> getLinkedIds,
+        //    Func<TParentDoc, IDictionary<TMiddleDoc, TLinkedDoc[]>, TResult> found,
+        //    Func<TResult> lookupDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TMiddleDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var result = await await repo.FindByIdAsync(parentDocId,
+        //        async (TParentDoc parentDoc) =>
+        //        {
+        //            var middleDocIds = getMiddleDocumentIds(parentDoc);
+        //            var middleAndLinkedDocs = await middleDocIds
+        //                .Select(
+        //                    middleDocId =>
+        //                        repo.FindLinkedDocumentsAsync(middleDocId,
+        //                            (middleDoc) => getLinkedIds(middleDoc),
+        //                            (TMiddleDoc middleDoc, TLinkedDoc[] linkedDocsByMiddleDoc) => 
+        //                                new KeyValuePair<TMiddleDoc, TLinkedDoc[]>(middleDoc, linkedDocsByMiddleDoc),
+        //                            () => default(KeyValuePair<TMiddleDoc, TLinkedDoc[]>?)))
+        //                .WhenAllAsync()
+        //                .SelectWhereHasValueAsync();
+        //            return found(parentDoc, middleAndLinkedDocs.ToDictionary());
+        //        },
+        //        () =>
+        //        {
+        //            // TODO: Log data inconsistency here
+        //            return lookupDocNotFound().AsTask();
+        //        });
+        //    return result;
+        //}
 
-        public static Task<TResult> FindLinkedDocumentsAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocId,
-            Func<TParentDoc, Guid[]> getLinkedIds,
-            Func<TParentDoc, IEnumerableAsync<TLinkedDoc>, TResult> found,
-            Func<TResult> parentDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            return repo.FindByIdAsync(parentDocId,
-                (TParentDoc document) =>
-                {
-                    var linkedDocIds = getLinkedIds(document);
-                    var linkedDocs = linkedDocIds
-                        .SelectAsyncOptional<Guid, TLinkedDoc>(
-                            (linkedDocId, select, skip) =>
-                            {
-                                return repo.FindByIdAsync(linkedDocId,
-                                    (TLinkedDoc priceSheetDocument) => select(priceSheetDocument),
-                                    skip);
-                            });
-                    return found(document, linkedDocs);
-                },
-                () => parentDocNotFound());
-        }
+        //public static Task<TResult> FindLinkedDocumentsAsync<TParentDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocId,
+        //    Func<TParentDoc, Guid[]> getLinkedIds,
+        //    Func<TParentDoc, IEnumerableAsync<TLinkedDoc>, TResult> found,
+        //    Func<TResult> parentDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    return repo.FindByIdAsync(parentDocId,
+        //        (TParentDoc document) =>
+        //        {
+        //            var linkedDocIds = getLinkedIds(document);
+        //            var linkedDocs = linkedDocIds
+        //                .SelectAsyncOptional<Guid, TLinkedDoc>(
+        //                    (linkedDocId, select, skip) =>
+        //                    {
+        //                        return repo.FindByIdAsync(linkedDocId,
+        //                            (TLinkedDoc priceSheetDocument) => select(priceSheetDocument),
+        //                            skip);
+        //                    });
+        //            return found(document, linkedDocs);
+        //        },
+        //        () => parentDocNotFound());
+        //}
 
-        public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocId,
-            Func<TParentDoc, Guid[]> getMiddleDocumentIds,
-            Func<TMiddleDoc, Guid> getLinkedId,
-            Func<TParentDoc, IDictionary<TMiddleDoc, TLinkedDoc>, TResult> found,
-            Func<TResult> lookupDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TMiddleDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            var result = await await repo.FindByIdAsync(parentDocId,
-                async (TParentDoc parentDoc) =>
-                {
-                    var middleDocIds = getMiddleDocumentIds(parentDoc);
-                    var middleAndLinkedDocs = await middleDocIds
-                        .Select(
-                            middleDocId =>
-                                repo.FindLinkedDocumentAsync(middleDocId,
-                                    (middleDoc) => getLinkedId(middleDoc),
-                                    (TMiddleDoc middleDoc, TLinkedDoc linkedDocsByMiddleDoc) =>
-                                        new KeyValuePair<TMiddleDoc, TLinkedDoc>(middleDoc, linkedDocsByMiddleDoc),
-                                    () => default(KeyValuePair<TMiddleDoc, TLinkedDoc>?),
-                                    (middleDoc) => default(KeyValuePair<TMiddleDoc, TLinkedDoc>?)))
-                        .WhenAllAsync()
-                        .SelectWhereHasValueAsync();
-                    return found(parentDoc, middleAndLinkedDocs.ToDictionary());
-                },
-                () =>
-                {
-                    // TODO: Log data inconsistency here
-                    return lookupDocNotFound().ToTask();
-                });
-            return result;
-        }
+        //public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocId,
+        //    Func<TParentDoc, Guid[]> getMiddleDocumentIds,
+        //    Func<TMiddleDoc, Guid> getLinkedId,
+        //    Func<TParentDoc, IDictionary<TMiddleDoc, TLinkedDoc>, TResult> found,
+        //    Func<TResult> lookupDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TMiddleDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var result = await await repo.FindByIdAsync(parentDocId,
+        //        async (TParentDoc parentDoc) =>
+        //        {
+        //            var middleDocIds = getMiddleDocumentIds(parentDoc);
+        //            var middleAndLinkedDocs = await middleDocIds
+        //                .Select(
+        //                    middleDocId =>
+        //                        repo.FindLinkedDocumentAsync(middleDocId,
+        //                            (middleDoc) => getLinkedId(middleDoc),
+        //                            (TMiddleDoc middleDoc, TLinkedDoc linkedDocsByMiddleDoc) =>
+        //                                new KeyValuePair<TMiddleDoc, TLinkedDoc>(middleDoc, linkedDocsByMiddleDoc),
+        //                            () => default(KeyValuePair<TMiddleDoc, TLinkedDoc>?),
+        //                            (middleDoc) => default(KeyValuePair<TMiddleDoc, TLinkedDoc>?)))
+        //                .WhenAllAsync()
+        //                .SelectWhereHasValueAsync();
+        //            return found(parentDoc, middleAndLinkedDocs.ToDictionary());
+        //        },
+        //        () =>
+        //        {
+        //            // TODO: Log data inconsistency here
+        //            return lookupDocNotFound().AsTask();
+        //        });
+        //    return result;
+        //}
 
-        public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
-            Guid parentDocId,
-            Func<TParentDoc, Guid> getMiddleDocumentId,
-            Func<TMiddleDoc, Guid[]> getLinkedIds,
-            Func<TParentDoc, TMiddleDoc, TLinkedDoc[], TResult> found,
-            Func<TResult> parentDocNotFound,
-            Func<TResult> middleDocNotFound,
-            Func<TResult> linkedDocNotFound)
-            where TParentDoc : class, ITableEntity
-            where TMiddleDoc : class, ITableEntity
-            where TLinkedDoc : class, ITableEntity
-        {
-            var resultAll = await await repo.FindByIdAsync(parentDocId,
-                async (TParentDoc parentDoc) =>
-                {
-                    var middleDocId = getMiddleDocumentId(parentDoc);
-                    var result = await repo.FindLinkedDocumentsAsync(middleDocId,
-                        (middleDoc) => getLinkedIds(middleDoc),
-                        (TMiddleDoc middleDoc, TLinkedDoc[] linkedDocsByMiddleDocs) =>
-                            found(parentDoc, middleDoc, linkedDocsByMiddleDocs),
-                        () => middleDocNotFound());
-                    return result;
-                },
-                () => parentDocNotFound().ToTask());
-            return resultAll;
-        }
+        //public static async Task<TResult> FindLinkedLinkedDocumentsAsync<TParentDoc, TMiddleDoc, TLinkedDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid parentDocId,
+        //    Func<TParentDoc, Guid> getMiddleDocumentId,
+        //    Func<TMiddleDoc, Guid[]> getLinkedIds,
+        //    Func<TParentDoc, TMiddleDoc, TLinkedDoc[], TResult> found,
+        //    Func<TResult> parentDocNotFound,
+        //    Func<TResult> middleDocNotFound,
+        //    Func<TResult> linkedDocNotFound)
+        //    where TParentDoc : class, ITableEntity
+        //    where TMiddleDoc : class, ITableEntity
+        //    where TLinkedDoc : class, ITableEntity
+        //{
+        //    var resultAll = await await repo.FindByIdAsync(parentDocId,
+        //        async (TParentDoc parentDoc) =>
+        //        {
+        //            var middleDocId = getMiddleDocumentId(parentDoc);
+        //            var result = await repo.FindLinkedDocumentsAsync(middleDocId,
+        //                (middleDoc) => getLinkedIds(middleDoc),
+        //                (TMiddleDoc middleDoc, TLinkedDoc[] linkedDocsByMiddleDocs) =>
+        //                    found(parentDoc, middleDoc, linkedDocsByMiddleDocs),
+        //                () => middleDocNotFound());
+        //            return result;
+        //        },
+        //        () => parentDocNotFound().AsTask());
+        //    return resultAll;
+        //}
 
-        public static Guid? RemoveLinkedDocument<TJoin>(this TJoin[] joins, Guid joinId,
-            Func<TJoin, Guid> idField,
-            Func<TJoin, Guid> joinField,
-            Action<TJoin[]> save)
-        {
-            var joinsUpdated = joins
-                .Where(join => joinField(join) != joinId)
-                .ToArray();
-            save(joinsUpdated);
-            var match = joins.Where(join => joinField(join) == joinId).ToArray();
-            if (match.Length > 0)
-                return idField(match[0]);
-            return default(Guid?);
-        }
+        //public static Guid? RemoveLinkedDocument<TJoin>(this TJoin[] joins, Guid joinId,
+        //    Func<TJoin, Guid> idField,
+        //    Func<TJoin, Guid> joinField,
+        //    Action<TJoin[]> save)
+        //{
+        //    var joinsUpdated = joins
+        //        .Where(join => joinField(join) != joinId)
+        //        .ToArray();
+        //    save(joinsUpdated);
+        //    var match = joins.Where(join => joinField(join) == joinId).ToArray();
+        //    if (match.Length > 0)
+        //        return idField(match[0]);
+        //    return default(Guid?);
+        //}
 
         /// <summary>
         /// Starting with <paramref name="startingDocumentId"/>, searches for documents until <paramref name="getLinkedId"/>
@@ -411,33 +410,33 @@ namespace BlackBarLabs.Persistence
                         (linkedDocuments) => onFound(linkedDocuments.Append(document).ToArray()),
                         () => onFound(new TDoc[] { document })); // TODO: Log data inconsistency
                 },
-                () => startDocNotFound().ToTask());
+                () => startDocNotFound().AsTask());
 
             return result;
         }
 
-        public static async Task<TResult> FindRecursiveDocumentsAsync<TDoc, TResult>(this AzureStorageRepository repo,
-            Guid startingDocumentId, HashSet<Guid> skip,
-            Func<TDoc, Guid?> getLinkedId,
-            Func<TDoc[], TResult> onFound,
-            Func<TResult> startDocNotFound)
-            where TDoc : class, ITableEntity
-        {
-            var result = await await repo.FindByIdAsync(startingDocumentId,
-                async (TDoc document) =>
-                {
-                    var linkedDocId = getLinkedId(document);
-                    if ((!linkedDocId.HasValue) || skip.Contains(linkedDocId.Value))
-                        return onFound(document.AsEnumerable().ToArray());
-                    return await repo.FindRecursiveDocumentsAsync(linkedDocId.Value,
-                        getLinkedId,
-                        (linkedDocuments) => onFound(linkedDocuments.Append(document).ToArray()),
-                        () => onFound(new TDoc[] { document })); // TODO: Log data inconsistency
-                },
-                () => startDocNotFound().ToTask());
+        //public static async Task<TResult> FindRecursiveDocumentsAsync<TDoc, TResult>(this AzureStorageRepository repo,
+        //    Guid startingDocumentId, HashSet<Guid> skip,
+        //    Func<TDoc, Guid?> getLinkedId,
+        //    Func<TDoc[], TResult> onFound,
+        //    Func<TResult> startDocNotFound)
+        //    where TDoc : class, ITableEntity
+        //{
+        //    var result = await await repo.FindByIdAsync(startingDocumentId,
+        //        async (TDoc document) =>
+        //        {
+        //            var linkedDocId = getLinkedId(document);
+        //            if ((!linkedDocId.HasValue) || skip.Contains(linkedDocId.Value))
+        //                return onFound(document.AsEnumerable().ToArray());
+        //            return await repo.FindRecursiveDocumentsAsync(linkedDocId.Value,
+        //                getLinkedId,
+        //                (linkedDocuments) => onFound(linkedDocuments.Append(document).ToArray()),
+        //                () => onFound(new TDoc[] { document })); // TODO: Log data inconsistency
+        //        },
+        //        () => startDocNotFound().AsTask());
 
-            return result;
-        }
+        //    return result;
+        //}
 
         public static async Task<TResult> FindRecursiveDocumentsAsync<TDoc, TResult>(this AzureStorageRepository repo,
             Guid startingDocumentId,
@@ -461,7 +460,7 @@ namespace BlackBarLabs.Persistence
                          .ToArrayAsync(); // TODO: Log data inconsistency
                     return onFound(docs.Append(document).ToArray());
                 },
-                () => startDocNotFound().ToTask());
+                () => startDocNotFound().AsTask());
 
             return result;
         }
