@@ -237,11 +237,27 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     },
                     (tableInformation, resource) =>
                     {
-                        if (resource.RawRowKey != resource.RowKey)
+                        try
+                        {
+                            if (resource.RawRowKey != resource.RowKey)
+                                tableInformation.mismatchedRowKeys++;
+                        }catch(Exception)
+                        {
                             tableInformation.mismatchedRowKeys++;
-                        var partitionKey = resource.RawPartitionKey;
-                        if (partitionKey != resource.PartitionKey)
+                            return tableInformation;
+                        }
+                        var partitionKey = default(string);
+                        try
+                        { 
+                            partitionKey = resource.RawPartitionKey;
+                            if (partitionKey != resource.PartitionKey)
+                                tableInformation.mismatchedPartitionKeys++;
+                        }
+                        catch (Exception)
+                        {
                             tableInformation.mismatchedPartitionKeys++;
+                            return tableInformation;
+                        }
                         tableInformation.partitions = tableInformation.partitions.AddIfMissing(partitionKey,
                             (addValue) =>
                             {
