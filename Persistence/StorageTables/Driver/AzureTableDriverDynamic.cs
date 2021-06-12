@@ -1989,6 +1989,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
             System.Threading.CancellationToken cancellationToken = default)
         {
+            return RunQueryForTableEntries<TEntity>(whereFilter, table:table,
+                    numberOfTimesToRetry: numberOfTimesToRetry, cancellationToken: cancellationToken)
+                .Select(segResult => segResult.Entity);
+        }
+
+        public IEnumerableAsync<IWrapTableEntity<TEntity>> RunQueryForTableEntries<TEntity>(string whereFilter,
+            CloudTable table = default,
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
             var query = whereFilter.AsTableQuery<TEntity>();
 
             var tableEntityTypes = query.GetType().GetGenericArguments();
@@ -2005,9 +2015,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
                 .Invoke(null, new object[] { query, table, numberOfTimesToRetry, cancellationToken });
-            var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
-            return findAllCasted
-                .Select(segResult => segResult.Entity);
+            return findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
         }
 
         private IEnumerableAsync<(TEntity, string)> RunQuerySegmented<TEntity>(string whereFilter,

@@ -41,4 +41,14 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure);
     }
+
+    public interface IRepairAzureStorageTableSave : IModifyAzureStorageTableSave
+    {
+        Task<TResult> RepairAsync<TEntity, TResult>(MemberInfo memberInfo,
+                string rowKeyRef, string partitionKeyRef,
+                TEntity value, IDictionary<string, EntityProperty> propertyAndValues,
+                AzureTableDriverDynamic repository,
+            Func<string, TResult> onRepaired,
+            Func<TResult> onNoChangesNecessary);
+    }
 }

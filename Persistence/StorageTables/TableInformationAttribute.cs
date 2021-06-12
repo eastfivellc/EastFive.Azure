@@ -49,6 +49,26 @@ namespace EastFive.Api.Azure.Modules
                             System.Net.HttpStatusCode.OK,  tableData);
                     }
 
+                    if (request.Headers.ContainsKey("X-StorageTableInformation-RepairModifiers"))
+                    {
+                        return new WriteStreamAsyncHttpResponse(request, System.Net.HttpStatusCode.OK,
+                            $"{controllerType.FullName}.repair.txt", "text/text", true,
+                            async stream =>
+                            {
+                                string [] repairs = await controllerType
+                                    .StorageRepairModifiers()
+                                    .Select(
+                                        async line =>
+                                        {
+                                            var bytes = line.GetBytes(Encoding.UTF8);
+                                            await stream.WriteAsync(bytes, 0, bytes.Length);
+                                            return line;
+                                        })
+                                    .Await()
+                                    .ToArrayAsync();
+                            });
+                    }
+
                     var tableInformation = await controllerType.StorageTableInformationAsync();
                     return request.CreateResponse(System.Net.HttpStatusCode.OK, tableInformation);
                 },

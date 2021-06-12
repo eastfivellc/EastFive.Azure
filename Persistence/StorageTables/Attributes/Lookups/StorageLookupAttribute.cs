@@ -22,7 +22,7 @@ using System.Threading.Tasks;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class StorageLookupAttribute : Attribute,
-        IModifyAzureStorageTableSave, IProvideFindBy, IBackupStorageMember, CascadeDeleteAttribute.IDeleteCascaded,
+        IRepairAzureStorageTableSave, IProvideFindBy, IBackupStorageMember, CascadeDeleteAttribute.IDeleteCascaded,
         IGenerateLookupKeys
     {
         public string LookupTableName { get; set; }
@@ -410,6 +410,66 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public async Task<TResult> RepairAsync<TEntity, TResult>(MemberInfo memberInfo,
+                string rowKeyRef, string partitionKeyRef,
+                TEntity value, IDictionary<string, EntityProperty> propertyAndValues,
+                AzureTableDriverDynamic repository,
+            Func<string, TResult> onRepaired,
+            Func<TResult> onNoChangesNecessary)
+        {
+            var queryableProperties = typeof(TEntity)
+                .StorageProperties()
+                .Select(
+                    (memberAttrKvp) =>
+                    {
+                        var member = memberAttrKvp.Key;
+                        var attr = memberAttrKvp.Value;
+                        var memberValue = member.GetValue(value);
+                        return member.PairWithValue(memberValue);
+                    })
+                .ToArray();
+            var existingRowKeys = await GetKeys(memberInfo, repository, queryableProperties)
+                .ToArrayAsync();
+            var updatedRowKeys = GetKeys(memberInfo, value);
+            var rowKeysDeleted = existingRowKeys
+                .Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
+                .ToArray();
+            var rowKeysAdded = updatedRowKeys
+                .Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
+                .ToArray();
+            if (rowKeysDeleted.None() && rowKeysAdded.None())
+                return onNoChangesNecessary();
+
+            var deletionRollbacks = await rowKeysDeleted
+                .Select(
+                    rowKey =>
+                    {
+                        return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+                            repository,
+                            (rowAndParitionKeys) => rowAndParitionKeys
+                                .NullToEmpty()
+                                .Where(kvp => kvp.Key != rowKeyRef));
+                    })
+                .AsyncEnumerable()
+                .ToArrayAsync();
+            var additionRollbacks = rowKeysAdded
+                 .Select(
+                     rowKey =>
+                     {
+                         return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+                             repository,
+                             (rowAndParitionKeys) => rowAndParitionKeys
+                                .NullToEmpty()
+                                .Append(rowKeyRef.PairWithValue(partitionKeyRef)));
+                     })
+                .AsyncEnumerable()
+                .ToArrayAsync();
+
+            return onRepaired(
+                $"Added:{rowKeysAdded.Select(ar => ar.PartitionKey+" | "+ar.RowKey).Join(';')}" +
+                $"Deleted:{rowKeysDeleted.Select(ar => ar.PartitionKey + " | " + ar.RowKey).Join(';')}");
+        }
+
         #endregion
 
         #region Modification Failures
@@ -511,6 +571,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         public abstract IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember, 
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues);
 
+        
     }
 
 }
