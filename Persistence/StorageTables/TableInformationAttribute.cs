@@ -51,12 +51,19 @@ namespace EastFive.Api.Azure.Modules
 
                     if (request.Headers.ContainsKey("X-StorageTableInformation-RepairModifiers"))
                     {
+                        var query = request.Headers
+                            .Where(hdr => "X-StorageTableInformation-Query".Equals(hdr.Key, StringComparison.OrdinalIgnoreCase))
+                            .First(
+                                (hdr, next) => hdr.Value.First(
+                                    (hdrValue, next) => hdrValue,
+                                    () => string.Empty),
+                                () => string.Empty);
                         return new WriteStreamAsyncHttpResponse(request, System.Net.HttpStatusCode.OK,
                             $"{controllerType.FullName}.repair.txt", "text/text", true,
                             async stream =>
                             {
                                 string [] repairs = await controllerType
-                                    .StorageRepairModifiers()
+                                    .StorageRepairModifiers(query)
                                     .Select(
                                         async line =>
                                         {
@@ -64,7 +71,7 @@ namespace EastFive.Api.Azure.Modules
                                             await stream.WriteAsync(bytes, 0, bytes.Length);
                                             return line;
                                         })
-                                    .Await()
+                                    .Await(readAhead:100)
                                     .ToArrayAsync();
                             });
                     }

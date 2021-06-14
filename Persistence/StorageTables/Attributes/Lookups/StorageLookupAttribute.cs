@@ -428,46 +428,62 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return member.PairWithValue(memberValue);
                     })
                 .ToArray();
-            var existingRowKeys = await GetKeys(memberInfo, repository, queryableProperties)
-                .ToArrayAsync();
-            var updatedRowKeys = GetKeys(memberInfo, value);
-            var rowKeysDeleted = existingRowKeys
-                .Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                .ToArray();
-            var rowKeysAdded = updatedRowKeys
-                .Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                .ToArray();
-            if (rowKeysDeleted.None() && rowKeysAdded.None())
-                return onNoChangesNecessary();
 
-            var deletionRollbacks = await rowKeysDeleted
+            //var existingRowKeys = await GetKeys(memberInfo, repository, queryableProperties)
+            //    .ToArrayAsync();
+            //var doesContainLookup = existingRowKeys
+            //    .Contains(rk => rk.RowKey == rowKeyRef && rk.PartitionKey == partitionKeyRef);
+            //if (doesContainLookup)
+            //    return onNoChangesNecessary();
+
+            Func<Task>[] rollbacks = await this.GetLookupKeys(memberInfo, queryableProperties)
                 .Select(
-                    rowKey =>
-                    {
-                        return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-                            repository,
-                            (rowAndParitionKeys) => rowAndParitionKeys
-                                .NullToEmpty()
-                                .Where(kvp => kvp.Key != rowKeyRef));
-                    })
-                .AsyncEnumerable()
-                .ToArrayAsync();
-            var additionRollbacks = rowKeysAdded
-                 .Select(
-                     rowKey =>
-                     {
-                         return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-                             repository,
-                             (rowAndParitionKeys) => rowAndParitionKeys
-                                .NullToEmpty()
-                                .Append(rowKeyRef.PairWithValue(partitionKeyRef)));
-                     })
+                    lookupKeys => MutateLookupTable(lookupKeys.RowKey, lookupKeys.PartitionKey, memberInfo,
+                        repository,
+                        (rowAndParitionKeys) => rowAndParitionKeys
+                            .NullToEmpty()
+                            .Append(rowKeyRef.PairWithValue(partitionKeyRef))))
                 .AsyncEnumerable()
                 .ToArrayAsync();
 
-            return onRepaired(
-                $"Added:{rowKeysAdded.Select(ar => ar.PartitionKey+" | "+ar.RowKey).Join(';')}" +
-                $"Deleted:{rowKeysDeleted.Select(ar => ar.PartitionKey + " | " + ar.RowKey).Join(';')}");
+            return onRepaired($"Processed Lookup:{rowKeyRef + " | " + partitionKeyRef}");
+
+            //var updatedRowKeys = new RefAst(rowKeyRef, partitionKeyRef).AsArray(); // GetKeys(memberInfo, value);
+            //var rowKeysDeleted = existingRowKeys
+            //    .Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
+            //    .ToArray();
+            //var rowKeysAdded = updatedRowKeys
+            //    .Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
+            //    .ToArray();
+            //if (rowKeysDeleted.None() && rowKeysAdded.None())
+            //    return onNoChangesNecessary();
+
+            //var deletionRollbacks = await rowKeysDeleted
+            //    .Select(
+            //        rowKey =>
+            //        {
+            //            return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+            //                repository,
+            //                (rowAndParitionKeys) => rowAndParitionKeys
+            //                    .NullToEmpty()
+            //                    .Where(kvp => kvp.Key != rowKeyRef));
+            //        })
+            //    .AsyncEnumerable()
+            //    .ToArrayAsync();
+            //var additionRollbacks = await rowKeysAdded
+            //     .Select(
+            //         rowKey =>
+            //         {
+            //             return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+            //                 repository,
+            //                 (rowAndParitionKeys) => rowAndParitionKeys
+            //                    .NullToEmpty()
+            //                    .Append(rowKeyRef.PairWithValue(partitionKeyRef)));
+            //         })
+            //    .AsyncEnumerable()
+            //    .ToArrayAsync();
+
+
         }
 
         #endregion

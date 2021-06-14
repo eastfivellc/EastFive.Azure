@@ -1558,15 +1558,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         #region Maintainence
 
 
-        public static IEnumerableAsync<string> StorageRepairModifiers(this Type type, string tableName = default)
+        public static IEnumerableAsync<string> StorageRepairModifiers(this Type type, string query, string tableName = default)
         {
             var storageRepairModifiersMethod = typeof(StorageExtensions)
                 .GetMethod("StorageRepairModifiersInternal", BindingFlags.Public | BindingFlags.Static);
             var storageRepairModifiersCast = storageRepairModifiersMethod.MakeGenericMethod(type.AsArray());
-            return (IEnumerableAsync<string>)storageRepairModifiersCast.Invoke(null, new object[] { tableName });
+            return (IEnumerableAsync<string>)storageRepairModifiersCast.Invoke(null, new object[] { query, tableName });
         }
 
-        public static IEnumerableAsync<string> StorageRepairModifiersInternal<TEntity>(string tableName = default)
+        public static IEnumerableAsync<string> StorageRepairModifiersInternal<TEntity>(string query, string tableName = default)
         {
             var repairers = typeof(TEntity)
                 .StorageProperties()
@@ -1579,18 +1579,28 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
             var driver = AzureTableDriverDynamic.FromSettings();
             return driver
-                .RunQueryForTableEntries<TEntity>(string.Empty)
+                .RunQueryForTableEntries<TEntity>(query)
                 .Select(
                     tableEntity =>
                     {
                         return repairers
                             .Select(
-                                tuple => tuple.repairer.RepairAsync(tuple.member,
-                                        tableEntity.RowKey, tableEntity.PartitionKey,
-                                        tableEntity.Entity, tableEntity.RawProperties,
-                                        driver,
-                                    repairNote => $"{tableEntity.PartitionKey}|{tableEntity.RowKey}:{repairNote}",
-                                    () => $"{tableEntity.PartitionKey}|{tableEntity.RowKey}:No Change"))
+                                async tuple =>
+                                {
+                                    try
+                                    {
+                                        return await tuple.repairer.RepairAsync(tuple.member,
+                                            tableEntity.RowKey, tableEntity.PartitionKey,
+                                            tableEntity.Entity, tableEntity.RawProperties,
+                                            driver,
+                                        repairNote => $"{tableEntity.PartitionKey}|{tableEntity.RowKey}:{repairNote}",
+                                        () => $"{tableEntity.PartitionKey}|{tableEntity.RowKey}:No Change");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        return ex.Message;
+                                    }
+                                })
                             .AsyncEnumerable()
                             .ToArrayAsync();
                     })
