@@ -19,6 +19,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool KeyFilter { get; set; } = false;
 
+        public bool CaseInsensitive { get; set; } = false;
+
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
             if (value == null)
@@ -41,6 +43,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .Replace('\t', '_')
                     .Replace('\n', '_')
                     .Replace('\r', '_');
+
+            if (CaseInsensitive)
+                stringValue = stringValue.ToLower();
 
             return $"{currentKey}{stringValue}";
         }
