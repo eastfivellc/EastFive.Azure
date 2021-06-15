@@ -42,9 +42,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
-            var lookupGeneratorAttr = this;
             var scopedLogger = logger.CreateScope("GetKeys");
-            var lookupRefs = lookupGeneratorAttr
+            var lookupRefs = this
                 .GetLookupKeys(memberInfo, queries)
                 .ToArray();
             scopedLogger.Trace($"Found {lookupRefs.Length} lookupRefs [{lookupRefs.Select(lr => $"{lr.PartitionKey}/{lr.RowKey}").Join(",")}]");
