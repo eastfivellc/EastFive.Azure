@@ -93,8 +93,9 @@ namespace EastFive.Azure.Persistence
                 if (parameterType.IsSubClassOfGeneric(typeof(EastFive.Api.Property<>)))
                 {
                     var refType = parameterType.GenericTypeArguments.First();
-                    var parameterTypeGeneric = RefOptionalHelper.CreateEmpty(refType);
-                    return parameterTypeGeneric;
+                    return refType.GetDefault();
+                    //var parameterTypeGeneric = RefOptionalHelper.CreateEmpty(refType);
+                    //return parameterTypeGeneric;
                 }
 
                 return parameterType.GetDefault();

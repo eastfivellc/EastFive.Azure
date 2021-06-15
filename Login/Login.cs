@@ -1,6 +1,7 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Extensions;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
@@ -50,7 +51,7 @@ namespace EastFive.Azure.Login
                 IAzureApplication application,
             CreatedBodyResponse<Auth.Session> onSuccess,
             AlreadyExistsResponse onAlreadyExists,
-            GeneralConflictResponse onInvalidPassword)
+            GeneralConflictResponse onInvalidUserNameOrPassword)
         {
             return await await Account
                 .GetRef(login.username)
@@ -58,11 +59,12 @@ namespace EastFive.Azure.Login
                     async (account) =>
                     {
                         if (!account.IsPasswordValid(login.password))
-                            return onInvalidPassword("Invalid password");
+                            return onInvalidUserNameOrPassword("Invalid username or password");
 
                         var session = await CreateSession(login.username, application);
                         return onSuccess(session);
-                    });
+                    },
+                    () => onInvalidUserNameOrPassword("Invalid username or password").AsTask());
         }
 
         [Api.HttpAction("CreateAccount")]

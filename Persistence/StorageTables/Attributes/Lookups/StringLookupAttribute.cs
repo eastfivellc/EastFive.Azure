@@ -149,5 +149,4 @@ namespace EastFive.Persistence.Azure.StorageTables
             return Partition;
         }
     }
-
 }
