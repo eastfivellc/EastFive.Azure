@@ -236,7 +236,7 @@ namespace EastFive.Api.Azure
             return AzureApplication.SendServiceBusMessageStaticAsync(queueName, listOfBytes);
         }
 
-        public static async Task SendServiceBusMessageStaticAsync(string queueName, IEnumerable<byte[]> listOfBytes)
+        public static async Task SendServiceBusMessageStaticAsync(string queueName, IEnumerable<byte[]> listOfBytes, Func<string> getSessionId = default)
         {
             const int maxPayloadSize = 262_144;
             const int perMessageHeaderSize = 58;
@@ -265,6 +265,7 @@ namespace EastFive.Api.Azure
                 var messages = listOfBytes
                     .Select(bytes => new Microsoft.Azure.ServiceBus.Message(bytes)
                     {
+                        SessionId = getSessionId != default ? getSessionId() : default(string),
                         ContentType = "application/octet-stream",
                     })
                     .ToArray();
