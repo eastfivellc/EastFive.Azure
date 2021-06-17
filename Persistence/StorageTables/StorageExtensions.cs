@@ -858,19 +858,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
-        [Obsolete]
-        public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            string partitionKey,
-            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated)
-            where TEntity : struct, IReferenceable
-        {
-            var rowKey = entityRef.StorageComputeRowKey();
-            return AzureTableDriverDynamic
-                .FromSettings()
-                .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
-                    onCreated,
-                    onTimeoutAsync: default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>));
-        }
+        //[Obsolete]
+        //public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+        //    string partitionKey,
+        //    Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated)
+        //    where TEntity : struct, IReferenceable
+        //{
+        //    var rowKey = entityRef.StorageComputeRowKey();
+        //    return AzureTableDriverDynamic
+        //        .FromSettings()
+        //        .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
+        //            onCreated,
+        //            onTimeoutAsync: default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>));
+        //}
 
         public static Task<TResult> StorageInsertOrReplaceAsync<TEntity, TResult>(this TEntity entity,
             Func<bool, TResult> onSuccess,
