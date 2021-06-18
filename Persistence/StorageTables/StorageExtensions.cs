@@ -1403,6 +1403,23 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region BLOB
 
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, Guid blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateOrUpdateAsync(content, blobId, containerName,
+                onSuccess,
+                onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+        }
+
         public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
             string contentType = default,
             IDictionary<string, string> metadata = default,
