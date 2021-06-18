@@ -65,38 +65,7 @@ namespace EastFive.Azure.Monitoring
             if (deactivated)
                 return response;
 
-            string teamsNotifyParam = default;
-            var teamsNotifyHeaders = request.Headers
-                .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase));
-            
-            if (teamsNotifyHeaders.Any())
-            {
-                var teamsNotifyParams = teamsNotifyHeaders.First().Value;
-                if (teamsNotifyParams.Any())
-                    teamsNotifyParam = teamsNotifyParams.First();
-            }
-
-
-            bool HasReportableError()
-            {
-                if (((int)response.StatusCode) < 400)
-                    return false;
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                    return false;
-                if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-                    return false;
-                return true;
-            }
-            
-            bool RequestTeamsNotify() => teamsNotifyParam != default;
-            bool ShouldNotify()
-            {
-                if (RequestTeamsNotify())
-                    return true;
-                if (HasReportableError())
-                    return true;
-                return false;
-            }
+            string teamsNotifyParam = GetTeamsNotifyParameter();
             
             if (!ShouldNotify())
                 return response;
@@ -110,6 +79,41 @@ namespace EastFive.Azure.Monitoring
 
             }
             return response;
+
+            string GetTeamsNotifyParameter()
+            {
+                return request.Headers
+                    .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase))
+                    .First(
+                        (teamsNotifyParams, next) =>
+                        {
+                            return teamsNotifyParams.Value.First(
+                                (teamsNotifyParam, next) => teamsNotifyParam,
+                                () => default(string));
+                        },
+                        () => default(string));
+            }
+
+            bool HasReportableError()
+            {
+                if (((int)response.StatusCode) < 400)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                    return false;
+                return true;
+            }
+
+            bool RequestTeamsNotify() => teamsNotifyParam != default;
+            bool ShouldNotify()
+            {
+                if (RequestTeamsNotify())
+                    return true;
+                if (HasReportableError())
+                    return true;
+                return false;
+            }
         }
 
         public async Task<string> TeamsNotifyAsync(IHttpResponse response, string teamsNotifyParam,
