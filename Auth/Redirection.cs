@@ -129,9 +129,10 @@ namespace EastFive.Azure.Auth
                                         },
                                         () =>
                                         {
-                                            if(authorizationRefToCreate.HasValueNotNull())
-                                                throw new Exception("Authorization to create already exists.");
-                                            throw new Exception("Duplicated update from ProcessAsync.");
+                                            //if(authorizationRefToCreate.HasValueNotNull())
+                                            //    throw new Exception("Authorization to create already exists.");
+                                            //throw new Exception("Duplicated update from ProcessAsync.");
+                                            return false;
                                         });
                                 },
                                 authentication, externalAccountKey, extraParams,
