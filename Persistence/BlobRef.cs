@@ -17,12 +17,24 @@ namespace EastFive.Persistence.Azure.StorageTables
     [BlobRefSerializer]
     public interface IBlobRef
     {
-        public string ContainerName { get; }
-        public string Id { get; } 
+        string ContainerName { get; }
+        string Id { get; }
+        Task SaveAsync();
     }
 
     public static class BlobRefExtensions
     {
+        public static string BlobContainerName(this MemberInfo member)
+        {
+            var validCharacters = $"{member.DeclaringType.Name}-{member.Name}"
+                .ToLower()
+                .Where(c => char.IsLetterOrDigit(c))
+                .Take(63)
+                .Join();
+            var containerName = string.Concat(validCharacters);
+            return containerName;
+        }
+
         public static Task<(byte[], string)> ReadBytesAsync(this IBlobRef blobRef) =>
             blobRef.ReadBytesAsync(
                 onSuccess:(bytes, contentType) => (bytes, contentType));
@@ -43,21 +55,40 @@ namespace EastFive.Persistence.Azure.StorageTables
                     onTimeout: onTimeout);
         }
 
-        public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef)
+        public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef,
+            string newBlobId = default)
         {
-            var blobId = Guid.NewGuid().ToString("N");
+            if(newBlobId.IsNullOrWhiteSpace())
+                newBlobId = Guid.NewGuid().ToString("N");
             var (bytes, contentType) = await blobRef.ReadBytesAsync();
             return await AzureTableDriverDynamic
                 .FromSettings()
-                .BlobCreateAsync(bytes, blobId, blobRef.ContainerName,
+                .BlobCreateAsync(bytes, newBlobId, blobRef.ContainerName,
                     () =>
                     {
                         return (IBlobRef)new BlobRef
                         {
-                            Id = blobId,
+                            Id = newBlobId,
                             ContainerName = blobRef.ContainerName,
                         };
                     },
+                    contentType: contentType);
+        }
+
+        public static async Task<TResult> SaveAsync<TResult>(this IBlobRef blobRef,
+                byte [] bytes,
+            Func<TResult> onSaved,
+            Func<TResult> onAlreadySaved)
+        {
+            var (bytes, contentType) = await blobRef.ReadBytesAsync();
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(bytes, blobRef.Id, blobRef.ContainerName,
+                    () =>
+                    {
+                        return onSaved();
+                    },
+                    onAlreadyExists:() => onAlreadySaved(),
                     contentType: contentType);
         }
 
@@ -66,6 +97,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             public string ContainerName { get; set; }
 
             public string Id { get; set; }
+
+            public Task SaveAsync() => throw new NotImplementedException();
         }
     }
 
@@ -77,6 +110,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             public string ContainerName { get; set; }
 
             public string Id { get; set; }
+
+            public Task SaveAsync() => throw new NotImplementedException();
         }
 
         public TResult Bind<TResult>(IDictionary<string, EntityProperty> value,
@@ -84,12 +119,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<object, TResult> onBound, 
             Func<TResult> onFailedToBind)
         {
-            var validCharacters = $"{member.DeclaringType.Name}-{member.Name}"
-                .ToLower()
-                .Where(c => char.IsLetterOrDigit(c))
-                .Take(63)
-                .Join();
-            var containerName = string.Concat(validCharacters);
+            var containerName = member.BlobContainerName();
 
             var id = GetId();
             var blobRef = new BlobRef
