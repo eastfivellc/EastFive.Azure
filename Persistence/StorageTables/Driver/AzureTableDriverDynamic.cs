@@ -2985,7 +2985,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 }
                 return onSuccess();
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (onFailure.IsDefaultOrNull())
                     throw;
@@ -3042,7 +3042,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 }
                 return onSuccess();
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (onFailure.IsDefaultOrNull())
                     throw;
@@ -3105,7 +3105,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 }
                 return onSuccess();
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (onFailure.IsDefaultOrNull())
                     throw;
@@ -3141,23 +3141,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
             catch (global::Azure.RequestFailedException ex)
             {
+                if (ex.IsProblemDoesNotExist())
+                    if (!onNotFound.IsDefaultOrNull())
+                        return onNotFound();
                 if (onFailure.IsDefaultOrNull())
                     throw;
                 return ex.ParseExtendedErrorInformation(
-                    (codes, why) =>
-                    {
-                        return onFailure(codes, why);
-                    },
-                    () =>
-                    {
-                        var isNotFound = ex.Message
-                            .ToLower()
-                            .Contains("not found");
-                        if (isNotFound)
-                            return onNotFound();
-
-                        return onFailure(ExtendedErrorInformationCodes.Other, ex.Message);
-                    });
+                    (code, msg) => onFailure(code, msg),
+                    () => throw ex);
             }
         }
 
@@ -3262,7 +3253,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 var returnStream = await returnStreamTask;
                 return onFound(returnStream, properties.Value);
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (ex.IsProblemDoesNotExist())
                     if (!onNotFound.IsDefaultOrNull())
@@ -3293,7 +3284,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 var result = await blockClient.DeleteIfExistsAsync();
                 return onSuccess(result.Value);
             }
-            catch (StorageException ex)
+            catch (global::Azure.RequestFailedException ex)
             {
                 if (onFailure.IsDefaultOrNull())
                     throw;

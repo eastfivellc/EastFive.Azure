@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using EastFive.Api;
+using EastFive.Api.Auth;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
@@ -94,6 +96,8 @@ namespace EastFive.Azure.Auth
 
         #region Http Methods
 
+        #region GET
+
         [Api.HttpGet]
         public static Task<IHttpResponse> GetAsync(
                 [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
@@ -128,11 +132,15 @@ namespace EastFive.Azure.Auth
                 () => onNotFound());
         }
 
+        #endregion
+
+        #region POST
+
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> method,
-                [Property(Name = LocationAuthorizationReturnPropertyName)]Uri LocationAuthenticationReturn,
+                [Property(Name = LocationAuthorizationReturnPropertyName)]Uri locationAuthenticationReturn,
                 [Resource]Authorization authorization,
                 IAuthApplication application, IProvideUrl urlHelper,
             CreatedBodyResponse<Authorization> onCreated,
@@ -258,6 +266,10 @@ namespace EastFive.Azure.Auth
                 () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }
 
+        #endregion
+
+        #region PATCH
+
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]
         public async static Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
@@ -284,6 +296,10 @@ namespace EastFive.Azure.Auth
                 },
                 () => onNotFound());
         }
+
+        #endregion
+
+        #region DELETE
 
         [HttpDelete]
         public static async Task<IHttpResponse> DeleteAsync(
@@ -330,6 +346,85 @@ namespace EastFive.Azure.Auth
                 },
                 () => onNotFound());
         }
+
+        #endregion
+
+        #region ACTION
+
+        [HttpAction("Replay")]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static async Task<IHttpResponse> ReplayAsync(
+                [QueryId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
+                Api.Azure.AzureApplication application,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
+            ContentTypeResponse<Session> onReplayed,
+            NotFoundResponse onNotFound,
+            ForbiddenResponse onAuthorizationFailed,
+            ServiceUnavailableResponse onServericeUnavailable,
+            ForbiddenResponse onInvalidMethod,
+            GeneralConflictResponse onFailure)
+        {
+            return await await authorizationRef.StorageGetAsync(
+                async (authorization) =>
+                {
+                    var methodRef = authorization.Method;
+                    return await await Auth.Method.ById(methodRef, application,
+                        async (method) =>
+                        {   
+                            var paramsUpdated = authorization.parameters
+                                .Append(authorizationRef.id.ToString().PairWithKey("state"))
+                                .ToDictionary();
+
+                            //var authorizationRequestManager = application.AuthorizationRequestManager;
+                            return await await Redirection.AuthenticationAsync(
+                                method,
+                                paramsUpdated,
+                                application, request,
+                                endpoints,
+                                request.RequestUri,
+                                authorizationRef.Optional(),
+                                async (redirect, accountIdMaybe, modifier) =>
+                                {
+                                    var sessionRef = Ref<Session>.SecureRef();
+                                    var session = new Session()
+                                    {
+                                        sessionId = sessionRef,
+                                        account = accountIdMaybe,
+                                        authorization = authorizationRef.Optional(),
+                                    };
+                                    var responseCreated = await Session.CreateAsync(sessionRef, authorizationRef.Optional(),
+                                        session,
+                                        application,
+                                        (sessionCreated, contentType) =>
+                                        {
+                                            var response = onReplayed(sessionCreated, contentType: contentType);
+                                            response.SetLocation(redirect);
+                                            return response;
+                                        },
+                                        onAlreadyExists: default,
+                                        onAuthorizationFailed,
+                                        (why1, why2) => onServericeUnavailable(),
+                                        onFailure);
+                                    var modifiedResponse = modifier(responseCreated);
+                                    return modifiedResponse;
+                                },
+                                () => onAuthorizationFailed()
+                                    .AddReason("Authorization was not found")
+                                    .AsTask(), // Bad credentials
+                                why => onServericeUnavailable()
+                                    .AddReason(why)
+                                    .AsTask(),
+                                why => onAuthorizationFailed()
+                                    .AddReason(why)
+                                    .AsTask());
+                        },
+                        () => onInvalidMethod().AddReason("The method was not found.").AsTask());
+                },
+                () => onNotFound().AsTask());
+        }
+
+        #endregion
 
         #endregion
 

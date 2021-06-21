@@ -127,7 +127,13 @@ namespace EastFive.Azure.Auth
                                         {
                                             return true;
                                         },
-                                        () => throw new Exception("Secure guid not unique"));
+                                        () =>
+                                        {
+                                            //if(authorizationRefToCreate.HasValueNotNull())
+                                            //    throw new Exception("Authorization to create already exists.");
+                                            //throw new Exception("Duplicated update from ProcessAsync.");
+                                            return false;
+                                        });
                                 },
                                 authentication, externalAccountKey, extraParams,
                                 application, request, endpoints, loginProvider, baseUri,

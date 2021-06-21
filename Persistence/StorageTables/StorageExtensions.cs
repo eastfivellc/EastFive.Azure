@@ -858,19 +858,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
-        [Obsolete]
-        public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            string partitionKey,
-            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated)
-            where TEntity : struct, IReferenceable
-        {
-            var rowKey = entityRef.StorageComputeRowKey();
-            return AzureTableDriverDynamic
-                .FromSettings()
-                .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
-                    onCreated,
-                    onTimeoutAsync: default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>));
-        }
+        //[Obsolete]
+        //public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+        //    string partitionKey,
+        //    Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated)
+        //    where TEntity : struct, IReferenceable
+        //{
+        //    var rowKey = entityRef.StorageComputeRowKey();
+        //    return AzureTableDriverDynamic
+        //        .FromSettings()
+        //        .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
+        //            onCreated,
+        //            onTimeoutAsync: default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>));
+        //}
 
         public static Task<TResult> StorageInsertOrReplaceAsync<TEntity, TResult>(this TEntity entity,
             Func<bool, TResult> onSuccess,
@@ -1402,6 +1402,23 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         #endregion
 
         #region BLOB
+
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, Guid blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateOrUpdateAsync(content, blobId, containerName,
+                onSuccess,
+                onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+        }
 
         public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
             string contentType = default,
