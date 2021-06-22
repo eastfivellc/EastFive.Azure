@@ -342,7 +342,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return CastEntityProperty(value, valueTypeOfInstance, onValue, onNoCast);
                     }
 
-
                     return onNoCast();
                 });
 

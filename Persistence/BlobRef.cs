@@ -76,11 +76,10 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         public static async Task<TResult> SaveAsync<TResult>(this IBlobRef blobRef,
-                byte [] bytes,
+                byte [] bytes, string contentType,
             Func<TResult> onSaved,
             Func<TResult> onAlreadySaved)
         {
-            var (bytes, contentType) = await blobRef.ReadBytesAsync();
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .BlobCreateAsync(bytes, blobRef.Id, blobRef.ContainerName,

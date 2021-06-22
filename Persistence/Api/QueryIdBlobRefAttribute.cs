@@ -38,11 +38,9 @@ namespace EastFive.Azure.Persistence
                         return bindingData.fetchQueryParam(parameterRequiringValidation,
                             v =>
                             {
-                                var blobRef = new BlobRef
-                                {
-                                    Id = (v as IBlobRef).Id,
-                                    ContainerName = blobContainerName,
-                                };
+                                var blobRef = (v as IApiBoundBlobRef);
+                                blobRef.ContainerName = blobContainerName;
+
                                 return SelectParameterResult.Query(blobRef, key, parameterRequiringValidation);
                             },
                             whyQuery =>
@@ -50,11 +48,8 @@ namespace EastFive.Azure.Persistence
                                 return bindingData.fetchDefaultParam(parameterRequiringValidation,
                                     (v) =>
                                     {
-                                        var blobRef = new BlobRef
-                                        {
-                                            Id = (v as IBlobRef).Id,
-                                            ContainerName = blobContainerName,
-                                        };
+                                        var blobRef = (v as IApiBoundBlobRef);
+                                        blobRef.ContainerName = blobContainerName;
                                         return SelectParameterResult.File(blobRef, key, parameterRequiringValidation);
                                     },
                                     (whyFile) =>
@@ -99,11 +94,8 @@ namespace EastFive.Azure.Persistence
                         return bindingData.fetchBodyParam(parameterRequiringValidation,
                             v =>
                             {
-                                var blobRef = new BlobRef
-                                {
-                                    Id = (v as IBlobRef).Id,
-                                    ContainerName = blobContainerName,
-                                };
+                                var blobRef = (v as IApiBoundBlobRef);
+                                blobRef.ContainerName = blobContainerName;
                                 return SelectParameterResult.Query(blobRef, key, parameterRequiringValidation);
                             },
                             whyQuery =>
@@ -117,13 +109,6 @@ namespace EastFive.Azure.Persistence
                         key,
                         parameterRequiringValidation));
         }
-
-        protected class BlobRef : IBlobRef
-        {
-            public string Id { get; set; }
-
-            public string ContainerName { get; set; }
-        }
     }
 
     public class BlobRefPropertyOptional : BlobRefProperty
@@ -131,9 +116,19 @@ namespace EastFive.Azure.Persistence
         public override SelectParameterResult TryCast(BindingData bindingData)
         {
             var parameterRequiringValidation = bindingData.parameterRequiringValidation;
+            var parameterType = parameterRequiringValidation.ParameterType;
             var baseValue = base.TryCast(bindingData);
+
             if (baseValue.valid)
+            {
+                if (parameterType.IsSubClassOfGeneric(typeof(EastFive.Api.Property<>)))
+                {
+                    var concretePropertyType = typeof(EastFive.Api.Property<>)
+                        .MakeGenericType(parameterType.GenericTypeArguments);
+                    baseValue.value = Activator.CreateInstance(concretePropertyType, baseValue.value);
+                }
                 return baseValue;
+            }
 
             baseValue.valid = true;
             baseValue.fromBody = true;
@@ -142,7 +137,6 @@ namespace EastFive.Azure.Persistence
 
             object GetValue()
             {
-                var parameterType = parameterRequiringValidation.ParameterType;
                 if (parameterType.IsSubClassOfGeneric(typeof(EastFive.Api.Property<>)))
                 {
                     var refType = parameterType.GenericTypeArguments.First();
@@ -150,7 +144,6 @@ namespace EastFive.Azure.Persistence
                     //var parameterTypeGeneric = RefOptionalHelper.CreateEmpty(refType);
                     //return parameterTypeGeneric;
                 }
-
                 return parameterType.GetDefault();
             }
         }

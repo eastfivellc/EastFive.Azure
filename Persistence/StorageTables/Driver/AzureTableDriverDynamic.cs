@@ -3068,7 +3068,38 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 metadata: metadata,
                 onTimeout: onTimeout);
 
-        public async Task<TResult> BlobCreateAsync<TResult>(Guid blobId, string containerName,
+        public Task<TResult> BlobCreateAsync<TResult>(Stream content, string blobName, string containerName,
+            Func<TResult> onSuccess,
+            Func<TResult> onAlreadyExists = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobName, containerName,
+                    stream => content.CopyToAsync(stream),
+                onSuccess: onSuccess,
+                onAlreadyExists: onAlreadyExists,
+                onFailure: onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+
+        public Task<TResult> BlobCreateAsync<TResult>(Guid blobId, string containerName,
+                Func<Stream, Task> writeAsync,
+            Func<TResult> onSuccess,
+            Func<TResult> onAlreadyExists = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(
+                    blobId.ToString("N"), containerName, writeAsync:writeAsync,
+                onSuccess: onSuccess,
+                onAlreadyExists: onAlreadyExists,
+                onFailure: onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                onTimeout: onTimeout);
+
+        public async Task<TResult> BlobCreateAsync<TResult>(string blobName, string containerName,
                 Func<Stream, Task> writeAsync,
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
@@ -3080,7 +3111,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var container = this.BlobClient.GetBlobContainerClient(containerName);
             var createResponse = await container.CreateIfNotExistsAsync();
             //global::Azure.ETag created = createResponse.Value.ETag;
-            var blockClient = container.GetBlobClient(blobId.ToString("N"));
+            var blockClient = container.GetBlobClient(blobName);
             try
             {
                 if (await blockClient.ExistsAsync())

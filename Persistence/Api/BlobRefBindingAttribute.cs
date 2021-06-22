@@ -14,10 +14,10 @@ namespace EastFive.Azure.Persistence
 {
     internal interface IApiBoundBlobRef : IBlobRef
     {
-        string ContainerName { get; set; }
+        new string ContainerName { set; }
     }
 
-    public class BlobRefBindingAttribute : Attribute, IBindApiParameter<string>
+    public class BlobRefBindingAttribute : Attribute, IBindApiParameter<string>,
         IBindApiParameter<Microsoft.AspNetCore.Http.IFormFile>
     {
         public TResult Bind<TResult>(Type type, string content,
@@ -53,6 +53,9 @@ namespace EastFive.Azure.Persistence
             Func<string, TResult> onDidNotBind,
             Func<string, TResult> onBindingFailure)
         {
+            if (type.IsSubClassOfGeneric(typeof(Property<>)))
+                type = type.GetGenericArguments().First();
+            
             if (!typeof(IBlobRef).IsAssignableFrom(type))
                 return onDidNotBind("BlobRefBindingAttribute only binds IBlobRef");
 
@@ -71,13 +74,17 @@ namespace EastFive.Azure.Persistence
             public BlobRefFormFile(IFormFile content)
             {
                 Id = Guid.NewGuid().ToString("N");
+                this.content = content;
             }
 
-            public Task SaveAsync()
+            public async Task SaveAsync()
             {
-                return content.OpenReadStream().BlobCreateAsync(
-                    Id, this.ContainerName,
-                    () => true);
+                using (var stream = content.OpenReadStream())
+                {
+                    bool created = await stream.BlobCreateAsync(
+                        Id, this.ContainerName,
+                        () => true);
+                }
             }
         }
     }

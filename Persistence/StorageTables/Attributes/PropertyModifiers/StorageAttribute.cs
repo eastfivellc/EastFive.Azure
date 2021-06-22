@@ -137,6 +137,16 @@ namespace EastFive.Persistence
             var propertyName = this.GetTablePropertyName(memberInfo);
 
             var valueType = memberInfo.GetPropertyOrFieldType();
+
+            if (valueType.TryGetAttributeInterface(
+                        out ICast<IDictionary<string, EntityProperty>> properties))
+            {
+                return properties.Cast(value, valueType,
+                    propertyName, memberInfo,
+                    props => props.ToArray(),
+                    () => CastValue(valueType, value, propertyName));
+            }
+
             return CastValue(valueType, value, propertyName);
         }
 
