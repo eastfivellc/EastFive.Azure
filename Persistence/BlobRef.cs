@@ -7,6 +7,7 @@ using EastFive.Serialization;
 using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -50,6 +51,26 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .FromSettings()
                 .BlobLoadBytesAsync(blobName, blobRef.ContainerName,
                     (bytes, properties) => onSuccess(bytes, properties.ContentType),
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
+        public static Task<(Stream, string)> ReadStreamAsync(this IBlobRef blobRef) =>
+            blobRef.ReadStreamAsync(
+                onSuccess: (stream, contentType) => (stream, contentType));
+
+        public static Task<TResult> ReadStreamAsync<TResult>(this IBlobRef blobRef,
+            Func<Stream, string, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            var blobName = blobRef.Id;
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobLoadStreamAsync(blobName, blobRef.ContainerName,
+                    (stream, properties) => onSuccess(stream, properties.ContentType),
                     onNotFound,
                     onFailure: onFailure,
                     onTimeout: onTimeout);
