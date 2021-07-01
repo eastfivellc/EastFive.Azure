@@ -3014,6 +3014,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
+            string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
@@ -3030,6 +3031,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
                 using (var stream = new MemoryStream(content))
                 {
+                    
                     await blockClient.UploadAsync(stream,
                         new global::Azure.Storage.Blobs.Models.BlobUploadOptions
                         {
@@ -3037,8 +3039,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
+                                ContentDisposition = GetDisposition(),
                             }
                         });
+
+                    string GetDisposition()
+                    {
+                        if (fileName.IsNullOrWhiteSpace())
+                            return default;
+                        var disposition = new System.Net.Mime.ContentDisposition();
+                        disposition.FileName = fileName;
+                        return disposition.ToString();
+                    }
                 }
                 return onSuccess();
             }

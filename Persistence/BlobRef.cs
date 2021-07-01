@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,21 +20,45 @@ namespace EastFive.Persistence.Azure.StorageTables
     public interface IBlobRef
     {
         string ContainerName { get; }
+
         string Id { get; }
-        Task SaveAsync();
+
+        Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], string, string, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
+    }
+
+    public interface IDefineBlobContainer
+    {
+        string ContainerName { get; }
+    }
+
+    public class BlobContainerAttribute 
+        : System.Attribute, IDefineBlobContainer
+    {
+        public string ContainerName { get; set; }
     }
 
     public static class BlobRefExtensions
     {
         public static string BlobContainerName(this MemberInfo member)
         {
-            var validCharacters = $"{member.DeclaringType.Name}-{member.Name}"
-                .ToLower()
-                .Where(c => char.IsLetterOrDigit(c))
-                .Take(63)
-                .Join();
-            var containerName = string.Concat(validCharacters);
-            return containerName;
+            return member.TryGetAttributeInterface(out IDefineBlobContainer blobContainer) ?
+                blobContainer.ContainerName
+                :
+                GetDefault();
+
+            string GetDefault()
+            {
+                var validCharacters = $"{member.DeclaringType.Name}-{member.Name}"
+                    .ToLower()
+                    .Where(c => char.IsLetterOrDigit(c))
+                    .Take(63)
+                    .Join();
+                var containerName = string.Concat(validCharacters);
+                return containerName;
+            }
         }
 
         public static Task<(byte[], string)> ReadBytesAsync(this IBlobRef blobRef) =>
@@ -91,25 +116,32 @@ namespace EastFive.Persistence.Azure.StorageTables
                         {
                             Id = newBlobId,
                             ContainerName = blobRef.ContainerName,
+                            ContentType = contentType,
+                            FileName = newBlobId,
                         };
                     },
                     contentType: contentType);
         }
 
-        public static async Task<TResult> SaveAsync<TResult>(this IBlobRef blobRef,
-                byte [] bytes, string contentType,
-            Func<TResult> onSaved,
-            Func<TResult> onAlreadySaved)
+        public static async Task<TResult> SaveOrUpdateAsync<TResult>(this IBlobRef blobRef,
+            Func<bool, byte[], string , string, TResult> onSaved,
+            Func<TResult> onCouldNotAccess = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
         {
-            return await AzureTableDriverDynamic
-                .FromSettings()
-                .BlobCreateAsync(bytes, blobRef.Id, blobRef.ContainerName,
-                    () =>
-                    {
-                        return onSaved();
-                    },
-                    onAlreadyExists:() => onAlreadySaved(),
-                    contentType: contentType);
+            return await await blobRef.LoadAsync(
+                async (blobName, bytes, contentType, fileName) =>
+                {
+                    return await AzureTableDriverDynamic
+                        .FromSettings()
+                        .BlobCreateOrUpdateAsync(bytes, blobRef.Id, blobRef.ContainerName,
+                            () =>
+                            {
+                                return onSaved(false, bytes, contentType, fileName);
+                            },
+                            onFailure: onFailure,
+                            contentType: contentType);
+                },
+                onNotFound: onCouldNotAccess.AsAsyncFunc());
         }
 
         private class BlobRef : IBlobRef
@@ -118,7 +150,17 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public string Id { get; set; }
 
-            public Task SaveAsync() => throw new NotImplementedException();
+            public string ContentType { get; set; }
+
+            public string FileName { get; set; }
+
+            public Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], string, string, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 
@@ -131,7 +173,25 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public string Id { get; set; }
 
-            public Task SaveAsync() => throw new NotImplementedException();
+            public Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], string, string, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+            {
+                var blobName = this.Id;
+                return AzureTableDriverDynamic
+                    .FromSettings()
+                    .BlobLoadBytesAsync(blobName: blobName, containerName: this.ContainerName,
+                        (bytes, properties) =>
+                        {
+                            ContentDispositionHeaderValue.TryParse(
+                                properties.ContentDisposition, out ContentDispositionHeaderValue fileName);
+                            return onFound(blobName, bytes,
+                                properties.ContentType, fileName.FileName);
+                        },
+                        onNotFound: onNotFound,
+                        onFailure: onFailure);
+            }
         }
 
         public TResult Bind<TResult>(IDictionary<string, EntityProperty> value,

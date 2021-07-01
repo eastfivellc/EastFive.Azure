@@ -1,13 +1,16 @@
 ﻿using EastFive.Api;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Persistence
@@ -44,7 +47,25 @@ namespace EastFive.Azure.Persistence
                 Id = id;
             }
 
-            public Task SaveAsync() => throw new NotImplementedException();
+            public async Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], string, string, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+            {
+                var blobName = this.Id;
+                return await AzureTableDriverDynamic
+                    .FromSettings()
+                    .BlobLoadBytesAsync(blobName:blobName, containerName:this.ContainerName,
+                        (bytes, properties) =>
+                        {
+                            ContentDispositionHeaderValue.TryParse(
+                                properties.ContentDisposition, out ContentDispositionHeaderValue fileName);
+                            return onFound(blobName, bytes,
+                                properties.ContentType, fileName.FileName);
+                        },
+                        onNotFound:onNotFound,
+                        onFailure: onFailure);
+            }
         }
 
         public TResult Bind<TResult>(Type type, IFormFile content,
@@ -67,7 +88,23 @@ namespace EastFive.Azure.Persistence
         {
             public string Id { get; private set; }
 
-            public string ContainerName { get; set; }
+            private string containerName = default;
+
+            public string ContainerName 
+            {
+                get
+                {
+                    if (containerName.HasBlackSpace())
+                        return containerName;
+                    throw new Exception($"{nameof(BlobRefProperty)} must be used as the Http Method Parameter decorator for IBlobRef");
+                }
+                set
+                {
+                    if (value.IsNullOrWhiteSpace())
+                        throw new Exception("Container names but not be empty.");
+                    this.containerName = value;
+                }
+            }
 
             public IFormFile content;
 
@@ -77,13 +114,15 @@ namespace EastFive.Azure.Persistence
                 this.content = content;
             }
 
-            public async Task SaveAsync()
+            public async Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], string, string, TResult> onFound, 
+                Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes, 
+                    string, TResult> onFailure = null)
             {
                 using (var stream = content.OpenReadStream())
                 {
-                    bool created = await stream.BlobCreateAsync(
-                        Id, this.ContainerName,
-                        () => true);
+                    var bytes = await stream.ToBytesAsync();
+                    return onFound(this.Id, bytes, this.content.ContentType, this.content.FileName);
                 }
             }
         }
