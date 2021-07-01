@@ -186,7 +186,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
             var backoff = TimeSpan.FromSeconds(1.0);
 
-            var completeMutex = new System.Threading.ManualResetEvent(false);
+            var completeMutex = new System.Threading.AutoResetEvent(false);
             var rowList = new ConcurrentBag<GenericTableEntity>();
             //var listLock = new object();
             //var rowList = new List<GenericTableEntity>();
