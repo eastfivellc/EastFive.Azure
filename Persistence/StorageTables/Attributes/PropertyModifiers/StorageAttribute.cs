@@ -1064,6 +1064,12 @@ namespace EastFive.Persistence
             if (typeof(Type) == type)
                 return onBound(null);
 
+            if(type.IsEnum)
+            {
+                var v = type.GetDefault();
+                return onBound(v);
+            }
+
             if (type.IsArray)
             {
                 var arrayInstance = Array.CreateInstance(type.GetElementType(), 0);
