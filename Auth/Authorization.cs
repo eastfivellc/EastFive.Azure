@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ namespace EastFive.Azure.Auth
         ContentType = "x-application/auth-authorization",
         ContentTypeVersion = "0.1")]
     [StorageTable]
+    [InstigateAuthorization]
     public struct Authorization : IReferenceable
     {
         #region Properties
@@ -466,6 +468,34 @@ namespace EastFive.Azure.Auth
                     //        () => onFailure("Method does not match any existing authentication."));
                 },
                 () => onFailure("Authentication not found"));
+        }
+    }
+
+    public class InstigateAuthorizationAttribute : Attribute, IInstigatable
+    {
+        public Task<IHttpResponse> Instigate(IApplication httpApp,
+                IHttpRequest request, ParameterInfo parameterInfo,
+            Func<object, Task<IHttpResponse>> onSuccess)
+        {
+            return request
+                .GetSessionIdClaimsAsync(
+                    async (sessionId, claims) =>
+                    {
+                        return await await sessionId.AsRef<Session>().StorageGetAsync(
+                            async session =>
+                            {
+                                return await await session.authorization.StorageGetAsync(
+                                    authorization => onSuccess(authorization),
+                                    () => request
+                                        .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
+                                        .AddReason("Session is not authorized.")
+                                        .AsTask());
+                            },
+                            () => request
+                                .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
+                                .AddReason("Session does not exist")
+                                .AsTask());
+                    });
         }
     }
 }
