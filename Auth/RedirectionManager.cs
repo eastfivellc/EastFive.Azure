@@ -26,6 +26,10 @@ namespace EastFive.Azure.Auth
         ContentTypeVersion = "0.1")]
     public struct RedirectionManager : IReferenceable
     {
+        #region Properties
+
+        #region Base
+
         [JsonIgnore]
         public Guid id => redirectionManagerRef.id;
 
@@ -35,6 +39,8 @@ namespace EastFive.Azure.Auth
         [RowKey]
         [StandardParititionKey]
         public IRef<RedirectionManager> redirectionManagerRef;
+
+        #endregion
 
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
@@ -59,6 +65,12 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = Redirection)]
         [Storage]
         public Uri redirection { get; set; }
+
+        #endregion
+
+        #region HTTP Methods
+
+        #region GET
 
         [Api.HttpGet]
         [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
@@ -316,5 +328,9 @@ namespace EastFive.Azure.Auth
                 },
                 () => onNotFound().AsTask());
         }
+
+        #endregion
+
+        #endregion
     }
 }
