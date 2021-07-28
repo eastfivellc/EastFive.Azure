@@ -60,8 +60,8 @@ namespace EastFive.Azure.Functions
         public DateTimeOffset lastModified;
 
         [JsonProperty]
-        [Storage]
-        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery)]
+        [StorageOverflow]
+        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery, ShouldHashRowKey = true)]
         public Uri requestUri;
 
         [JsonProperty]

@@ -94,6 +94,9 @@ namespace EastFive.Azure.StorageTables.Driver
                         return true;
                     if (errorCode == ExtendedErrorInformationCodes.BlobNotFound)
                         return true;
+                    if (errorCode == ExtendedErrorInformationCodes.Other)
+                        if ("ContainerNotFound".Equals(exception.ErrorCode, StringComparison.OrdinalIgnoreCase))
+                            return true;
                     return false;
                 },
                 () =>

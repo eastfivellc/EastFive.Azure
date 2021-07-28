@@ -15,6 +15,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public UriComponents Components { get; set; }
 
+        public bool ShouldHashRowKey { get; set; }
+
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -23,14 +25,16 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
-            var rowKey = GetStringValue(decoratedMember, rowKeyValue, this.GetType(), this.Components);
+            var rowKey = GetStringValue(decoratedMember, rowKeyValue, 
+                this.GetType(), this.Components, this.ShouldHashRowKey);
             if (rowKey.IsNullOrWhiteSpace())
                 return Enumerable.Empty<IRefAst>();
             var partitionKey = GetPartitionKey(rowKey);
             return new RefAst(rowKey, partitionKey).AsEnumerable();
         }
 
-        internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType, UriComponents components)
+        internal static string GetStringValue(MemberInfo memberInfo, object memberValue, 
+            Type thisAttributeType, UriComponents components, bool shouldHasRowKey)
         {
             var propertyValueType = memberInfo.GetMemberType();
             if (typeof(Uri).IsAssignableFrom(propertyValueType))
@@ -40,6 +44,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return null;
                 var rowKeyUnsanitized = GetUnsanitized(url);
                 var rowKeyBytes = rowKeyUnsanitized.GetBytes(System.Text.Encoding.UTF8);
+                if (shouldHasRowKey)
+                    return rowKeyBytes.MD5HashGuid().ToString("N");
                 var stringValue = Convert
                     .ToBase64String(rowKeyBytes, Base64FormattingOptions.None)
                     .Replace('/', '_');
