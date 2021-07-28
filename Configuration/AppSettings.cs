@@ -59,6 +59,10 @@ namespace EastFive.Azure
                 "Create API Key")]
             public const string ClientSecret = "EastFive.Azure.ApplicationInsights.ClientSecret";
 
+            public const string ApiBase = "EastFive.Azure.ApplicationInsights.ApiBase";
+
+            public const string Path = "EastFive.Azure.ApplicationInsights.Path";
+
             public const string TeamsHook = "EastFive.Azure.ApplicationInsights.TeamsHook";
 
             public const string TeamsAppIdentification = "EastFive.Azure.ApplicationInsights.TeamsAppIdentification";
