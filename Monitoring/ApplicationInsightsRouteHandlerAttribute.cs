@@ -22,8 +22,8 @@ namespace EastFive.Azure.Monitoring
 {
     public class ApplicationInsightsRouteHandlerAttribute : Attribute, IHandleRoutes, IHandleMethods, IHandleExceptions
     {
+        public const string TelemetryStatusType = "StatusType";
         public const string TelemetryStatusName = "StatusName";
-        public const string TelemetryStatusInstance = "StatusInstance";
 
         internal const string HttpRequestMessagePropertyRequestTelemetryKey = "e5_monitoring_requesttelemetry_key";
 
@@ -36,7 +36,7 @@ namespace EastFive.Azure.Monitoring
             var telemetry = new RequestTelemetry()
             {
                 Id = requestId,
-                Source = "EastFive.Api",
+                Source = controllerType.Assembly.FullName,
                 Timestamp = DateTimeOffset.UtcNow,
                 Url = routeData.GetAbsoluteUri(), // request.RequestUri,
             };
@@ -81,15 +81,15 @@ namespace EastFive.Azure.Monitoring
 
             #region Method result identfiers
 
-            if (response.Headers.TryGetValue(Middleware.HeaderStatusName, out string[] statusNames))
+            if (response.Headers.TryGetValue(Middleware.HeaderStatusType, out string[] statusNames))
             {
                 if (statusNames.Any())
-                    telemetry.Properties.Add(TelemetryStatusName, statusNames.First());
+                    telemetry.Properties.Add(TelemetryStatusType, statusNames.First());
             }
-            if (response.Headers.TryGetValue(Middleware.HeaderStatusInstance, out string[] statusInstances))
+            if (response.Headers.TryGetValue(Middleware.HeaderStatusName, out string[] statusInstances))
             {
                 if(statusInstances.Any())
-                    telemetry.Properties.Add(TelemetryStatusInstance, statusInstances.First());
+                    telemetry.Properties.Add(TelemetryStatusName, statusInstances.First());
             }
 
             #endregion
