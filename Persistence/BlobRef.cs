@@ -185,9 +185,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                         (bytes, properties) =>
                         {
                             ContentDispositionHeaderValue.TryParse(
-                                properties.ContentDisposition, out ContentDispositionHeaderValue fileName);
+                                properties.ContentDisposition, out ContentDispositionHeaderValue fileNameHeaderValue);
+                            var fileName = fileNameHeaderValue.IsDefaultOrNull() ?
+                                string.Empty
+                                :
+                                fileNameHeaderValue.FileName;
                             return onFound(blobName, bytes,
-                                properties.ContentType, fileName.FileName);
+                                properties.ContentType, fileName);
                         },
                         onNotFound: onNotFound,
                         onFailure: onFailure);
