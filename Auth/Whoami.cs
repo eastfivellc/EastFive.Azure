@@ -17,6 +17,7 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Auth
 {
@@ -48,11 +49,16 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = TokenPropertyName)]
         public System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken;
 
+        [WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 4.0)]
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
         public static async Task<IHttpResponse> GetAsync(
                 EastFive.Api.SessionToken security,
                 IHttpRequest request,
                 IAuthApplication application,
+            [WorkflowVariable("Session", SessionPropertyName)]
+            [WorkflowVariable2("Account", AccountPropertyName)]
             ContentTypeResponse<Whoami> onFound)
         {
             async Task<string> GetName()

@@ -29,6 +29,8 @@ namespace EastFive.Azure.Auth
     {
         #region Properties
 
+        #region Base
+
         public Guid id => authorizationRef.id;
 
         public const string AuthorizationIdPropertyName = "id";
@@ -36,12 +38,15 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = AuthorizationIdPropertyName)]
         [RowKey]
         [StandardParititionKey]
+        [ResourceIdentifier]
         public IRef<Authorization> authorizationRef;
 
         [LastModified]
         [StorageQuery]
         public DateTime lastModified;
-        
+
+        #endregion
+
         public const string MethodPropertyName = "method";
         [ApiProperty(PropertyName = MethodPropertyName)]
         [JsonProperty(PropertyName = MethodPropertyName)]
@@ -138,11 +143,23 @@ namespace EastFive.Azure.Auth
 
         #region POST
 
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 2.0)]
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
-                [Property(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
-                [Property(Name = MethodPropertyName)]IRef<Method> method,
-                [Property(Name = LocationAuthorizationReturnPropertyName)]Uri locationAuthenticationReturn,
+                [Api.Meta.Flows.WorkflowNewId]
+                [Property(Name = AuthorizationIdPropertyName)]
+                IRef<Authorization> authorizationRef,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{E5_AUTH_AuthenticationMethod}}")]
+                [Property(Name = MethodPropertyName)]
+                IRef<Method> method,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "http://example.com")]
+                [Property(Name = LocationAuthorizationReturnPropertyName)]
+                Uri locationAuthenticationReturn,
+
                 [Resource]Authorization authorization,
                 IAuthApplication application, IProvideUrl urlHelper,
             CreatedBodyResponse<Authorization> onCreated,

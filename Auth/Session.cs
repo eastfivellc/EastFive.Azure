@@ -29,6 +29,7 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = SessionIdPropertyName)]
         [RowKey]
         [StandardParititionKey]
+        [ResourceIdentifier]
         public IRef<Session> sessionId;
 
         public const string CreatedScopeName = "created";
@@ -118,6 +119,8 @@ namespace EastFive.Azure.Auth
 
         #region Http Methods
 
+        #region GET
+
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
@@ -196,13 +199,28 @@ namespace EastFive.Azure.Auth
                 onFailure);
         }
 
+        #endregion
+
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 3.0)]
         [HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
-                [Property(Name = SessionIdPropertyName)]IRef<Session> sessionId,
-                [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
+                [Api.Meta.Flows.WorkflowNewId]
+                [Property(Name = SessionIdPropertyName)]
+                IRef<Session> sessionId,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{E5_AUTH_XAuthorization}}")]
+                [PropertyOptional(Name = AuthorizationPropertyName)]
+                IRefOptional<Authorization> authorizationRefMaybe,
+
                 [Resource]Session session,
                 IAuthApplication application,
+
+            [Api.Meta.Flows.WorkflowVariable2(Workflows.AuthorizationFlow.Variables.AuthHeaderName, HeaderNamePropertyName)]
+            [Api.Meta.Flows.WorkflowVariable(Workflows.AuthorizationFlow.Variables.TokenName, TokenPropertyName)]
             CreatedBodyResponse<Session> onCreated,
+
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse forbidden,
             ConfigurationFailureResponse onConfigurationFailure,
@@ -367,6 +385,9 @@ namespace EastFive.Azure.Auth
             return await await authorizationRef.StorageGetAsync(
                 async (authorization) =>
                 {
+                    if (!authorization.authorized)
+                        return onFailure("Invalid authorization -- it is not authorized.", false);
+
                     var methodRef = authorization.Method;
                     return await await Method.ById(methodRef, application,
                         async method =>

@@ -21,6 +21,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using BlackBarLabs.Api;
 using EastFive.Security.SessionServer;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Auth
 {
@@ -38,12 +39,14 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = AuthenticationIdPropertyName)]
         [RowKey]
         [StandardParititionKey]
+        [ResourceIdentifier]
         public IRef<Method> authenticationId;
 
         public const string NamePropertyName = "name";
         [ApiProperty(PropertyName = NamePropertyName)]
         [JsonProperty(PropertyName = NamePropertyName)]
         [Storage(Name = NamePropertyName)]
+        [ResourceTitle]
         public string name;
 
         public Task<TResult> GetLoginProviderAsync<TResult>(IAuthApplication application,
@@ -89,6 +92,10 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
+        [WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 1.0,
+            StepName = "List Methods")]
         public static IHttpResponse QueryAsync(
             IAuthApplication application,
             MultipartAcceptArrayResponse<Method> onContent)
