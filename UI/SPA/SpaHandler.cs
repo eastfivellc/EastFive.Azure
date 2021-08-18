@@ -373,7 +373,7 @@ namespace EastFive.Azure.Spa
 
                 var expiresDefault = DateTime.UtcNow.AddDays(-1);
                 return onResolved(location,
-                    lookupSpaFile[defaultFileName], fileName.Split('/').Last(),
+                    lookupSpaFile[defaultFileName], defaultFileName.Split('/').Last(),
                     defaultCacheControl, expiresDefault);
             }
 
@@ -399,6 +399,7 @@ namespace EastFive.Azure.Spa
             context.Response.StatusCode = 200;
             if (!mimeType.IsDefaultNullOrEmpty())
                 context.Response.ContentType = mimeType;
+            context.Response.ContentLength = fileData.Length;
             context.Response.Headers.Add("Content-Disposition", $"filename=\"{spaFileName}\"");
             await context.Response.Body.WriteAsync(fileData);
         }
