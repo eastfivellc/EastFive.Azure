@@ -57,6 +57,7 @@ namespace EastFive.Azure.Auth
                 EastFive.Api.SessionToken security,
                 IHttpRequest request,
                 IAuthApplication application,
+
             [WorkflowVariable("Session", SessionPropertyName)]
             [WorkflowVariable2("Account", AccountPropertyName)]
             ContentTypeResponse<Whoami> onFound)

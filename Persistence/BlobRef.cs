@@ -40,6 +40,16 @@ namespace EastFive.Persistence.Azure.StorageTables
         public string ContainerName { get; set; }
     }
 
+    public interface IMigrateBlobIdAttribute
+    {
+        string IdName { get; }
+    }
+
+    public class MigrateBlobIdAttribute : Attribute, IMigrateBlobIdAttribute
+    {
+        public string IdName { get; set; }
+    }
+
     public static class BlobRefExtensions
     {
         public static string BlobContainerName(this MemberInfo member)
@@ -199,13 +209,13 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         public TResult Bind<TResult>(IDictionary<string, EntityProperty> value,
-                Type type, string path, MemberInfo member,
+                Type type, string pathStart, MemberInfo member,
             Func<object, TResult> onBound, 
             Func<TResult> onFailedToBind)
         {
             var containerName = member.BlobContainerName();
 
-            var id = GetId();
+            var id = GetId(pathStart);
             var blobRef = new BlobRef
             {
                 Id = id,
@@ -213,11 +223,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             };
             return onBound(blobRef);
 
-            string GetId()
+            string GetId(string path)
             {
-                if (!value.ContainsKey(path))
-                    return default;
-                var epValue = value[path];
+                if (!value.TryGetValue(path, out EntityProperty epValue))
+                {
+                    if(!member.TryGetAttributeInterface(out IMigrateBlobIdAttribute migrateBlobId))
+                        return default;
+
+                    // terminate recursion
+                    if (migrateBlobId.IdName.Equals(path, StringComparison.Ordinal))
+                        return default;
+
+                    return GetId(migrateBlobId.IdName);
+                }
+
                 if (epValue.PropertyType == EdmType.String)
                     return epValue.StringValue;
                 if (epValue.PropertyType == EdmType.Guid)
