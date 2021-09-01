@@ -326,7 +326,7 @@ namespace EastFive.Azure.Auth
             NotFoundResponse onNotFound)
         {
             return sessionRef.StorageDeleteAsync(
-                () =>
+                onDeleted:(discard) =>
                 {
                     return onDeleted();
                 },

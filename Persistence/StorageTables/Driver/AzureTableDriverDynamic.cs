@@ -2493,6 +2493,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> DeleteAsync<TData, TResult>(string rowKey, string partitionKey,
             Func<TData, TResult> success,
             Func<TResult> onNotFound,
+            Func<TData, Func<Task>, Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
             AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
@@ -2506,8 +2507,23 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     return DeleteAsync<TData, TResult>(entity,
                         () => success(data),
                         onNotFound,
-                        onFailure,
-                        onTimeout,
+                        onModified: () =>
+                        {
+                            return OnModified();
+
+                            Task<TResult> OnModified()
+                            {
+                                return onModified(data,
+                                    () => DeleteAsync(entity,
+                                        success: () => success(data),
+                                        onNotFound: onNotFound,
+                                        onModified: () => OnModified(),
+                                        onFailure: onFailure,
+                                        onTimeout: onTimeout));
+                            }
+                        },
+                        onFailure:onFailure,
+                        onTimeout:onTimeout,
                         tableName: tableName);
                 },
                 onNotFound.AsAsyncFunc(),
@@ -2532,10 +2548,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             var data = GetEntity(entity);
                             data.ETag = tableResult.Etag;
                             return DeleteAsync(data,
-                                () => data,
-                                () => data,
-                                (a, b) => data,
-                                onTimeout,
+                                success:() => data,
+                                onNotFound:() => data,
+                                onFailure:(a, b) => data,
+                                onTimeout: onTimeout,
                                 tableName: tableName);
                         });
                 },
@@ -2604,6 +2620,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> DeleteAsync<TData, TResult>(IAzureStorageTableEntity<TData> entity,
             Func<TResult> success,
             Func<TResult> onNotFound,
+            Func<Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = default,
             string tableName = default)
@@ -2643,7 +2660,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     await onTimeout(se.RequestInformation.HttpStatusCode, se,
                                         async () =>
                                         {
-                                            timeoutResult = await DeleteAsync<TData, TResult>(entity, success, onNotFound, onFailure, onTimeout);
+                                            timeoutResult = await DeleteAsync<TData, TResult>(entity, 
+                                                success:success,
+                                                onNotFound:onNotFound,
+                                                onFailure:onFailure,
+                                                onTimeout: onTimeout);
                                         });
                                     return timeoutResult;
                                 }
@@ -2651,6 +2672,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.TableBeingDeleted:
                                 {
                                     return onNotFound();
+                                }
+                            case ExtendedErrorInformationCodes.UpdateConditionNotSatisfied:
+                                {
+                                    if (!onModified.IsDefaultOrNull())
+                                        return await onModified();
+
+                                    if (onFailure.IsDefaultOrNull())
+                                        throw se;
+                                    
+                                    return onFailure(errorCode, errorMessage);
                                 }
                             default:
                                 {

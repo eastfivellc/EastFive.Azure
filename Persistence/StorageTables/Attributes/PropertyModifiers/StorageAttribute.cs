@@ -53,7 +53,10 @@ namespace EastFive.Persistence
     {
         string ComputePartitionKey(object memberValue, MemberInfo memberInfo,
             string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues);
+    }
 
+    public interface IGenerateAzureStorageTablePartitionKey
+    {
         IEnumerable<string> GeneratePartitionKeys(Type type, int skip, int top);
     }
 

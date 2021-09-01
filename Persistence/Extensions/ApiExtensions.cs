@@ -100,7 +100,7 @@ namespace EastFive.Azure.Persistence
             where TResource : IReferenceable
         {
             return resourceRef.StorageDeleteAsync(
-                () => onDeleted(),
+                onDeleted:(discard) => onDeleted(),
                 () => onNotFound());
         }
     }

@@ -16,7 +16,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     public class ParititionKeyAttribute : Attribute,
         IModifyAzureStorageTablePartitionKey, 
         IProvideTableQuery,
-        ParititionKeyAttribute.IModifyPartitionScope
+        ParititionKeyAttribute.IModifyPartitionScope,
+        IComputeAzureStorageTablePartitionKey
     {
         public interface IModifyPartitionScope
         {
@@ -202,6 +203,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return refValue.id.ToString("N");
             }
             return (string)memberValue;
+        }
+
+        public string ComputePartitionKey(object memberValue,
+            MemberInfo memberInfo, string rowKey,
+            params KeyValuePair<MemberInfo, object>[] extraValues)
+        {
+            if(memberValue is string)
+                return memberValue as string;
+
+            throw new Exception(
+                $"{nameof(ParititionKeyAttribute)} only works on string members." + 
+                $" Issue is on {memberInfo.DeclaringType.FullName}..{memberInfo.Name}.");
         }
     }
 
