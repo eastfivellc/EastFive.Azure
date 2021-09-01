@@ -245,13 +245,14 @@ namespace EastFive.Azure.Auth
 
             var integration = integrationMaybe.Value;
             return await await integrationRef.StorageDeleteAsync(
-                async () =>
+                onDeleted: async (discard) =>
                 {
                     if (integration.authorization.HasValue)
                     {
                         var authorizationId = integration.authorization.id.Value;
                         var authorizationLookupRef = authorizationId.AsRef<AuthorizationIntegrationLookup>();
-                        await authorizationLookupRef.StorageDeleteAsync(() => true);
+                        await authorizationLookupRef.StorageDeleteAsync(
+                            onDeleted:(discard) => true);
                     }
                     var accountIntegrationRef = integration.accountId.AsRef<AccountIntegrationLookup>();
                     await accountIntegrationRef.StorageUpdateAsync(

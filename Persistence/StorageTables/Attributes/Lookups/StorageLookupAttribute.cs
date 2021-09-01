@@ -303,7 +303,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 rowKeyRef, partitionKeyRef,
                 value, dictionary,
                 repository,
-                (rowAndParitionKeys) => rowAndParitionKeys.NullToEmpty().Append(rowKeyRef.PairWithValue(partitionKeyRef)),
+                (rowAndParitionKeys) => rowAndParitionKeys
+                    .NullToEmpty()
+                    .Append(rowKeyRef.PairWithValue(partitionKeyRef))
+                    .ToArray(),
                 onSuccessWithRollback,
                 onFailure);
         }
@@ -404,7 +407,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 repository,
                 (rowAndParitionKeys) => rowAndParitionKeys
                     .NullToEmpty()
-                    .Where(kvp => kvp.Key != rowKeyRef && kvp.Value != partitionKeyRef),
+                    .Where(
+                        kvp =>
+                            kvp.Key != rowKeyRef ||
+                            kvp.Value != partitionKeyRef),
                 onSuccessWithRollback,
                 onFailure);
         }

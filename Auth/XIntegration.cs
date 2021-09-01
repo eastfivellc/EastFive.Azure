@@ -264,7 +264,7 @@ namespace EastFive.Azure.Auth
             Func<TResult> onNotFound)
         {
             return integrationRef.StorageDeleteAsync(
-                () =>
+                onDeleted: (discard) =>
                 {
                     return onDeleted();
                 },

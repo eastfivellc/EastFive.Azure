@@ -228,7 +228,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         if (onMissing.IsDefaultOrNull())
                         {
                             var exMessage = $"{typeof(TEntity).FullName} is missing attribute implementing" +
-                                " {typeof(EastFive.Persistence.IComputeAzureStorageTablePartitionKey).FullName}.";
+                                $" {typeof(EastFive.Persistence.IComputeAzureStorageTablePartitionKey).FullName}.";
                             throw new Exception(exMessage);
                         }
                         return onMissing().PairWithKey(default(MemberInfo));
@@ -381,14 +381,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerable<string> StorageGetPartitionKeys(this Type type, int skip, int top)
         {
             var partitionKeyMember = type
-                .GetPropertyOrFieldMembers()
-                .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>())
-                .Select(member =>
-                    member.GetAttributesInterface<EastFive.Persistence.IComputeAzureStorageTablePartitionKey>()
-                        .First()
-                        .PairWithKey(member))
+                .GetAttributesAndPropertyAttributesInterface<EastFive.Persistence.IGenerateAzureStorageTablePartitionKey>()
                 .First();
-            return partitionKeyMember.Value.GeneratePartitionKeys(type, skip: skip, top: top);
+            return partitionKeyMember.GeneratePartitionKeys(type, skip: skip, top: top);
         }
 
         #endregion
@@ -1112,25 +1107,51 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region Delete
 
-        public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            Func<TResult> onSuccess,
-            Func<TResult> onNotFound = default,
+        public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this TEntity entity,
+            Func<TResult> onDeleted,
+            Func<TEntity, Func<Task<TResult>>, Task<TResult>> onModified = default,
+            Func<TResult> onAlreadyDeleted = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             where TEntity : IReferenceable
         {
-            var rowKey = entityRef.StorageComputeRowKey();
-            return AzureTableDriverDynamic
-                .FromSettings()
-                .DeleteAsync<TEntity, TResult>(
-                        rowKey,
-                        entityRef.StorageComputePartitionKey(rowKey),
-                    (discard) => onSuccess(),
-                    onNotFound,
-                    onFailure);
+            var tableEntity = typeof(TEntity)
+                .GetAttributesInterface<IProvideEntity>()
+                .First<IProvideEntity, IAzureStorageTableEntity<TEntity>>(
+                    (entityProvider, next) =>
+                    {
+                        return entityProvider.GetEntity(entity);
+                    },
+                    () =>
+                    {
+                        throw new Exception(
+                            $"`{typeof(TEntity).FullName}` does not provide tableEntity.");
+                    });
+            var driver = AzureTableDriverDynamic
+                .FromSettings();
+            return driver
+                .DeleteAsync<TEntity, TResult>(tableEntity,
+                    () => onDeleted(),
+                    onNotFound: onAlreadyDeleted,
+                    onModified: async () =>
+                    {
+                        return await await driver.FindByIdAsync<TEntity, Task<TResult>>(
+                                tableEntity.RowKey, tableEntity.PartitionKey,
+                            (entity, result) =>
+                            {
+                                return onModified(entity,
+                                    () => entity.StorageDeleteAsync(
+                                        onDeleted: onDeleted,
+                                        onModified: onModified,
+                                        onAlreadyDeleted: onAlreadyDeleted,
+                                        onFailure: onFailure));
+                            },
+                            () => onAlreadyDeleted().AsTask());
+                    },
+                    onFailure: onFailure);
         }
 
         public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-            Func<TEntity, TResult> onSuccess,
+            Func<TEntity, TResult> onDeleted,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             where TEntity : IReferenceable
@@ -1141,9 +1162,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         rowKey,
                         entityRef.StorageComputePartitionKey(rowKey),
-                    onSuccess,
+                    onDeleted,
                     onNotFound,
-                    onFailure);
+                    onFailure:onFailure);
         }
 
         public static Task<TResult> StorageDeleteIfAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
@@ -1180,6 +1201,31 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onFailure);
         }
 
+        public static async Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
+                Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, TResult> onFound,
+            Func<TResult> onDoesNotExists = default)
+            where TEntity : IReferenceable
+        {
+            if (entityRef.IsDefaultOrNull())
+                return onDoesNotExists();
+            var rowKey = entityRef.StorageComputeRowKey();
+
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryById = query.StorageQueryById(entityRef);
+            var queryFull = additionalProperties(queryById);
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+            return await storageDriver
+                .DeleteAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onFound: async (entity, deleteEntity) =>
+                    {
+                        await deleteEntity();
+                        return onFound(entity);
+                    },
+                    onNotFound: onDoesNotExists);
+        }
+
         public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
                 string partitionKey,
             Func<TResult> onSuccess,
@@ -1194,7 +1240,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         partitionKey,
                     (discard) => onSuccess(),
                     onNotFound,
-                    onFailure);
+                    onFailure:onFailure);
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<IRef<TEntity>> entityRefs,
