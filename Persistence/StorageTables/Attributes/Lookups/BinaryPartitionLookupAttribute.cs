@@ -234,6 +234,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -334,6 +341,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion
 
         #region Modification Failures
@@ -425,6 +439,5 @@ namespace EastFive.Persistence.Azure.StorageTables
                 sortKey = tableName,
             };
         }
-
     }
 }
