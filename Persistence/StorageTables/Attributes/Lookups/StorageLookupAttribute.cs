@@ -311,6 +311,68 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        private class BatchModifier : IBatchModify
+        {
+            public delegate IEnumerable<KeyValuePair<string, string>> ModifierDelegate(
+                IEnumerable<KeyValuePair<string, string>> currentLookups);
+
+            public BatchModifier(string tableName,
+                IRefAst lookupResourceRef,
+                ModifierDelegate modifier)
+            {
+                this.tableName = tableName;
+                this.lookupResourceRef = lookupResourceRef;
+                this.modifier = modifier;
+            }
+
+            private string tableName;
+            private IRefAst lookupResourceRef;
+
+            private ModifierDelegate modifier;
+
+            public string RowKey => lookupResourceRef.RowKey;
+
+            public string PartitionKey => lookupResourceRef.PartitionKey;
+
+            public Task<TResult> CreateOrUpdateAsync<TResult>(
+                AzureTableDriverDynamic repository,
+                Func<object, Func<object, Task>, Task<TResult>> callback)
+            {
+                return repository.UpdateOrCreateAsync<StorageLookupTable, TResult>(
+                    RowKey, PartitionKey,
+                    (created, lookupTable, saveAsync) => callback(lookupTable,
+                        resource => saveAsync((StorageLookupTable)resource)),
+                    tableName: tableName);
+            }
+
+            public object Modify(object resource)
+            {
+                var storageLookup = (StorageLookupTable)resource;
+                storageLookup.rowAndPartitionKeys = this.modifier(
+                        storageLookup
+                            .rowAndPartitionKeys
+                            .NullToEmpty())
+                    .ToArray();
+                return storageLookup;
+            }
+        }
+
+        public virtual IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo memberInfo,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            return GetKeys(memberInfo, entity)
+                .Select(
+                    lookupKey =>
+                    {
+                        return (IBatchModify)new BatchModifier(tableName, lookupKey,
+                            rowAndPartitionKeys => rowAndPartitionKeys
+                                .Append(rowKey.PairWithValue(partitionKey)));
+                    })
+                .ToArray();
+        }
+
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -332,12 +394,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     .NullToEmpty()
                                     .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
                                     .Where(kvp => kvp.Key == rowKeyRef)
-                                    .Any();
-                                var partitionKeyFound = rowAndParitionKeys
-                                    .NullToEmpty()
                                     .Where(kvp => kvp.Value == partitionKeyRef)
                                     .Any();
-                                if (rowKeyFound && partitionKeyFound)
+                                if (rowKeyFound)
                                     return true;
                                 return false;
                             },
@@ -413,6 +472,28 @@ namespace EastFive.Persistence.Azure.StorageTables
                             kvp.Value != partitionKeyRef),
                 onSuccessWithRollback,
                 onFailure);
+        }
+
+        public virtual IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo memberInfo,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            return GetKeys(memberInfo, entity)
+                .Select(
+                    lookupKey =>
+                    {
+                        return (IBatchModify)new BatchModifier(tableName, lookupKey,
+                            rowAndPartitionKeys =>
+                            {
+                                return rowAndPartitionKeys
+                                    .Where(
+                                        kvp =>
+                                            kvp.Key != rowKey ||
+                                            kvp.Value != partitionKey);
+                            });
+                    })
+                .ToArray();
         }
 
         public async Task<TResult> RepairAsync<TEntity, TResult>(MemberInfo memberInfo,

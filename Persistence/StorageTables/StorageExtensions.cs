@@ -853,20 +853,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
-        //[Obsolete]
-        //public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-        //    string partitionKey,
-        //    Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated)
-        //    where TEntity : struct, IReferenceable
-        //{
-        //    var rowKey = entityRef.StorageComputeRowKey();
-        //    return AzureTableDriverDynamic
-        //        .FromSettings()
-        //        .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
-        //            onCreated,
-        //            onTimeoutAsync: default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>));
-        //}
-
         public static Task<TResult> StorageInsertOrReplaceAsync<TEntity, TResult>(this TEntity entity,
             Func<bool, TResult> onSuccess,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
@@ -1257,10 +1243,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
         {
-            var documentIds = entities.Select(entity => entity.id);
             return AzureTableDriverDynamic
                 .FromSettings()
-                .DeleteBatch<TEntity, TResult>(documentIds, onSuccess);
+                .DeleteBatch<TEntity, TResult>(entities, onSuccess);
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,

@@ -73,6 +73,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(() => false.AsTask()));
         }
 
+
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -130,6 +137,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(
                     () => 1.AsTask()),
                 () => throw new Exception("Delete with ETAG = * failed due to modification."));
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -40,6 +40,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                 AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure);
+
+        IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
+
+        IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
     }
 
     public interface IRepairAzureStorageTableSave : IModifyAzureStorageTableSave

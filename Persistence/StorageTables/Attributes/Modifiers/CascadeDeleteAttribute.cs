@@ -39,6 +39,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onSuccessWithRollback(() => true.AsTask()).AsTask();
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef, TEntity value,
                 IDictionary<string, EntityProperty> dictionary, 
@@ -84,6 +91,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                     },
                     () => throw new Exception($"Cascade references property named {this.Name} on {type.FullName} which does not exists or does not contain attribute of type {typeof(IDeleteCascaded).FullName}."));
             return onSuccessWithRollback(rollback);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion
