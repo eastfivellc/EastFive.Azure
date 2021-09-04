@@ -65,7 +65,7 @@ namespace EastFive.Azure.Persistence.StorageTables
                         {
                             if (!linkedToken.Token.IsCancellationRequested)
                             {
-                                if (!autoMutex.WaitOne(mutexWait))
+                                if (queue.IsEmpty && !autoMutex.WaitOne(mutexWait))
                                     continue;
                             }
                             if (!queue.TryDequeue(out string message))
