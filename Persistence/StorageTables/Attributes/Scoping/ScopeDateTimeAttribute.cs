@@ -50,9 +50,15 @@ namespace EastFive.Persistence.Azure.StorageTables
                 }
                 value = value.GetNullableValue();
             }
-            ignore = false;
 
             var dateTime = (DateTime)value;
+            if (dateTime.IsDefault())
+            {
+                ignore = true;
+                return currentKey;
+            }
+
+            ignore = false;
             if (!OffsetHours.IsDefault())
                 dateTime = dateTime + TimeSpan.FromHours(OffsetHours);
             var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, WeeksEpoch);
