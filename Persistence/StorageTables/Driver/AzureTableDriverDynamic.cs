@@ -97,7 +97,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #region ITableEntity Management
 
-        private static IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
+        public static IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
         {
             return typeof(TEntity)
                 .GetAttributesInterface<IProvideEntity>()
@@ -2387,7 +2387,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .Select(
                     rows =>
                     {
-                        return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, perItemCallback, table: table, onTimeout);
+                        return CreateOrReplaceBatch(rows, 
+                            getRowKey, getPartitionKey, perItemCallback, 
+                            table: table,
+                            out Task<object[]> modifiersTask,
+                            onTimeout);
                     })
                 .SelectAsyncMany();
         }
@@ -2403,20 +2407,78 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 this.TableClient.GetTableReference(tableName)
                 :
                 GetTable<TData>();
-            return datas
+
+            var batchedEntities = datas
                 .Select(data => GetEntity(data))
-                .Batch()
+                .Batch();
+
+            //var savingModifiers = batchedEntities
+            //    .Select(
+            //        rows => SaveModifiersAsync(rows))
+            //    .ToArrayAsync();
+
+            return batchedEntities
                 .Select(
-                    rows =>
+                    async rows =>
                     {
-                        return CreateOrReplaceBatch(rows,
-                            row => row.RowKey,
-                            row => row.PartitionKey,
-                            perItemCallback, table,
-                            onTimeout: onTimeout,
-                            diagnostics: diagnostics);
+                        System.Diagnostics.Debug.WriteLine($"Processing batch of size {rows.Length}");
+                        var x = CreateOrReplaceBatch(rows,
+                                row => row.RowKey,
+                                row => row.PartitionKey,
+                                perItemCallback, table,
+                                out Task<object[]> modifiersTask,
+                                onTimeout: onTimeout,
+                                diagnostics: diagnostics)
+                            .ToArrayAsync();
+                        await modifiersTask;
+                        return await x;
                     })
-                .SelectAsyncMany();
+                .Await(readAhead: 50)
+                .SelectMany();
+                // .SelectAsyncMany();
+                //.JoinTask(savingModifiers);
+
+            Task<object[]> SaveModifiersAsync(IEnumerable<IAzureStorageTableEntity<TData>> entities) => entities
+                .SelectMany(
+                    resultDocument =>
+                    {
+                        return resultDocument.GetType()
+                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                (resultDocument as IAzureStorageTableEntityBatchable)
+                                    .BatchCreateModifiers()
+                            :
+                                new IBatchModify[] { };
+                    })
+                .GroupBy(modifier => modifier.GroupingKey)
+                .Where(grp => grp.Any())
+                .Select(
+                    async grp =>
+                    {
+                        var modifier = grp.First();
+                        if (!modifier.GroupLimit.HasValue)
+                            return await SaveItemsAsync(grp);
+
+                        return await grp
+                            .Segment(modifier.GroupLimit.Value)
+                            .Select(items => SaveItemsAsync(items))
+                            .AsyncEnumerable()
+                            .ToArrayAsync();
+
+                        async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                            await modifier.CreateOrUpdateAsync(this,
+                                async (resourceToModify, saveAsync) =>
+                                {
+                                    var modifiedResource = items.Aggregate(resourceToModify,
+                                        (resource, modifier) =>
+                                        {
+                                            return modifier.Modify(resource);
+                                        });
+                                    await saveAsync(modifiedResource);
+                                    return modifiedResource;
+                                });
+                    })
+                .AsyncEnumerable()
+                .ToArrayAsync();
         }
 
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
@@ -2434,6 +2496,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 entity => entity.PartitionKey,
                 perItemCallback,
                 table: table,
+                out Task<object[]> modifiersTask,
                 onTimeout: onTimeout,
                 diagnostics: diagnostics);
         }
@@ -2443,10 +2506,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<TDocument, string> getPartitionKey,
                 Func<TDocument, TableResult, TResult> perItemCallback,
                 CloudTable table,
+                out Task<object[]> modifiersTask,
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : class, ITableEntity
         {
+            modifiersTask = SaveModifiersAsync();
             return entities
                 .Select(
                     row =>
@@ -2474,44 +2539,51 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 {
                                     var resultDocument = (tableResult.Result as TDocument);
                                     var itemResult = perItemCallback(resultDocument, tableResult);
-                                    var modifierResult = resultDocument.GetType()
-                                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
-                                        (resultDocument as IAzureStorageTableEntityBatchable)
-                                            .BatchCreateModifiers()
-                                        :
-                                        new IBatchModify[] { };
-                                    return (itemResult, modifierResult);
+                                    return itemResult;
+                                });
+                    });
+
+            Task<object[]> SaveModifiersAsync() => entities
+                .SelectMany(
+                    resultDocument =>
+                    {
+                        return resultDocument.GetType()
+                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                (resultDocument as IAzureStorageTableEntityBatchable)
+                                    .BatchCreateModifiers()
+                            :
+                                new IBatchModify[] { };
+                    })
+                .GroupBy(modifier => modifier.GroupingKey)
+                .Where(grp => grp.Any())
+                .Select(
+                    async grp =>
+                    {
+                        var modifier = grp.First();
+                        if (!modifier.GroupLimit.HasValue)
+                            return await SaveItemsAsync(grp);
+
+                        return await grp
+                            .Segment(modifier.GroupLimit.Value)
+                            .Select(items => SaveItemsAsync(items))
+                            .AsyncEnumerable(readAhead: 100)
+                            .ToArrayAsync();
+
+                        async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                            await modifier.CreateOrUpdateAsync(this,
+                                async (resourceToModify, saveAsync) =>
+                                {
+                                    var modifiedResource = items.Aggregate(resourceToModify,
+                                        (resource, modifier) =>
+                                        {
+                                            return modifier.Modify(resource);
+                                        });
+                                    await saveAsync(modifiedResource);
+                                    return modifiedResource;
                                 });
                     })
-                .OnCompleteAsync(
-                    (itemResultAndModifiers) =>
-                    {
-                        return itemResultAndModifiers
-                            .SelectMany(tpl => tpl.modifierResult)
-                            .GroupBy(modifier => $"{modifier.PartitionKey}|{modifier.RowKey}")
-                            .Where(grp => grp.Any())
-                            .Select(
-                                async grp =>
-                                {
-                                    var modifier = grp.First();
-                                    var rowKey = modifier.RowKey;
-                                    var partitionKey = modifier.PartitionKey;
-                                    return await modifier.CreateOrUpdateAsync(this,
-                                        async (resourceToModify, saveAsync) =>
-                                        {
-                                            var modifiedResource = grp.Aggregate(resourceToModify,
-                                                (resource, modifier) =>
-                                                {
-                                                    return modifier.Modify(resource);
-                                                });
-                                            await saveAsync(modifiedResource);
-                                            return modifiedResource;
-                                        });
-                                })
-                            .AsyncEnumerable()
-                            .ToArrayAsync();
-                    })
-                .Select(itemResultAndModifiers => itemResultAndModifiers.itemResult);
+                .AsyncEnumerable(readAhead: 100)
+                .ToArrayAsync();
         }
 
         #endregion
@@ -2796,25 +2868,33 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     {
                         return itemResultAndModifiers
                             .SelectMany(tpl => tpl.modifierResult)
-                            .GroupBy(modifier => $"{modifier.PartitionKey}|{modifier.RowKey}")
+                            .GroupBy(modifier => modifier.GroupingKey)
                             .Where(grp => grp.Any())
                             .Select(
                                 async grp =>
                                 {
                                     var modifier = grp.First();
-                                    var rowKey = modifier.RowKey;
-                                    var partitionKey = modifier.PartitionKey;
-                                    return await modifier.CreateOrUpdateAsync(this,
-                                        async (resourceToModify, saveAsync) =>
-                                        {
-                                            var modifiedResource = grp.Aggregate(resourceToModify,
-                                                (resource, modifier) =>
-                                                {
-                                                    return modifier.Modify(resource);
-                                                });
-                                            await saveAsync(modifiedResource);
-                                            return modifiedResource;
-                                        });
+                                    if(!modifier.GroupLimit.HasValue)
+                                        return await SaveItemsAsync(grp);
+
+                                    return await grp
+                                        .Segment(modifier.GroupLimit.Value)
+                                        .Select(items => SaveItemsAsync(items))
+                                        .AsyncEnumerable()
+                                        .ToArrayAsync();
+
+                                    async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                                        await modifier.CreateOrUpdateAsync(this,
+                                            async (resourceToModify, saveAsync) =>
+                                            {
+                                                var modifiedResource = items.Aggregate(resourceToModify,
+                                                    (resource, modifier) =>
+                                                    {
+                                                        return modifier.Modify(resource);
+                                                    });
+                                                await saveAsync(modifiedResource);
+                                                return modifiedResource;
+                                            });
                                 })
                             .AsyncEnumerable()
                             .ToArrayAsync();

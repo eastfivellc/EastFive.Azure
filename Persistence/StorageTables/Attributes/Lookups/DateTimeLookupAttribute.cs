@@ -45,6 +45,18 @@ namespace EastFive.Persistence.Azure.StorageTables
             var lookupMemberValueKvp = lookupValues.Single();
             var lookupMemberInfo = lookupMemberValueKvp.Key;
 
+            var lookupValueMaybe = GetDateTime();
+            if (!lookupValueMaybe.HasValue)
+                return Enumerable.Empty<IRefAst>();
+            var lookupValue = lookupValueMaybe.Value;
+            if(IgnoreDefault && lookupValue.IsDefault())
+                return Enumerable.Empty<IRefAst>();
+
+            var lookupRowKey = ComputeLookupKey(lookupValue, this.Row);
+            var lookupPartitionKey = ComputeLookupKey(lookupValue, this.Partition);
+
+            return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
+
             DateTime? GetDateTime()
             {
                 if (typeof(DateTime?).IsAssignableFrom(lookupMemberInfo.GetMemberType()))
@@ -70,17 +82,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                 throw new ArgumentException();
             }
-            var lookupValueMaybe = GetDateTime();
-            if (!lookupValueMaybe.HasValue)
-                return Enumerable.Empty<IRefAst>();
-            var lookupValue = lookupValueMaybe.Value;
-            if(IgnoreDefault && lookupValue.IsDefault())
-                return Enumerable.Empty<IRefAst>();
-
-            var lookupRowKey = ComputeLookupKey(lookupValue, this.Row);
-            var lookupPartitionKey = ComputeLookupKey(lookupValue, this.Partition);
-
-            return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
         }
 
         internal static string ComputeLookupKey(DateTime memberValue, TimeSpanUnits timeSpan)

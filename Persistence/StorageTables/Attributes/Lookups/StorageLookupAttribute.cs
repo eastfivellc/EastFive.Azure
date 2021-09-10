@@ -178,7 +178,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
         }
 
-        private IEnumerable<IRefAst> GetKeys<TEntity>(MemberInfo decoratedMember, TEntity value)
+        protected IEnumerable<IRefAst> GetKeys<TEntity>(MemberInfo decoratedMember, TEntity value)
         {
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
             var membersOfInterest = lookupGeneratorAttr.ProvideLookupMembers(decoratedMember);
@@ -330,16 +330,16 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             private ModifierDelegate modifier;
 
-            public string RowKey => lookupResourceRef.RowKey;
+            public string GroupingKey => $"{tableName}|{lookupResourceRef.PartitionKey}|{lookupResourceRef.RowKey}";
 
-            public string PartitionKey => lookupResourceRef.PartitionKey;
+            public int? GroupLimit => default(int?);
 
             public Task<TResult> CreateOrUpdateAsync<TResult>(
                 AzureTableDriverDynamic repository,
                 Func<object, Func<object, Task>, Task<TResult>> callback)
             {
                 return repository.UpdateOrCreateAsync<StorageLookupTable, TResult>(
-                    RowKey, PartitionKey,
+                    lookupResourceRef.RowKey, lookupResourceRef.PartitionKey,
                     (created, lookupTable, saveAsync) => callback(lookupTable,
                         resource => saveAsync((StorageLookupTable)resource)),
                     tableName: tableName);
