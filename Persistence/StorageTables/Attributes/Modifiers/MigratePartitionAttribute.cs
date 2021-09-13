@@ -90,17 +90,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onFailure().AsTask();
         }
 
-        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKey, string partitionKey, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
+            var rowKey = updatedEntity.RowKey;
+            var valueUpdated = updatedEntity.Entity;
+            var dictionaryUpdated = updatedEntity.WriteEntity(null);
             var to = (IModifyAzureStorageTablePartitionKey)Activator.CreateInstance(this.To);
             var toPartitionKey = to.GeneratePartitionKey(rowKey, valueUpdated, memberInfo);
             var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionaryUpdated);
+            var dictionaryExisting = existingEntity.WriteEntity(null);
             return repository.InsertOrReplaceAsync<TEntity, TResult>(typeWrapper,
                 (created, newEntity) => onSuccessWithRollback(
                     () =>
@@ -110,7 +113,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                                 () => true,
                                 () => true,
                                 onFailure:(codes, why) => false);
-                        var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey, dictionaryExisting);
+                        var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey,
+                            dictionaryExisting);
                         return repository.ReplaceAsync<TEntity, bool>(typeWrapperExisting,
                             () => true);
                     }));

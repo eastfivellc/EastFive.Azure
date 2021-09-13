@@ -1209,7 +1209,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             var table = GetTable<TData>();
             var update = TableOperation.Replace(tableData);
-            var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
+            //var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
+            //    rollbacks => rollbacks,
+            //    (members) => throw new Exception("Modifiers failed to execute."));
+            var rollback = await tableData.ExecuteCreateModifiersAsync(this,
                 rollbacks => rollbacks,
                 (members) => throw new Exception("Modifiers failed to execute."));
             try
@@ -2194,11 +2197,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         onModificationFailures = onModificationFailures,
                         tableResult = tableResult,
                     };
+                    var entity = typeof(TData).IsClass?
+                        GetEntity((TData)((object)currentStorage).CloneObject())
+                        :
+                        GetEntity(currentStorage);
                     var resultLocal = await onUpdate(currentStorage,
                         async (documentToSave) =>
                         {
-                            var entity = GetEntity(currentStorage);
-
                             var useResultGlobalTableResult = await await UpdateIfNotModifiedAsync<TData, Task<(bool, TableResult)>>(documentToSave,
                                     entity,
                                 onUpdated: (tr) =>
