@@ -386,6 +386,31 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return partitionKeyMember.GeneratePartitionKeys(type, skip: skip, top: top);
         }
 
+        public static string StorageGetETag<TEntity>(this TEntity entity)
+        {
+            entity.StorageTryGetETagForType(typeof(TEntity), out string eTag);
+            return eTag;
+        }
+
+        public static bool StorageTryGetETagForType(this object entity, Type entityType, out string eTag)
+        {
+            bool success = true;
+            (success, eTag) = entityType
+                .GetPropertyAndFieldsWithAttributesInterface<IModifyAzureStorageTableETag>()
+                .First(
+                    (eTagMemberAndAttr, next) =>
+                    {
+                        var eT = eTagMemberAndAttr.Item2
+                            .GenerateETag(entity, eTagMemberAndAttr.Item1);
+                        return (true, eT);
+                    },
+                    () =>
+                    {
+                        return (false, "");
+                    });
+            return success;
+        }
+
         #endregion
 
         #region Metadata
