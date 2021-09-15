@@ -275,6 +275,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -285,10 +292,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onFailure().AsTask();
         }
 
-        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
@@ -311,6 +317,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 repository,
                 onSuccessWithRollback,
                 onFailure);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
     }
 }

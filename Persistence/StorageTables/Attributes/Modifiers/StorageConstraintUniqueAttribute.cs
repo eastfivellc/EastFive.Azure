@@ -179,7 +179,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-                                    (codes, why) => false,
+                                    onFailure:(codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -187,6 +187,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                 tableName: tableName);
         }
 
+
+
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -230,7 +238,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-                                    (codes, why) => false,
+                                    onFailure: (codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -238,17 +246,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                 tableName: tableName);
         }
 
-        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
+            var valueExisting = existingEntity.Entity;
             var existingRowKey = valueExisting.StorageGetRowKey();
             var existingPartitionKey = valueExisting.StorageGetPartitionKey();
 
+            var valueUpdated = updatedEntity.Entity;
+            var rowKeyRef = updatedEntity.RowKey;
+            var partitionKeyRef = updatedEntity.PartitionKey;
+            var dictionaryExisting = existingEntity.WriteEntity(null);
             if (IsIgnored(memberInfo, valueUpdated))
             {
                 if (IsIgnored(memberInfo, valueExisting))
@@ -295,7 +307,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-                                    (codes, why) => false,
+                                    onFailure: (codes, why) => false,
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -328,6 +340,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(() => 1.AsTask()),
                 (codes, why) => onSuccessWithRollback(() => 1.AsTask()),
                 tableName: tableName);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
 
         public static IHandleFailedModifications<TResult> ModificationFailure<T, TResult>(

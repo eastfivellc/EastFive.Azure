@@ -27,9 +27,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onFailure);
         
         Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
-                string rowKeyRef, string partitionKeyRef,
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated,
+                IAzureStorageTableEntity<TEntity> updatedEntity, 
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure);
@@ -40,6 +39,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                 AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure);
+
+        IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
+
+        IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
     }
 
     public interface IRepairAzureStorageTableSave : IModifyAzureStorageTableSave

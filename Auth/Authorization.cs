@@ -152,7 +152,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = AuthorizationIdPropertyName)]
                 IRef<Authorization> authorizationRef,
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{E5_AUTH_AuthenticationMethod}}")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
                 [Property(Name = MethodPropertyName)]
                 IRef<Method> method,
 

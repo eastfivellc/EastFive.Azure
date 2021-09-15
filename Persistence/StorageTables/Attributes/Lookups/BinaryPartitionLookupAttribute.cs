@@ -234,6 +234,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -275,15 +282,14 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
-                string rowKeyRef, string partitionKeyRef,
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure)
         {
-            var existingRowKeys = GetKeys(memberInfo, valueExisting);
-            var updatedRowKeys = GetKeys(memberInfo, valueUpdated);
+            var existingRowKeys = GetKeys(memberInfo, existingEntity.Entity);
+            var updatedRowKeys = GetKeys(memberInfo, updatedEntity.Entity);
             var rowKeysDeleted = existingRowKeys.Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
             var rowKeysAdded = updatedRowKeys.Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
             var deletionRollbacks = rowKeysDeleted
@@ -294,7 +300,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                             repository,
                             (rowAndParitionKeys) => rowAndParitionKeys
                                 .NullToEmpty()
-                                .Where(kvp => kvp.Key != rowKeyRef));
+                                .Where(kvp =>
+                                    kvp.Key != existingEntity.RowKey &&
+                                    kvp.Value != existingEntity.PartitionKey)
+                                .ToArray());
                     });
             var additionRollbacks = rowKeysAdded
                  .Select(
@@ -304,7 +313,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                              repository,
                              (rowAndParitionKeys) => rowAndParitionKeys
                                 .NullToEmpty()
-                                .Append(rowKeyRef.PairWithValue(partitionKeyRef)));
+                                .Append(updatedEntity.RowKey.PairWithValue(updatedEntity.PartitionKey))
+                                .ToArray());
                      });
             var allRollbacks = await additionRollbacks.Concat(deletionRollbacks).WhenAllAsync();
             Func<Task> allRollback =
@@ -332,6 +342,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .Where(kvp => kvp.Key != rowKeyRef && kvp.Value != partitionKeyRef),
                 onSuccessWithRollback,
                 onFailure);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -425,6 +442,5 @@ namespace EastFive.Persistence.Azure.StorageTables
                 sortKey = tableName,
             };
         }
-
     }
 }

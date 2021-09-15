@@ -39,6 +39,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onSuccessWithRollback(() => true.AsTask()).AsTask();
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef, TEntity value,
                 IDictionary<string, EntityProperty> dictionary, 
@@ -49,10 +56,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new NotImplementedException();
         }
 
-        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
@@ -84,6 +90,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                     },
                     () => throw new Exception($"Cascade references property named {this.Name} on {type.FullName} which does not exists or does not contain attribute of type {typeof(IDeleteCascaded).FullName}."));
             return onSuccessWithRollback(rollback);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion

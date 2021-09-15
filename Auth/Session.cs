@@ -210,7 +210,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = SessionIdPropertyName)]
                 IRef<Session> sessionId,
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{E5_AUTH_XAuthorization}}")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{XAuthorization}}")]
                 [PropertyOptional(Name = AuthorizationPropertyName)]
                 IRefOptional<Authorization> authorizationRefMaybe,
 
@@ -326,7 +326,7 @@ namespace EastFive.Azure.Auth
             NotFoundResponse onNotFound)
         {
             return sessionRef.StorageDeleteAsync(
-                () =>
+                onDeleted:(discard) =>
                 {
                     return onDeleted();
                 },

@@ -97,7 +97,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #region ITableEntity Management
 
-        private static IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
+        public static IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
         {
             return typeof(TEntity)
                 .GetAttributesInterface<IProvideEntity>()
@@ -1209,7 +1209,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             var table = GetTable<TData>();
             var update = TableOperation.Replace(tableData);
-            var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
+            //var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
+            //    rollbacks => rollbacks,
+            //    (members) => throw new Exception("Modifiers failed to execute."));
+            var rollback = await tableData.ExecuteCreateModifiersAsync(this,
                 rollbacks => rollbacks,
                 (members) => throw new Exception("Modifiers failed to execute."));
             try
@@ -1471,7 +1474,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
             if (table.IsDefaultOrNull())
                 table = GetTable<TDocument>();
-            var bucketCount = (entities.Length / 100) + 1;
+
             diagnostics.Trace($"{entities.Length} rows for partition `{partitionKey}`.");
 
             var batch = new TableBatchOperation();
@@ -2194,11 +2197,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         onModificationFailures = onModificationFailures,
                         tableResult = tableResult,
                     };
+                    var entity = typeof(TData).IsClass?
+                        GetEntity((TData)((object)currentStorage).CloneObject())
+                        :
+                        GetEntity(currentStorage);
                     var resultLocal = await onUpdate(currentStorage,
                         async (documentToSave) =>
                         {
-                            var entity = GetEntity(currentStorage);
-
                             var useResultGlobalTableResult = await await UpdateIfNotModifiedAsync<TData, Task<(bool, TableResult)>>(documentToSave,
                                     entity,
                                 onUpdated: (tr) =>
@@ -2387,7 +2392,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .Select(
                     rows =>
                     {
-                        return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, perItemCallback, table: table, onTimeout);
+                        return CreateOrReplaceBatch(rows, 
+                            getRowKey, getPartitionKey, perItemCallback, 
+                            table: table,
+                            out Task<object[]> modifiersTask,
+                            onTimeout);
                     })
                 .SelectAsyncMany();
         }
@@ -2403,20 +2412,78 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 this.TableClient.GetTableReference(tableName)
                 :
                 GetTable<TData>();
-            return datas
+
+            var batchedEntities = datas
                 .Select(data => GetEntity(data))
-                .Batch()
+                .Batch();
+
+            //var savingModifiers = batchedEntities
+            //    .Select(
+            //        rows => SaveModifiersAsync(rows))
+            //    .ToArrayAsync();
+
+            return batchedEntities
                 .Select(
-                    rows =>
+                    async rows =>
                     {
-                        return CreateOrReplaceBatch(rows,
-                            row => row.RowKey,
-                            row => row.PartitionKey,
-                            perItemCallback, table,
-                            onTimeout: onTimeout,
-                            diagnostics: diagnostics);
+                        System.Diagnostics.Debug.WriteLine($"Processing batch of size {rows.Length}");
+                        var x = CreateOrReplaceBatch(rows,
+                                row => row.RowKey,
+                                row => row.PartitionKey,
+                                perItemCallback, table,
+                                out Task<object[]> modifiersTask,
+                                onTimeout: onTimeout,
+                                diagnostics: diagnostics)
+                            .ToArrayAsync();
+                        await modifiersTask;
+                        return await x;
                     })
-                .SelectAsyncMany();
+                .Await(readAhead: 50)
+                .SelectMany();
+                // .SelectAsyncMany();
+                //.JoinTask(savingModifiers);
+
+            Task<object[]> SaveModifiersAsync(IEnumerable<IAzureStorageTableEntity<TData>> entities) => entities
+                .SelectMany(
+                    resultDocument =>
+                    {
+                        return resultDocument.GetType()
+                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                (resultDocument as IAzureStorageTableEntityBatchable)
+                                    .BatchCreateModifiers()
+                            :
+                                new IBatchModify[] { };
+                    })
+                .GroupBy(modifier => modifier.GroupingKey)
+                .Where(grp => grp.Any())
+                .Select(
+                    async grp =>
+                    {
+                        var modifier = grp.First();
+                        if (!modifier.GroupLimit.HasValue)
+                            return await SaveItemsAsync(grp);
+
+                        return await grp
+                            .Segment(modifier.GroupLimit.Value)
+                            .Select(items => SaveItemsAsync(items))
+                            .AsyncEnumerable()
+                            .ToArrayAsync();
+
+                        async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                            await modifier.CreateOrUpdateAsync(this,
+                                async (resourceToModify, saveAsync) =>
+                                {
+                                    var modifiedResource = items.Aggregate(resourceToModify,
+                                        (resource, modifier) =>
+                                        {
+                                            return modifier.Modify(resource);
+                                        });
+                                    await saveAsync(modifiedResource);
+                                    return modifiedResource;
+                                });
+                    })
+                .AsyncEnumerable()
+                .ToArrayAsync();
         }
 
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
@@ -2434,6 +2501,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 entity => entity.PartitionKey,
                 perItemCallback,
                 table: table,
+                out Task<object[]> modifiersTask,
                 onTimeout: onTimeout,
                 diagnostics: diagnostics);
         }
@@ -2443,10 +2511,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<TDocument, string> getPartitionKey,
                 Func<TDocument, TableResult, TResult> perItemCallback,
                 CloudTable table,
+                out Task<object[]> modifiersTask,
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : class, ITableEntity
         {
+            modifiersTask = SaveModifiersAsync();
             return entities
                 .Select(
                     row =>
@@ -2465,14 +2535,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     })
                 .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, table: table, diagnostics: diagnostics))
                 .AsyncEnumerable()
-                .OnComplete(
-                    (resultss) =>
-                    {
-                        if (!resultss.Any())
-                            diagnostics.Trace($"saved 0 {typeof(TDocument).Name} documents across 0 partitions.");
-
-                        diagnostics.Trace($"saved {resultss.Sum(results => results.Length)} {typeof(TDocument).Name} documents across {resultss.Length} partitions.");
-                    })
                 .SelectMany(
                     trs =>
                     {
@@ -2481,9 +2543,52 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 tableResult =>
                                 {
                                     var resultDocument = (tableResult.Result as TDocument);
-                                    return perItemCallback(resultDocument, tableResult);
+                                    var itemResult = perItemCallback(resultDocument, tableResult);
+                                    return itemResult;
                                 });
                     });
+
+            Task<object[]> SaveModifiersAsync() => entities
+                .SelectMany(
+                    resultDocument =>
+                    {
+                        return resultDocument.GetType()
+                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                (resultDocument as IAzureStorageTableEntityBatchable)
+                                    .BatchCreateModifiers()
+                            :
+                                new IBatchModify[] { };
+                    })
+                .GroupBy(modifier => modifier.GroupingKey)
+                .Where(grp => grp.Any())
+                .Select(
+                    async grp =>
+                    {
+                        var modifier = grp.First();
+                        if (!modifier.GroupLimit.HasValue)
+                            return await SaveItemsAsync(grp);
+
+                        return await grp
+                            .Segment(modifier.GroupLimit.Value)
+                            .Select(items => SaveItemsAsync(items))
+                            .AsyncEnumerable(readAhead: 100)
+                            .ToArrayAsync();
+
+                        async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                            await modifier.CreateOrUpdateAsync(this,
+                                async (resourceToModify, saveAsync) =>
+                                {
+                                    var modifiedResource = items.Aggregate(resourceToModify,
+                                        (resource, modifier) =>
+                                        {
+                                            return modifier.Modify(resource);
+                                        });
+                                    await saveAsync(modifiedResource);
+                                    return modifiedResource;
+                                });
+                    })
+                .AsyncEnumerable(readAhead: 100)
+                .ToArrayAsync();
         }
 
         #endregion
@@ -2493,6 +2598,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> DeleteAsync<TData, TResult>(string rowKey, string partitionKey,
             Func<TData, TResult> success,
             Func<TResult> onNotFound,
+            Func<TData, Func<Task>, Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
             AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
@@ -2506,8 +2612,23 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     return DeleteAsync<TData, TResult>(entity,
                         () => success(data),
                         onNotFound,
-                        onFailure,
-                        onTimeout,
+                        onModified: () =>
+                        {
+                            return OnModified();
+
+                            Task<TResult> OnModified()
+                            {
+                                return onModified(data,
+                                    () => DeleteAsync(entity,
+                                        success: () => success(data),
+                                        onNotFound: onNotFound,
+                                        onModified: () => OnModified(),
+                                        onFailure: onFailure,
+                                        onTimeout: onTimeout));
+                            }
+                        },
+                        onFailure:onFailure,
+                        onTimeout:onTimeout,
                         tableName: tableName);
                 },
                 onNotFound.AsAsyncFunc(),
@@ -2532,10 +2653,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             var data = GetEntity(entity);
                             data.ETag = tableResult.Etag;
                             return DeleteAsync(data,
-                                () => data,
-                                () => data,
-                                (a, b) => data,
-                                onTimeout,
+                                success:() => data,
+                                onNotFound:() => data,
+                                onFailure:(a, b) => data,
+                                onTimeout: onTimeout,
                                 tableName: tableName);
                         });
                 },
@@ -2604,6 +2725,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> DeleteAsync<TData, TResult>(IAzureStorageTableEntity<TData> entity,
             Func<TResult> success,
             Func<TResult> onNotFound,
+            Func<Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             AzureStorageDriver.RetryDelegate onTimeout = default,
             string tableName = default)
@@ -2643,7 +2765,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     await onTimeout(se.RequestInformation.HttpStatusCode, se,
                                         async () =>
                                         {
-                                            timeoutResult = await DeleteAsync<TData, TResult>(entity, success, onNotFound, onFailure, onTimeout);
+                                            timeoutResult = await DeleteAsync<TData, TResult>(entity, 
+                                                success:success,
+                                                onNotFound:onNotFound,
+                                                onFailure:onFailure,
+                                                onTimeout: onTimeout);
                                         });
                                     return timeoutResult;
                                 }
@@ -2651,6 +2777,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.TableBeingDeleted:
                                 {
                                     return onNotFound();
+                                }
+                            case ExtendedErrorInformationCodes.UpdateConditionNotSatisfied:
+                                {
+                                    if (!onModified.IsDefaultOrNull())
+                                        return await onModified();
+
+                                    if (onFailure.IsDefaultOrNull())
+                                        throw se;
+                                    
+                                    return onFailure(errorCode, errorMessage);
                                 }
                             default:
                                 {
@@ -2694,6 +2830,82 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             .SelectMany();
                     })
                 .SelectAsyncMany();
+
+        }
+
+        public IEnumerableAsync<TResult> DeleteBatch<TData, TResult>(IEnumerableAsync<TData> documents,
+            Func<TableResult, TResult> result,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+            where TData : IReferenceable
+        {
+            return documents
+                .Select(document => GetEntity(document))
+                .Batch()
+                .Select(
+                    docs =>
+                    {
+                        return docs
+                            .GroupBy(doc => doc.PartitionKey)
+                            .Select(
+                                async partitionDocsGrp =>
+                                {
+                                    var results = await this.DeleteBatchAsync<TData>(
+                                        partitionDocsGrp.Key, partitionDocsGrp.ToArray());
+                                    return results
+                                        .Select(
+                                            tr =>
+                                            {
+                                                var itemResult = result(tr);
+                                                var modifierResult = tr.Result.GetType()
+                                                        .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                                    (tr.Result as IAzureStorageTableEntityBatchable).BatchDeleteModifiers()
+                                                    :
+                                                    new IBatchModify[] { };
+                                                return (itemResult, modifierResult);
+                                            });
+                                })
+                            .AsyncEnumerable()
+                            .SelectMany();
+                    })
+                .SelectAsyncMany()
+                .OnCompleteAsync(
+                    (itemResultAndModifiers) =>
+                    {
+                        return itemResultAndModifiers
+                            .SelectMany(tpl => tpl.modifierResult)
+                            .GroupBy(modifier => modifier.GroupingKey)
+                            .Where(grp => grp.Any())
+                            .Select(
+                                async grp =>
+                                {
+                                    var modifier = grp.First();
+                                    if(!modifier.GroupLimit.HasValue)
+                                        return await SaveItemsAsync(grp);
+
+                                    return await grp
+                                        .Segment(modifier.GroupLimit.Value)
+                                        .Select(items => SaveItemsAsync(items))
+                                        .AsyncEnumerable()
+                                        .ToArrayAsync();
+
+                                    async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+                                        await modifier.CreateOrUpdateAsync(this,
+                                            async (resourceToModify, saveAsync) =>
+                                            {
+                                                var modifiedResource = items.Aggregate(resourceToModify,
+                                                    (resource, modifier) =>
+                                                    {
+                                                        return modifier.Modify(resource);
+                                                    });
+                                                await saveAsync(modifiedResource);
+                                                return modifiedResource;
+                                            });
+                                })
+                            .AsyncEnumerable()
+                            .ToArrayAsync();
+                    })
+                .Select(itemResultAndModifiers => itemResultAndModifiers.itemResult);
+
         }
 
         public IEnumerableAsync<TResult> DeleteBatch<TData, TResult>(IEnumerable<Guid> documentIds,

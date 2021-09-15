@@ -39,4 +39,33 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<MemberInfo[], TResult> onFailure);
     }
 
+    public interface IBatchModify
+    {
+        /// <summary>
+        /// This key will be equal for modifications that can use the same resource
+        /// </summary>
+        string GroupingKey { get; }
+
+        int? GroupLimit { get; }
+
+        Task<TResult> CreateOrUpdateAsync<TResult>(
+            AzureTableDriverDynamic repository,
+            Func<object, Func<object, Task>, Task<TResult>> callback);
+        object Modify(object resource);
+    }
+
+    public interface IWriteBatchModify : IBatchModify
+    {
+        object InsertBatchInstruction(object resource);
+    }
+
+    public interface IAzureStorageTableEntityBatchable
+    {
+        IBatchModify[] BatchCreateModifiers();
+
+        IBatchModify[] BatchInsertOrReplaceModifiers();
+
+        IBatchModify[] BatchDeleteModifiers();
+    }
+
 }

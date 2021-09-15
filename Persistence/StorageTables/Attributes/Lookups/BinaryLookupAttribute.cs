@@ -5,6 +5,7 @@ using System.Reflection;
 
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 using EastFive.Serialization;
 
 namespace EastFive.Persistence.Azure.StorageTables

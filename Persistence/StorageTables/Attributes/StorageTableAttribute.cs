@@ -63,7 +63,9 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         private class TableEntity<EntityType> : 
-            IWrapTableEntity<EntityType>, IAzureStorageTableEntity<EntityType>
+            IWrapTableEntity<EntityType>,
+            IAzureStorageTableEntity<EntityType>,
+            IAzureStorageTableEntityBatchable
         {
             public EntityType Entity { get; set; }
 
@@ -271,6 +273,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return valuesToStore;
             }
 
+            #region IAzureStorageTableEntity
+
             private struct ExecResult
             {
                 public bool success;
@@ -344,49 +348,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                         },
                     onSuccessWithRollback: onSuccessWithRollback,
                     onFailure: onFailure);
-                //var modifierResults = await typeof(EntityType)
-                //    .GetPropertyOrFieldMembers()
-                //    .SelectMany(memberInfo =>
-                //        memberInfo
-                //            .GetAttributesAndPropertyAttributesInterface<IModifyAzureStorageTableSave>()
-                //            .Select(
-                //               storageModifier =>
-                //               {
-                //                   return storageModifier.ExecuteCreateAsync(memberInfo,
-                //                            this.RowKey, this.PartitionKey,
-                //                            this.Entity, this.WriteEntity(null),
-                //                            repository,
-                //                        rollback =>
-                //                            new ExecResult
-                //                            {
-                //                                success = true,
-                //                                rollback = rollback,
-                //                                member = memberInfo,
-                //                            },
-                //                        () =>
-                //                        new ExecResult
-                //                        {
-                //                            success = false,
-                //                            member = memberInfo,
-                //                        });
-                //               }))
-                //    .AsyncEnumerable()
-                //    .ToArrayAsync();
-                //var rollbacks = modifierResults
-                //    .Where(result => result.success)
-                //    .Select(result => result.rollback());
-                //var failures = modifierResults
-                //    .Where(result => !result.success)
-                //    .Select(result => result.member);
-                //var didFail = failures.Any();
-                //if (didFail)
-                //{
-                //    await Task.WhenAll(rollbacks);
-                //    return onFailure(failures.ToArray());
-                //}
-
-                //return onSuccessWithRollback(
-                //    () => Task.WhenAll(rollbacks));
             }
 
             public Task<TResult> ExecuteInsertOrReplaceModifiersAsync<TResult>(AzureTableDriverDynamic repository, 
@@ -416,51 +377,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                         },
                     onSuccessWithRollback: onSuccessWithRollback,
                     onFailure: onFailure);
-
-                //var modifierResults = await typeof(EntityType)
-                //    .GetPropertyOrFieldMembers()
-                //    .Where(member => member.ContainsAttributeInterface<IModifyAzureStorageTableSave>())
-                //    .SelectMany(memberInfo =>
-                //        memberInfo
-                //            .GetAttributesInterface<IModifyAzureStorageTableSave>()
-                //            .Select(
-                //               storageModifier =>
-                //               {
-                //                   return storageModifier.ExecuteInsertOrReplaceAsync(memberInfo,
-                //                            this.RowKey, this.PartitionKey,
-                //                            this.Entity, this.WriteEntity(null),
-                //                            repository,
-                //                        rollback =>
-                //                            new ExecResult
-                //                            {
-                //                                success = true,
-                //                                rollback = rollback,
-                //                                member = memberInfo,
-                //                            },
-                //                        () =>
-                //                        new ExecResult
-                //                        {
-                //                            success = false,
-                //                            member = memberInfo,
-                //                        });
-                //               }))
-                //    .AsyncEnumerable()
-                //    .ToArrayAsync();
-                //var rollbacks = modifierResults
-                //    .Where(result => result.success)
-                //    .Select(result => result.rollback());
-                //var failures = modifierResults
-                //    .Where(result => !result.success)
-                //    .Select(result => result.member);
-                //var didFail = failures.Any();
-                //if (didFail)
-                //{
-                //    await Task.WhenAll(rollbacks);
-                //    return onFailure(failures.ToArray());
-                //}
-
-                //return onSuccessWithRollback(
-                //    () => Task.WhenAll(rollbacks));
             }
 
             public Task<TResult> ExecuteUpdateModifiersAsync<TResult>(IAzureStorageTableEntity<EntityType> current,
@@ -472,9 +388,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         (memberInfo, storageModifier) =>
                         {
                             return storageModifier.ExecuteUpdateAsync(memberInfo,
-                                this.RowKey, this.PartitionKey,
-                                current.Entity, current.WriteEntity(null),
-                                this.Entity, this.WriteEntity(null),
+                                this, current,
                                 repository,
                                 rollback =>
                                 {
@@ -497,40 +411,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                         },
                     onSuccessWithRollback: onSuccessWithRollback,
                     onFailure: onFailure);
-
-                //var modifierResults = await typeof(EntityType)
-                //       .GetPropertyOrFieldMembers()
-                //       .Where(member => member.ContainsAttributeInterface<IModifyAzureStorageTableSave>())
-                //       .SelectMany(memberInfo =>
-                //           memberInfo
-                //               .GetAttributesInterface<IModifyAzureStorageTableSave>()
-                //               .Select(
-                //                  storageModifier =>
-                //                  {
-                //                      return storageModifier.ExecuteUpdateAsync(memberInfo,
-                //                          this.RowKey, this.PartitionKey,
-                //                          current.Entity, current.WriteEntity(null), 
-                //                          this.Entity, this.WriteEntity(null),
-                //                          repository,
-                //                          rollback => rollback.PairWithKey(true),
-                //                          () => default(Func<Task>).PairWithKey(false));
-                //                  }))
-                //       .AsyncEnumerable()
-                //       .ToArrayAsync();
-                //var rollbacks = modifierResults
-                //    .Where(kvp => kvp.Key)
-                //    .SelectValues(callback => callback());
-                //var didFail = modifierResults
-                //    .Where(kvp => !kvp.Key)
-                //    .Any();
-                //if (didFail)
-                //{
-                //    await Task.WhenAll(rollbacks);
-                //    return onFailure(new MemberInfo[] { });
-                //}
-
-                //return onSuccessWithRollback(
-                //    () => Task.WhenAll(rollbacks));
             }
 
             public Task<TResult> ExecuteDeleteModifiersAsync<TResult>(AzureTableDriverDynamic repository,
@@ -565,40 +445,40 @@ namespace EastFive.Persistence.Azure.StorageTables
                         },
                     onSuccessWithRollback: onSuccessWithRollback,
                     onFailure: onFailure);
-
-                //var modifierResults = await typeof(EntityType)
-                //    .GetPropertyOrFieldMembers()
-                //    .Where(member => member.ContainsAttributeInterface<IModifyAzureStorageTableSave>())
-                //    .SelectMany(memberInfo =>
-                //        memberInfo
-                //            .GetAttributesInterface<IModifyAzureStorageTableSave>()
-                //            .Select(
-                //               storageModifier =>
-                //               {
-                //                   return storageModifier.ExecuteDeleteAsync(memberInfo,
-                //                           this.RowKey, this.PartitionKey,
-                //                           this.Entity, this.WriteEntity(null),
-                //                           repository,
-                //                       rollback => rollback.PairWithKey(true),
-                //                       () => default(Func<Task>).PairWithKey(true));
-                //               }))
-                //    .AsyncEnumerable()
-                //    .ToArrayAsync();
-                //var rollbacks = modifierResults
-                //    .Where(kvp => kvp.Key)
-                //    .SelectValues(callback => callback());
-                //var didFail = modifierResults
-                //    .Where(kvp => !kvp.Key)
-                //    .Any();
-                //if (didFail)
-                //{
-                //    await Task.WhenAll(rollbacks);
-                //    return onFailure(new MemberInfo[] { });
-                //}
-
-                //return onSuccessWithRollback(
-                //    () => Task.WhenAll(rollbacks));
             }
+
+            #endregion
+
+            #region IAzureStorageTableEntityBatchable
+
+            public IBatchModify[] BatchCreateModifiers()
+            {
+                return typeof(EntityType)
+                    .GetPropertyAndFieldsWithAttributesInterface<IModifyAzureStorageTableSave>()
+                    .SelectMany(memberInfoAndModifier =>
+                        memberInfoAndModifier.Item2.GetBatchCreateModifier(memberInfoAndModifier.Item1,
+                            this.RowKey, this.PartitionKey,
+                            this.Entity, this.WriteEntity(null)))
+                    .ToArray();
+            }
+
+            public IBatchModify[] BatchInsertOrReplaceModifiers()
+            {
+                throw new NotImplementedException();
+            }
+
+            public IBatchModify[] BatchDeleteModifiers()
+            {
+                return typeof(EntityType)
+                    .GetPropertyAndFieldsWithAttributesInterface<IModifyAzureStorageTableSave>()
+                    .SelectMany(memberInfoAndModifier =>
+                        memberInfoAndModifier.Item2.GetBatchDeleteModifier(memberInfoAndModifier.Item1,
+                            this.RowKey, this.PartitionKey,
+                            this.Entity, this.WriteEntity(null)))
+                    .ToArray();
+            }
+
+            #endregion
         }
     }
 }
