@@ -52,9 +52,9 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = StartedPropertyName)]
         [ApiProperty(PropertyName = StartedPropertyName)]
         [Storage]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         public DateTime started;
 
         public const string EndedPropertyName = "ended";

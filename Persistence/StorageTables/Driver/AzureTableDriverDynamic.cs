@@ -2201,6 +2201,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         GetEntity((TData)((object)currentStorage).CloneObject())
                         :
                         GetEntity(currentStorage);
+                    var eTag = entity.ETag;
                     var resultLocal = await onUpdate(currentStorage,
                         async (documentToSave) =>
                         {
@@ -2212,6 +2213,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 },
                                 onDocumentHasBeenModified: async () =>
                                 {
+                                    var updatedETag = documentToSave.StorageGetETag();
+                                    if (eTag != updatedETag)
+                                        throw new ArgumentException($"Cannot change ETag in update. {typeof(TData).FullName}:{eTag} => {updatedETag}");
+
+                                    var updatedRowKey = documentToSave.StorageGetRowKey();
+                                    if (rowKey != updatedRowKey)
+                                        throw new ArgumentException($"Cannot change row key in update. {typeof(TData).FullName}:{rowKey} => {updatedRowKey}");
+
+                                    var updatedPartitionKey = documentToSave.StorageGetPartitionKey();
+                                    if (partitionKey != updatedPartitionKey)
+                                        throw new ArgumentException($"Cannot change partition key in update. {typeof(TData).FullName}:{partitionKey} => {updatedPartitionKey}");
+
                                     var trGlobal = default(TableResult);
                                     if (onTimeoutAsync.IsDefaultOrNull())
                                     {
