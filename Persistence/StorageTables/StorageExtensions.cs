@@ -894,19 +894,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         //            onTimeout: onTimeout);
         //}
 
-        public static IEnumerableAsync<TResult> StorageCreateOrUpdateBatch<TEntity, TResult>(this IEnumerable<TEntity> entities,
-            Func<TEntity, TableResult, TResult> perItemCallback,
+        public static IEnumerableAsync<TResult> StorageCreateOrUpdateBatch<TResource, TResult>(
+            this IEnumerable<TResource> entities,
+            Func<TResource, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
-            where TEntity : class, ITableEntity
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .CreateOrUpdateBatch<TResult>(entities,
+                .CreateOrReplaceBatch<TResource, TResult>(entities,
                     (tableEntity, result) =>
                     {
-                        var entity = tableEntity as TEntity;
+                        var entity = ((IAzureStorageTableEntity<TResource>)tableEntity).Entity;
                         return perItemCallback(entity, result);
                     },
                     tableName: tableName,

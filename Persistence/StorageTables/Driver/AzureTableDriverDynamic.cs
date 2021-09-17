@@ -241,14 +241,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         {
                             if (resource.RawRowKey != resource.RowKey)
                                 tableInformation.mismatchedRowKeys++;
-                        }catch(Exception)
+                        } catch (Exception)
                         {
                             tableInformation.mismatchedRowKeys++;
                             return tableInformation;
                         }
                         var partitionKey = default(string);
                         try
-                        { 
+                        {
                             partitionKey = resource.RawPartitionKey;
                             if (partitionKey != resource.PartitionKey)
                                 tableInformation.mismatchedPartitionKeys++;
@@ -1467,7 +1467,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             CloudTable table = default(CloudTable),
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
-            where TDocument : class, ITableEntity
+            where TDocument : ITableEntity
         {
             if (!entities.Any())
                 return new TableResult[] { };
@@ -1814,7 +1814,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             table: table,
                             onTimeout: onTimeout);
                     })
-                .AsyncEnumerable(readAhead.HasValue? readAhead.Value : 0)
+                .AsyncEnumerable(readAhead.HasValue ? readAhead.Value : 0)
                 .SelectWhereHasValue()
                 .SelectValues();
         }
@@ -1992,7 +1992,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
             System.Threading.CancellationToken cancellationToken = default)
         {
-            return RunQueryForTableEntries<TEntity>(whereFilter, table:table,
+            return RunQueryForTableEntries<TEntity>(whereFilter, table: table,
                     numberOfTimesToRetry: numberOfTimesToRetry, cancellationToken: cancellationToken)
                 .Select(segResult => segResult.Entity);
         }
@@ -2197,7 +2197,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         onModificationFailures = onModificationFailures,
                         tableResult = tableResult,
                     };
-                    var entity = typeof(TData).IsClass?
+                    var entity = typeof(TData).IsClass ?
                         GetEntity((TData)((object)currentStorage).CloneObject())
                         :
                         GetEntity(currentStorage);
@@ -2359,6 +2359,26 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #region Batch
 
+        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,
+                Func<ITableEntity, TableResult, TResult> perItemCallback,
+                string tableName = default(string),
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+        {
+            var table = tableName.HasBlackSpace() ?
+                   this.TableClient.GetTableReference(tableName)
+                   :
+                   GetTable<TData>();
+            var batchedEntities = datas
+                .Select(data => GetEntity(data));
+
+            return CreateOrUpdateBatch(batchedEntities,
+                perItemCallback,
+                table: table,
+                onTimeout: onTimeout,
+                diagnostics: diagnostics);
+        }
+
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerableAsync<ITableEntity> entities,
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
@@ -2489,13 +2509,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
+            CloudTable table = default(CloudTable),
             AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
         {
-            var table = tableName.HasBlackSpace() ?
-                TableClient.GetTableReference(tableName)
-                :
-                default(CloudTable);
+            if(table.IsDefaultOrNull())
+                table = tableName.HasBlackSpace() ?
+                    TableClient.GetTableReference(tableName)
+                    :
+                    default(CloudTable);
             return CreateOrReplaceBatch<ITableEntity, TResult>(entities,
                 entity => entity.RowKey,
                 entity => entity.PartitionKey,
@@ -2514,7 +2536,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 out Task<object[]> modifiersTask,
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
-            where TDocument : class, ITableEntity
+            where TDocument : ITableEntity
         {
             modifiersTask = SaveModifiersAsync();
             return entities
@@ -2542,7 +2564,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             .Select(
                                 tableResult =>
                                 {
-                                    var resultDocument = (tableResult.Result as TDocument);
+                                    var resultDocument = (TDocument)tableResult.Result;
                                     var itemResult = perItemCallback(resultDocument, tableResult);
                                     return itemResult;
                                 });
