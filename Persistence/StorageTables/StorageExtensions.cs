@@ -964,7 +964,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
-            EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+            EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+            int? readAhead = default)
             where TEntity : IReferenceable
         {
             return AzureTableDriverDynamic
@@ -977,7 +978,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     },
                     tableName: tableName,
                     onTimeout: onTimeout,
-                    diagnostics: diagnostics);
+                    diagnostics: diagnostics,
+                    readAhead: readAhead);
         }
 
         #endregion

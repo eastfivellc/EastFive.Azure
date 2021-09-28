@@ -2438,7 +2438,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<ITableEntity, TableResult, TResult> perItemCallback,
                 string tableName = default(string),
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
-                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+                int? readAhead = default)
             where TData : IReferenceable
         {
             var table = tableName.HasBlackSpace() ?
@@ -2466,7 +2467,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 perItemCallback, table,
                                 out Task<object[]> modifiersTask,
                                 onTimeout: onTimeout,
-                                diagnostics: diagnostics)
+                                diagnostics: diagnostics,
+                                readAhead: readAhead)
                             .ToArrayAsync();
                         await modifiersTask;
                         return await x;
@@ -2548,9 +2550,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 CloudTable table,
                 out Task<object[]> modifiersTask,
                 AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
-                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+                int? readAhead = default)
             where TDocument : ITableEntity
         {
+            const int raDefault = 100;
             modifiersTask = SaveModifiersAsync();
             return entities
                 .Select(
@@ -2606,7 +2610,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         return await grp
                             .Segment(modifier.GroupLimit.Value)
                             .Select(items => SaveItemsAsync(items))
-                            .AsyncEnumerable(readAhead: 100)
+                            .AsyncEnumerable(readAhead: readAhead ?? raDefault)
                             .ToArrayAsync();
 
                         async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
@@ -2622,7 +2626,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     return modifiedResource;
                                 });
                     })
-                .AsyncEnumerable(readAhead: 100)
+                .AsyncEnumerable(readAhead: readAhead ?? raDefault)
                 .ToArrayAsync();
         }
 
