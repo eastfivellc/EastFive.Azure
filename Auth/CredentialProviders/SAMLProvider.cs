@@ -1,24 +1,22 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Security.CredentialProvider;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
+
+using Newtonsoft.Json;
+
 using EastFive.Security.SessionServer.Persistence;
 using EastFive.Api.Services;
-using System.Security.Claims;
 using EastFive.Security.SessionServer;
-using EastFive.Api.Azure.Credentials.Attributes;
 using EastFive.Serialization;
+using EastFive.Web.Configuration;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
     [IntegrationName(IntegrationName)]
     public class SAMLProvider : IProvideLogin
@@ -46,7 +44,7 @@ namespace EastFive.Api.Azure.Credentials
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new SAMLProvider()).ToTask();
+            return onProvideAuthorization(new SAMLProvider()).AsTask();
         }
         
         public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
@@ -57,7 +55,7 @@ namespace EastFive.Api.Azure.Credentials
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            return await EastFive.Web.Configuration.Settings.GetBase64Bytes(EastFive.Azure.AppSettings.SAML.SAMLCertificate,
+            return await EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
                 async (certBuffer) =>
                 {
                     using (var certificate = new X509Certificate2(certBuffer))
@@ -92,10 +90,10 @@ namespace EastFive.Api.Azure.Credentials
                             (why) => onUnspecifiedConfiguration(why));
                     } catch(Exception ex)
                     {
-                        return await onInvalidCredentials("SAML Assertion parse and validate failed").ToTask();
+                        return await onInvalidCredentials("SAML Assertion parse and validate failed").AsTask();
                     }
                 },
-                (why) => onUnspecifiedConfiguration(why).ToTask());
+                (why) => onUnspecifiedConfiguration(why).AsTask());
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> tokens,
@@ -113,7 +111,7 @@ namespace EastFive.Api.Azure.Credentials
 
         #region IProvideLogin
 
-        public Type CallbackController => typeof(Controllers.SAMLRedirectController);
+        public Type CallbackController => typeof(SAMLProvider); // typeof(Controllers.SAMLRedirectController);
 
         public Uri GetSignupUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {

@@ -1,10 +1,9 @@
 ﻿using EastFive.Api.Azure;
-using EastFive.Api.Azure.Credentials.Attributes;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
+using EastFive.Web.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,40 +37,22 @@ namespace EastFive.Azure.Login
         private readonly Guid clientId;
         private readonly string clientSecret;
 
-        private CredentialProvider(Guid clientKey, string clientSecret)
+        public CredentialProvider(Guid clientKey, string clientSecret)
         {
             this.clientId = clientKey;
             this.clientSecret = clientSecret;
         }
 
-        public static TResult LoadFromConfig<TResult>(
-            Func<CredentialProvider, TResult> onLoaded,
-            Func<string, TResult> onConfigurationNotAvailable)
-        {
-            return Web.Configuration.Settings.GetGuid(AppSettings.ClientKey,
-                (clientKey) =>
-                {
-                    return Web.Configuration.Settings.GetString(AppSettings.ClientSecret,
-                        (clientSecret) =>
-                        {
-                            var provider = new CredentialProvider(clientKey, clientSecret);
-                            return onLoaded(provider);
-                        },
-                        onConfigurationNotAvailable);
-                },
-                onConfigurationNotAvailable);
-        }
-
-        [IntegrationName(IntegrationName)]
-        public static async Task<TResult> InitializeAsync<TResult>(
-            Func<IProvideAuthorization, TResult> onProvideAuthorization,
-            Func<TResult> onProvideNothing,
-            Func<string, TResult> onFailure)
-        {
-            return await LoadFromConfig(
-                (provider) => onProvideAuthorization(provider),
-                (why) => onFailure(why)).AsTask();
-        }
+        //[IntegrationName(IntegrationName)]
+        //public static async Task<TResult> InitializeAsync<TResult>(
+        //    Func<IProvideAuthorization, TResult> onProvideAuthorization,
+        //    Func<TResult> onProvideNothing,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    return await LoadFromConfig(
+        //        (provider) => onProvideAuthorization(provider),
+        //        (why) => onFailure(why)).AsTask();
+        //}
 
         #endregion
 
@@ -197,5 +178,26 @@ namespace EastFive.Azure.Login
 
         #endregion
 
+    }
+
+    public class CredentialProviderAttribute : Attribute, IProvideLoginProvider
+    {
+        public TResult ProvideLoginProvider<TResult>(
+            Func<IProvideLogin, TResult> onLoaded,
+            Func<string, TResult> onNotAvailable)
+        {
+            return AppSettings.ClientKey.ConfigurationGuid(
+                (clientKey) =>
+                {
+                    return AppSettings.ClientSecret.ConfigurationString(
+                        (clientSecret) =>
+                        {
+                            var provider = new CredentialProvider(clientKey, clientSecret);
+                            return onLoaded(provider);
+                        },
+                        onNotAvailable);
+                },
+                onNotAvailable);
+        }
     }
 }

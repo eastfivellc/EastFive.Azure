@@ -3,7 +3,7 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Reflection;
 using EastFive.Serialization;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +16,7 @@ using BlackBarLabs.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Linq;
+using EastFive.Azure.Persistence.AzureStorageTables;
 
 namespace EastFive.Persistence
 {
@@ -52,7 +53,10 @@ namespace EastFive.Persistence
     {
         string ComputePartitionKey(object memberValue, MemberInfo memberInfo,
             string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues);
+    }
 
+    public interface IGenerateAzureStorageTablePartitionKey
+    {
         IEnumerable<string> GeneratePartitionKeys(Type type, int skip, int top);
     }
 
@@ -136,10 +140,20 @@ namespace EastFive.Persistence
             var propertyName = this.GetTablePropertyName(memberInfo);
 
             var valueType = memberInfo.GetPropertyOrFieldType();
+
+            if (valueType.TryGetAttributeInterface(
+                        out ICast<IDictionary<string, EntityProperty>> properties))
+            {
+                return properties.Cast(value, valueType,
+                    propertyName, memberInfo,
+                    props => props.ToArray(),
+                    () => CastValue(valueType, value, propertyName));
+            }
+
             return CastValue(valueType, value, propertyName);
         }
 
-        public KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object value, string propertyName)
+        public virtual KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object value, string propertyName)
         {
             if (value.IsDefaultOrNull())
                 return new KeyValuePair<string, EntityProperty>[] { };
@@ -229,18 +243,29 @@ namespace EastFive.Persistence
 
         public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
         {
-            var propertyName = this.GetTablePropertyName(memberInfo);
-
             var type = memberInfo.GetPropertyOrFieldType();
-
-            return GetMemberValue(type, propertyName, values,
-                (convertedValue) => convertedValue,
+            var propertyName = this.GetTablePropertyName(memberInfo);
+            if (type.TryGetAttributeInterface(
+                out ISerialize<IDictionary<string, EntityProperty>> serializer))
+            {
+                return serializer.Bind(values, type, propertyName, memberInfo,
+                    (convertedValue) => convertedValue,
                     () =>
                     {
                         var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
                             $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
                         throw new Exception(exceptionText);
                     });
+            }
+
+            return GetMemberValue(type, propertyName, values,
+                (convertedValue) => convertedValue,
+                () =>
+                {
+                    var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
+                        $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
+                    throw new Exception(exceptionText);
+                });
         }
 
         public virtual TResult GetMemberValue<TResult>(Type type, string propertyName, IDictionary<string, EntityProperty> values,
@@ -588,6 +613,28 @@ namespace EastFive.Persistence
             if (storageMembers.Any())
             {
                 var value = Activator.CreateInstance(type);
+                var rowKeyKey = $"{propertyName}___rowKey_";
+                if (allValues.ContainsKey(rowKeyKey))
+                {
+                    var rowKeyProperty = allValues[rowKeyKey];
+                    if (rowKeyProperty.PropertyType == EdmType.String)
+                    {
+                        var rowKey = rowKeyProperty.StringValue;
+                        value.StorageParseRowKeyForType(rowKey, type);
+
+                        var partitionKeyKey = $"{propertyName}___partitionKey_";
+                        if (allValues.ContainsKey(partitionKeyKey))
+                        {
+                            var partitionKeyProperty = allValues[partitionKeyKey];
+                            if (partitionKeyProperty.PropertyType == EdmType.String)
+                            {
+                                var partitionKey = partitionKeyProperty.StringValue;
+                                value.StorageParsePartitionKeyForType(partitionKey, type);
+                            }
+                        }
+                    }
+                }
+
                 foreach (var storageMemberKvp in storageMembers)
                 {
                     var attr = storageMemberKvp.Value.First();
@@ -705,6 +752,25 @@ namespace EastFive.Persistence
                             return epValue.PairWithKey(propName);
                         })
                     .ToArray();
+
+                if(value.StorageTryGetRowKeyForType(valueType, out string rowKeyValue))
+                {
+                    var rowKeyKey = $"_rowKey_";
+                    var rowKeyProperty = new EntityProperty(rowKeyValue);
+                    storageArrays = storageArrays
+                        .Append(rowKeyProperty.PairWithKey(rowKeyKey))
+                        .ToArray();
+                }
+
+                if (value.StorageTryGetPartitionKeyForType(rowKeyValue, valueType, out string partitionKeyValue))
+                {
+                    var partitionKeyKey = $"_partitionKey_";
+                    var partitionKeyProperty = new EntityProperty(partitionKeyValue);
+                    storageArrays = storageArrays
+                        .Append(partitionKeyProperty.PairWithKey(partitionKeyKey))
+                        .ToArray();
+                }
+
                 return onValues(storageArrays);
             }
 
@@ -785,6 +851,11 @@ namespace EastFive.Persistence
                 .Select(kvp => kvp.Value.PairWithKey(kvp.Key.Substring(propertyName.Length + 2)))
                 .ToDictionary();
 
+            var rowKeyKey = $"_rowKey_";
+            var rowKeyKeys = GetKeys(rowKeyKey);
+            var partitionKeyKey = $"_partitionKey_";
+            var partitionKeyKeys = GetKeys(partitionKeyKey);
+
             var storageArrays = storageMembers
                 .Select(
                     storageMemberKvp =>
@@ -814,6 +885,16 @@ namespace EastFive.Persistence
             foreach (int i in Enumerable.Range(0, itemsLength))
             {
                 var item = Activator.CreateInstance(arrayType);
+                if(i < rowKeyKeys.Length)
+                {
+                    var rowKeyValue = rowKeyKeys[i];
+                    item = item.StorageParseRowKeyForType(rowKeyValue, arrayType);
+                }
+                if (i < partitionKeyKeys.Length)
+                {
+                    var partitionKeyValue = partitionKeyKeys[i];
+                    item = item.StorageParsePartitionKeyForType(partitionKeyValue, arrayType);
+                }
                 items.SetValue(item, i);
             }
             foreach (var storageArray in storageArrays)
@@ -825,7 +906,21 @@ namespace EastFive.Persistence
                     member.SetValue(ref item, value);
                     items.SetValue(item, i); // needed for copied structs
                 }
+
             return items;
+
+
+            string[] GetKeys(string keyKey)
+            {
+                if (!entityProperties.ContainsKey(keyKey))
+                    return new string[] { };
+
+                var ep = entityProperties[keyKey];
+                if (ep.PropertyType != EdmType.Binary)
+                    return new string[] { };
+
+                return ep.BinaryValue.ToStringsFromUTF8ByteArray();
+            }
         }
 
         protected KeyValuePair<string, EntityProperty>[] CastArrayEntityProperties(object value,
@@ -834,6 +929,7 @@ namespace EastFive.Persistence
             var items = ((IEnumerable)value)
                 .Cast<object>()
                 .ToArray();
+
             var epsArray = storageMembers
                 .SelectMany(
                     storageMember =>
@@ -855,8 +951,52 @@ namespace EastFive.Persistence
                         return entityProperties;
                     })
                 .ToArray();
-            return epsArray;
 
+            var keyValues = items
+                .Select(
+                    item =>
+                    {
+                        var itemType = item.GetType();
+                        var rowKeyValue = item.StorageTryGetRowKeyForType(
+                                itemType, out string rkValue)?
+                            rkValue
+                            :
+                            string.Empty;
+                        var partitionKeyValue = item.StorageTryGetPartitionKeyForType(
+                                rowKeyValue, itemType, out string pkValue) ?
+                            pkValue
+                            :
+                            string.Empty;
+                        return (rowKeyValue, partitionKeyValue);
+                    });
+            
+            var hasRowKeys = items.Any(item => item.GetType().StorageHasRowKey());
+            if (hasRowKeys)
+            {
+                var rowKeyKey = $"_rowKey_";
+                var rowKeyValue = keyValues
+                .Select(kv => kv.rowKeyValue)
+                .ToUTF8ByteArrayOfStrings();
+                var rowKeyEp = new EntityProperty(rowKeyValue);
+                epsArray = epsArray
+                    .Append(rowKeyEp.PairWithKey(rowKeyKey))
+                    .ToArray();
+            }
+
+            var hasPartitionKeys = items.Any(item => item.GetType().StorageHasPartitionKey());
+            if (hasPartitionKeys)
+            {
+                var partitionKeyKey = $"_partitionKey_";
+                var partitionKeyValue = keyValues
+                    .Select(kv => kv.partitionKeyValue)
+                    .ToUTF8ByteArrayOfStrings();
+                var partitionKeyEp = new EntityProperty(partitionKeyValue);
+                epsArray = epsArray
+                    .Append(partitionKeyEp.PairWithKey(partitionKeyKey))
+                    .ToArray();
+            }
+
+            return epsArray;
         }
 
         #endregion
@@ -865,6 +1005,14 @@ namespace EastFive.Persistence
             Func<object, TResult> onBound,
             Func<TResult> onFailedToBind)
         {
+            if (type.IsSubClassOfGeneric(typeof(Nullable<>)))
+            {
+                var resourceType = type.GenericTypeArguments.First();
+                var instantiatableType = typeof(Nullable<>).MakeGenericType(resourceType);
+                var instance = Activator.CreateInstance(instantiatableType, new object[] { });
+                return onBound(instance);
+            }
+
             if (type.IsAssignableFrom(typeof(Guid)))
                 return onBound(default(Guid));
 
@@ -904,22 +1052,26 @@ namespace EastFive.Persistence
             if (type.IsAssignableFrom(typeof(int)))
                 return onBound(default(int));
 
+            if (type.IsAssignableFrom(typeof(float)))
+                return onBound(default(float));
+
+            if (type.IsAssignableFrom(typeof(double)))
+                return onBound(default(double));
+
             if (type.IsAssignableFrom(typeof(Uri)))
                 return onBound(default(Uri));
 
             if (type.IsAssignableFrom(typeof(bool)))
                 return onBound(default(bool));
 
-            if (type.IsSubClassOfGeneric(typeof(Nullable<>)))
-            {
-                var resourceType = type.GenericTypeArguments.First();
-                var instantiatableType = typeof(Nullable<>).MakeGenericType(resourceType);
-                var instance = Activator.CreateInstance(instantiatableType, new object[] { });
-                return onBound(instance);
-            }
-
             if (typeof(Type) == type)
                 return onBound(null);
+
+            if(type.IsEnum)
+            {
+                var v = type.GetDefault();
+                return onBound(v);
+            }
 
             if (type.IsArray)
             {
@@ -948,17 +1100,6 @@ namespace EastFive.Persistence
             return onFailedToBind();
         }
 
-        public TResult Bind<TResult>(IDictionary<string, EntityProperty> value, Type type,
-            Func<object, TResult> onBound,
-            Func<TResult> onFailedToBind)
-        {
-            throw new NotImplementedException();
-        }
-
-        public TResult Cast<TResult>(object value, Type valueType, Func<KeyValuePair<string, EntityProperty>[], TResult> onValue, Func<TResult> onNoCast)
-        {
-            throw new NotImplementedException();
-        }
     }
 
 }

@@ -1,10 +1,10 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
+﻿using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Runtime.Serialization;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
-    internal class LoginActorLookupDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    internal class LoginActorLookupDocument : TableEntity
     {
         #region Properties
         

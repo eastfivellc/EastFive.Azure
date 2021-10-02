@@ -9,8 +9,7 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -178,9 +177,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                         async () =>
                         {
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
+<<<<<<< HEAD
                                     (codes, why) => false,
+=======
+                                    onFailure:(codes, why) => false,
+>>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -188,6 +191,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                 tableName: tableName);
         }
 
+
+
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -229,9 +240,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                         async () =>
                         {
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
+<<<<<<< HEAD
                                     (codes, why) => false,
+=======
+                                    onFailure: (codes, why) => false,
+>>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -239,17 +254,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                 tableName: tableName);
         }
 
-        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
+            var valueExisting = existingEntity.Entity;
             var existingRowKey = valueExisting.StorageGetRowKey();
             var existingPartitionKey = valueExisting.StorageGetPartitionKey();
 
+            var valueUpdated = updatedEntity.Entity;
+            var rowKeyRef = updatedEntity.RowKey;
+            var partitionKeyRef = updatedEntity.PartitionKey;
+            var dictionaryExisting = existingEntity.WriteEntity(null);
             if (IsIgnored(memberInfo, valueUpdated))
             {
                 if (IsIgnored(memberInfo, valueExisting))
@@ -294,9 +313,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                             if (!rollbackMaybe.IsDefaultOrNull())
                                 await rollbackMaybe();
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
-                                    () => true,
+                                    (discard) => true,
                                     () => false,
+<<<<<<< HEAD
                                     (codes, why) => false,
+=======
+                                    onFailure: (codes, why) => false,
+>>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -323,10 +346,19 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     await deleteAsync();
                     return onSuccessWithRollback(
-                        () => repository.CreateAsync(entity, (discardAgain) => true, () => false));
+                        () => repository.CreateAsync(entity, 
+                            (discardAgain, discard2x) => true, () => false));
                 },
                 () => onSuccessWithRollback(() => 1.AsTask()),
+                (codes, why) => onSuccessWithRollback(() => 1.AsTask()),
                 tableName: tableName);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
 
         public static IHandleFailedModifications<TResult> ModificationFailure<T, TResult>(

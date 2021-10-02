@@ -11,7 +11,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {
@@ -94,13 +94,13 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> PostLoginAsync(
+        public static IHttpResponse PostLogin(
                 Guid authenticationId,
-                HttpApplication application, UrlHelper urlHelper,
+                HttpApplication application, IProvideUrl urlHelper,
             RedirectResponse onRedirect,
             GeneralFailureResponse onFailure)
         {
-            return EastFive.Security.RSA.FromConfig(EastFive.Azure.AppSettings.AdminLoginRsaKey,
+            return EastFive.Security.RSA.RSAFromConfig(EastFive.Azure.AppSettings.AdminLoginRsaKey,
                 rsa =>
                 {
                     using (rsa)
@@ -114,6 +114,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                         return onRedirect(redirectUrl);
                     }
                 },
+                () => onFailure("missing config setting"),
                 (why) => onFailure(why));
         }
 

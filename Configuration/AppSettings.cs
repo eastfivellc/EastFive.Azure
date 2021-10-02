@@ -13,6 +13,31 @@ namespace EastFive.Azure
         public const string ASTConnectionStringKey = "EastFive.Azure.StorageTables.ConnectionString";
         public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
 
+        public static class SPA
+        {
+            public const string BuildConfigPath = "EastFive.Azure.SPA.BuildConfigPath";
+            public const string IndexHtmlPath = "EastFive.Azure.SPA.IndexHtmlPath";
+            public const string SiteLocation = "EastFive.Azure.SpaSiteLocation";
+
+            [ConfigKey("Expiration in days for immutable spa files.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Discressionary")]
+            public const string FilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
+
+            [ConfigKey("Enable dynamic serving of the SPA.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Discressionary")]
+            public const string ServeEnabled = "EastFive.Azure.SpaServeEnabled";
+
+            [ConfigKey("Default azure spa connection string",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = true,
+                PrivateRepositoryOnly = true)]
+            public const string SpaStorage = "EastFive.Azure.Spa.ConnectionString";
+        }
+
         public static class ApplicationInsights
         {
             [ConfigKey("Identifies the application insights endpoint to which data is posted.",
@@ -34,6 +59,10 @@ namespace EastFive.Azure
                 "Create API Key")]
             public const string ClientSecret = "EastFive.Azure.ApplicationInsights.ClientSecret";
 
+            public const string ApiBase = "EastFive.Azure.ApplicationInsights.ApiBase";
+
+            public const string Path = "EastFive.Azure.ApplicationInsights.Path";
+
             public const string TeamsHook = "EastFive.Azure.ApplicationInsights.TeamsHook";
 
             public const string TeamsAppIdentification = "EastFive.Azure.ApplicationInsights.TeamsAppIdentification";
@@ -41,9 +70,24 @@ namespace EastFive.Azure
             public const string TeamsAppImage = "EastFive.Azure.ApplicationInsights.TeamsAppImage";
         }
 
+        public static class Search
+        {
+            [ConfigKey("Identifies the search endpoint to use.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false,
+                PrivateRepositoryOnly = true,
+                Location = "Home > Search > {Index Name} > Dashboard / Instrumentation Key")]
+            public const string EndPoint = "EastFive.Azure.Search.SearchServiceEndPoint";
+
+            [ConfigKey("Key for API access.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = true,
+                Location = "Home > Search > {Index Name} > API Access / AdminKey")]
+            public const string AdminApiKey = "EastFive.Azure.Search.SearchServiceAdminApiKey";
+        }
+
         public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
 
-        public const string SpaSiteLocation = "EastFive.Azure.SpaSiteLocation";
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
         public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
@@ -78,8 +122,8 @@ namespace EastFive.Azure
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false)]
             public const string SAMLCertificate = "EastFive.Security.CredentialProvider.SAML.Certificate";
-            
-            [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " + 
+
+            [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " +
                 "This value is used to lookup the user in the local system.",
                 DeploymentOverrides.Optional,
                 DeploymentSecurityConcern = false)]
@@ -94,7 +138,9 @@ namespace EastFive.Azure
                 Location = "Apple developer portal -> Login with apple",
                 DeploymentSecurityConcern = false)]
             public const string DeveloperSiteAssociation = "EastFive.Azure.Apple.DeveloperSiteAssociation";
-	}
+
+            public const string AppleAppSiteAssociationId = "EastFive.Azure.Apple.AppleAppSiteAssociation.AppId";
+        }
 
         public static class AzureADB2C
         {
@@ -111,7 +157,7 @@ namespace EastFive.Azure
                 Location = "Azure Portal | Azure Active Directory | App Registrations | Application ID",
                 PrivateRepositoryOnly = false)]
             public const string ApplicationId = "EastFive.Azure.AzureADB2C.ApplicationId";
-            
+
             [ConfigKey("The audience used for token validation.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false,
@@ -145,17 +191,36 @@ namespace EastFive.Azure
         public const string Redirections = "EastFive.Azure.Auth.Redirections";
         public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
 
-        [ConfigKey("Expiration in days for immutable spa files.",
-            DeploymentOverrides.Optional,
-            DeploymentSecurityConcern = false,
-            Location = "Discressionary")]
-        public const string SpaFilesExpirationInDays = "EastFive.Azure.SpaFilesExpirationInDays";
+        [Config]
+        public static class Auth
+        {
+            [Config]
+            public static class Apple
+            {
+                [ConfigKey("ID used to identify the application to apple.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientId = "EastFive.Apple.ClientId";
 
-        [ConfigKey("Enable dynamic serving of the SPA.",
-            DeploymentOverrides.Optional,
-            DeploymentSecurityConcern = false,
-            Location = "Discressionary")]
-        public const string SpaServeEnabled = "EastFive.Azure.SpaServeEnabled";
+                [ConfigKey("Key used to redeem a token code to Apple.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = true,
+                    PrivateRepositoryOnly = true)]
+                public const string AppSecret = "EastFive.Apple.ClientSecret";
+
+                [ConfigKey("This is the list of audiences that are valid for the Apple JWT. This should include the ClientID.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Apple developer portal",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ValidAudiences = "EastFive.Apple.ValidAudiences";
+            }
+
+            public const string OpenApiCollectionName = "EastFive.Azure.Auth";
+        }
     }
 }
 
@@ -176,7 +241,6 @@ namespace EastFive.Security.SessionServer.Configuration
             DeploymentSecurityConcern = false,
             Location = "The URL that the webUI is deployed")]
         public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
-        public const string AppleAppSiteAssociationId = "EastFive.Security.SessionServer.AppleAppSiteAssociation.AppId";
 
         [ConfigKey("Connection string that is used for the service bus.",
             DeploymentOverrides.Suggested,

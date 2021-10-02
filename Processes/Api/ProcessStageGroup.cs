@@ -7,7 +7,7 @@ using EastFive.Azure;
 using System.Threading.Tasks;
 using EastFive.Api.Controllers;
 using System.Net.Http;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Linq;
 using BlackBarLabs.Extensions;
 
@@ -15,8 +15,13 @@ namespace EastFive.Api.Azure.Resources
 {
     [DataContract]
     [FunctionViewController(Route = "ProcessStageGroup")]
-    public class ProcessStageGroup : ResourceBase
+    public class ProcessStageGroup
     {
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         public const string TitlePropertyName = "title";
         [JsonProperty(PropertyName = TitlePropertyName)]
         public string Title { get; set; }
@@ -51,9 +56,9 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -75,39 +80,18 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindAllAsync(
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
-            MultipartAcceptArrayResponseAsync onMultipart)
+        public static IHttpResponse FindAll(
+                EastFive.Api.Security security,
+            MultipartAcceptArrayResponse onMultipart)
         {
             return onMultipart(stages);
         }
 
-
         #endregion
 
 
-        [EastFive.Api.HttpPut(Type = typeof(EastFive.Api.Resources.Connector), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateGroupAsync(
-                [Property]Guid id,
-                [Property(Name = EastFive.Api.Resources.Connector.SourcePropertyName)]Guid source,
-                [PropertyOptional(Name = EastFive.Api.Resources.Connector.DestinationPropertyName)]Guid? destination,
-                [PropertyOptional(Name = EastFive.Api.Resources.Connector.DestinationIntegrationPropertyName)]Guid? destinationIntegration,
-                EastFive.Api.Security security, HttpRequestMessage request, UrlHelper url,
-            NoContentResponse onUpdated,
-            NotFoundResponse onNotFound,
-            UnauthorizedResponse onUnauthorized,
-            GeneralConflictResponse onFailure)
-        {
-            throw new NotImplementedException();
-            //return Connectors.UpdateConnectorAsync(id,
-            //        Flow, security.performingAsActorId, security.claims,
-            //    () => onUpdated(),
-            //    () => onNotFound(),
-            //    (why) => onFailure(why));
-        }
-
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse Options(
             ContentResponse onOption)
         {
             return onOption(stages[1]);

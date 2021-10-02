@@ -1,17 +1,14 @@
 ﻿using System;
 using System.Net;
 using System.Collections.Generic;
-
 using System.Threading.Tasks;
-using BlackBarLabs.Extensions;
 using System.Linq;
-using BlackBarLabs.Collections.Generic;
-using EastFive.Collections.Generic;
 using System.Threading;
+
+using EastFive;
 using EastFive.Extensions;
-using System.Net.Http;
 using EastFive.Linq;
-using Microsoft.WindowsAzure.Storage;
+using EastFive.Collections.Generic;
 
 namespace EastFive.Messaging
 {

@@ -12,7 +12,7 @@ namespace EastFive.Api.Azure.Credentials
         Task<TResult> CreateAccount<TResult>(
                 string subject, IDictionary<string, string> extraParameters,
                 Method authentication, Authorization authorization, Uri baseUri,
-                EastFive.Api.Azure.AzureApplication webApiApplication,
+                IApiApplication webApiApplication,
             Func<Guid, TResult> onCreatedMapping,
             Func<TResult> onAllowSelfServeAccounts,
             Func<Uri, TResult> onInterceptProcess,

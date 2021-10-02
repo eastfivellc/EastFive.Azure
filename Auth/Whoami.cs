@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -17,13 +17,13 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Whoami",
-        Resource = typeof(Whoami),
         ContentType = "x-application/auth-whoami",
         ContentTypeVersion = "0.1")]
     [DisplayEntryPoint]
@@ -44,10 +44,22 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = AccountPropertyName)]
         public Guid? account { get; set; }
 
+        public const string TokenPropertyName = "token";
+        [JsonProperty(PropertyName = TokenPropertyName)]
+        [ApiProperty(PropertyName = TokenPropertyName)]
+        public System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken;
+
+        [WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 4.0)]
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IHttpRequest request,
+                IAuthApplication application,
+
+            [WorkflowVariable("Session", SessionPropertyName)]
+            [WorkflowVariable2("Account", AccountPropertyName)]
             ContentTypeResponse<Whoami> onFound)
         {
             async Task<string> GetName()
@@ -61,11 +73,13 @@ namespace EastFive.Azure.Auth
                     },
                     () => string.Empty);
             }
+            request.TryParseJwt(out System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken);
             var whoami = new Whoami()
             {
                 session = security.sessionId.AsRef<Session>(),
                 account = security.accountIdMaybe,
                 name = await GetName(),
+                securityToken = securityToken,
             };
             return onFound(whoami);
         }

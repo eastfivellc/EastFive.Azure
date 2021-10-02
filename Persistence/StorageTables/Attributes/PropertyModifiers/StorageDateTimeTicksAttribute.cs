@@ -7,7 +7,7 @@ using System.Text;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 using EastFive.Linq;
 using EastFive.Extensions;
@@ -75,13 +75,13 @@ namespace EastFive.Persistence
                 {
                     if (!ep.Int64Value.HasValue)
                         return defaultValue;
-                    return new DateTime(ep.Int64Value.Value);
+                    return new DateTime(ep.Int64Value.Value, DateTimeKind.Utc);
                 }
                 if (ep.PropertyType == EdmType.Int32)
                 {
                     if (!ep.Int32Value.HasValue)
                         return defaultValue;
-                    return new DateTime(ep.Int32Value.Value);
+                    return new DateTime(ep.Int32Value.Value, DateTimeKind.Utc);
                 }
                 return defaultValue;
             }

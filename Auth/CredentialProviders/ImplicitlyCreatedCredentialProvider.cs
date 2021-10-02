@@ -3,16 +3,18 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Configuration;
-using BlackBarLabs.Extensions;
-using System.Security.Claims;
-using EastFive.Security.CredentialProvider.ImplicitCreation;
 using System.Collections.Generic;
+using System.Security.Claims;
+
 using EastFive.Security.SessionServer;
 using EastFive.Serialization;
+using EastFive.Security.CredentialProvider.ImplicitCreation;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(IntegrationName)]
+    [IntegrationName(IntegrationName)]
     public class ImplicitlyCreatedCredentialProvider : IProvideLoginManagement, IProvideAuthorization
     {
         public const string IntegrationName = "Implicit";
@@ -20,17 +22,17 @@ namespace EastFive.Api.Azure.Credentials
 
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        [Attributes.IntegrationName(IntegrationName)]
+        [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideLogin, TResult> onProvideLogin,
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideNothing().ToTask();
+            return onProvideNothing().AsTask();
         }
-        
-        public Type CallbackController => typeof(Controllers.TokenController);
+
+        public Type CallbackController => typeof(ImplicitlyCreatedCredentialProvider); // typeof(Controllers.TokenController);
 
         public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
@@ -82,6 +84,49 @@ namespace EastFive.Api.Azure.Credentials
 
         #endregion
         
+        //public async Task<TResult> LookupAndDeleteUser<TResult>(string username, string token,
+        //    Func<Guid, TResult> success,
+        //    Func<TResult> invalidCredentials,
+        //    Func<TResult> onNotFound, 
+        //    Func<string, TResult> couldNotConnect)
+        //{
+        //    // create hashed version of the password
+        //    var tokenHashBytes = SHA512.Create().ComputeHash(Encoding.UTF8.GetBytes(token));
+        //    var tokenHash = Convert.ToBase64String(tokenHashBytes);
+            
+        //    #region User MD5 hash to create a unique key for each providerId and username combination
+
+        //    var providerId = ConfigurationManager.AppSettings.Get("BlackBarLabs.Security.CredentialProvider.ImplicitCreation.ProviderId");
+
+        //    var concatination = providerId + username;
+        //    var md5 = MD5.Create();
+        //    byte[] md5data = md5.ComputeHash(Encoding.UTF8.GetBytes(concatination));
+        //    var authId = new Guid(md5data);
+
+        //    #endregion
+
+        //    // Create or fetch the document with that key
+
+        //    const string connectionStringKeyName = EastFive.Azure.AppSettings.ASTConnectionStringKey;
+        //    var context = new BlackBarLabs.Persistence.Azure.DataStores(connectionStringKeyName);
+        //    var result = await context.AzureStorageRepository.DeleteIfAsync<CredentialsDocument, TResult>(authId,
+        //        async (document, delete) =>
+        //        {
+        //            // If there currently is a credential document for this providerId / username combination
+        //            // then check the stored password hash with the provided password hash and respond accordingly. 
+        //            if (String.Compare(document.AccessToken, tokenHash, false) == 0)
+        //            {
+        //                var r = success(authId);
+        //                await delete();
+        //                return r;
+        //            }
+
+        //            return invalidCredentials();
+        //        },
+        //        () => onNotFound());
+        //    return result;
+        //}
+
         public async Task<TResult> LookupAndDeleteUser<TResult>(string username, string token,
             Func<Guid, TResult> success,
             Func<TResult> invalidCredentials,

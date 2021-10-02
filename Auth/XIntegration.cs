@@ -1,18 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
-using BlackBarLabs.Api;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -20,18 +12,15 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
-using EastFive.Serialization;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "XIntegration",
-        Resource = typeof(XIntegration),
         ContentType = "x-application/auth-xintegration",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(RowKeyPrefixAttribute))]
     [StorageTable]
     public struct XIntegration : IReferenceable
     {
@@ -75,9 +64,9 @@ namespace EastFive.Azure.Auth
         #region Http Methods
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByIdAsync(
+        public async static Task<IHttpResponse> GetByIdAsync(
                 [QueryParameter(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                Api.Azure.AzureApplication application, SessionToken security,
+                IAuthApplication application, SessionToken security,
             ContentTypeResponse<XIntegration> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -102,11 +91,10 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByAccountAsync(
+        public async static Task<IHttpResponse> GetByAccountAsync(
                 [QueryParameter(Name = AccountPropertyName)]Guid accountId,
-                Api.Azure.AzureApplication application, SessionToken security,
-            MultipartResponseAsync<XIntegration> onContents,
-            ReferencedDocumentNotFoundResponse<object> onAccountNotFound,
+                IAuthApplication application, SessionToken security,
+            MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
             if (!await application.CanAdministerCredentialAsync(accountId, security))
@@ -129,14 +117,14 @@ namespace EastFive.Azure.Auth
                 .Await()
                 .SelectWhereHasValue();
 
-            return await onContents(integrations);
+            return onContents(integrations);
         }
 
         [Api.HttpGet]
-        public async static Task<HttpResponseMessage> GetByMethodAsync(
+        public static IHttpResponse GetByMethodAsync(
                 [QueryParameter(Name = Authorization.MethodPropertyName)]IRef<Method> methodRef,
-                Api.Azure.AzureApplication application, SessionToken security,
-            MultipartResponseAsync<XIntegration> onContents,
+                IAuthApplication application, SessionToken security,
+            MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
             if (!security.accountIdMaybe.HasValue)
@@ -160,15 +148,15 @@ namespace EastFive.Azure.Auth
                     })
                 .Await()
                 .SelectWhereHasValue();
-            return await onContents(integrations);
+            return onContents(integrations);
         }
 
         [Api.HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]XIntegration integration,
-                Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
+                IAuthApplication application, EastFive.Api.SessionToken security,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onForbidden,
@@ -200,9 +188,9 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpDelete]
-        public static async Task<HttpResponseMessage> DeleteAsync(
+        public static async Task<IHttpResponse> DeleteAsync(
         [UpdateId(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
+                IAuthApplication application, EastFive.Api.SessionToken security,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound,
             ForbiddenResponse onForbidden)
@@ -215,11 +203,11 @@ namespace EastFive.Azure.Auth
             if (!await application.CanAdministerCredentialAsync(integration.accountId, security))
                 return onForbidden();
 
-            return await DeleteInternalAsync(integrationRef, application, () => onDeleted(), () => onNotFound());
+            return await DeleteInternalAsync(integrationRef, () => onDeleted(), () => onNotFound());
         }
 
         [Api.HttpPatch] //(MatchAllBodyParameters = false)]
-        public async static Task<HttpResponseMessage> UpdateAsync(
+        public async static Task<IHttpResponse> UpdateAsync(
                 [Property(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 Api.Azure.AzureApplication application, EastFive.Api.SessionToken security,
@@ -271,12 +259,12 @@ namespace EastFive.Azure.Auth
         #region Utility Methods
 
         public static Task<TResult> DeleteInternalAsync<TResult>(
-                IRef<XIntegration> integrationRef, Api.Azure.AzureApplication application, 
+                IRef<XIntegration> integrationRef,
             Func<TResult> onDeleted,
             Func<TResult> onNotFound)
         {
             return integrationRef.StorageDeleteAsync(
-                () =>
+                onDeleted: (discard) =>
                 {
                     return onDeleted();
                 },

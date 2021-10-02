@@ -13,9 +13,8 @@ using Newtonsoft.Json;
 
 namespace EastFive.Azure.Persistence
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "StorageProperty",
-        Resource = typeof(StorageProperty),
         ContentType = "x-application/eastfive.azure.storage-property",
         ContentTypeVersion = "0.1")]
     [DataContract]

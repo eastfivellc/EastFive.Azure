@@ -2,10 +2,11 @@
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+
+using Microsoft.Azure.Cosmos.Table;
+
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 
 namespace EastFive.Azure.StorageTables.Driver
 {
@@ -83,23 +84,37 @@ namespace EastFive.Azure.StorageTables.Driver
 
         public static bool IsProblemDoesNotExist(this StorageException exception)
         {
-            if (exception.InnerException is System.Net.WebException)
-            {
-                var webEx = (System.Net.WebException)exception.InnerException;
-
-                if (webEx.Response is System.Net.HttpWebResponse)
+            return exception.ParseExtendedErrorInformation(
+                (errorCode, message) =>
                 {
-                    var httpResponse = (System.Net.HttpWebResponse)webEx.Response;
-                    return (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound);
-                }
-            }
-            return false;
+                    if (errorCode == ExtendedErrorInformationCodes.TableNotFound)
+                        return true;
+                    if (errorCode == ExtendedErrorInformationCodes.BlobNotFound)
+                        return true;
+                    return false;
+                },
+                () =>
+                {
+                    if (exception.RequestInformation.HttpStatusCode == (int)HttpStatusCode.NotFound)
+                        return true;
+                    if (exception.InnerException is System.Net.WebException)
+                    {
+                        var webEx = (System.Net.WebException)exception.InnerException;
+
+                        if (webEx.Response is System.Net.HttpWebResponse)
+                        {
+                            var httpResponse = (System.Net.HttpWebResponse)webEx.Response;
+                            return (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound);
+                        }
+                    }
+                    return false;
+                });
         }
 
         #endregion
 
         public static Task<TResult> ResolveCreate<TResult>(this StorageException exception, 
-            Microsoft.WindowsAzure.Storage.Table.CloudTable table,
+            CloudTable table,
             Func<TResult> retry,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             Func<TResult> onAlreadyExists = default,
@@ -170,6 +185,7 @@ namespace EastFive.Azure.StorageTables.Driver
             Func<string, TResult> onTooManyProperties = default,
             Func<string, TResult> onUpdateConditionNotSatisfied = default,
             Func<string, TResult> onTimeout = default,
+            Func<string, TResult> onNetworkUnavailable = default,
             Func<string, TResult> onOther = default,
             Func<string, TResult> onGeneral = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onDefaultCallback = default)
@@ -202,6 +218,7 @@ namespace EastFive.Azure.StorageTables.Driver
                         case ExtendedErrorInformationCodes.TableBeingDeleted:
                             return ExecuteIfNotDefault(onTableBeingDeleted);
                         case ExtendedErrorInformationCodes.TableNotFound:
+                        case ExtendedErrorInformationCodes.BlobNotFound:
                             return ExecuteIfNotDefault(onNotFound);
                         case ExtendedErrorInformationCodes.TooManyProperties:
                             return ExecuteIfNotDefault(onTooManyProperties);
@@ -253,6 +270,17 @@ namespace EastFive.Azure.StorageTables.Driver
                         }
                         throw ExHandleMsg("inner exception response types", webEx.Response);
                     }
+                    if(!storageException.InnerException.InnerException.IsDefaultOrNull())
+                    {
+                        if(storageException.InnerException.InnerException is System.Net.Sockets.SocketException)
+                        {
+                            if(onNetworkUnavailable.IsDefaultOrNull())
+                                return onTimeout(
+                                    storageException.InnerException.InnerException.Message);
+                            return onNetworkUnavailable(
+                                storageException.InnerException.InnerException.Message);
+                        }
+                    }
                     throw ExHandleMsg("inner exceptions", storageException.InnerException);
 
                     Exception ExHandleMsg(string handle, object type)
@@ -291,7 +319,7 @@ namespace EastFive.Azure.StorageTables.Driver
                             var httpWebResponse = webEx.Response as System.Net.HttpWebResponse;
                             try
                             {
-                                var responseContent = httpWebResponse.GetResponseStream().ReadAsString();
+                                var responseContent = webEx.Message; // await httpWebResponse.GetResponseStream().ReadAsStringAsync();
                                 System.Diagnostics.Debug.WriteLine($"AST replied:{responseContent}");
                                 return onParsed(ExtendedErrorInformationCodes.General, responseContent);
                             }

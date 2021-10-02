@@ -4,34 +4,27 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Web;
-using System.Web.Http;
-using BlackBarLabs.Api.Controllers;
-
-using BlackBarLabs;
-using BlackBarLabs.Api;
-using EastFive.Api.Services;
-using System.Xml;
-using BlackBarLabs.Extensions;
-using System.Text;
-using System.IO;
 using System.Net.Http.Headers;
-using Microsoft.ApplicationInsights;
-using EastFive.Security.SessionServer.Configuration;
-using EastFive.Security.SessionServer.Exceptions;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
+
+using EastFive.Api.Services;
 using EastFive.Extensions;
 using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
-using Newtonsoft.Json;
 using EastFive.Azure.Auth;
 using EastFive.Linq;
+using EastFive.Api;
+using EastFive.Api.Azure;
+using EastFive.Api.Azure.Credentials;
 
-namespace EastFive.Api.Azure.Credentials.Controllers
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [RoutePrefix("aadb2c")]
-    [FunctionViewController6(
+    [FunctionViewController(
+        Namespace = "aadb2c",
         Route="PingResponse",
-        Resource = typeof(PingResponse),
         ContentType = "x-application/ping-response",
         ContentTypeVersion = "0.1")]
     public class PingResponse : EastFive.Azure.Auth.Redirection
@@ -47,13 +40,14 @@ namespace EastFive.Api.Azure.Credentials.Controllers
         public string agentid { get; set; }
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
+        public static async Task<IHttpResponse> Get(
                 [OptionalQueryParameter(CheckFileName = true)]string tag,
                 [QueryParameter(Name = TokenIdPropertyName)]string tokenId,
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
                 AzureApplication application,
-                HttpRequestMessage request,
-                IInvokeApplication urlHelper,
+                IHttpRequest request,
+                IProvideUrl urlHelper,
+                IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             BadRequestResponse onBadCredentials,
             HtmlResponse onCouldNotConnect,
@@ -77,8 +71,8 @@ namespace EastFive.Api.Azure.Credentials.Controllers
             if (tag.IsNullOrWhiteSpace())
                 tag = "OpioidTool";
 
-            var methodName = Enum.GetName(typeof(CredentialValidationMethodTypes), CredentialValidationMethodTypes.Ping);
-            var method = await EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
+            var methodName = PingProvider.IntegrationName;
+            var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
 
             var failureHtml = "<html><title>{0}</title><body>{1} Please report:<code>{2}</code> to Affirm Health if the issue persists.</body></html>";
 
@@ -88,14 +82,15 @@ namespace EastFive.Api.Azure.Credentials.Controllers
                     return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
                         async reportSetId =>
                         {
-                            var requestParams = request.GetQueryNameValuePairs()
+                            var requestParams = request.RequestUri
+                                .ParseQuery()
                                 .Append("PingAuthName".PairWithValue(pingAuthName))
                                 .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
                                 .ToDictionary();
 
                             return await Redirection.ProcessRequestAsync(method, 
                                     requestParams,
-                                    application, request, urlHelper,
+                                    application, request, endpoints, urlHelper,
                                 (redirect, accountIdMaybe) =>
                                 {
                                     return onRedirectResponse(redirect);

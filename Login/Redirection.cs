@@ -9,13 +9,12 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "LoginRedirection",
-        Resource = typeof(Redirection),
         ContentType = "x-application/login-redirection",
         ContentTypeVersion = "0.1")]
     public class Redirection
@@ -26,10 +25,10 @@ namespace EastFive.Azure.Login
         public string state;
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
-                AzureApplication application, 
-                IInvokeApplication urlHelper,
-                HttpRequestMessage request,
+        public static async Task<IHttpResponse> Get(
+                IAzureApplication application, IProvideUrl urlHelper,
+                IHttpRequest request,
+                IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,
@@ -37,18 +36,17 @@ namespace EastFive.Azure.Login
         {
             var parameters = request.RequestUri.ParseQuery();
             parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
-            var authentication = await Auth.Method.ByMethodName(
+            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
                 CredentialProvider.IntegrationName, application);
 
             return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
                     parameters,
                     application,
-                    request, urlHelper,
+                    request, endpoints, urlHelper,
                 (redirect, accountIdMaybe) => onRedirectResponse(redirect).AddReason("success"),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));
         }
-
     }
 }

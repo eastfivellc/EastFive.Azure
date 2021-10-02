@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -18,13 +18,14 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
 using Newtonsoft.Json;
+using EastFive.Api.Auth;
+using System.Security.Claims;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Token",
-        Resource = typeof(Token),
         ContentType = "x-application/auth-token",
         ContentTypeVersion = "0.1")]
     public struct Token
@@ -55,8 +56,7 @@ namespace EastFive.Azure.Auth
         public string secret;
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+        public static IHttpResponse Get(
             ContentTypeResponse<Token> onFound)
         {
             var token = new Token()
@@ -73,6 +73,15 @@ namespace EastFive.Azure.Auth
             };
 
             return onFound(token);
+        }
+
+        [Api.HttpAction("Generate")]
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse Generate(
+            TextResponse onFound)
+        {
+            return EastFive.Security.RSA.Generate(
+                (key, keyPrivate) => onFound(keyPrivate));
         }
     }
 }

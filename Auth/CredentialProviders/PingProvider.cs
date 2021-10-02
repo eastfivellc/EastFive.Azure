@@ -1,29 +1,24 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Security.CredentialProvider;
-using Newtonsoft.Json;
-using System;
+﻿using System;
+using System.Net;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
-using EastFive.Security.SessionServer.Persistence;
+using System.Collections;
+using System.Security.Claims;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net;
-using EastFive.Api.Services;
-using System.Security.Claims;
-using EastFive.Security.SessionServer;
-using System.Collections;
-using EastFive.Serialization;
 
-namespace EastFive.Api.Azure.Credentials
+using Newtonsoft.Json;
+
+using EastFive.Serialization;
+using EastFive.Azure.Auth;
+using EastFive.Extensions;
+
+namespace EastFive.Azure.Auth.CredentialProviders
 {
-    [Attributes.IntegrationName(PingProvider.IntegrationName)]
+    [IntegrationName(PingProvider.IntegrationName)]
     public class PingProvider : IProvideLogin
     {
         public const string IntegrationName = "Ping";
@@ -53,16 +48,16 @@ namespace EastFive.Api.Azure.Credentials
             //return "https://sso.connect.pingidentity.com/sso/TXS/2.0/2/" + pingConnectToken;
         }
 
-        [Attributes.IntegrationName(PingProvider.IntegrationName)]
+        [IntegrationName(PingProvider.IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideAuthorization, TResult> onProvideAuthorization,
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new PingProvider()).ToTask();
+            return onProvideAuthorization(new PingProvider()).AsTask();
         }
 
-        public Type CallbackController => typeof(Controllers.PingResponse);
+        public Type CallbackController => typeof(PingResponse);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
@@ -88,49 +83,69 @@ namespace EastFive.Api.Azure.Credentials
                         var credentials = Encoding.ASCII.GetBytes($"{restAuthUsername}:{restApiKey}");
                         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(credentials));
                         var tokenUrl = GetTokenServiceUrl(tokenId);
-                        var request = new HttpRequestMessage(
-                            new HttpMethod("GET"), tokenUrl);
-                        request.Headers.Add("Cookie", "agentid=" + agentId);
-                        try
+                        using (var request = new HttpRequestMessage(
+                            new HttpMethod("GET"), tokenUrl))
                         {
-                            var response = await httpClient.SendAsync(request);
-                            var content = await response.Content.ReadAsStringAsync();
-                            if (response.StatusCode == HttpStatusCode.OK)
+                            request.Headers.Add("Cookie", "agentid=" + agentId);
+                            try
                             {
-                                dynamic stuff = null;
-                                try
+                                using (var response = await httpClient.SendAsync(request))
                                 {
-                                    stuff = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(content);
+                                    var content = await response.Content.ReadAsStringAsync();
+                                    if (response.StatusCode == HttpStatusCode.OK)
+                                    {
+                                        dynamic stuff = null;
+                                        try
+                                        {
+                                            stuff = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(content);
+                                        }
+                                        catch (Newtonsoft.Json.JsonReaderException)
+                                        {
+                                            return onCouldNotConnect($"PING Returned non-json response:{content}");
+                                        }
+                                        string subject = (string)stuff[Subject];
+                                        var loginId = Guid.NewGuid();
+                                        var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
+                                        foreach (var item in stuff)
+                                        {
+                                            extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
+                                        }
+
+                                        void ShimKey(string expectedName)
+                                        {
+                                            var alternateName = expectedName.ToLower();
+                                            if (!extraParamsWithTokenValues.ContainsKey(expectedName) && extraParamsWithTokenValues.TryGetValue(alternateName.ToLower(), out string value))
+                                            {
+                                                extraParamsWithTokenValues.Add(expectedName, value);
+                                                extraParamsWithTokenValues.Remove(alternateName);
+                                            }
+                                        }
+
+                                        // shim differences in casing of keys among connection setups
+                                        ShimKey(PracticeId);
+                                        ShimKey(DepartmentId);
+                                        ShimKey(PatientId);
+
+                                        return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
+                                    }
+                                    else
+                                    {
+                                        return onFailure($"{content} TokenId: {tokenId}, AgentId: {agentId}");
+                                    }
                                 }
-                                catch (Newtonsoft.Json.JsonReaderException)
-                                {
-                                    return onCouldNotConnect($"PING Returned non-json response:{content}");
-                                }
-                                string subject = (string)stuff[Subject];
-                                var loginId = Guid.NewGuid();
-                                var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
-                                foreach (var item in stuff)
-                                {
-                                    extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
-                                }
-                                return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
                             }
-                            else
+                            catch (System.Net.Http.HttpRequestException ex)
                             {
-                                return onFailure($"{content} TokenId: {tokenId}, AgentId: {agentId}");
+                                return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
                             }
-                        }
-                        catch (System.Net.Http.HttpRequestException ex)
-                        {
-                            return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
-                        }
-                        catch(Exception exGeneral)
-                        {
-                            return onCouldNotConnect(exGeneral.Message);
+                            catch (Exception exGeneral)
+                            {
+                                return onCouldNotConnect(exGeneral.Message);
+                            }
                         }
                     }
                 },
-                (why) => onUnspecifiedConfiguration(why).ToTask());
+                (why) => onUnspecifiedConfiguration(why).AsTask());
         }
         
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, 
@@ -174,7 +189,7 @@ namespace EastFive.Api.Azure.Credentials
             return onSuccess(
                 new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "Push PMP file to EHR" } },
                 new Dictionary<string, Type>() { { "push_pmp_file_to_ehr", typeof(bool) } },
-                new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "When true, the system will push PMP files into the provider's clinical documents in their EHR system." } }).ToTask();
+                new Dictionary<string, string>() { { "push_pmp_file_to_ehr", "When true, the system will push PMP files into the provider's clinical documents in their EHR system." } }).AsTask();
         }
 
         #endregion

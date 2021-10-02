@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using BlackBarLabs.Api.Resources;
 using BlackBarLabs;
 using BlackBarLabs.Extensions;
@@ -12,6 +12,7 @@ using System.Security.Claims;
 using System.Net.Http;
 using System.Net;
 using EastFive.Extensions;
+using EastFive.Api;
 
 namespace EastFive.Security.SessionServer
 {
@@ -46,7 +47,7 @@ namespace EastFive.Security.SessionServer
                 (why) => false);
         }
 
-        public virtual WebId GetActorLink(Guid actorId, UrlHelper urlHelper)
+        public virtual WebId GetActorLink(Guid actorId, IProvideUrl urlHelper)
         {
             return urlHelper.GetWebId<TActorController>(actorId);
         }
@@ -58,7 +59,7 @@ namespace EastFive.Security.SessionServer
             return onActorNotFound();
         }
 
-        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(Context context,
+        public virtual async Task<TResult> GetRedirectUriAsync<TResult>(//Context context,
                 string validationType,
                 AuthenticationActions action,
                 Guid requestId,
@@ -114,8 +115,8 @@ namespace EastFive.Security.SessionServer
             return deny().ToTask();
         }
 
-        public virtual Task<TResult> RemoveIntegrationAsync<TResult>(Session integration, HttpRequestMessage request,
-            Func<HttpResponseMessage, TResult> onSuccess,
+        public virtual Task<TResult> RemoveIntegrationAsync<TResult>(Session integration, IHttpRequest request,
+            Func<IHttpResponse, TResult> onSuccess,
             Func<TResult> onFailure)
         {
             return onSuccess(request.CreateResponse(HttpStatusCode.NoContent)).ToTask();

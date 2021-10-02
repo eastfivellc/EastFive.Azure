@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Security.SessionServer.Persistence.Documents
 {
-    internal class InviteDocument : Microsoft.WindowsAzure.Storage.Table.TableEntity
+    internal class InviteDocument : TableEntity
     {
         [IgnoreDataMember]
         [IgnoreProperty]

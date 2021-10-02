@@ -11,8 +11,6 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using System.Net.Http.Headers;
 using EastFive.Linq;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
 using System.Net;
 using EastFive.Extensions;
 using EastFive.Azure.StorageTables.Driver;
@@ -20,6 +18,8 @@ using System.IO;
 using EastFive.Collections.Generic;
 using RestSharp;
 using System.Threading;
+using Azure.Storage.Blobs;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Persistence.Azure.StorageTables.Caching
 {
@@ -220,14 +220,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                 });
         }
 
-        private CloudBlobClient GetBlobClient()
+        private BlobServiceClient GetBlobClient()
         {
             var blobClient = Web.Configuration.Settings.GetString(
                     EastFive.Azure.AppSettings.ASTConnectionStringKey,
                 (storageSetting) =>
                 {
                     var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
-                    var bc = cloudStorageAccount.CreateCloudBlobClient();
+                    var bc = new BlobServiceClient(storageSetting);
                     return bc;
                 },
                 (issue) =>
@@ -249,47 +249,33 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                 await saveAsync(this);
                 return;
             }
-
-            var blobClient = GetBlobClient();
-            var container = blobClient.GetContainerReference("cache");
-            container.CreateIfNotExists();
-            var contentType = response.Content.Headers.ContentType.IsDefaultOrNull()?
+            var contentType = response.Content.Headers.ContentType.IsDefaultOrNull() ?
                 string.Empty
                 :
                 response.Content.Headers.ContentType.MediaType;
-            var blobId = Guid.NewGuid();
-            try
-            {
-                var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));
-                if (!String.IsNullOrWhiteSpace(contentType))
-                    blockBlob.Properties.ContentType = contentType;
-                blockBlob.Metadata.AddOrReplace("statuscode",
-                    Enum.GetName(typeof(HttpStatusCode), response.StatusCode));
-                blockBlob.Metadata.AddOrReplace("method", response.RequestMessage.Method.Method);
-                blockBlob.Metadata.AddOrReplace("requestUri", response.RequestMessage.RequestUri.AbsoluteUri);
-                if(!response.Headers.ETag.IsDefaultOrNull())
-                    blockBlob.Metadata.AddOrReplace("eTag", response.Headers.ETag.Tag);
-                if (response.Content.Headers.ContentEncoding.AnyNullSafe())
-                    blockBlob.Metadata.AddOrReplace("ContentEncoding",
-                        response.Content.Headers.ContentEncoding.First());
-                if (!response.Content.Headers.ContentLocation.IsDefaultOrNull())
-                    blockBlob.Metadata.AddOrReplace("ContentLocation",
-                        response.Content.Headers.ContentLocation.AbsoluteUri);
 
-                using (var stream = await blockBlob.OpenWriteAsync())
-                {
-                    await stream.WriteAsync(responseData, 0, responseData.Length);
-                }
-                this.whenLookup.Add(blobId, when);
-                this.checksumLookup.Add(checksum, blobId);
-                await saveAsync(this);
-            }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
-            {
-                if (ex.IsProblemResourceAlreadyExists())
-                    return;
-                throw;
-            }
+            var metadata = new Dictionary<string, string>();
+            metadata.AddOrReplace("statuscode",
+                Enum.GetName(typeof(HttpStatusCode), response.StatusCode));
+            metadata.AddOrReplace("method", response.RequestMessage.Method.Method);
+            metadata.AddOrReplace("requestUri", response.RequestMessage.RequestUri.AbsoluteUri);
+            if (!response.Headers.ETag.IsDefaultOrNull())
+                metadata.AddOrReplace("eTag", response.Headers.ETag.Tag);
+            if (response.Content.Headers.ContentEncoding.AnyNullSafe())
+                metadata.AddOrReplace("ContentEncoding",
+                    response.Content.Headers.ContentEncoding.First());
+            if (!response.Content.Headers.ContentLocation.IsDefaultOrNull())
+                metadata.AddOrReplace("ContentLocation",
+                    response.Content.Headers.ContentLocation.AbsoluteUri);
+
+            var blobId = await responseData.BlobCreateAsync("cache",
+                onSuccess: blobId => blobId,
+                contentType: contentType,
+                metadata: metadata);
+
+            this.whenLookup.Add(blobId, when);
+            this.checksumLookup.Add(checksum, blobId);
+            await saveAsync(this);
         }
 
         private async Task<HttpResponseMessage> ConstructResponseAsync(DateTime? asOfUtcMaybe)
@@ -309,50 +295,40 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                         throw new Exception("No cached values");
                     });
 
-            var blobClient = GetBlobClient();
-            var container = blobClient.GetContainerReference("cache");
-            container.CreateIfNotExists();
-            try
-            {
-                var blockBlob = container.GetBlockBlobReference(blobId.ToString("N"));
-                using (var stream = await blockBlob.OpenReadAsync())
+            return await await blobId.BlobLoadStreamAsync("cache",
+                async (stream, contentType, metadata) =>
                 {
                     var statusCode = HttpStatusCode.OK;
-                    if (blockBlob.Metadata.ContainsKey("statuscode"))
-                        Enum.TryParse(blockBlob.Metadata["statuscode"], out statusCode);
+                    if (metadata.ContainsKey("statuscode"))
+                        Enum.TryParse(metadata["statuscode"], out statusCode);
                     var method = default(HttpMethod);
-                    if (blockBlob.Metadata.ContainsKey("method"))
-                        method = new HttpMethod(blockBlob.Metadata["method"]);
+                    if (metadata.ContainsKey("method"))
+                        method = new HttpMethod(metadata["method"]);
                     var requestUri = default(Uri);
-                    if (blockBlob.Metadata.ContainsKey("requestUri"))
-                        Uri.TryCreate(blockBlob.Metadata["requestUri"], UriKind.RelativeOrAbsolute, out requestUri);
-                    var responseBytes = stream.ToBytes(); ;
+                    if (metadata.ContainsKey("requestUri"))
+                        Uri.TryCreate(metadata["requestUri"], UriKind.RelativeOrAbsolute, out requestUri);
+                    var responseBytes = await stream.ToBytesAsync(); ;
                     var response = new HttpResponseMessage(statusCode)
                     {
                         Content = new ByteArrayContent(responseBytes),
                         RequestMessage = new HttpRequestMessage(method, requestUri),
                     };
-                    if (blockBlob.Metadata.ContainsKey("eTag"))
-                        response.Headers.ETag = new EntityTagHeaderValue(blockBlob.Metadata["eTag"]);
-                    if (blockBlob.Properties.ContentType.HasBlackSpace())
+                    if (metadata.ContainsKey("eTag"))
+                        response.Headers.ETag = new EntityTagHeaderValue(metadata["eTag"]);
+                    if (contentType.HasBlackSpace())
                         response.Content.Headers.ContentType =
-                            new MediaTypeHeaderValue(blockBlob.Properties.ContentType);
-                    if (blockBlob.Metadata.ContainsKey("ContentEncoding"))
+                            new MediaTypeHeaderValue(contentType);
+                    if (metadata.ContainsKey("ContentEncoding"))
                         response.Content.Headers.ContentEncoding.Add(
-                            blockBlob.Metadata["ContentEncoding"]);
-                    if (blockBlob.Metadata.ContainsKey("ContentLocation"))
-                        if (Uri.TryCreate(blockBlob.Metadata["ContentLocation"], UriKind.RelativeOrAbsolute, out Uri contentLocation))
+                            metadata["ContentEncoding"]);
+                    if (metadata.ContainsKey("ContentLocation"))
+                        if (Uri.TryCreate(metadata["ContentLocation"], UriKind.RelativeOrAbsolute, out Uri contentLocation))
                             response.Content.Headers.ContentLocation = contentLocation;
 
                     return response;
-                }
-            }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
-            {
-                if(ex.IsProblemDoesNotExist())
-                    return new HttpResponseMessage(HttpStatusCode.NotFound);
-                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
-            }
+                },
+                onNotFound: () =>
+                     new HttpResponseMessage(HttpStatusCode.NotFound).AsTask());
         }
     }
 }

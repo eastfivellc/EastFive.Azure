@@ -1,22 +1,22 @@
-﻿using BlackBarLabs.Api;
-using EastFive.Api;
-using EastFive.Api.Azure;
-using EastFive.Api.Azure.Credentials;
-using EastFive.Api.Controllers;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+
+using Newtonsoft.Json;
+
+using EastFive.Api;
+using EastFive.Api.Azure;
+using EastFive.Api.Azure.Credentials;
+using EastFive.Api.Controllers;
+
 
 namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "OpenIdRedirection",
-        Resource = typeof(Redirection),
         ContentType = "x-application/auth-redirection.aadb2c",
         ContentTypeVersion = "0.1")]
     public class OpenIdRedirection : EastFive.Azure.Auth.Redirection
@@ -39,24 +39,22 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         //public string token;
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> Get(
+        public static async Task<IHttpResponse> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
-                AzureApplication application, IInvokeApplication urlHelper,
-                HttpRequestMessage request,
+                IAzureApplication application, IProvideUrl urlHelper,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,
             GeneralConflictResponse onFailure)
         {
             var parameters = request.RequestUri.ParseQuery();
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
                 AzureADB2CProvider.IntegrationName, application);
-            
-            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
-                    parameters,
-                    application,
-                    request, urlHelper,
+            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method, parameters,
+                    application, request, endpoints, urlHelper,
                 (redirect, accountIdMaybe) => onRedirectResponse(redirect),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),
@@ -64,11 +62,11 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         }
 
         [HttpPost(MatchAllParameters = false)]
-        public static async Task<HttpResponseMessage> PostAsync(
+        public static async Task<IHttpResponse> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,
-                AzureApplication application, IInvokeApplication urlHelper,
-                HttpRequestMessage request,
+                IAzureApplication application, IProvideUrl urlHelper,
+                IHttpRequest request, IInvokeApplication endpoints,
             RedirectResponse onRedirectResponse,
             ServiceUnavailableResponse onNoServiceResponse,
             BadRequestResponse onBadCredentials,
@@ -79,13 +77,11 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
                 { id_token, idToken },
                 { state, authorization.id.ToString("N") },
             };
-            var authentication = await EastFive.Azure.Auth.Method.ByMethodName(
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
                 AzureADB2CProvider.IntegrationName, application);
 
-            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication,
-                    parameters,
-                    application,
-                    request, urlHelper,
+            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method, parameters,
+                    application, request, endpoints, urlHelper,
                 (redirect, accountIdMaybe) => onRedirectResponse(redirect),
                 (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
                 (why) => onNoServiceResponse().AddReason(why),

@@ -15,8 +15,6 @@ using EastFive.Linq;
 using EastFive.Security.SessionServer;
 using EastFive.Security;
 using EastFive.Linq.Async;
-using EastFive.Api.Azure.Credentials.Attributes;
-using EastFive.Security.SessionServer.Persistence.Documents;
 using EastFive.Api.Azure.Monitoring;
 
 namespace EastFive.Azure.Monitoring
@@ -33,43 +31,43 @@ namespace EastFive.Azure.Monitoring
 
     public class Monitoring
     {
-        private Context context;
-        private Security.SessionServer.Persistence.DataContext dataContext;
+        //private Context context;
+        //private Security.SessionServer.Persistence.DataContext dataContext;
 
-        internal Monitoring(Context context, Security.SessionServer.Persistence.DataContext dataContext)
-        {
-            this.dataContext = dataContext;
-            this.context = context;
-        }
+        //internal Monitoring(Context context, Security.SessionServer.Persistence.DataContext dataContext)
+        //{
+        //    this.dataContext = dataContext;
+        //    this.context = context;
+        //}
 
-        public Security.SessionServer.Context AzureContext
-        {
-            get
-            {
-                return new EastFive.Security.SessionServer.Context(
-                    () => new EastFive.Security.SessionServer.Persistence.DataContext(
-                        EastFive.Azure.AppSettings.ASTConnectionStringKey));
-            }
-        }
+        //public Security.SessionServer.Context AzureContext
+        //{
+        //    get
+        //    {
+        //        return new EastFive.Security.SessionServer.Context(
+        //            () => new EastFive.Security.SessionServer.Persistence.DataContext(
+        //                EastFive.Azure.AppSettings.ASTConnectionStringKey));
+        //    }
+        //}
 
-        public Task<TResult> GetByMonthAsync<TResult>(DateTime month,
-            Func<MonitoringInfo[], TResult> onSuccess)
-        {
-            return MonitoringDocument.GetByMonthAsync(month, AzureContext.DataContext.AzureStorageRepository,
-                (monitoringItems) => onSuccess(monitoringItems.Select(item => Convert(item)).ToArray()));
-        }
+        //public Task<TResult> GetByMonthAsync<TResult>(DateTime month,
+        //    Func<MonitoringInfo[], TResult> onSuccess)
+        //{
+        //    return MonitoringDocument.GetByMonthAsync(month, AzureContext.DataContext.AzureStorageRepository,
+        //        (monitoringItems) => onSuccess(monitoringItems.Select(item => Convert(item)).ToArray()));
+        //}
 
-        private static MonitoringInfo Convert(MonitoringDocument doc)
-        {
-            return new MonitoringInfo
-            {
-                Id = doc.Id,
-                AuthenticationId = doc.AuthenticationId,
-                Time = doc.Time,
-                Method = doc.Method,
-                Controller = doc.Controller,
-                Content = doc.Content
-            };
-        }
+        //private static MonitoringInfo Convert(MonitoringDocument doc)
+        //{
+        //    return new MonitoringInfo
+        //    {
+        //        Id = doc.id,
+        //        AuthenticationId = doc.AuthenticationId,
+        //        Time = doc.Time,
+        //        Method = doc.Method,
+        //        Controller = doc.Controller,
+        //        Content = doc.Content
+        //    };
+        //}
     }
 }

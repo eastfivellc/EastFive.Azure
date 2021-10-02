@@ -20,15 +20,15 @@ using System.Linq.Expressions;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.ComponentModel;
 using EastFive.Api.Azure;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure
 {
-    [FunctionViewController6(
+    [FunctionViewController(
          ContentType = "application/x-redirect",
-         Resource = typeof(Redirect),
          Route = "redirect")]
     [StorageTable]
     public struct Redirect : IReferenceable
@@ -63,17 +63,16 @@ namespace EastFive.Azure
 
         [HttpGet]
         [Description("Looks for the redirect by the resource ID and resource type.")]
-        public static HttpResponseMessage QueryByResourceIdAndTypeAsync(
+        public static IHttpResponse QueryByResourceIdAndTypeAsync(
                 [QueryParameter(Name = ResourceTypePropertyName)]Type resourceType,
                 [QueryParameter(Name = ResourcePropertyName)]Guid resourceId,
-                AzureApplication application,
+                IApiApplication application,
             RedirectResponse onRedirect,
             UnauthorizedResponse onUnauthorized,
             NotFoundResponse onRedirectNotFound,
             ConfigurationFailureResponse onConfigurationFailure)
         {
-            return EastFive.Web.Configuration.Settings.GetUri(
-                EastFive.Azure.AppSettings.SpaSiteLocation,
+            return AppSettings.SPA.SiteLocation.ConfigurationUri(
                 siteUrl =>
                 {
                     var resourceName = application.GetResourceMime(resourceType);

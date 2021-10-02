@@ -1,13 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
@@ -18,12 +13,10 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "XSession",
-        Resource = typeof(Session),
         ContentType = "x-application/auth-session",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
     [StorageTable]
     public struct Session : IReferenceable
     {
@@ -36,7 +29,12 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = SessionIdPropertyName)]
         [RowKey]
         [StandardParititionKey]
+        [ResourceIdentifier]
         public IRef<Session> sessionId;
+
+        public const string CreatedScopeName = "created";
+        [ScopeDateTime(CreatedScopeName, SpanUnits = TimeSpanUnits.years, IgnoreNull = true)]
+        public DateTime? created;
 
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
@@ -46,7 +44,10 @@ namespace EastFive.Azure.Auth
 
         public const string AccountPropertyName = "account";
         [JsonProperty(PropertyName = AccountPropertyName)]
+        [ApiProperty(PropertyName = AccountPropertyName)]
         [Storage(Name = AccountPropertyName)]
+        [ScopedLookup(AccountPropertyName, partitionScope: CreatedScopeName)]
+        [ScopeId(AccountPropertyName, IgnoreNullOrDefault = true)]
         public Guid? account { get; set; }
 
         /// <summary>
@@ -91,7 +92,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         private static async Task<TResult> GetClaimsAsync<TResult>(
-            Api.Azure.AzureApplication application, IRefOptional<Authorization> authorizationRefMaybe,
+            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
             Func<string, TResult> onFailure)
         {
@@ -118,18 +119,23 @@ namespace EastFive.Azure.Auth
 
         #region Http Methods
 
+        #region GET
+
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
-                EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                EastFive.Api.SessionTokenMaybe security,
+                IAuthApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigurationFailure)
         {
-            if (security.sessionId != sessionRef.id)
-                return onUnauthorized();
+            if (!IsAnonSessionAllowed())
+            {
+                if (security.sessionId != sessionRef.id)
+                    return onUnauthorized();
+            }
             return await await sessionRef.StorageGetAsync(
                 (session) =>
                 {
@@ -162,14 +168,22 @@ namespace EastFive.Azure.Auth
                         (why) => onConfigurationFailure("Missing", why).AsTask());
                 },
                 () => onNotFound().AsTask());
+
+            bool IsAnonSessionAllowed()
+            {
+                var appType = application.GetType();
+                if (!appType.TryGetAttributeInterface<IConfigureAuthorization>(out IConfigureAuthorization authConfig))
+                    return false;
+                return authConfig.IsAnonymousSessionAllowed;
+            }
         }
 
         [Api.HttpGet]
-        public static Task<HttpResponseMessage> GetByRequestIdAsync(
+        public static Task<IHttpResponse> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
                 //EastFive.Api.SessionToken security,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, IProvideUrl urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse forbidden,
@@ -185,13 +199,28 @@ namespace EastFive.Azure.Auth
                 onFailure);
         }
 
+        #endregion
+
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 3.0)]
         [HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
-                [Property(Name = SessionIdPropertyName)]IRef<Session> sessionId,
-                [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
+        public async static Task<IHttpResponse> CreateAsync(
+                [Api.Meta.Flows.WorkflowNewId]
+                [Property(Name = SessionIdPropertyName)]
+                IRef<Session> sessionId,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{XAuthorization}}")]
+                [PropertyOptional(Name = AuthorizationPropertyName)]
+                IRefOptional<Authorization> authorizationRefMaybe,
+
                 [Resource]Session session,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
+
+            [Api.Meta.Flows.WorkflowVariable2(Workflows.AuthorizationFlow.Variables.AuthHeaderName, HeaderNamePropertyName)]
+            [Api.Meta.Flows.WorkflowVariable(Workflows.AuthorizationFlow.Variables.TokenName, TokenPropertyName)]
             CreatedBodyResponse<Session> onCreated,
+
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse forbidden,
             ConfigurationFailureResponse onConfigurationFailure,
@@ -245,10 +274,10 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpPatch]
-        public static Task<HttpResponseMessage> UpdateBodyAsync(
+        public static Task<IHttpResponse> UpdateBodyAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse forbidden,
@@ -291,14 +320,13 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpDelete]
-        public static Task<HttpResponseMessage> DeleteAsync(
+        public static Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
-                Api.Azure.AzureApplication application,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound)
         {
             return sessionRef.StorageDeleteAsync(
-                () =>
+                onDeleted:(discard) =>
                 {
                     return onDeleted();
                 },
@@ -307,14 +335,59 @@ namespace EastFive.Azure.Auth
 
         #endregion
 
+        public async static Task<Session> CreateAsync(
+            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe)
+        {
+            var session = new Session()
+            {
+                sessionId = Ref<Session>.SecureRef(),
+                refreshToken = Security.SecureGuid.Generate().ToString("N"),
+                authorization = authorizationRefMaybe,
+            };
+
+            return await Security.AppSettings.TokenScope.ConfigurationUri(
+                scope =>
+                {
+                    return Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes.ConfigurationDouble(
+                        async (tokenExpirationInMinutes) =>
+                        {
+                            return await await GetClaimsAsync(application, authorizationRefMaybe,
+                                (claims, accountIdMaybe, authorized) =>
+                                {
+                                    session.account = accountIdMaybe;
+                                    session.authorized = authorized;
+                                    return session.StorageCreateAsync(
+                                        (sessionIdCreated) =>
+                                        {
+                                            return Api.Auth.JwtTools.CreateToken(session.id,
+                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
+                                                (tokenNew) =>
+                                                {
+                                                    session.token = tokenNew;
+                                                    return session;
+                                                },
+                                                (missingConfig) => throw new Exception(missingConfig),
+                                                (configName, issue) => throw new Exception(issue));
+                                        });
+                                },
+                                (why) => throw new Exception(why));
+                        },
+                        (why) => throw new Exception(why));
+                },
+                (why) => throw new Exception(why));
+        }
+
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
-                Api.Azure.AzureApplication application,
+                IAuthApplication application,
             Func<Guid, bool, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {
             return await await authorizationRef.StorageGetAsync(
                 async (authorization) =>
                 {
+                    if (!authorization.authorized)
+                        return onFailure("Invalid authorization -- it is not authorized.", false);
+
                     var methodRef = authorization.Method;
                     return await await Method.ById(methodRef, application,
                         async method =>

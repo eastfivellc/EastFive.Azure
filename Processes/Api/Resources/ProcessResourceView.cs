@@ -10,7 +10,7 @@ using System.ComponentModel.DataAnnotations;
 using EastFive.Api.Controllers;
 using System.Linq;
 using BlackBarLabs.Extensions;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Api.Azure;
 
 namespace EastFive.Api.Azure.Resources
@@ -18,11 +18,16 @@ namespace EastFive.Api.Azure.Resources
     [DataContract]
     [FunctionViewController(
         Route = "ProcessResourceView",
-        Resource = typeof(Resources.ProcessResourceView),
         ContentType = "x-application/process-resource-view",
         ContentTypeVersion = "0.1")]
-    public class ProcessResourceView : ResourceBase
+    public class ProcessResourceView
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         #region identification of the view resources
         public const string ActorPropertyName = "actor";
         [JsonProperty(PropertyName = ActorPropertyName)]
@@ -96,32 +101,35 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByResourceTypeAsync(
+        public static Task<IHttpResponse> FindByResourceTypeAsync(
                 [EastFive.Api.QueryParameter(Name = ActorPropertyName)]Guid actorId,
                 [EastFive.Api.QueryParameter(Name = Resources.ProcessStageType.ResourceTypePropertyName)]Type resourceType,
-                EastFive.Api.Security security, AzureApplication application, UrlHelper url,
-            [Display(Name = "Found")]MultipartAcceptArrayResponseAsync onMultipart,
+                EastFive.Api.Security security, AzureApplication application, IProvideUrl url,
+            [Display(Name = "Found")]MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessResourceViews.FindByResourceAsync(actorId, resourceType,
+            return EastFive.Azure.ProcessResourceViews.FindByResourceAsync(actorId, resourceType,
                     security,
                 (views) =>
                 {
                     var viewResources = views.Select(ps => GetResource(ps, application, url)).ToArray();
                     return onMultipart(viewResources);
                 },
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
-        internal static Resources.ProcessResourceView GetResource(EastFive.Azure.ProcessResourceView view, AzureApplication application, UrlHelper url)
+        internal static Resources.ProcessResourceView GetResource(
+            EastFive.Azure.ProcessResourceView view, 
+            AzureApplication application,
+            IProvideUrl url)
         {
             return new Resources.ProcessResourceView
             {
                 Id = url.GetWebId<ProcessResourceView>(view.processViewId),
-                Actor = application.GetActorLink(view.actorId, url),
-                Resource = application.GetResourceLink(view.resourceType, view.resourceId, url),
+                //Actor = application.GetActorLink(view.actorId, url),
+                //Resource = application.GetResourceLink(view.resourceType, view.resourceId, url),
                 ResourceType = application.GetResourceMime(view.resourceType),
 
                 CurrentProcessStep = url.GetWebId<ProcessStep>(view.currentProcessStepId),
@@ -135,7 +143,7 @@ namespace EastFive.Api.Azure.Resources
                         resourceProvided => new Resources.ProcessResourceView.ConfirmableResource
                         {
                             Key = resourceProvided.key,
-                            Resource = application.GetResourceLink(resourceProvided.type, resourceProvided.resourceId, url),
+                            //Resource = application.GetResourceLink(resourceProvided.type, resourceProvided.resourceId, url),
                             Type = application.GetResourceMime(resourceProvided.type),
                         })
                     .ToArray(),
@@ -152,7 +160,7 @@ namespace EastFive.Api.Azure.Resources
 
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, AzureApplication application, UrlHelper url,
+        public static IHttpResponse Options(AzureApplication application, IProvideUrl url,
             ContentResponse onOption)
         {
             return onOption(

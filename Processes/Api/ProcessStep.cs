@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using System.Net.Http;
 using EastFive.Api.Controllers;
 using System.Linq;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.Threading.Tasks;
 using EastFive.Linq;
 using BlackBarLabs.Extensions;
@@ -16,8 +16,14 @@ namespace EastFive.Api.Azure.Resources
 {
     [DataContract]
     [FunctionViewController(Route = "ProcessStep")]
-    public class ProcessStep : ResourceBase
+    public class ProcessStep
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         public const string StagePropertyName = "stage";
         [JsonProperty(PropertyName = StagePropertyName)]
         public WebId Stage { get; set; }
@@ -54,9 +60,9 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ProcessStep.IdPropertyName)]Guid id,
-                AzureApplication httpApplication, EastFive.Api.Security security, UrlHelper url,
+                AzureApplication httpApplication, EastFive.Api.Security security, IProvideUrl url,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -68,13 +74,13 @@ namespace EastFive.Api.Azure.Resources
                 () => onUnauthorized());
         }
 
-        internal static Resources.ProcessStep GetResource(EastFive.Azure.Process process, AzureApplication httpApplication, UrlHelper urlHelper)
+        internal static Resources.ProcessStep GetResource(EastFive.Azure.Process process, AzureApplication httpApplication, IProvideUrl urlHelper)
         {
             return new Resources.ProcessStep
             {
                 Id = urlHelper.GetWebId<ProcessStep>(process.processId),
                 Stage = urlHelper.GetWebId<EastFive.Api.Azure.Resources.ProcessStage>(process.processStageId),
-                Resource = httpApplication.GetResourceLink(process.resourceType, process.resourceId, urlHelper),
+                //Resource = httpApplication.GetResourceLink(process.resourceType, process.resourceId, urlHelper),
                 CreatedOn = process.createdOn,
 
                 ConfirmedBy = process.confirmedBy.HasValue ?
@@ -83,9 +89,9 @@ namespace EastFive.Api.Azure.Resources
                     default(WebId),
                 ConfirmedWhen = process.confirmedWhen,
                 Previous = urlHelper.GetWebId<ProcessStep>(process.previousStep),
-                Resources = process.resources
-                    .Select(resource => httpApplication.GetResourceLink(process.resourceType, resource.resourceId, urlHelper))
-                    .ToArray(),
+                //Resources = process.resources
+                //    .Select(resource => httpApplication.GetResourceLink(process.resourceType, resource.resourceId, urlHelper))
+                //    .ToArray(),
                 ResourceKeys = process.resources
                     .Select(resource => (resource.key))
                     .ToArray(),
@@ -95,7 +101,7 @@ namespace EastFive.Api.Azure.Resources
         #endregion
 
         [EastFive.Api.HttpPost(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = ProcessStep.IdPropertyName)]Guid processId,
                 [PropertyOptional(Name = ProcessStep.PreviousPropertyName)]Guid? previousStepId,
                 [Property(Name = ProcessStep.ResourcePropertyName)]Guid resourceId,
@@ -105,7 +111,7 @@ namespace EastFive.Api.Azure.Resources
                 [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
                 [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
                 [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStage> onStageNotFound,
@@ -123,13 +129,13 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpPatch(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateProcessStepAsync(
+        public static Task<IHttpResponse> UpdateProcessStepAsync(
                 [QueryParameter(Name = ProcessStep.IdPropertyName, CheckFileName = true)]Guid processId,
                 [PropertyOptional(Name = ProcessStep.ConfirmedByPropertyName)]Guid? confirmedById,
                 [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
                 [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
                 [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             NoContentResponse onUpdated,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -152,7 +158,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpDelete]
-        public static Task<HttpResponseMessage> DeleteByIdAsync(
+        public static Task<IHttpResponse> DeleteByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ProcessStep.IdPropertyName)]Guid processStepId,
                 EastFive.Api.Security security,
             NoContentResponse onDeleted,
@@ -166,7 +172,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url, AzureApplication application,
+        public static IHttpResponse Options(IHttpRequest request, IProvideUrl url, AzureApplication application,
             ContentResponse onOption)
         {
             return onOption(

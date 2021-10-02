@@ -13,6 +13,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public bool IgnoreNull { get; set; }
 
+        public bool IgnoreNullWhiteSpace { get; set; }
+
         public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
         {
@@ -30,6 +32,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 if (IgnoreNull && rowKey.IsDefaultOrNull())
                     return Enumerable.Empty<IRefAst>();
 
+                if(IgnoreNullWhiteSpace && rowKey.IsNullOrWhiteSpace())
+                    return Enumerable.Empty<IRefAst>();
+
                 var partitionKey = GetPartitionKey(rowKey);
                 return new RefAst(rowKey, partitionKey).AsEnumerable();
             }
@@ -45,6 +50,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(string).IsAssignableFrom(propertyValueType))
             {
                 var stringValue = (string)memberValue;
+                return stringValue;
+            }
+            if(propertyValueType.IsEnum)
+            {
+                var stringValue = Enum.GetName(propertyValueType, memberValue);
                 return stringValue;
             }
             var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
@@ -80,6 +90,34 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     }
 
+    public class StringLookupHashXX32Attribute : StringLookupAttribute
+    {
+        /// <summary>
+        /// Limit 4
+        /// </summary>
+        private uint? charactersMaybe;
+        public uint Characters
+        {
+            get
+            {
+                if (!charactersMaybe.HasValue)
+                    return 2;
+                return charactersMaybe.Value;
+            }
+            set
+            {
+                charactersMaybe = value;
+            }
+        }
+
+        public override string GetPartitionKey(string rowKey)
+        {
+            var hash = rowKey.GetBytes().HashXX32();
+            var hashStr = hash.ToString("X");
+            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
+        }
+    }
+
     public class StringStandardPartitionLookupAttribute : StringLookupAttribute
     {
         public override string GetPartitionKey(string rowKey)
@@ -89,5 +127,26 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     }
 
+    public class StringConstantPartitionLookupAttribute : StringLookupAttribute
+    {
+        private string partition;
+        public string Partition
+        {
+            get
+            {
+                if (partition.HasBlackSpace())
+                    return partition;
+                return "-";
+            }
+            set
+            {
+                partition = value;
+            }
+        }
 
+        public override string GetPartitionKey(string rowKey)
+        {
+            return Partition;
+        }
+    }
 }

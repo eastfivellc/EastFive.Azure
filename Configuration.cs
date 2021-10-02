@@ -6,7 +6,9 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Mvc.Routing;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -27,9 +29,8 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Configuration
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Configuration",
-        Resource = typeof(Configuration),
         ContentType = "x-application/auth-configuration",
         ContentTypeVersion = "0.1")]
     public struct Configuration
@@ -110,11 +111,12 @@ namespace EastFive.Azure.Configuration
         #endregion
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static HttpResponseMessage GetAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse GetAsync(
+            IApplication application,
             ContentTypeResponse<Configuration[]> onFound)
         {
-            var configs = HttpApplication.configurationTypes
+            var configs = application.ConfigurationTypes
                 .SelectMany(configurationType =>
                     configurationType.Key.GetFields(BindingFlags.Public |
                             BindingFlags.Static | BindingFlags.FlattenHierarchy)

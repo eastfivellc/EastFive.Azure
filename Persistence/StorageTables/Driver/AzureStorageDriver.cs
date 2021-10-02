@@ -1,12 +1,13 @@
-﻿using EastFive.Analytics;
-using EastFive.Azure.Persistence.StorageTables;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Microsoft.WindowsAzure.Storage.Table;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+
+using Microsoft.Azure.Cosmos.Table;
+
+using EastFive.Analytics;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.StorageTables.Driver
 {
@@ -30,11 +31,13 @@ namespace EastFive.Azure.StorageTables.Driver
         internal static RetryDelegate GetRetryDelegate()
         {
             var retriesAttempted = 0;
-            var retryPolicy = new Microsoft.WindowsAzure.Storage.RetryPolicies.ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
+            var retryDelay = TimeSpan.FromSeconds(1.0);
             return async (statusCode, ex, retry) =>
             {
-                TimeSpan retryDelay;
-                bool shouldRetry = retryPolicy.ShouldRetry(retriesAttempted++, statusCode, ex, out retryDelay, null);
+                TimeSpan retryDelayInner = retryDelay;
+                retryDelay = TimeSpan.FromSeconds(retryDelay.TotalSeconds * retryDelay.TotalSeconds);
+                bool shouldRetry = retriesAttempted < 4;
+                retriesAttempted++;
                 if (!shouldRetry)
                     throw new Exception("After " + retriesAttempted + "attempts finding the resource timed out");
                 await Task.Delay(retryDelay);

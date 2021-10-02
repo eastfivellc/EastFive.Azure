@@ -6,7 +6,11 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -19,14 +23,12 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
-using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Claim",
-        Resource = typeof(Claim),
         ContentType = "x-application/auth-claim",
         ContentTypeVersion = "0.1")]
     public struct Claim : IReferenceable
@@ -76,8 +78,8 @@ namespace EastFive.Azure.Auth
         #endregion
 
         [Api.HttpOptions]
-        public static HttpResponseMessage OptionsAsync(
-                Api.Azure.AzureApplication application,
+        public static IHttpResponse OptionsAsync(
+                IApplication application,
             ContentTypeResponse<Claim[]> onFound)
         {
             var claims = application.GetType()
@@ -94,11 +96,10 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
-                Api.Azure.AzureApplication application,
+        public static IHttpResponse GetAsync(
                 RequestMessage<Claim> claims,
                 Authorization auth,
-            MultipartResponseAsync<Claim> onFound,
+            MultipartAsyncResponse<Claim> onFound,
             UnauthorizedResponse onUnauthorized)
         {
             if (!auth.accountIdMaybe.HasValue)
@@ -107,18 +108,17 @@ namespace EastFive.Azure.Auth
             var claimsForUser = claims
                 .Where(claim => claim.actorId == auth.accountIdMaybe.Value)
                 .StorageGet();
-            return await onFound(claimsForUser);
+            return onFound(claimsForUser);
         }
 
         [HttpPost]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<Claim> claimRef,
                 [Property(Name = ActorPropertyName)]Guid actorId,
                 [Property(Name = TypePropertyName)]string type,
                 [Property(Name = NamePropertyName)]string value,
                 [Resource]Claim claim,
-                Api.Azure.AzureApplication application,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists)
         {
@@ -138,7 +138,7 @@ namespace EastFive.Azure.Auth
 
     public class ClaimEnableRolesAttribute : Attribute, IDeclareClaim
     {
-        public const string Type = Microsoft.IdentityModel.Claims.ClaimTypes.Role;
+        public const string Type = ClaimTypes.Role;
 
         public Uri ClaimType => new Uri(Type);
 
@@ -149,7 +149,7 @@ namespace EastFive.Azure.Auth
 
     public class ClaimEnableAuthenticationAttribute : Attribute, IDeclareClaim
     {
-        public const string Type = Microsoft.IdentityModel.Claims.ClaimTypes.Authentication;
+        public const string Type = ClaimTypes.Authentication;
 
         public Uri ClaimType => new Uri(Type);
 
@@ -160,7 +160,7 @@ namespace EastFive.Azure.Auth
 
     public class ClaimEnableAuthenticationMethodAttribute : Attribute, IDeclareClaim
     {
-        public const string Type = Microsoft.IdentityModel.Claims.ClaimTypes.AuthenticationMethod;
+        public const string Type = ClaimTypes.AuthenticationMethod;
 
         public Uri ClaimType => new Uri(Type);
 
@@ -172,7 +172,7 @@ namespace EastFive.Azure.Auth
 
     public class ClaimEnableAuthenticationInstantAttribute : Attribute, IDeclareClaim
     {
-        public const string Type = Microsoft.IdentityModel.Claims.ClaimTypes.AuthenticationInstant;
+        public const string Type = ClaimTypes.AuthenticationInstant;
 
         public Uri ClaimType => new Uri(Type);
 

@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Api;
+﻿using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
@@ -14,16 +13,12 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Security.AccessControl;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "VoucherToken",
-        Resource = typeof(VoucherToken),
         ContentType = "x-application/auth-voucher-token",
         ContentTypeVersion = "0.1")]
     [StorageTable]
@@ -90,7 +85,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         #region Http Methods
 
         [Api.HttpPost]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<VoucherToken> voucherTokenRef,
                 [PropertyOptional(Name = AuthIdPropertyName)]Guid? authorizationIdMaybe,
                 [Property(Name = KeyPropertyName)] string key,
@@ -129,7 +124,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [RequiredClaim(
             System.Security.Claims.ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static HttpResponseMessage WhoAmI(
+        public static IHttpResponse WhoAmI(
                 EastFive.Api.Security security,
             ContentTypeResponse<Guid> onFound)
         {

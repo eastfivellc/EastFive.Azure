@@ -5,102 +5,142 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Collections.Generic;
+using EastFive.Serialization;
+using EastFive.Linq;
 using EastFive.Linq.Expressions;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
-    public class ExternalIntegrationKeyLookupAttribute : ScopedLookupAttribute, IScopeKeys
+    public class ExternalIntegrationLookupAttribute 
+        : StorageLookupAttribute, IProvideIntegrationId
     {
-        internal const string ExternalIntegrationRowScoping = "External__Integration__Scope__Row";
-        private const string ExternalIntegrationPartionScoping = "External__Integration__Scope__Parition";
-
-        public ExternalIntegrationKeyLookupAttribute()
-            : base(ExternalIntegrationRowScoping, ExternalIntegrationPartionScoping)
+        public bool TryGetIntegrationId(MemberInfo key, object value, out string integrationId)
         {
+            var idMaybe = (Guid?)value;
+            if (idMaybe.HasValue)
+            {
+                var id = idMaybe.Value;
+                integrationId = id.ToString("N");
+                return true;
+            }
+            integrationId = default;
+            return false;
         }
 
-        public double Order { get; set; }
-
-        public string Scope => ExternalIntegrationPartionScoping;
-
-        public string MutateKey(string currentKey, MemberInfo memberInfo, object memberValue, out bool ignore)
+        public override IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)
         {
-            var rowKey = ScopePrefixAttribute.RowKey(memberInfo.GetMemberType(), memberValue, this.GetType());
-            if (rowKey.IsNullOrWhiteSpace())
-            {
-                ignore = true;
-                return null;
-            }
-            ignore = false;
-            return rowKey;
+            return decoratedMember.DeclaringType
+                .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                .Where(
+                    (member) =>
+                    {
+                        if (member.ContainsAttributeInterface<IProvideIntegrationId>())
+                            return true;
+                        if (member.ContainsAttributeInterface<IProvideIntegrationKey>())
+                            return true;
+                        return false;
+                    });
+        }
+
+        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        {
+            return lookupValues
+                .Select(
+                    lookup =>
+                    {
+                        var hasAttr = lookup.Key.TryGetAttributeInterface(
+                            out IProvideIntegrationId integrationIdProvider);
+                        return (hasAttr, lookup, integrationIdProvider);
+                    })
+                .Where(tpl => tpl.hasAttr)
+                .First(
+                    (tpl, next) =>
+                    {
+                        var (hasAttr, lookup, integrationIdProvider) = tpl;
+                        if(!integrationIdProvider.TryGetIntegrationId(lookup.Key, lookup.Value, 
+                                out string integrationId))
+                            return Enumerable.Empty<IRefAst>();
+                        var keyLookupAttrs = lookupValues
+                            .Select(
+                                lookup =>
+                                {
+                                    var hasAttr = lookup.Key.TryGetAttributeInterface(
+                                        out IProvideIntegrationKey integrationKeyProvider);
+                                    return (hasAttr, lookup, integrationKeyProvider);
+                                })
+                            .Where(tpl => tpl.hasAttr);
+                        if (!keyLookupAttrs.Any())
+                            throw new Exception(
+                                $"Property that implements {nameof(IProvideIntegrationKey)} was not provided in query.");
+
+                        return keyLookupAttrs
+                            .First(
+                                (tpl, next) =>
+                                {
+                                    var (hasAttrKey, lookupKey, integrationKeyProvider) = tpl;
+                                    if (integrationKeyProvider.TryGetIntegrationKey(integrationId,
+                                            lookupKey.Key, lookupKey.Value, out IRefAst astLookup))
+                                        return astLookup.AsEnumerable();
+                                    return next();
+                                },
+                                () => Enumerable.Empty<IRefAst>());
+                    },
+                    () =>
+                    {
+                        throw new Exception(
+                            $"{decoratedMember.DeclaringType.FullName}..{decoratedMember.Name} was not provided in query.");
+                        return Enumerable.Empty<IRefAst>();
+                    });
         }
 
     }
 
-    public class ExternalIntegrationIdAttribute : Attribute, IScopeKeys
+    public interface IProvideIntegrationId
     {
-        public string Scope { get; set; }
+        bool TryGetIntegrationId(MemberInfo key, object value, out string integrationId);
+    }
 
-        public double Order { get; set; }
+    public interface IProvideIntegrationKey
+    {
+        bool TryGetIntegrationKey(string integrationId, MemberInfo key, object value,
+            out IRefAst astLookup);
+    }
 
-        public ExternalIntegrationIdAttribute()
+    public class IntegrationKeyAttribute : Attribute, IProvideIntegrationKey
+    {
+        private uint? charactersMaybe;
+        public uint Characters
         {
-            this.Scope = ExternalIntegrationKeyLookupAttribute.ExternalIntegrationRowScoping;
-        }
-
-        protected string GetStringValue(MemberInfo key, object valueOuter, out bool ignore)
-        {
-            return GetStringFromType(key.GetMemberType(), valueOuter, out ignore);
-
-            string GetStringFromType(Type memberType, object value, out bool ignoreInner)
+            get
             {
-                ignoreInner = false;
-                if (typeof(Guid).IsAssignableFrom(memberType))
-                {
-                    var guidValue = (Guid)value;
-                    return guidValue.ToString("N");
-                }
-                if (typeof(IReferenceable).IsAssignableFrom(memberType))
-                {
-                    var referenceableValue = (IReferenceable)value;
-                    return referenceableValue.id.ToString("N");
-                }
-                if (typeof(string).IsAssignableFrom(memberType))
-                {
-                    var stringValue = (string)value;
-                    return stringValue;
-                }
-                if (typeof(Guid?).IsAssignableFrom(memberType))
-                {
-                    var guidMaybeValue = (Guid?)value;
-                    if (!guidMaybeValue.HasValue)
-                    {
-                        ignoreInner = true;
-                        return string.Empty;
-                    }
-                    return GetStringFromType(typeof(Guid), guidMaybeValue.Value, out ignoreInner);
-                }
-                if (typeof(IReferenceableOptional).IsAssignableFrom(memberType))
-                {
-                    var guidMaybeValue = (IReferenceableOptional)value;
-                    if (!guidMaybeValue.HasValue)
-                    {
-                        ignoreInner = true;
-                        return string.Empty;
-                    }
-                    return GetStringFromType(typeof(Guid), guidMaybeValue.id.Value, out ignoreInner);
-                }
-                throw new ArgumentException(
-                        $"Integration ID of type {memberType.FullName} is not supported.");
+                if (!charactersMaybe.HasValue)
+                    return 2;
+                return charactersMaybe.Value;
+            }
+            set
+            {
+                charactersMaybe = value;
             }
         }
 
-        public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
+        public bool TryGetIntegrationKey(string integrationId, MemberInfo key, object value,
+            out IRefAst astLookup)
         {
-            var valueStr = GetStringValue(key, value, out ignore);
-            if (ignore)
-                return currentKey;
-            return currentKey; // This should be the only partition modifier $"{valueStr}_{currentKey}";
+            var integrationKey = (string)value;
+            if (integrationKey.IsNullOrWhiteSpace())
+            {
+                astLookup = default;
+                return false;
+            }
+            var integrationKeyHashInt = integrationKey.GetBytes().HashXX64();
+            var integrationKeyHash = integrationKeyHashInt.ToString("X").Substring(0, (int)this.Characters);
+            var partitionKey = integrationId + integrationKeyHash;
+            astLookup = new RefAst(integrationKey, partitionKey);
+            return true;
         }
     }
 }

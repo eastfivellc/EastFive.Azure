@@ -1,45 +1,0 @@
-[1mdiff --git a/Api/Actions/ActAsUserActions.cs b/Api/Actions/ActAsUserActions.cs[m
-[1mindex c9d2c30..94673db 100644[m
-[1m--- a/Api/Actions/ActAsUserActions.cs[m
-[1m+++ b/Api/Actions/ActAsUserActions.cs[m
-[36m@@ -38,15 +38,18 @@[m [mnamespace EastFive.Security.SessionServer.Api[m
-         {[m
-             return await request.GetActorIdClaimsAsync([m
-                 async (actorId, claims) =>[m
-[31m-                {[m
-[31m-                    var superAdminId = default(Guid);[m
-[31m-                    var superAdminIdStr = EastFive.Web.Configuration.Settings.Get([m
-[31m-                        EastFive.Api.Configuration.SecurityDefinitions.ActorIdSuperAdmin);[m
-[31m-                    if (!Guid.TryParse(superAdminIdStr, out superAdminId))[m
-[31m-                    {[m
-[31m-                        request.CreateResponse(HttpStatusCode.Unauthorized, $"Configuration parameter [{EastFive.Api.Configuration.SecurityDefinitions.ActorIdSuperAdmin}] is not set");[m
-[31m-                    }[m
-[31m-                    if (actorId != superAdminId)[m
-[32m+[m[32m                {[m
-[32m+[m[32m                    var canActAsUserAsync = await Library.configurationManager.CanActAsUsersAsync(actorId, claims,[m
-[32m+[m[32m                        () =>true,[m
-[32m+[m[32m                        () =>false);[m[41m[m
-[32m+[m[32m                    //var superAdminId = default(Guid);[m[41m[m
-[32m+[m[32m                    //var superAdminIdStr = EastFive.Web.Configuration.Settings.Get([m[41m[m
-[32m+[m[32m                    //    EastFive.Api.Configuration.SecurityDefinitions.ActorIdSuperAdmin);[m[41m[m
-[32m+[m[32m                    //if (!Guid.TryParse(superAdminIdStr, out superAdminId))[m[41m[m
-[32m+[m[32m                    //{[m[41m[m
-[32m+[m[32m                    //    request.CreateResponse(HttpStatusCode.Unauthorized, $"Configuration parameter [{EastFive.Api.Configuration.SecurityDefinitions.ActorIdSuperAdmin}] is not set");[m[41m[m
-[32m+[m[32m                    //}[m[41m[m
-[32m+[m[32m                    if (!canActAsUserAsync)[m[41m[m
-                     {[m
-                         request.CreateResponse(HttpStatusCode.Unauthorized, $"Actor [{actorId}] is not site admin");[m
-                     }[m
-[1mdiff --git a/CredentialProviders/AzureADB2CProvider.cs b/CredentialProviders/AzureADB2CProvider.cs[m
-[1mindex 02641e0..8087438 100644[m
-[1m--- a/CredentialProviders/AzureADB2CProvider.cs[m
-[1m+++ b/CredentialProviders/AzureADB2CProvider.cs[m
-[36m@@ -255,7 +255,7 @@[m [mnamespace EastFive.Security.CredentialProvider.AzureADB2C[m
-                             }))[m
-                         .ToArray();[m
-                 },[m
-[31m-                () => onFound(new LoginInfo[] { }),[m
-[32m+[m[32m                () => onFound(total),[m[41m[m
-                 (why) => onFailure(why));[m
-         }[m
- [m

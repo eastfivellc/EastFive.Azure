@@ -26,7 +26,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
-        public double Order => 0.0;
+        private double? orderMaybe;
+        public double Order
+        {
+            get
+            {
+                if (!orderMaybe.HasValue)
+                    return 0d;
+                return orderMaybe.Value;
+            }
+            set
+            {
+                orderMaybe = value;
+            }
+        }
 
         public string Scope { get; set; }
 
@@ -45,7 +58,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
 
             ignore = false;
-            return RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
+            var prefix = RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
+            return $"{currentKey}{prefix}";
         }
 
         internal static string RowKey(Type propertyValueType, object rowKeyValue, Type thisAttributeType)
@@ -64,12 +78,22 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
             if (typeof(IReferenceableOptional).IsAssignableFrom(propertyValueType))
             {
-                var referenceableOptional = (IReferenceableOptional)rowKeyValue;
-                if (referenceableOptional.IsDefaultOrNull())
-                    return null;
-                if (!referenceableOptional.HasValue)
-                    return null;
-                return referenceableOptional.id.Value.ToString("N");
+                if (rowKeyValue is IReferenceableOptional)
+                {
+                    var referenceableOptional = (IReferenceableOptional)rowKeyValue;
+                    if (referenceableOptional.IsDefaultOrNull())
+                        return null;
+                    if (!referenceableOptional.HasValue)
+                        return null;
+                    return referenceableOptional.id.Value.ToString("N");
+                }
+                if (rowKeyValue is IReferenceable)
+                {
+                    var referenceable = (IReferenceable)rowKeyValue;
+                    if (referenceable.IsDefaultOrNull())
+                        return null;
+                    return referenceable.id.ToString("N");
+                }
             }
             if (typeof(string).IsAssignableFrom(propertyValueType))
             {

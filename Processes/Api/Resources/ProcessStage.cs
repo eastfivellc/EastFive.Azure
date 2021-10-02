@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using EastFive.Api;
 using System.Net.Http;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Api.Controllers;
 using BlackBarLabs.Extensions;
 using System.Linq;
@@ -18,8 +18,14 @@ namespace EastFive.Api.Azure.Resources
 {
     [DataContract]
     [FunctionViewController(Route = "ProcessStage")]
-    public class ProcessStage : ResourceBase
+    public class ProcessStage
     {
+
+        public const string IdPropertyName = "id";
+        [JsonProperty(PropertyName = IdPropertyName)]
+        [DataMember(Name = IdPropertyName)]
+        public WebId Id { get; set; }
+
         #region Properties
 
         public class ConfirmableResource
@@ -68,9 +74,9 @@ namespace EastFive.Api.Azure.Resources
         #region GET
 
         [EastFive.Api.HttpGet]
-        public static Task<HttpResponseMessage> FindByIdAsync(
+        public static Task<IHttpResponse> FindByIdAsync(
                 [QueryParameter(CheckFileName = true)]Guid id,
-                EastFive.Api.Security security, UrlHelper url,
+                EastFive.Api.Security security, IProvideUrl url,
             ContentResponse onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -83,38 +89,39 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByResourceAsync(
+        public static Task<IHttpResponse> FindByResourceAsync(
                 [QueryParameter]Guid resourceId,
-                EastFive.Api.Security security, UrlHelper url,
-            MultipartAcceptArrayResponseAsync onMultipart,
+                EastFive.Api.Security security, IProvideUrl url,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessStages.FindByResourceAsync(resourceId, security,
+            return EastFive.Azure.ProcessStages.FindByResourceAsync(resourceId, security,
                 (processStages) => onMultipart(processStages.Select(ps => GetResource(ps, url))),
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
         [EastFive.Api.HttpGet]
-        public static async Task<HttpResponseMessage> FindByFirstStepByActorAndTypeAsync(
+        public static Task<IHttpResponse> FindByFirstStepByActorAndTypeAsync(
                 [QueryParameter(Name = Resources.ProcessStage.OwnerPropertyName)]Guid ownerId,
                 [QueryParameter(Name = Resources.ProcessStage.TypePropertyName)]Type resourceType,
                 [QueryParameter(Name = "processstage." + Resources.ProcessStage.ConfirmablePropertyName + "." + Resources.ProcessStage.ConfirmableResource.ProcessStageNextPropertyName)]
                     IRefOptional<IReferenceable> nextStage,
-                AzureApplication application, EastFive.Api.Security security, UrlHelper url,
-            MultipartAcceptArrayResponseAsync onMultipart,
+                EastFive.Api.Security security, IProvideUrl url,
+            MultipartAcceptArrayResponse onMultipart,
             ReferencedDocumentNotFoundResponse onResourceNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            return await await EastFive.Azure.ProcessStages.FindStartByActorAndResourceTypeAsync(ownerId, resourceType,
+            return EastFive.Azure.ProcessStages.FindStartByActorAndResourceTypeAsync(ownerId, resourceType,
                     security,
                 (processStages) => onMultipart(processStages.Select(ps => GetResource(ps, url))),
-                () => onResourceNotFound().ToTask(),
-                () => onUnauthorized().ToTask());
+                () => onResourceNotFound(),
+                () => onUnauthorized());
         }
 
-        internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage, UrlHelper url)
+        internal static Resources.ProcessStage GetResource(EastFive.Azure.ProcessStage processStage,
+            IProvideUrl url)
         {
             return new Resources.ProcessStage
             {
@@ -147,7 +154,7 @@ namespace EastFive.Api.Azure.Resources
         #endregion
 
         [EastFive.Api.HttpPost(Type = typeof(Resources.ProcessStage), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> CreateAsync(
+        public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = Resources.ProcessStage.IdPropertyName)]
                     Guid processStageId,
                 [Property(Name = Resources.ProcessStage.OwnerPropertyName)]
@@ -169,7 +176,7 @@ namespace EastFive.Api.Azure.Resources
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStageType> onTypeDoesNotExist,
             ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStage> onConfirmationStageDoesNotExist,
-            ReferencedDocumentDoesNotExistsResponse<BlackBarLabs.Api.ResourceBase> onActorDoesNotExists,
+            ReferencedDocumentNotFoundResponse onActorDoesNotExists,
             UnauthorizedResponse onUnauthorized,
             GeneralConflictResponse onFailure)
         {
@@ -194,7 +201,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpPut(Type = typeof(Resources.ProcessStage), MatchAllBodyParameters = false)]
-        public static Task<HttpResponseMessage> UpdateConnectorAsync(
+        public static Task<IHttpResponse> UpdateConnectorAsync(
                 [Property(Name = Resources.ProcessStage.IdPropertyName)]
                     Guid processStageId,
                 [PropertyOptional(Name = Resources.ProcessStage.TypePropertyName)]
@@ -209,7 +216,7 @@ namespace EastFive.Api.Azure.Resources
                     Guid [] editableIds,
                 [PropertyOptional(Name = Resources.ProcessStage.ConfirmablePropertyName)]
                     Resources.ProcessStage.ConfirmableResource [] confirmables,
-                EastFive.Api.Security security, Context context, HttpRequestMessage request, UrlHelper url,
+                EastFive.Api.Security security,// Context context,
             NoContentResponse onUpdated,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -237,7 +244,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [EastFive.Api.HttpOptions(MatchAllBodyParameters = false)]
-        public static HttpResponseMessage Options(HttpRequestMessage request, UrlHelper url,
+        public static IHttpResponse Options(IProvideUrl url,
             ContentResponse onOption)
         {
             return onOption(GetResource(

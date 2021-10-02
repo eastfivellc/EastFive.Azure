@@ -2,37 +2,29 @@
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Xml;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence;
 using Newtonsoft.Json;
 using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
-using System.Net.Http;
 using EastFive.Azure.Functions;
 using EastFive.Analytics;
-using EastFive.Web.Configuration;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using System.Collections.Concurrent;
 using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "TableBackup",
-        Resource = typeof(TableBackup),
         ContentType = "x-application/table-backup",
         ContentTypeVersion = "0.1")]
-    [StorageResourceNoOp]
     [StorageTable]
     public struct TableBackup : IReferenceable
     {
@@ -92,15 +84,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             System.Security.Claims.ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateAsync(
+        public static async Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 [Property(Name = TableNamePropertyName)]string tableName,
                 [Property(Name = BackupPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Resource]TableBackup tableBackup,
                 RequestMessage<TableBackup> requestQuery,
+                IHttpRequest request,
                 EastFive.Api.Security security,
-                HttpRequestMessage request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onCreated,
             AlreadyExistsResponse onAlreadyExists)
@@ -121,10 +113,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = IdPropertyName)]IRef<TableBackup> tableBackupRef,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onContinued,
             NoContentResponse onComplete,
@@ -159,7 +151,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             string storageSettingCopyFrom,
             string storageSettingCopyTo,
             RequestMessage<TableBackup> requestQuery,
-            HttpRequestMessage request,
+            IHttpRequest request,
             ILogger logger)
         {
             var watch = new Stopwatch();
@@ -176,24 +168,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             var token = default(TableContinuationToken);
             if (StillScanning)
             {
-                var settings = new XmlReaderSettings
-                {
-                    DtdProcessing = DtdProcessing.Ignore, // prevents XXE attacks, such as Billion Laughs
-                    MaxCharactersFromEntities = 1024,
-                    XmlResolver = null,                   // prevents external entity DoS attacks, such as slow loading links or large file requests
-                };
-                token = new TableContinuationToken();
-                using (var strReader = new StringReader(continuationToken))
-                using (var xmlReader = XmlReader.Create(strReader, settings))
-                {
-                    token.ReadXml(xmlReader);
-                }
+                token = JsonConvert.DeserializeObject<TableContinuationToken>(continuationToken);
+                //var settings = new XmlReaderSettings
+                //{
+                //    DtdProcessing = DtdProcessing.Ignore, // prevents XXE attacks, such as Billion Laughs
+                //    MaxCharactersFromEntities = 1024,
+                //    XmlResolver = null,                   // prevents external entity DoS attacks, such as slow loading links or large file requests
+                //};
+                //token = new TableContinuationToken();
+                //using (var strReader = new StringReader(continuationToken))
+                //using (var xmlReader = XmlReader.Create(strReader, settings))
+                //{
+                //    token.ReadXml(xmlReader);
+                //}
             }
 
             var segmentFetching = tableFrom.ExecuteQuerySegmentedAsync(query, token);
             var backoff = TimeSpan.FromSeconds(1.0);
 
-            var completeMutex = new System.Threading.ManualResetEvent(false);
+            var completeMutex = new System.Threading.AutoResetEvent(false);
             var rowList = new ConcurrentBag<GenericTableEntity>();
             //var listLock = new object();
             //var rowList = new List<GenericTableEntity>();
@@ -259,14 +252,16 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 return default;
 
                             logger.Trace($"{rowList.Count} rows read [{tableBackup.tableName}]");
-                            using (var writer = new StringWriter())
-                            {
-                                using (var xmlWriter = XmlWriter.Create(writer))
-                                {
-                                    token.WriteXml(xmlWriter);
-                                }
-                                return writer.ToString();
-                            }
+                            
+                            return JsonConvert.SerializeObject(token);
+                            //using (var writer = new StringWriter())
+                            //{
+                            //    using (var xmlWriter = XmlWriter.Create(writer))
+                            //    {
+                            //        token.WriteXml(xmlWriter);
+                            //    }
+                            //    return writer.ToString();
+                            //}
                         }
 
                         segmentFetching = token.IsDefaultOrNull() ?

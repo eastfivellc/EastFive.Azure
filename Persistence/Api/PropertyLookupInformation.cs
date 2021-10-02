@@ -5,21 +5,19 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using System.Security.Claims;
+
+using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Azure.Auth;
 using EastFive.Persistence.Azure.StorageTables;
-
-using Newtonsoft.Json;
-using EastFive.Api.Azure;
 using EastFive.Extensions;
-using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Api.Serialization;
 using System.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Microsoft.WindowsAzure.Storage.Table;
 using EastFive.Persistence;
 using EastFive.Linq.Expressions;
 using EastFive.Linq;
@@ -28,9 +26,8 @@ using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Persistence
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "PropertyLookupInformation",
-        Resource = typeof(PropertyLookupInformation),
         ContentType = "x-application/eastfive.azure.storage.property-lookup-info",
         ContentTypeVersion = "0.1")]
     public class PropertyLookupInformation
@@ -63,12 +60,12 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> PropertyInformation(
+        public static async Task<IHttpResponse> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
                 [QueryParameter(Name = "property")]string propertyName,
-                HttpApplication httpApp,
+                IApplication httpApp,
             ContentTypeResponse<PropertyLookupInformation[]> onFound,
             NotFoundResponse onNotFound,
             BadRequestResponse onPropertyDoesNotSupportFindBy)

@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
+using EastFive.Api;
+
 namespace EastFive.Azure.Auth
 {
     public delegate Task<TResult> ResolveRedirectionDelegate<TResult>(Uri relUri,
@@ -16,8 +18,8 @@ namespace EastFive.Azure.Auth
     {
         float Order { get; }
 
-        Task<(Func<HttpResponseMessage, HttpResponseMessage>, Uri)> ResolveAbsoluteUrlAsync(Uri relUri,
-            HttpRequestMessage request, Guid? accountIdMaybe, 
+        Task<(Func<IHttpResponse, IHttpResponse>, Uri)> ResolveAbsoluteUrlAsync(Uri relUri,
+            IHttpRequest request, Guid? accountIdMaybe, 
             IDictionary<string, string> authParams);
     }
 }

@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using BlackBarLabs.Persistence.Azure;
 using EastFive.Azure.StorageTables.Driver;
-using EastFive.Security.SessionServer;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Blob;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Microsoft.WindowsAzure.Storage.Table;
+
+using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage.Blobs;
+using System.IO;
+using Azure.Storage.Blobs.Models;
 
 namespace EastFive.Api.Azure.Persistence
 {
@@ -16,48 +15,62 @@ namespace EastFive.Api.Azure.Persistence
     [DataContract]
     internal class Content : TableEntity
     {
+        private const string ContainerName = "content";
+
         [IgnoreDataMember]
         [IgnoreProperty]
         public Guid Id { get { return Guid.Parse(this.RowKey); } }
         
         public Guid IntegrationId { get; set; }
 
-        private static CloudBlobClient BlobStore(CloudStorageAccount cloudStorageAccount = null)
+        private static BlobServiceClient BlobStore()
         {
-            if (cloudStorageAccount == null)
-                cloudStorageAccount = Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
-                    (storageSetting) =>
-                    {
-                        return CloudStorageAccount.Parse(storageSetting);
-                    },
-                    (issue) =>
-                    {
-                        throw new Exception($"Azure storage key not specified: {issue}");
-                    });
+            return Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
+                (connectionString) =>
+                {
+                    return new BlobServiceClient(connectionString,
+                            new BlobClientOptions
+                            {
+                                // Retry = new global::Azure.Core.RetryOptions()
+                            });
+                },
+                (issue) =>
+                {
+                    throw new Exception($"Azure storage key not specified: {issue}");
+                });
+        }
 
-            var blobClient = cloudStorageAccount.CreateCloudBlobClient();
-            blobClient.DefaultRequestOptions.RetryPolicy = new ExponentialRetry(TimeSpan.FromSeconds(1), 10);
-            return blobClient;
+        private static async Task<BlobClient> GetBlobClientAsync(string containerReference, string blockId)
+        {
+            var blobClient = BlobStore();
+            var container = blobClient.GetBlobContainerClient(containerReference);
+            var createResponse = await container.CreateIfNotExistsAsync();
+            //global::Azure.ETag created = createResponse.Value.ETag;
+            return container.GetBlobClient(blockId);
         }
 
         public static async Task<TResult> CreateAsync<TResult>(Guid contentId, string contentType, byte[] content,
             Func<TResult> onCreated,
             Func<TResult> onAlreadyExists)
         {
-            var container = BlobStore().GetContainerReference("content");
-            container.CreateIfNotExists();
-            var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
             try
             {
-                if (contentType.HasBlackSpace())
-                    blockBlob.Properties.ContentType = contentType;
-                using (var stream = await blockBlob.OpenWriteAsync())
+                var blockClient = await GetBlobClientAsync(ContainerName, contentId.ToString("N"));
+
+                using (var stream = new MemoryStream(content))
                 {
-                    await stream.WriteAsync(content, 0, content.Length);
+                    await blockClient.UploadAsync(stream,
+                        new BlobUploadOptions
+                        {
+                            HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                            {
+                                ContentType = contentType,
+                            }
+                        });
                 }
                 return onCreated();
             }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
+            catch (StorageException ex)
             {
                 if (ex.IsProblemResourceAlreadyExists())
                     return onAlreadyExists();
@@ -65,49 +78,28 @@ namespace EastFive.Api.Azure.Persistence
             }
         }
 
-        public async Task<TResult> FindByIdAsync<TResult>(Guid contentId,
+        public Task<TResult> FindByIdAsync<TResult>(Guid contentId,
             Func<string, byte[], TResult> onFound,
             Func<TResult> onNotFound)
         {
-            var container = BlobStore().GetContainerReference("content");
-            await container.CreateIfNotExistsAsync();
-            try
-            {
-                var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
-                using (var stream = await blockBlob.OpenReadAsync())
-                {
-                    var image = stream.ToBytes();
-                    var contentType = (!String.IsNullOrWhiteSpace(blockBlob.Properties.ContentType)) ?
-                        blockBlob.Properties.ContentType
-                        :
-                        "image/*";
-                    return onFound(contentType, image);
-                }
-            }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
-            {
-                if (ex.IsProblemDoesNotExist())
-                    return onNotFound();
-                throw;
-            }
+            return FindContentByIdAsync(contentId, onFound, onNotFound);
         }
         
         public static async Task<TResult> FindContentTypeByIdAsync<TResult>(Guid contentId,
             Func<string, TResult> onFound,
             Func<TResult> onNotFound)
         {
-            var container = BlobStore().GetContainerReference("content");
-            await container.CreateIfNotExistsAsync();
             try
             {
-                var blockBlob = await container.GetBlobReferenceFromServerAsync(contentId.ToString("N"));
-                var contentType = (!String.IsNullOrWhiteSpace(blockBlob.Properties.ContentType)) ?
-                        blockBlob.Properties.ContentType
+                var blockClient = await GetBlobClientAsync(ContainerName, contentId.ToString("N"));
+                var properties = await blockClient.GetPropertiesAsync();
+                var contentType = (!String.IsNullOrWhiteSpace(properties.Value.ContentType)) ?
+                        properties.Value.ContentType
                         :
                         "image/*";
                 return onFound(contentType);
             }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
+            catch (StorageException ex)
             {
                 if (ex.IsProblemDoesNotExist())
                     return onNotFound();
@@ -119,24 +111,27 @@ namespace EastFive.Api.Azure.Persistence
             Func<string, byte[], TResult> onFound,
             Func<TResult> onNotFound)
         {
-            var container = BlobStore().GetContainerReference("content");
-            await container.CreateIfNotExistsAsync();
             try
             {
-                var blockBlob = container.GetBlockBlobReference(contentId.ToString("N"));
-                using (var stream = await blockBlob.OpenReadAsync())
-                {
-                    var image = stream.ToBytes();
-                    var contentType = (!String.IsNullOrWhiteSpace(blockBlob.Properties.ContentType)) ?
-                        blockBlob.Properties.ContentType
-                        :
-                        "image/*";
-                    return onFound(contentType, image);
-                }
+                var blockClient = await GetBlobClientAsync(ContainerName, contentId.ToString("N"));
+                var returnStream = await blockClient.OpenReadAsync(
+                    new BlobOpenReadOptions(true)
+                    {
+                        Conditions = new BlobRequestConditions()
+                        {
+                        }
+                    });
+                var properties = await blockClient.GetPropertiesAsync();
+                var image = await returnStream.ToBytesAsync();
+                var contentType = (!String.IsNullOrWhiteSpace(properties.Value.ContentType)) ?
+                    properties.Value.ContentType
+                    :
+                    "image/*";
+                return onFound(contentType, image);
             }
-            catch (Microsoft.WindowsAzure.Storage.StorageException ex)
+            catch (StorageException storageEx)
             {
-                if (ex.IsProblemDoesNotExist())
+                if (storageEx.IsProblemDoesNotExist())
                     return onNotFound();
                 throw;
             }

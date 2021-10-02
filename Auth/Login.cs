@@ -6,7 +6,11 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
+using System.Security.Claims;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
@@ -19,14 +23,12 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
-using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "AuthLogin",
-        Resource = typeof(Login),
         ContentType = "x-application/auth-login",
         ContentTypeVersion = "0.1")]
     public struct Login
@@ -79,23 +81,23 @@ namespace EastFive.Azure.Auth
 
         [Api.HttpGet]
         [RequiredClaim(
-            Microsoft.IdentityModel.Claims.ClaimTypes.Role,
+            ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> AllAsync(
+        public static IHttpResponse AllAsync(
                 [QueryParameter(Name = "start_time")]DateTime startTime,
                 [QueryParameter(Name = "end_time")]DateTime endTime,
                 RequestMessage<Authorization> authorizations,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application,
                 EastFive.Api.SessionToken? securityMaybe,
-            MultipartResponseAsync<Login> onFound)
+            MultipartAsyncResponse<Login> onFound)
         {
-            var methodLookups = await application.LoginProviders
+            var methodLookups = application.LoginProviders
                 .Select(
                     (loginProvider) =>
                     {
                         return loginProvider.Value.Id.PairWithValue(loginProvider.Value.Method);
                     })
-                .ToDictionaryAsync();
+                .ToDictionary();
             var results = authorizations
                 .Where(auth => auth.lastModified <= endTime)
                 .Where(auth => auth.lastModified >= startTime)
@@ -123,7 +125,7 @@ namespace EastFive.Azure.Auth
                         };
                     })
                 .Await();
-            return await onFound(results);
+            return onFound(results);
         }
     }
 }

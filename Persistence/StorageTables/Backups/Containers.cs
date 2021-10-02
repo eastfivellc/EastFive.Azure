@@ -6,13 +6,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Newtonsoft.Json;
-
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Api.Azure;
 using EastFive.Web.Configuration;
+using EastFive.Azure.Persistence.Attributes;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {
@@ -132,7 +131,8 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
         }
 
 
-        private static async Task ThrowIfContainerIsMissingStorageResourceAttribute(string sourceConnectionString, ContainerResourceInfo[] configuredContainers)
+        private static async Task ThrowIfContainerIsMissingStorageResourceAttribute(string sourceConnectionString,
+            ContainerResourceInfo[] configuredContainers)
         {
             var configuredNames = configuredContainers
                 .Select(configuredContainer => configuredContainer.name.ToLower())
@@ -140,11 +140,13 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
 
             var queryResult = await BackupFunction.GetRepository(sourceConnectionString)
                 .BlobClient
-                .ListContainersSegmentedAsync(null);
+                .GetBlobContainersAsync()
+                .AsPages()
+                .ToListAsync();
             var containersMissingAttribute = queryResult
-                .Results
+                .SelectMany(x => x.Values)
                 .Select(queryContainer => queryContainer.Name.ToLower())
-                .Where(queryName => !ignoreContainerNames.Contains(queryName))
+                //.Where(queryName => !ignoreContainerNames.Contains(queryName))
                 .Where(queryName => !configuredNames.Contains(queryName))
                 .ToArray();
 

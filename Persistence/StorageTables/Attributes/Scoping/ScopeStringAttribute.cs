@@ -17,6 +17,10 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool IgnoreScopeIfNull { get; set; } = true;
 
+        public bool KeyFilter { get; set; } = false;
+
+        public bool CaseInsensitive { get; set; } = false;
+
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
             if (value == null)
@@ -29,7 +33,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
             ignore = false;
             var stringValue = StringLookupAttribute.GetStringValue(key, value, this.GetType());
-            
+
+            if (KeyFilter)
+                stringValue = stringValue
+                    .Replace('/', '_')
+                    .Replace('\\', '_')
+                    .Replace('#', '_')
+                    .Replace('?', '_')
+                    .Replace('\t', '_')
+                    .Replace('\n', '_')
+                    .Replace('\r', '_');
+
+            if (CaseInsensitive)
+                stringValue = stringValue.ToLower();
+
             return $"{currentKey}{stringValue}";
         }
 

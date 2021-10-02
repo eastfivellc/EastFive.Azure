@@ -1,8 +1,6 @@
-﻿using EastFive.Extensions;
-using EastFive.Linq;
+﻿using EastFive.Linq;
 using EastFive.Linq.Async;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,25 +8,22 @@ using EastFive.Persistence;
 using Newtonsoft.Json;
 using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
-using System.Net.Http;
 using EastFive.Azure.Functions;
 using EastFive.Api.Azure;
 using EastFive.Analytics;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using System.Collections.Concurrent;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Azure.Persistence.StorageTables.Backups;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "RepositoryBackup",
-        Resource = typeof(RepositoryBackup),
         ContentType = "x-application/repository-backup",
         ContentTypeVersion = "0.1")]
-    [StorageResourceNoOp]
     [StorageTable]
     public struct RepositoryBackup : IReferenceable
     {
@@ -76,7 +71,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             System.Security.Claims.ClaimTypes.Role,
             ClaimValues.Roles.SuperAdmin)]
         [HttpPost]
-        public static async Task<HttpResponseMessage> QueueUpBackupPartitions(
+        public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Property(Name = StorageSettingCopyFromPropertyName)]string storageSettingCopyFrom,
                 [Property(Name = StorageSettingCopyToPropertyName)]string storageSettingCopyTo,
@@ -84,9 +79,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 AzureApplication application,
                 EastFive.Api.Security security,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
-            MultipartResponseAsync<InvocationMessage> onQueued,
+            MultipartAsyncResponse<InvocationMessage> onQueued,
             AlreadyExistsResponse onAlreadyExists)
         {
             CloudStorageAccount account = CloudStorageAccount
@@ -94,7 +89,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             CloudTableClient tableClient =
                 new CloudTableClient(account.TableEndpoint, account.Credentials);
 
-            return await await repositoryBackup.StorageCreateAsync(
+            return await repositoryBackup.StorageCreateAsync(
                 (discard) =>
                 {
                     var includedTables = BackupFunction.DiscoverStorageResources()
@@ -102,8 +97,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                         .Select(x => x.tableName)
                         .ToArray();
 
-                    var resourceInfoToProcess = tableClient
-                        .ListTables()
+                    var resourceInfoToProcess = tableClient.GetTables()
                         .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
                         .Distinct()
                         .Select(
@@ -124,20 +118,20 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .AsyncEnumerable();
+                        .Await(readAhead:10);
                     return onQueued(resourceInfoToProcess);
                 },
-                () => onAlreadyExists().AsTask());
+                () => onAlreadyExists());
         }
 
         [HttpPatch]
-        public static async Task<HttpResponseMessage> QueueUpBackupPartitions(
+        public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Property(Name = WhenPropertyName)]DateTime when,
                 RequestMessage<TableBackup> requestQuery,
-                HttpRequestMessage request,
+                IHttpRequest request,
                 EastFive.Analytics.ILogger logger,
-            MultipartResponseAsync<InvocationMessage> onQueued,
+            MultipartAsyncResponse<InvocationMessage> onQueued,
             NoContentResponse onTooEarly,
             NotFoundResponse onNotFound)
         {
@@ -169,8 +163,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                     CloudTableClient tableClient =
                         new CloudTableClient(account.TableEndpoint, account.Credentials);
 
-                    var resourceInfoToProcess = tableClient
-                        .ListTables()
+                    var tables = tableClient.GetTables();
+                    var resourceInfoToProcess = tables
                         .Where(table => includedTables.Contains(table.Name, StringComparer.OrdinalIgnoreCase))
                         .Distinct()
                         .Select(
@@ -191,11 +185,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .AsyncEnumerable();
+                        .Await(readAhead:10);
                     repoBack.when = when;
                     await saveAsync(repoBack);
 
-                    return await onQueued(resourceInfoToProcess);
+                    return onQueued(resourceInfoToProcess);
+
+
                 },
                 () => onNotFound());
         }

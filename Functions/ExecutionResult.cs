@@ -11,14 +11,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net.Http;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Functions
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "ExecutionResult",
-        Resource = typeof(ExecutionResult),
         ContentType = "x-application/eastfive.azure.execution-result",
         ContentTypeVersion = "0.1")]
     [StorageTable]
@@ -52,9 +52,9 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = StartedPropertyName)]
         [ApiProperty(PropertyName = StartedPropertyName)]
         [Storage]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         public DateTime started;
 
         public const string EndedPropertyName = "ended";
@@ -87,10 +87,10 @@ namespace EastFive.Azure.Functions
         #endregion
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> GetByInvocationMessageAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse GetByInvocationMessageAsync(
             [QueryParameter(Name = InvocationMessagePropertyName)]IRef<InvocationMessage> message,
-            MultipartResponseAsync<ExecutionResult> onResults)
+            MultipartAsyncResponse<ExecutionResult> onResults)
         {
             var messages = message.StorageGetBy(
                 (ExecutionResult ent) => ent.invocationMessage);
@@ -98,12 +98,12 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> ListAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
-            MultipartResponseAsync<InvocationMessage> onRun)
+            MultipartAsyncResponse<InvocationMessage> onRun)
         {
             Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
 

@@ -8,20 +8,18 @@ using EastFive.Api;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
 using Microsoft.Azure.ApplicationInsights;
-using Microsoft.Rest.Azure.Authentication;
 using Microsoft.Azure.ApplicationInsights.Models;
 
 namespace EastFive.Azure.Monitoring
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "ApplicationInsights",
-        Resource = typeof(ApplicationInsights),
         ContentType = "x-application/application-sights-results",
         ContentTypeVersion = "0.1")]
     public class ApplicationInsights
     {
         [HttpGet]
-        public static Task<HttpResponseMessage> GetAsync(
+        public static Task<IHttpResponse> GetAsync(
                 [QueryParameter]string eventId,
                 ContentTypeResponse<EventsExceptionResult[]> onResults)
         {
@@ -52,7 +50,7 @@ namespace EastFive.Azure.Monitoring
         }
 
         [HttpPost]
-        public static Task<HttpResponseMessage> WebhookAsync(
+        public static Task<IHttpResponse> WebhookAsync(
                 [Resource]object appInsightsCallback,
                 ContentTypeResponse<EventsExceptionResult[]> onResults)
         {

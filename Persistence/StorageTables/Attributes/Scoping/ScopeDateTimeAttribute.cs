@@ -1,4 +1,6 @@
 ﻿using EastFive.Extensions;
+using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +32,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public double OffsetHours { get; set; } = default;
 
+        public bool IgnoreNull { get; set; } = false;
+
         /// <summary>
         /// If the SpanUnits are weeks, this is the day of the first week.
         /// </summary>
@@ -37,8 +41,24 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
-            ignore = false;
+            if(key.GetMemberType().IsNullable())
+            {
+                if (!value.NullableHasValue())
+                {
+                    ignore = IgnoreNull;
+                    return currentKey;
+                }
+                value = value.GetNullableValue();
+            }
+
             var dateTime = (DateTime)value;
+            if (dateTime.IsDefault())
+            {
+                ignore = true;
+                return currentKey;
+            }
+
+            ignore = false;
             if (!OffsetHours.IsDefault())
                 dateTime = dateTime + TimeSpan.FromHours(OffsetHours);
             var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, WeeksEpoch);

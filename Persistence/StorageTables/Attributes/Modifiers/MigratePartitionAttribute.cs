@@ -7,8 +7,7 @@ using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,6 +73,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(() => false.AsTask()));
         }
 
+
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -84,17 +90,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onFailure().AsTask();
         }
 
-        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKey, string partitionKey, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
+            var rowKey = updatedEntity.RowKey;
+            var valueUpdated = updatedEntity.Entity;
+            var dictionaryUpdated = updatedEntity.WriteEntity(null);
             var to = (IModifyAzureStorageTablePartitionKey)Activator.CreateInstance(this.To);
             var toPartitionKey = to.GeneratePartitionKey(rowKey, valueUpdated, memberInfo);
             var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionaryUpdated);
+            var dictionaryExisting = existingEntity.WriteEntity(null);
             return repository.InsertOrReplaceAsync<TEntity, TResult>(typeWrapper,
                 (created, newEntity) => onSuccessWithRollback(
                     () =>
@@ -103,8 +112,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return repository.DeleteAsync<TEntity, bool>(newEntity,
                                 () => true,
                                 () => true,
+<<<<<<< HEAD
                                 (codes, why) => false);
                         var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey, dictionaryExisting);
+=======
+                                onFailure:(codes, why) => false);
+                        var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey,
+                            dictionaryExisting);
+>>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                         return repository.ReplaceAsync<TEntity, bool>(typeWrapperExisting,
                             () => true);
                     }));
@@ -131,6 +146,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(
                     () => 1.AsTask()),
                 () => throw new Exception("Delete with ETAG = * failed due to modification."));
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
     }
 }

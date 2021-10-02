@@ -1,4 +1,5 @@
 ﻿using EastFive.Api;
+using EastFive.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +19,10 @@ namespace EastFive.Azure.Functions
                 .IsAssignableFrom(typeof(InvokeApplicationFromFunction));
         }
 
-        public override Task<HttpResponseMessage> Instigate(IApplication httpApp, HttpRequestMessage request, CancellationToken cancellationToken, ParameterInfo parameterInfo, Func<object, Task<HttpResponseMessage>> onSuccess)
+        public override Task<IHttpResponse> Instigate(IApplication httpApp,
+                IHttpRequest request,
+                ParameterInfo parameterInfo,
+            Func<object, Task<IHttpResponse>> onSuccess)
         {
             var apiPrefix = GetApiPrefix(request);
             var serverLocation = GetServerLocation(request);
@@ -29,24 +33,21 @@ namespace EastFive.Azure.Functions
         protected class InvokeApplicationFromFunction : InvokeApplicationFromRequest
         {
             public InvokeApplicationFromFunction(IApplication httpApp,
-                    HttpRequestMessage request, 
+                    IHttpRequest request, 
                     Uri serverLocation, string apiPrefix) :
                 base(httpApp as HttpApplication, request, serverLocation, apiPrefix)
             {
 
             }
 
-            public override HttpRequestMessage GetHttpRequest()
+            public override IHttpRequest GetHttpRequest()
             {
                 var request = base.GetHttpRequest();
                 if(this.Application is IFunctionApplication)
                 {
                     var funcApp = (IFunctionApplication)this.Application;
-                    if (request.Headers.Contains(InvocationMessage.InvocationMessageSourceHeaderKey))
-                        request.Headers.Remove(InvocationMessage.InvocationMessageSourceHeaderKey);
-                    request.Headers.Add(
-                        InvocationMessage.InvocationMessageSourceHeaderKey,
-                        funcApp.InvocationMessageRef.id.ToString());
+                    request.UpdateHeader(InvocationMessage.InvocationMessageSourceHeaderKey,
+                        headers => funcApp.InvocationMessageRef.id.ToString().AsArray());
                 }
                 return request;
             }

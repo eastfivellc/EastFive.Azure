@@ -4,14 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+
+using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
+using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
+
 using EastFive.Api;
 using EastFive.Api.Azure.Resources;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Images;
 using EastFive.Web.Configuration;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
+using System.Drawing;
 
 namespace EastFive.Azure.Media
 {
@@ -36,16 +40,33 @@ namespace EastFive.Azure.Media
         }
 
         public static Task<TResult> LoadImageAsync<TResult>(this IRef<Content> contentRef,
-            Func<System.Drawing.Image, TResult> onFound,
-            Func<TResult> onNotFound)
+            Func<System.Drawing.Image, string, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<Stream, string, TResult> onInvalidImage = default)
         {
             return contentRef.id.BlobLoadStreamAsync("content",
                 (imageStream, contentType) =>
                 {
-                    var image = System.Drawing.Image.FromStream(imageStream);
-                    return onFound(image);
+                    //var image = System.Drawing.Image.FromStream(imageStream);
+                    if(imageStream.TryReadImage(out Image image))
+                        return onFound(image, contentType);
+
+                    if(onInvalidImage.IsDefaultOrNull())
+                        return onNotFound();
+
+                    return onInvalidImage(imageStream, contentType);
                 },
                 onNotFound);
+        }
+
+        public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
+            string contentType = default,
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return content.BlobCreateAsync("content",
+                (contentId) => contentId.AsRef<Content>(),
+                contentType: contentType,
+                onTimeout: onTimeout);
         }
 
         public static Task<TResult> SaveBytesAsync<TResult>(this IRef<Content> contentRef, 
@@ -118,6 +139,8 @@ namespace EastFive.Azure.Media
                                                 .Append(VisualFeatureTypes.Objects)
                                                 .Append(VisualFeatureTypes.Tags)
                                                 .Append(VisualFeatureTypes.Brands)
+                                                .Append(VisualFeatureTypes.Color)
+                                                .Append(VisualFeatureTypes.Faces)
                                                 .ToList();
                                         try
                                         {

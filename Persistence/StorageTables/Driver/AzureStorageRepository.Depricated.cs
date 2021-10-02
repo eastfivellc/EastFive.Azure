@@ -6,12 +6,10 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
-
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
@@ -104,7 +102,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                 }
                 catch (Exception ex)
                 {
-                    if (!table.Exists()) return new TData[] { };
+                    if (!await table.ExistsAsync()) return new TData[] { };
                     if (ex is StorageException except && except.IsProblemTimeout())
                     {
                         if (--numberOfTimesToRetry > 0)
@@ -157,7 +155,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                             }
                             catch (Exception ex)
                             {
-                                if (!table.Exists())
+                                if (!await table.ExistsAsync())
                                     return yieldBreak;
                                 if (ex is StorageException except && except.IsProblemTimeout())
                                 {

@@ -8,25 +8,27 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 using EastFive.Api;
-using EastFive.Api.Controllers;
+using EastFive.Linq;
+using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
 using EastFive.Serialization;
-using System.Web.Http.Routing;
+using Microsoft.AspNetCore.Mvc.Routing;
 using System.Net.Http.Headers;
+using EastFive.Api.Auth;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController5(
+    [FunctionViewController(
         Route = "Authentication",
-        Resource = typeof(Authentication),
         ContentType = "x-application/login-authentication",
         ContentTypeVersion = "0.1")]
     [StorageTable]
-    [Html(Title = "Login")]
+    [Html(Title = "Login", Preference = -10.0)]
     public struct Authentication : IReferenceable
     {
         #region Properties
@@ -64,8 +66,6 @@ namespace EastFive.Azure.Login
         public DateTime? authenticated;
 
         public const string StatePropertyName = "state";
-        [ApiProperty(PropertyName = StatePropertyName)]
-        [JsonProperty(PropertyName = StatePropertyName)]
         [Storage]
         [JsonIgnore]
         public string state;
@@ -74,7 +74,7 @@ namespace EastFive.Azure.Login
         [ApiProperty(PropertyName = ClientPropertyName)]
         [JsonProperty(PropertyName = ClientPropertyName)]
         [Storage]
-        public Guid client;
+        public IRef<Client> client;
 
         public const string ValidationPropertyName = "validation";
         [ApiProperty(PropertyName = ValidationPropertyName)]
@@ -94,17 +94,15 @@ namespace EastFive.Azure.Login
         #region HTTP Methods
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
                 [Accepts(Media = "text/html")]MediaTypeWithQualityHeaderValue accept,
-                HttpRequestMessage request,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
             ContentTypeResponse<Authentication> onFound,
             HtmlResponse onHtmlWanted,
             NotFoundResponse onNotFound)
         {
             if (!accept.IsDefaultOrNull())
-                return onHtmlWanted(EastFive.Azure.Properties.Resources.loginHtml);
+                return onHtmlWanted(Properties.Resources.loginHtml);
             return await authenticationRef.StorageGetAsync(
                 (authentication) =>
                 {
@@ -114,11 +112,11 @@ namespace EastFive.Azure.Login
         }
 
         [Api.HttpGet]
-        public static async Task<HttpResponseMessage> GetAsync(
+        public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = StatePropertyName)]string state,
                 [QueryParameter(Name = ClientPropertyName)]IRef<Client> clientRef,
                 [QueryParameter(Name = ValidationPropertyName)]string validation,
-                Api.Azure.AzureApplication application, UrlHelper urlHelper,
+                IAuthApplication application, IProvideUrl urlHelper,
             //ContentTypeResponse<Authentication> onFound,
             RedirectResponse onFound,
             ReferencedDocumentNotFoundResponse<Client> onInvalidClient)
@@ -130,6 +128,7 @@ namespace EastFive.Azure.Login
                     {
                         authenticationRef = SecureGuid.Generate().AsRef<Authentication>(),
                         state = state,
+                        client = clientRef,
                     };
                     return authentication.StorageCreateAsync(
                         (entity) =>
@@ -146,12 +145,12 @@ namespace EastFive.Azure.Login
 
         [Api.HttpPatch]
         [HtmlAction(Label = "Login")]
-        public static async Task<HttpResponseMessage> UpdateAsync(
+        public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
                 [OptionalQueryParameter(Name = "hold")]bool? hold,
                 [Property(Name = UserIdentificationPropertyName)]string userIdentification,
                 [Property(Name = PasswordPropertyName)]string password,
-                HttpRequestMessage httpRequest,
+                IHttpRequest httpRequest,
             RedirectResponse onUpdated,
             ContentTypeResponse<string> onHeldup,
             NotFoundResponse onNotFound,
@@ -191,5 +190,6 @@ namespace EastFive.Azure.Login
         }
 
         #endregion
+
     }
 }

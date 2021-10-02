@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
@@ -59,10 +59,10 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                 : TableQuery.CombineFilters(query, TableOperators.And, activeFilter);
         }
 
-        public static TableQuery<TData> AddActiveDataSelection<TData>(this TableQuery<TData> query) where TData : class
-        {
-            return new TableQuery<TData>().Where(query.FilterString.AddActiveDataSelection());
-        }
+        //public static TableQuery<TData> AddActiveDataSelection<TData>(this TableQuery<TData> query) where TData : class
+        //{
+        //    return new TableQuery<TData>().Where(query.FilterString.AddActiveDataSelection());
+        //}
 
         public static bool HasValidRange(this DateTimeOffset date)
         {

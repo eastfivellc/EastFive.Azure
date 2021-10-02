@@ -3,25 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Web.Http;
-using BlackBarLabs.Web;
-using BlackBarLabs.Api;
 using System.Threading.Tasks;
-using EastFive.Api.Controllers;
-using Newtonsoft.Json;
 using System.IO;
 using System.IO.Compression;
+
+using Newtonsoft.Json;
+
 using EastFive.Azure.Persistence.AzureStorageTables;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Images;
 
 namespace EastFive.Api.Azure.Resources
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "Content",
-        Resource = typeof(Content),
         ContentType = "x-application/content",
         ContentTypeVersion = "0.1")]
     public class Content : IReferenceable
@@ -63,7 +59,7 @@ namespace EastFive.Api.Azure.Resources
         public string contentType { get; set; }
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateContentAsync(
+        public static async Task<IHttpResponse> CreateContentAsync(
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [QueryParameter(Name = ContentPropertyName)]ByteArrayContent content,
             CreatedResponse onCreated,
@@ -77,7 +73,7 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [HttpPost]
-        public static async Task<HttpResponseMessage> CreateContentFormAsync(
+        public static async Task<IHttpResponse> CreateContentFormAsync(
                 [Property(Name = ContentIdPropertyName)]Guid contentId,
                 [Property(Name = ContentPropertyName)]byte[] contentBytes,
                 [Header(Content = ContentPropertyName)]System.Net.Http.Headers.MediaTypeHeaderValue mediaHeader,
@@ -91,14 +87,16 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QueryByContentIdAsync(
+        public static async Task<IHttpResponse> QueryByContentIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
                 [OptionalQueryParameter]string renderer,
-            HttpRequestMessage request,
-            System.Web.Http.Routing.UrlHelper url)
+            BytesResponse bytesResponse,
+            ImageRawResponse imageResponse,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
         {
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                 (contentType, image) =>
@@ -114,31 +112,36 @@ namespace EastFive.Api.Azure.Resources
                                 var zipFile = zipStream.Entries.First();
                                 zipFile.Open().CopyTo(resultStream);
                                 var data = resultStream.ToArray();
-                                return request.CreateFileResponse(data, "application/object", filename: zipFile.Name);
+                                return bytesResponse(data, contentType: "application/object", filename: zipFile.Name);
+                                //return request.CreateFileResponse(data, "application/object", filename: zipFile.Name);
                             }
                         }
                     }
 
-                    if (contentType.StartsWith("video", StringComparison.InvariantCultureIgnoreCase) &&
-                        (width.HasValue || height.HasValue || fill.HasValue))
-                    {
-                        var videoPreviewImage = default(System.Drawing.Image); // Properties.Resources.video_preview;
-                        return request.CreateImageResponse(videoPreviewImage,
-                            width: width, height: height, fill: fill,
-                            filename: contentId.ToString("N"));
-                    }
-                    return request.CreateImageResponse(image,
+                    //if (contentType.StartsWith("video", StringComparison.InvariantCultureIgnoreCase) &&
+                    //    (width.HasValue || height.HasValue || fill.HasValue))
+                    //{
+                    //    var videoPreviewImage = default(System.Drawing.Image); // Properties.Resources.video_preview;
+                    //    return request.CreateImageResponse(videoPreviewImage,
+                    //        width: width, height: height, fill: fill,
+                    //        filename: contentId.ToString("N"));
+                    //}
+                    return imageResponse(image,
                         width: width, height: height, fill: fill,
                         filename: contentId.ToString("N"),
                         contentType: contentType);
+                    //return request.CreateImageResponse(image,
+                    //    width: width, height: height, fill: fill,
+                    //    filename: contentId.ToString("N"),
+                    //    contentType: contentType);
                 },
-                () => request.CreateResponse(HttpStatusCode.NotFound),
-                () => request.CreateResponse(HttpStatusCode.Unauthorized));
+                () => onNotFound(),
+                () => onUnauthorized());
             return response;
         }
 
         [HttpGet]
-        public static async Task<HttpResponseMessage> QuerySubImageByContentIdAsync(
+        public static async Task<IHttpResponse> QuerySubImageByContentIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [QueryParameter(Name = XPropertyName)]int x,
                 [QueryParameter(Name = YPropertyName)]int y,
@@ -147,7 +150,9 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
-            HttpRequestMessage request)
+            ImageResponse imageResponse,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
         {
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                 (contentType, imageData) =>
@@ -157,17 +162,17 @@ namespace EastFive.Api.Azure.Resources
                         .Crop(x, y, w, h)
                         .Scale(width, height, fill);
                     
-                    return request.CreateImageResponse(newImage,
+                    return imageResponse(newImage,
                         filename: contentId.ToString("N"),
                         contentType: contentType);
                 },
-                () => request.CreateResponse(HttpStatusCode.NotFound),
-                () => request.CreateResponse(HttpStatusCode.Unauthorized));
+                () => onNotFound(),
+                () => onUnauthorized());
             return response;
         }
 
         [HttpGet]
-        public static Task<HttpResponseMessage> QuerySubImageByContentIdAsync(
+        public static Task<IHttpResponse> QuerySubImageByContentIdAsync(
                 [HashedFile(Name = ContentIdPropertyName)]CheckSumRef<Content> contentId,
                 [QueryParameter(Name = XPropertyName)]int x,
                 [QueryParameter(Name = YPropertyName)]int y,
@@ -176,12 +181,14 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
-            HttpRequestMessage request)
+            ImageResponse imageResponse,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
         {
             return QuerySubImageByContentIdAsync(contentId.resourceRef.id,
                 x, y, w, h,
                 width, height, fill,
-                request);
+                imageResponse, onNotFound, onUnauthorized);
         }
 
         public Task<TResult> LoadStreamAsync<TResult>(
@@ -215,8 +222,7 @@ namespace EastFive.Api.Azure.Resources
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [QueryParameter(Name = StreamingPropertyName)]bool streaming,
                 HttpRequestMessage request,
-                EastFive.Api.Security security,
-                System.Web.Http.Routing.UrlHelper url)
+                EastFive.Api.Security security)
         {
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                     security,

@@ -79,8 +79,10 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var r = ComputeKey(declaringType,
                 mi => mi.GetAttributesInterface<IScopeKeys>()
-                    .First()
-                    .PairWithKey(mi), // no scoping on partition
+                    .Where(scoper => scoper.Scope == Scoping)
+                    .First(
+                        (scoper, next) => scoper.PairWithKey(mi),
+                        () => default(KeyValuePair<MemberInfo, IScopeKeys>?)),
                 lookupValues, out bool ignore);
             if(ignore)
                 throw new Exception("Cannot ignore partition key");
@@ -121,7 +123,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     
                                     var partitionNext = scoping.MutateKey(keyCurrent, 
                                         memberInfo, value, out allIgnored);
-                                    return partitionNext;
+                                    return partitionNext; // $"{keyCurrent}{partitionNext}";
                                 },
                                 () => throw new ArgumentException($"{member.DeclaringType}..{member.Name} " +
                                     " has not been included in the query."));

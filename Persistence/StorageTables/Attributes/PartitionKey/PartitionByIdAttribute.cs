@@ -1,13 +1,9 @@
-﻿using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.Attributes;
-using EastFive.Linq.Expressions;
+﻿using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {

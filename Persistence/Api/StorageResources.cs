@@ -91,16 +91,16 @@ namespace EastFive.Persistence.Azure
 
     public class StorageResourcesAttribute : Attribute, IInstigatableGeneric
     {
-        public virtual Task<HttpResponseMessage> InstigatorDelegateGeneric(Type type,
-                IApplication httpApp, HttpRequestMessage request,
-                CancellationToken cancellationToken, ParameterInfo parameterInfo,
-            Func<object, Task<HttpResponseMessage>> onSuccess)
+        public virtual Task<IHttpResponse> InstigatorDelegateGeneric(Type type,
+                IApplication httpApp, IHttpRequest request,
+                ParameterInfo parameterInfo,
+            Func<object, Task<IHttpResponse>> onSuccess)
         {
             return type
                 .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                 .First()
                 .GetParameters()
-                .Aggregate<ParameterInfo, Func<object[], Task<HttpResponseMessage>>>(
+                .Aggregate<ParameterInfo, Func<object[], Task<IHttpResponse>>>(
                     (invocationParameterValues) =>
                     {
                         var requestMessage = Activator.CreateInstance(type, invocationParameterValues);
@@ -110,7 +110,7 @@ namespace EastFive.Persistence.Azure
                     {
                         return (previousParams) =>
                         {
-                            return httpApp.Instigate(request, cancellationToken, invocationParameterInfo,
+                            return httpApp.Instigate(request, invocationParameterInfo,
                                 (invocationParameterValue) =>
                                 {
                                     return next(previousParams.Prepend(invocationParameterValue).ToArray());

@@ -14,13 +14,21 @@ using EastFive.Linq;
 using EastFive.Web.Configuration;
 using EastFive.Azure;
 using System.Net.Http.Headers;
+using EastFive.Api;
+using System.Runtime.Serialization;
 
 namespace EastFive.Azure.Auth
 {
+    [DataContract]
     public class RedirectionConfiguration
     {
+        [DataMember]
         public string Key;
+
+        [DataMember]
         public string Value;
+
+        [DataMember]
         public long Limit;
     }
 
@@ -31,9 +39,10 @@ namespace EastFive.Azure.Auth
         public PreserverRedirectionAttribute()
         {
             redirections = AppSettings.Redirections.ConfigurationJson(
-                (KeyValuePair<string, string>[] kvps) =>
+                (RedirectionConfiguration[] kvps) =>
                 {
                     return kvps
+                        .NullToEmpty()
                         .Select(
                             kvp =>
                             {
@@ -50,63 +59,48 @@ namespace EastFive.Azure.Auth
 
         public float Order { get; set; }
 
-        public Task<(Func<HttpResponseMessage, HttpResponseMessage>, Uri)> ResolveAbsoluteUrlAsync(Uri defaultUri, 
-            HttpRequestMessage request, Guid? accountIdMaybe, 
+        public Task<(Func<IHttpResponse, IHttpResponse>, Uri)> ResolveAbsoluteUrlAsync(Uri defaultUri, 
+            IHttpRequest request, Guid? accountIdMaybe, 
             IDictionary<string, string> authParams)
         {
-            Func<HttpResponseMessage, HttpResponseMessage> emptyModifier = x => x;
-            if (request.Headers.IsDefaultNullOrEmpty())
-                return (emptyModifier, defaultUri).AsTask();
+            Func<IHttpResponse, IHttpResponse> modifier =
+                (response) =>
+                {
+                    // No redirect, no modification
+                    if (!response.TryGetLocation(out Uri finalUrl))
+                        return response;
+                    
+                    if (!finalUrl.IsAbsoluteUri)
+                        return response;
+                    var finalUrlStr = finalUrl.AbsoluteUri;
+                    
+                    // No mutation, no modification
+                    if (finalUrlStr.StartsWith(defaultUri.AbsoluteUri))
+                        return response;
+                    
+                    var matchingRedirections = redirections
+                        .Where(redir => finalUrlStr.StartsWith(redir.Value.AbsoluteUri));
+                    if (!matchingRedirections.TrySingle(out KeyValuePair<string, Uri> matchingRedirection))
+                        return response;
+                    
+                    var lookupToken = matchingRedirection.Key;
+                    response.AddCookie("e5-redirect-base", lookupToken, TimeSpan.FromDays(365));
+                    return response;
+                };
 
-            return request.Headers
-                .GetCookies()
-                .NullToEmpty()
-                .SelectMany(cookieBucket => cookieBucket.Cookies
-                    .Select(cookie => (cookie, cookieBucket.Expires)))
-                .Where(cookie => cookie.cookie.Name == "e5-redirect-base")
-                .Where(cookie => redirections.ContainsKey(cookie.cookie.Value))
-                .OrderByDescending(cookie => cookie.Expires)
-                .First(
-                    (cookie, next) =>
-                    {
-                        var redirect = redirections[cookie.cookie.Value];
-                        var fullUri = defaultUri.ReplaceBase(redirect);
-                        Func<HttpResponseMessage, HttpResponseMessage> modifier =
-                            (response) => response;
-                        return (modifier, fullUri).AsTask();
-                    },
-                    () =>
-                    {
-                        Func<HttpResponseMessage, HttpResponseMessage> modifier =
-                            (response) =>
-                            {
-                                // No redirect, no modification
-                                if (response.Headers.Location.IsDefaultOrNull())
-                                    return response;
+            return request.ReadCookie("e5-redirect-base",
+                redirBase =>
+                {
+                    if (!redirections.ContainsKey(redirBase))
+                        return (modifier, defaultUri);
 
-                                var finalUrl = response.Headers.Location;
-                                if (!finalUrl.IsAbsoluteUri)
-                                    return response;
-                                var finalUrlStr = finalUrl.AbsoluteUri;
-
-                                // No mutation, no modification
-                                if (finalUrlStr.StartsWith(defaultUri.AbsoluteUri))
-                                    return response;
-
-                                var matchingRedirections = redirections
-                                    .Where(redir => finalUrlStr.StartsWith(redir.Value.AbsoluteUri));
-                                if(!matchingRedirections.TrySingle(out KeyValuePair<string, Uri> matchingRedirection))
-                                    return response;
-
-                                var lookupToken = matchingRedirection.Key;
-                                response.Headers.AddCookies(
-                                    new CookieHeaderValue("e5-redirect-base", lookupToken).AsEnumerable());
-                                return response;
-                            };
-
-                        return (modifier, defaultUri).AsTask();
-
-                    });
+                    var redirect = redirections[redirBase];
+                    var fullUri = defaultUri.ReplaceBase(redirect);
+                    Func<IHttpResponse, IHttpResponse> emptyModifier =
+                        (response) => response;
+                    return (emptyModifier, fullUri);
+                },
+                () => (modifier, defaultUri)).AsTask();
         }
     }
 }

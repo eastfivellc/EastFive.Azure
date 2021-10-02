@@ -7,8 +7,9 @@ using System.Text;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 
+using EastFive;
 using EastFive.Linq;
 using EastFive.Extensions;
 using EastFive.Reflection;
@@ -23,6 +24,7 @@ namespace EastFive.Persistence
         IPersistInAzureStorageTables
     {
         private const string overflowToken = "8d40521b-7d71-47b3-92c5-46e4a804e7de";
+        private const string overflowTokenString = "9a9a2e13d0ed44d7aa39c2549aff176a";
 
         public override KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
         {
@@ -53,6 +55,23 @@ namespace EastFive.Persistence
                                     })
                                 .Append(propName.PairWithValue(new EntityProperty(overflowTokenBytes)));
                         }
+                        if (storageValue.PropertyType == EdmType.String)
+                        {
+                            if (storageValue.StringValue.Length <= 0x8000)
+                                return propNameStorageValueKvp.AsArray();
+
+                            return storageValue.StringValue
+                                .Split(x => 0x8000)
+                                .Select(
+                                    (chars, index) =>
+                                    {
+                                        var stringValue = new String(chars.ToArray());
+                                        var storageValueSized = new EntityProperty(stringValue);
+                                        var propNameIndexed = $"{propName}_overflow_{index}";
+                                        return propNameIndexed.PairWithValue(storageValueSized);
+                                    })
+                                .Append(propName.PairWithValue(new EntityProperty(overflowTokenString)));
+                        }
 
                         return propNameStorageValueKvp.AsArray();
                     })
@@ -80,13 +99,25 @@ namespace EastFive.Persistence
 
                             var compactedBytes = values
                                 .Where(value => value.Value.PropertyType == EdmType.Binary)
-                                .Where(value => value.Key.StartsWith($"{propName}_of_"))
+                                .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
                                 .OrderBy(value => value.Key)
                                 .Aggregate(new byte[] { },
                                     (bytes, valueKvp) => bytes.Concat(valueKvp.Value.BinaryValue).ToArray());
                             return propName.PairWithValue(new EntityProperty(compactedBytes));
                         }
+                        if (storageValue.PropertyType == EdmType.String)
+                        {
+                            if (storageValue.StringValue != overflowTokenString)
+                                return propNameStorageValueKvp;
 
+                            var stringBuilder = values
+                                .Where(value => value.Value.PropertyType == EdmType.String)
+                                .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
+                                .OrderBy(value => value.Key)
+                                .Aggregate(new StringBuilder(),
+                                    (sb, valueKvp) => sb.Append(valueKvp.Value.StringValue));
+                            return propName.PairWithValue(new EntityProperty(stringBuilder.ToString()));
+                        }
                         return propNameStorageValueKvp;
                     })
                 .ToDictionary();

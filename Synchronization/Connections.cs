@@ -8,33 +8,107 @@ using BlackBarLabs;
 using BlackBarLabs.Extensions;
 using EastFive;
 using EastFive.Analytics;
+using EastFive.Api;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Text;
+using Newtonsoft.Json;
 
 namespace EastFive.Azure.Synchronization
 {
     public struct Adapter
     {
         public Guid adapterId;
+
+        [JsonProperty(PropertyName = "resource_key")]
         public string key;
+
+        [JsonProperty(PropertyName = "name")]
         public string name;
+
+        //[JsonProperty(PropertyName = "keys")]
+        //[JsonProperty(PropertyName = "values")]
         public KeyValuePair<string, string>[] identifiers;
+
+        [JsonProperty(PropertyName = "integration")]
         public Guid integrationId;
+
+        [JsonProperty(PropertyName = "resource_type")]
         public string resourceType;
+
+        [JsonProperty(PropertyName = "connector")]
         public Guid[] connectorIds;
+
+
+        #region GET
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByIdAsync(
+                [QueryId] Guid adapterId,
+                EastFive.Api.Security security,
+            ContentResponse onFound,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return EastFive.Azure.Synchronization.Connections.FindAdapterByIdAsync(adapterId,
+                (adapter) => onFound(adapter),
+                () => onNotFound());
+        }
+
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByRelatedAsync(
+                [QueryParameter]Guid relatedTo, [QueryParameter]Guid integration, // int top, int skip
+                Api.Security security,
+            MultipartAcceptArrayResponse onMultipart,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return EastFive.Azure.Synchronization.Connections.FindAdaptersByRelatedAsync(relatedTo, integration,
+                    security.claims,
+                synchronizations =>
+                {
+                    var r = onMultipart(synchronizations.Cast<object>());
+                    return r;
+                },
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
+        }
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByRelatedAsync([QueryParameter]string key, [QueryParameter]Guid integration, [QueryParameter]string resourceType,
+                Api.Security security,
+            ContentResponse onFound,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return EastFive.Azure.Synchronization.Connections.FindAdapterByKeyAsync(key, integration, resourceType,
+                    security.claims,
+                adapter =>
+                {
+                    var r = onFound(adapter);
+                    return r;
+                },
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
+        }
+
+        #endregion
     }
 
     public struct Connector
     {
         public Guid connectorId;
-        
+
+        public const string CreatedByPropertyName = "created_by";
         public Guid createdBy;
 
+        public const string SourcePropertyName = "source";
         public Guid adapterInternalId;
 
+        public const string DestinationPropertyName = "destination";
         public Guid adapterExternalId;
 
         public enum SynchronizationMethod
@@ -44,16 +118,238 @@ namespace EastFive.Azure.Synchronization
             latest,
             ignore,
         }
+        public const string FlowPropertyName = "flow";
         public SynchronizationMethod synchronizationMethod;
 
         public DateTime? lastSynchronized;
+
+        //public const string DestinationIntegrationPropertyName = "destination_integration";
+        //[JsonProperty(PropertyName = DestinationIntegrationPropertyName)]
+
+        #region GET
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByIdAsync(
+                [QueryParameter(CheckFileName = true)]Guid id,
+                Api.Security security,
+            ContentResponse onFound,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return Connectors.FindByIdAsync(id,
+                    security.performingAsActorId, security.claims,
+                (synchronization) => onFound(synchronization),
+                () => onNotFound(),
+                () => onUnauthorized());
+        }
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByAdapterAsync(
+                [QueryParameter(Name = "adapter")]Guid adapterId,
+                Api.Security security,
+            MultipartAcceptArrayResponse onMultipart,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return EastFive.Azure.Synchronization.Connectors.FindByAdapterAsync(adapterId,
+                    security.performingAsActorId, security.claims,
+                connectors =>
+                {
+                    var r = onMultipart(connectors.Cast<object>());
+                    return r;
+                },
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
+        }
+
+        #endregion
+
+        [EastFive.Api.HttpPost(Type = typeof(Connector), MatchAllBodyParameters = false)]
+        public static Task<IHttpResponse> CreateConnectorAsync(
+                [Property]Guid id,
+                [Property(Name = Connector.SourcePropertyName)]Guid source,
+                [Property(Name = Connector.DestinationPropertyName)]Guid destination,
+                [Property(Name = Connector.FlowPropertyName)]Connector.SynchronizationMethod Flow,
+                Api.Security security, IHttpRequest request,
+            CreatedResponse onCreated,
+            CreatedBodyResponse<Connection> onCreatedAndModifiedConnection,
+            CreatedBodyResponse<Connector> onCreatedAndModified,
+            AlreadyExistsResponse onAlreadyExists,
+            AlreadyExistsReferencedResponse onRelationshipAlreadyExists,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized,
+            GeneralConflictResponse onFailure)
+        {
+            return Connectors.CreateConnectorAsync(id, source, destination,
+                    Flow, security.performingAsActorId, security.claims,
+                () => onCreated(),
+                (connection) =>
+                {
+                    return request.GetAcceptTypes()
+                        .OrderByDescending(accept => accept.Quality.HasValue ? accept.Quality.Value : 1.0)
+                        .First(
+                            (accept, next) =>
+                            {
+                                if (
+                                    accept.MediaType.ToLower() == "x-ordering/connection" ||
+                                    accept.MediaType.ToLower() == "x-ordering/connection+json")
+                                    return onCreatedAndModifiedConnection(connection,
+                                        "x-ordering/connection+json");
+
+                                if (
+                                    accept.MediaType.ToLower() == "x-ordering/connector" ||
+                                    accept.MediaType.ToLower() == "x-ordering/connector+json" ||
+                                    accept.MediaType.ToLower() == "application/json")
+                                    return onCreatedAndModified(connection.connector,
+                                        "x-ordering/connector+json");
+
+                                return next();
+                            },
+                            () => onCreatedAndModified(connection.connector));
+                },
+                () => onAlreadyExists(),
+                (existingConnectorId) => onRelationshipAlreadyExists(existingConnectorId),
+                (brokenId) => onReferenceNotFound(),
+                (why) => onFailure(why));
+        }
+
+
+        [EastFive.Api.HttpPut(MatchAllBodyParameters = false)]
+        public static Task<IHttpResponse> UpdateConnectorAsync(
+                [Property]Guid id,
+                [Property(Name = Connector.SourcePropertyName)]Guid source,
+                [PropertyOptional(Name = Connector.DestinationPropertyName)]Guid? destination,
+                [Property(Name = Connector.FlowPropertyName)]Connector.SynchronizationMethod Flow,
+                Api.Security security, 
+            NoContentResponse onUpdated,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized,
+            GeneralConflictResponse onFailure)
+        {
+            return Connectors.UpdateConnectorAsync(id,
+                    Flow, security.performingAsActorId, security.claims,
+                () => onUpdated(),
+                () => onNotFound(),
+                (why) => onFailure(why));
+        }
+
+        [EastFive.Api.HttpDelete()]
+        public static Task<IHttpResponse> DeleteByIdAsync(
+                [QueryId]Guid synchronizationId,
+                Api.Security security,
+            ContentResponse onFound,
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return Connectors.DeleteByIdAsync(synchronizationId,
+                    security.performingAsActorId, security.claims,
+                () => onFound(true),
+                () => onNotFound());
+        }
+
+        [EastFive.Api.HttpOptions]
+        public static IHttpResponse Options(
+            ContentResponse onOption,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            var adapter1Id = Guid.NewGuid();
+            var adapter2Id = Guid.NewGuid();
+            var connectorId = Guid.NewGuid();
+            var integration1 = Guid.NewGuid();
+            return onOption(
+                    new Connector()
+                    {
+                        adapterExternalId = adapter1Id,
+                        adapterInternalId = adapter2Id,
+                        connectorId = connectorId,
+                        createdBy = adapter1Id,
+                        synchronizationMethod = Connector.SynchronizationMethod.useExternal,
+                    });
+        }
     }
     
     public struct Connection
     {
+        [JsonProperty(PropertyName = "connector")]
         public Connector connector;
+        [JsonProperty(PropertyName = "source")]
         public Adapter adapterInternal;
+        [JsonProperty(PropertyName = "destination")]
         public Adapter adapterExternal;
+
+
+        #region GET
+
+        [EastFive.Api.HttpGet]
+        public static Task<IHttpResponse> FindByAdapterAsync([QueryParameter]Guid adapter,
+                Api.Security security,
+            MultipartAcceptArrayResponse onMultipart,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            return EastFive.Azure.Synchronization.Connectors.FindConnectionByAdapterAsync(adapter,
+                    security.performingAsActorId, security.claims,
+                connectors =>
+                {
+                    var r = onMultipart(connectors.Cast<object>());
+                    return r;
+                },
+                () => onReferenceNotFound(),
+                () => onUnauthorized());
+        }
+
+        #endregion
+
+        [EastFive.Api.HttpOptions]
+        public static IHttpResponse Options(
+            ContentResponse onOption,
+            ReferencedDocumentNotFoundResponse onReferenceNotFound,
+            UnauthorizedResponse onUnauthorized)
+        {
+            var adapter1Id = Guid.NewGuid();
+            var adapter2Id = Guid.NewGuid();
+            var connectorId = Guid.NewGuid();
+            var integration1 = Guid.NewGuid();
+            return onOption(
+                    new Connection()
+                    {
+                        connector = new Connector()
+                        {
+                            adapterExternalId = adapter1Id,
+                            adapterInternalId = adapter2Id,
+                            connectorId = connectorId,
+                            createdBy = adapter1Id,
+                            synchronizationMethod = Connector.SynchronizationMethod.useExternal,
+                        },
+                        adapterInternal = new Adapter()
+                        {
+                            adapterId = adapter1Id,
+                            connectorIds = new Guid[] { connectorId },
+                            identifiers = new KeyValuePair<string, string>[]
+                            {
+                                "name".PairWithValue("Example Name"),
+                            },
+                            integrationId = integration1,
+                            key = Guid.NewGuid().ToString(),
+                            name = "Example",
+                            resourceType = "Product",
+                        },
+                        adapterExternal = new Adapter()
+                        {
+                            adapterId = adapter1Id,
+                            connectorIds = new Guid[] { connectorId },
+                            identifiers = new KeyValuePair<string, string>[]
+                            {
+                                "name".PairWithValue("Test Name"),
+                            },
+                            integrationId = integration1,
+                            key = Guid.NewGuid().ToString("N"),
+                            name = "Test",
+                            resourceType = "Product",
+                        },
+                    });
+        }
     }
 
     public delegate Task<TResult> ResourceAllSynchronizationsAsync<TResult>(
@@ -634,7 +930,6 @@ namespace EastFive.Azure.Synchronization
             return CreateOrUpdateInternalExternalConnection(resourceIdInternal.ToString("N"), resourceKeyExternal, externalSystemIntegrationId, resourceType, onSuccess);
         }
 
-
         public static Task<TResult> CreateOrUpdateConnection<TResult>(Guid resourceIdInternal,
             string resourceKeyExternal, Guid externalSystemIntegrationId,
             string resourceType,
@@ -711,17 +1006,17 @@ namespace EastFive.Azure.Synchronization
                             adapterExternalId = adapterExternal.adapterId,
                             synchronizationMethod = method,
                         };
-                        return adapterInternal.PairWithValue(adapterExternal).PairWithValue(connector);
+                        return (connector, adapterInternal, adapterExternal);
                     });
 
             var connectors = resourceIdKeyConnections
-                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Value); // Get connectors
+                .Select(resourceIdKeyConnection => resourceIdKeyConnection.connector); // Get connectors
             return Persistence.ConnectorDocument.CreateBatch(connectors, method)
                 .JoinTask(
                     async () =>
                     {
                         var adaptersInternal = resourceIdKeyConnections
-                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Key.Key) // Get internal adapters
+                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.adapterInternal) // Get internal adapters
                                 .Distinct(internalAdapter => internalAdapter.key);
                         Adapter[] adaptersInternalSaved = await Persistence.AdapterDocument
                             .CreateOrUpdateBatch(adaptersInternal, defaultInternalIntegrationId, resourceType)
@@ -731,7 +1026,7 @@ namespace EastFive.Azure.Synchronization
                     async () =>
                     {
                         var externalAdapters = resourceIdKeyConnections
-                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Key.Value) // Get external adapters
+                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.adapterExternal) // Get external adapters
                                 .Distinct(externalAdapter => externalAdapter.key);
                         Adapter[] adaptersExternalSaved = await Persistence.AdapterDocument
                                 .CreateOrUpdateBatch(externalAdapters,

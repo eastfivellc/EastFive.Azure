@@ -13,9 +13,8 @@ using System.Threading.Tasks;
 
 namespace EastFive.Azure.Login
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "LoginClient",
-        Resource = typeof(Client),
         ContentType = "x-application/login-client",
         ContentTypeVersion = "0.1")]
     public struct Client : IReferenceable
@@ -37,9 +36,8 @@ namespace EastFive.Azure.Login
         public string secret;
 
         [Api.HttpPost]
-        public static async Task<HttpResponseMessage> CreateAsync(
+        public static async Task<IHttpResponse> CreateAsync(
                 [Resource]Client client,
-                Api.Azure.AzureApplication application,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onFailure)

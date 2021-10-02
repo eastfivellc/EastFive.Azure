@@ -23,7 +23,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 (why) => throw new Exception(why));
         }
 
-        // DefaultEndpointsProtocol=https;AccountName=accountName;AccountKey=9jpXXXzm6CJSg==
         public static AzureTableDriver FromStorageString(string storageString)
         {
             return storageString.MatchRegexInvoke(".*;AccountName=(?<accountName>[a-zA-Z0-9]+);AccountKey=(?<accountKey>[a-zA-Z0-9\\-\\+=\\/]+)",
@@ -36,7 +35,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 });
         }
 
-        // humagelorderowltest2
         public AzureTableDriver(string accountName, string accountKey)
         {
             this.accountName = accountName;

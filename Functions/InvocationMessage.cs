@@ -1,37 +1,36 @@
-﻿using EastFive;
-using EastFive.Extensions;
-using EastFive.Api;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Persistence;
-using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using System.Threading;
+using System.Security.Claims;
+using System.Linq.Expressions;
 using System.Web.Http;
-using EastFive.Api.Controllers;
-using EastFive.Api.Azure;
+
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Api;
+using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Persistence;
+using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Collections.Generic;
-using Microsoft.WindowsAzure.Storage.Queue;
 using EastFive.Linq.Async;
 using EastFive.Linq;
 using EastFive.Analytics;
-using System.Linq.Expressions;
 using EastFive.Api.Auth;
 using EastFive.Azure.Auth;
-using System.Net.Http.Headers;
 using EastFive.Azure.Persistence.StorageTables;
-using System.Threading;
 
 namespace EastFive.Azure.Functions
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "InvocationMessage",
-        Resource = typeof(InvocationMessage),
         ContentType = "x-application/eastfive.azure.invocation-message",
         ContentTypeVersion = "0.1")]
     [DataContract]
@@ -54,15 +53,15 @@ namespace EastFive.Azure.Functions
 
         public const string LastModifiedPropertyName = "last_modified";
         [LastModified]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         [JsonProperty]
         public DateTimeOffset lastModified;
 
         [JsonProperty]
-        [Storage]
-        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery)]
+        [StorageOverflow]
+        //[UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery, ShouldHashRowKey = true)]
         public Uri requestUri;
 
         [JsonProperty]
@@ -71,7 +70,7 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
-        [UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
+        //[UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
         public Uri referrer;
 
         public const string InvocationMessageSourcePropertyName = "InvocationMessageSource";
@@ -92,9 +91,9 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = LastExecutedPropertyName)]
         [ApiProperty(PropertyName = LastExecutedPropertyName)]
         [Storage]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         public DateTime? lastExecuted;
 
         public const string ExecutionHistoryPropertyName = "execution_history";
@@ -116,8 +115,8 @@ namespace EastFive.Azure.Functions
         #region GET
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> GetByIdAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<IHttpResponse> GetByIdAsync(
             [QueryId]IRef<InvocationMessage> invocationMessageRef,
             ContentTypeResponse<InvocationMessage> onFound,
             NotFoundResponse onNotFound)
@@ -128,12 +127,12 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> ListAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
             [HeaderLog]EastFive.Analytics.ILogger analyticsLog,
-            MultipartResponseAsync<InvocationMessage> onRun)
+            MultipartAsyncResponse<InvocationMessage> onRun)
         {
             Expression<Func<InvocationMessage, bool>> allQuery = (im) => true;
 
@@ -145,10 +144,10 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> ListByRequerUrlAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse ListByRequestUrlAsync(
             [QueryParameter(Name = "request_uri")]Uri requestUri,
-            MultipartResponseAsync<InvocationMessage> onRun)
+            MultipartAsyncResponse<InvocationMessage> onRun)
         {
             var messages = requestUri.StorageGetBy(
                 (InvocationMessage ent) => ent.requestUri);
@@ -160,29 +159,28 @@ namespace EastFive.Azure.Functions
         #region Actions
 
         [HttpAction("Invoke")]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> InvokeAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static IHttpResponse InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
                 [HeaderLog]ILogger analyticsLog,
                 InvokeApplicationDirect invokeApplication,
                 CancellationToken cancellationToken,
-                MultipartResponseAsync onRun)
+                MultipartAsyncResponse<IHttpResponse> onRun)
         {
-            var messages = await invocationMessageRefs.refs
+            var messages = invocationMessageRefs.refs
                 .Select(
                     invocationMessageRef => InvokeAsync(invocationMessageRef, invokeApplication,
                         logging:new EventLogger(analyticsLog),
                         cancellationToken: cancellationToken))
-                .AsyncEnumerable()
-                .ToArrayAsync();
-            return await onRun(messages);
+                .AsyncEnumerable();
+            return onRun(messages);
         }
 
         [HttpAction("Enqueue")]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static async Task<HttpResponseMessage> EnqueueAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static async Task<IHttpResponse> EnqueueAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
-                AzureApplication application,
+                IAzureApplication application,
             NoContentResponse onNoContent)
         {
             await SendToQueueAsync(invocationMessageRef, application);
@@ -194,8 +192,8 @@ namespace EastFive.Azure.Functions
         #region Update
 
         [Api.HttpPatch]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> UpdateByIdAsync(
+        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<IHttpResponse> UpdateByIdAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
                 [Property(Name = ExecutionLimitPropertyName)]int executionLimit,
                 // [Resource]InvocationMessage invocationMessage,
@@ -216,7 +214,7 @@ namespace EastFive.Azure.Functions
 
         #endregion
 
-        public static IEnumerableAsync<HttpResponseMessage> InvokeAsync(
+        public static IEnumerableAsync<IHttpResponse> InvokeAsync(
                 byte [] invocationMessageIdsBytes,
             IInvokeApplication invokeApplication,
             EastFive.Analytics.ILoggerWithEvents analyticsLog = default,
@@ -235,35 +233,30 @@ namespace EastFive.Azure.Functions
                 .Parallel();
         }
 
-        internal static async Task<HttpResponseMessage> CreateAsync(
-            HttpRequestMessage httpRequest, int executionLimit = 1)
+        internal static async Task<IHttpResponse> CreateAsync(
+            IHttpRequest httpRequest, int executionLimit = 1)
         {
             var invocationMessage = await httpRequest.InvocationMessageAsync(executionLimit: executionLimit);
             return await invocationMessage.StorageCreateAsync(
                 (created) =>
                 {
                     var invocationSerialized = JsonConvert.SerializeObject(invocationMessage,
-                        new EastFive.Api.Serialization.Converter());
-                    var response = new HttpResponseMessage(System.Net.HttpStatusCode.Accepted)
-                    {
-                        RequestMessage = httpRequest,
-                        ReasonPhrase = "Send to background-task message queue",
-                        Content = new StringContent(
-                            invocationSerialized, Encoding.UTF8,
-                            "x-application/eastfive-invocationmessage"),
-                    };
+                        new Api.Serialization.Converter(httpRequest));
+                    var response = new StringHttpResponse(httpRequest, System.Net.HttpStatusCode.Accepted,
+                        default, "x-application/eastfive-invocationmessage", default, 
+                        invocationSerialized, new UTF8Encoding(false));
                     return response;
                 },
                 () => throw new Exception());
         }
 
-        public Task SendToQueueAsync(AzureApplication application)
+        public Task SendToQueueAsync(IAzureApplication application)
         {
             return InvocationMessage.SendToQueueAsync(this.invocationRef, application);
         }
 
         public static Task SendToQueueAsync(IRef<InvocationMessage> invocationMessageRef,
-            AzureApplication azureApplication)
+            IAzureApplication azureApplication)
         {
             var byteContent = invocationMessageRef.id.ToByteArray();
             return EastFive.Web.Configuration.Settings.GetString(
@@ -276,7 +269,7 @@ namespace EastFive.Azure.Functions
         }
 
         public static Task SendToQueueAsync(IRefs<InvocationMessage> invocationMessageRefs,
-            AzureApplication azureApplication)
+            IAzureApplication azureApplication)
         {
             var byteContents = invocationMessageRefs.ids.Select(id => id.ToByteArray()).ToArray();
             return EastFive.Web.Configuration.Settings.GetString(
@@ -288,13 +281,14 @@ namespace EastFive.Azure.Functions
                 (why) => throw new Exception(why));
         }
 
-        public static async Task<HttpResponseMessage> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
+        public static async Task<IHttpResponse> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
             IInvokeApplication invokeApplication,
             ILoggerWithEvents logging = default,
             CancellationToken cancellationToken = default)
         {
             var scopedLogger = logging.CreateScope(invocationMessageRef.id.ToString());
             var executionResultRef = Ref<ExecutionResult>.SecureRef();
+
             var traceId = Security.SecureGuid.Generate();
             using (var messageWriter = new MessageWriter(logging, traceId, cancellationToken))
             {
@@ -304,10 +298,16 @@ namespace EastFive.Azure.Functions
                     {
                         var lastExecuted = DateTime.UtcNow;
 
+                        scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
+                        var httpRequest = new InvocationHttpRequest(invocationMessage.requestUri, cancellationToken)
+                        {
+                            Method = new HttpMethod(invocationMessage.method),
+                        };
+
                         if (ShortCircuit(out DateTime? latestExecutionSS))
                         {
                             logging.Trace($"The message {invocationMessage.id} was already executed on {latestExecutionSS}.");
-                            var responseShortCurcuit = new HttpResponseMessage(System.Net.HttpStatusCode.ExpectationFailed);
+                            var responseShortCurcuit = new HttpResponse(httpRequest, System.Net.HttpStatusCode.ExpectationFailed);
                             return await invocationMessageRef.StorageUpdateAsync(
                                 async (invocationMessageShortCircuit, saveAsync) =>
                                 {
@@ -322,13 +322,6 @@ namespace EastFive.Azure.Functions
                                 () => responseShortCurcuit);
                         }
 
-                        scopedLogger.Trace($"{invocationMessage.method.ToUpper()} {invocationMessage.requestUri}");
-                        var httpRequest = new HttpRequestMessage(
-                            new HttpMethod(invocationMessage.method),
-                            invocationMessage.requestUri);
-                        var config = new HttpConfiguration();
-                        httpRequest.SetConfiguration(config);
-
                         logging.Trace($"Message origin:[{invocationMessage.referrer}].");
                         if (invocationMessage.headers.ContainsKey(InvocationMessageSourceHeaderKey))
                         {
@@ -338,16 +331,16 @@ namespace EastFive.Azure.Functions
                         }
                         foreach (var headerKVP in invocationMessage.headers
                             .Where(headerKvp => headerKvp.Key != InvocationMessageSourceHeaderKey))
-                            httpRequest.Headers.Add(headerKVP.Key, headerKVP.Value);
+                            httpRequest.Headers.Add(headerKVP.Key, headerKVP.Value.AsArray());
                         httpRequest.Headers.Add(InvocationMessageSourceHeaderKey,
-                            invocationMessageRef.id.ToString());
+                            invocationMessageRef.id.ToString().AsArray());
 
                         if (!invocationMessage.content.IsDefaultOrNull())
                         {
                             var contentJson = System.Text.Encoding.UTF8.GetString(invocationMessage.content);
                             scopedLogger.Trace(contentJson);
-                            httpRequest.Content = new ByteArrayContent(invocationMessage.content);
-                            httpRequest.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                            httpRequest.Content = invocationMessage.content;
+                            httpRequest.SetMediaType("application/json");
                         }
 
                         var executionResult = new ExecutionResult
@@ -398,14 +391,23 @@ namespace EastFive.Azure.Functions
                                 async Task<TResult> GetContents<TResult>(
                                     Func<Guid?, DateTime, TResult> onContents)
                                 {
-                                    if (result.Content.IsDefaultOrNull())
-                                        return onContents(default, DateTime.UtcNow);
+                                    using (var stream = new MemoryStream())
+                                    {
+                                        await result.WriteResponseAsync(stream);
+                                        var contents = stream.ToArray();
 
-                                    var contents = await result.Content.ReadAsByteArrayAsync();
-                                    var whenCompleted = DateTime.UtcNow;
-                                    return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
-                                        contentBlobId => onContents(contentBlobId, whenCompleted),
-                                        contentType: result.Content.Headers.ContentType.MediaType);
+                                        if (!contents.Any())
+                                            return onContents(default, DateTime.UtcNow);
+
+                                        var whenCompleted = DateTime.UtcNow;
+                                        if(result.TryGetContentType(out string contentType))
+                                            return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
+                                                contentBlobId => onContents(contentBlobId, whenCompleted),
+                                                contentType: contentType);
+
+                                        return await contents.BlobCreateAsync("innvocationmessageexecutionresultcontents",
+                                                contentBlobId => onContents(contentBlobId, whenCompleted));
+                                    }
                                 }
                             });
 
@@ -436,7 +438,7 @@ namespace EastFive.Azure.Functions
                             return false;
                         }
                     },
-                    ResourceNotFoundException.StorageGetAsync<Task<HttpResponseMessage>>);
+                    ResourceNotFoundException.StorageGetAsync<Task<IHttpResponse>>);
             }
         }
     }

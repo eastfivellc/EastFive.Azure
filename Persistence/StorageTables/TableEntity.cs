@@ -5,8 +5,7 @@ using EastFive.Linq;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Reflection;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -138,7 +137,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             return creatableEntity;
         }
 
-        public async Task<TResult> ExecuteCreateModifiersAsync<TResult>(AzureTableDriverDynamic repository,
+        #region IAzureStorageTableEntity
+        public Task<TResult> ExecuteCreateModifiersAsync<TResult>(AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<MemberInfo[], TResult> onFailure)
         {
@@ -150,10 +150,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 throw new NotImplementedException("Please use the non-depricated StorageTableAttribute with modifier classes");
 
             return onSuccessWithRollback(
-                () => 1.AsTask());
+                () => 1.AsTask()).AsTask();
         }
 
-        public async Task<TResult> ExecuteInsertOrReplaceModifiersAsync<TResult>(AzureTableDriverDynamic repository, 
+        public Task<TResult> ExecuteInsertOrReplaceModifiersAsync<TResult>(AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<MemberInfo[], TResult> onFailure)
         {
@@ -165,10 +165,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 throw new NotImplementedException("Please use the non-depricated StorageTableAttribute with modifier classes");
 
             return onSuccessWithRollback(
-                () => 1.AsTask());
+                () => 1.AsTask()).AsTask();
         }
 
-        public async Task<TResult> ExecuteUpdateModifiersAsync<TResult>(IAzureStorageTableEntity<EntityType> current, AzureTableDriverDynamic repository,
+        public Task<TResult> ExecuteUpdateModifiersAsync<TResult>(IAzureStorageTableEntity<EntityType> current, AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<MemberInfo[], TResult> onFailure)
         {
@@ -180,10 +180,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 throw new NotImplementedException("Please use the non-depricated StorageTableAttribute with modifier classes");
 
             return onSuccessWithRollback(
-                () => 1.AsTask());
+                () => 1.AsTask()).AsTask();
         }
 
-        public async Task<TResult> ExecuteDeleteModifiersAsync<TResult>(AzureTableDriverDynamic repository,
+        public Task<TResult> ExecuteDeleteModifiersAsync<TResult>(AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<MemberInfo[], TResult> onFailure)
         {
@@ -195,7 +195,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 throw new NotImplementedException("Please use the non-depricated StorageTableAttribute with modifier classes");
 
             return onSuccessWithRollback(
-                () => 1.AsTask());
+                () => 1.AsTask()).AsTask();
         }
+
+        #endregion
     }
 }

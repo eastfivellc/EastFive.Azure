@@ -12,9 +12,8 @@ using Newtonsoft.Json;
 
 namespace EastFive.Azure.Persistence
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "StorageRow",
-        Resource = typeof(StorageRow),
         ContentType = "x-application/eastfive.azure.storage-row",
         ContentTypeVersion = "0.1")]
     [DataContract]

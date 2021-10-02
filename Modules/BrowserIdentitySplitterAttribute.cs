@@ -34,6 +34,7 @@ namespace EastFive.Azure.Auth
                    (RedirectionConfiguration[] kvps) =>
                    {
                        var redirs = kvps
+                           .NullToEmpty()
                            .Select(
                                kvp =>
                                {
@@ -45,6 +46,7 @@ namespace EastFive.Azure.Auth
                            .ToDictionary();
 
                        var lmts = kvps
+                           .NullToEmpty()
                            .Select(
                                kvp =>
                                {
@@ -62,17 +64,16 @@ namespace EastFive.Azure.Auth
 
         public float Order { get; set; }
 
-        public async Task<(Func<HttpResponseMessage, HttpResponseMessage>, Uri)> ResolveAbsoluteUrlAsync(Uri defaultUri, 
-            HttpRequestMessage request, Guid? accountIdMaybe, 
+        public async Task<(Func<IHttpResponse, IHttpResponse>, Uri)> ResolveAbsoluteUrlAsync(Uri defaultUri,
+            IHttpRequest request, Guid? accountIdMaybe,
             IDictionary<string, string> authParams)
         {
-            Func<HttpResponseMessage, HttpResponseMessage> emptyModifier = x => x;
+            Func<IHttpResponse, IHttpResponse> emptyModifier = x => x;
             if (request.Headers.IsDefaultNullOrEmpty())
                 return (emptyModifier, defaultUri);
-            var userAgents = request.Headers.UserAgent;
-            if (!userAgents.AnyNullSafe())
+            if(!request.TryGetUserAgent(out ProductInfoHeaderValue userAgent))
                 return (emptyModifier, defaultUri);
-            var userAgent = userAgents.First();
+
             var name = userAgent.Product.Name;
             var version = userAgent.Product.Version;
             return await redirections.First(
@@ -130,6 +131,7 @@ namespace EastFive.Azure.Auth
                 });
         }
 
+        
         [StorageTable]
         public struct BrowserIdentity : IReferenceable
         {

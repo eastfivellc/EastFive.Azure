@@ -1,46 +1,28 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using System.Web.Http.Routing;
-using BlackBarLabs.Api;
-using BlackBarLabs.Persistence.Azure.Attributes;
 using EastFive.Api;
-using EastFive.Api.Controllers;
+using EastFive.Api.Meta.OpenApi;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections.Generic;
 using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Security;
 using EastFive.Serialization;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
     [DataContract]
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "AccountMapping",
-        Resource = typeof(AccountMapping),
         ContentType = "x-application/auth-account-mapping",
         ContentTypeVersion = "0.1")]
-    [StorageResource(typeof(StandardPartitionKeyGenerator))]
+    [OpenApiRoute(Collection = AppSettings.Auth.OpenApiCollectionName)]
     [StorageTable]
     public struct AccountMapping : IReferenceable
     {
         [JsonIgnore]
-        public Guid id => accountMappingId;
-
-        public const string AccountMappingIdPropertyName = "id";
-        [ApiProperty(PropertyName = AccountMappingIdPropertyName)]
-        [JsonProperty(PropertyName = AccountMappingIdPropertyName)]
-        [Storage]
-        public Guid accountMappingId;
+        public Guid id => mappingId.IsNotDefaultOrNull()? mappingId.id : default(Guid);
 
         [RowKey]
         [StandardParititionKey]
@@ -50,8 +32,9 @@ namespace EastFive.Azure.Auth
             get
             {
                 var composeId = this.Method.id
-                    .ComposeGuid(this.accountId);
-                return new Ref<AccountMapping>(composeId);
+                    .ComposeGuid(this.accountId)
+                    .AsRef<AccountMapping>();
+                return composeId;
             }
             set
             {
@@ -69,7 +52,6 @@ namespace EastFive.Azure.Auth
         [Storage(Name = AccountPropertyName)]
         public Guid accountId { get; set; }
 
-        [StorageResource(typeof(StandardPartitionKeyGenerator))]
         [StorageTable]
         public struct AccountMappingLookup : IReferenceable
         {
@@ -113,7 +95,6 @@ namespace EastFive.Azure.Auth
             }
         }
 
-        [StorageResource(typeof(StandardPartitionKeyGenerator))]
         [StorageTable]
         public struct AuthorizationLookup : IReferenceable
         {
@@ -163,11 +144,11 @@ namespace EastFive.Azure.Auth
         //}
 
         [Api.HttpPost] //(MatchAllBodyParameters = false)]
-        public async static Task<HttpResponseMessage> CreateAsync(
+        public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 [Resource]AccountMapping accountMapping,
-                Api.Azure.AzureApplication application, Api.SessionToken security,
+                IAuthApplication application, Api.SessionToken security,
             CreatedResponse onCreated,
             ForbiddenResponse onForbidden,
             UnauthorizedResponse onUnauthorized,
@@ -223,13 +204,15 @@ namespace EastFive.Azure.Auth
         internal static async Task<TResult> CreateByMethodAndKeyAsync<TResult>(Authorization authorization, 
                 string externalAccountKey, Guid internalAccountId,
             Func<TResult> onCreated,
-            Func<TResult> onAlreadyMapped)
+            Func<TResult> onAlreadyMapped,
+                bool shouldRemap = false)
         {
             var accountMapping = new AccountMapping()
             {
                 accountId = internalAccountId,
             };
             accountMapping.Method = authorization.Method; // method is used in the .mappingId
+            accountMapping.authorization = authorization.authorizationRef;
             var authorizationLookup = new AuthorizationLookup
             {
                 accountMappingRef = accountMapping.mappingId,
@@ -252,17 +235,39 @@ namespace EastFive.Azure.Auth
                 accountMappingId = accountMapping.mappingId,
                 Method = authorization.Method,
             };
-            accountMapping.accountMappingLookup = await lookup.StorageCreateAsync(
-                (discard) => new RefOptional<AccountMappingLookup>(
-                    lookup.accountMappingLookupId),
-                () => new RefOptional<AccountMappingLookup>());
+            accountMapping.accountMappingLookup = await await lookup.StorageCreateAsync(
+                (discard) => lookup.accountMappingLookupId.Optional().AsTask(),
+                async () =>
+                {
+                    if (!shouldRemap)
+                        return RefOptional<AccountMappingLookup>.Empty();
+                    return await lookup.accountMappingLookupId.StorageCreateOrUpdateAsync(
+                        async (created, lookupToUpdate, saveAsync) =>
+                        {
+                            lookupToUpdate.accountMappingId = accountMapping.mappingId;
+                            await saveAsync(lookupToUpdate);
+                            return lookupToUpdate.accountMappingLookupId.Optional();
+                        });
+                });
 
-            return await accountMapping.StorageCreateAsync(
+            return await await accountMapping.StorageCreateAsync(
                 createdId =>
                 {
-                    return onCreated();
+                    return onCreated().AsTask();
                 },
-                () => onAlreadyMapped());
+                async () =>
+                {
+                    if (!shouldRemap)
+                        return onAlreadyMapped();
+                    return await accountMapping.mappingId.StorageCreateOrUpdateAsync(
+                        async (created, mapping, saveAsync) =>
+                        {
+                            mapping.accountMappingLookup = accountMapping.accountMappingLookup;
+                            mapping.authorization = accountMapping.authorization;
+                            await saveAsync(mapping);
+                            return onCreated();
+                        });
+                });
         }
     
 

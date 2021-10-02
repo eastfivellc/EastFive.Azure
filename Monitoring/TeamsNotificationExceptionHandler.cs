@@ -1,9 +1,4 @@
-﻿using EastFive.Api;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Web.Configuration;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -11,6 +6,16 @@ using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+
+using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Api;
+using EastFive.Api.Core;
+using EastFive.Linq;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -31,53 +36,91 @@ namespace EastFive.Azure.Monitoring
                 () => true);
         }
 
-        public async Task<HttpResponseMessage> HandleExceptionAsync(Exception ex, 
+        public async Task<IHttpResponse> HandleExceptionAsync(Exception ex, 
             MethodInfo method, KeyValuePair<ParameterInfo, object>[] queryParameters, 
-            IApplication httpApp, HttpRequestMessage request,
+            IApplication httpApp, IHttpRequest routeData,
             HandleExceptionDelegate continueExecution)
         {
             if (deactivated)
                 return await continueExecution(ex, method, queryParameters,
-                    httpApp, request);
-            
-            var message = await CreateMessageCardAsync(ex, method, httpApp, request);
-            string response = await message.SendAsync(teamsHookUrl);
+                        httpApp, routeData);
+
+            var message = await CreateMessageCardAsync(ex, method, httpApp, routeData);
+            try
+            {
+                var response = await message.SendAsync(teamsHookUrl);
+            } catch (HttpRequestException)
+            {
+
+            }
             return await continueExecution(ex, method, queryParameters,
-                httpApp, request);
+                httpApp, routeData);
         }
 
-        public async Task<HttpResponseMessage> HandleRouteAsync(Type controllerType,
-            IApplication httpApp, HttpRequestMessage request, string routeName,
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType,
+            IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
-            var response = await continueExecution(controllerType, httpApp, request, routeName);
+            var response = await continueExecution(controllerType, httpApp, request);
             if (deactivated)
                 return response;
+
+            string teamsNotifyParam = GetTeamsNotifyParameter();
             
-            bool HasReportableError() => 
-                ((int)response.StatusCode) >= 400 && 
-                response.StatusCode != System.Net.HttpStatusCode.Unauthorized;
+            if (!ShouldNotify())
+                return response;
 
-            string teamsNotifyParam = default;
-            if (request.Headers.Contains("X-Teams-Notify"))
+            try
             {
-                var teamsNotifyParams = request.Headers.GetValues("X-Teams-Notify");
-                if (teamsNotifyParams.Any())
-                    teamsNotifyParam = teamsNotifyParams.First();
+                string messageId = await TeamsNotifyAsync(response, teamsNotifyParam,
+                    httpApp, request);
+            } catch(HttpRequestException)
+            {
+
             }
-            bool RequestTeamsNotify() => teamsNotifyParam != default;
-
-            if (HasReportableError() || RequestTeamsNotify())
-                await TeamsNotifyAsync(response, teamsNotifyParam, httpApp, request, routeName);
-
             return response;
+
+            string GetTeamsNotifyParameter()
+            {
+                return request.Headers
+                    .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase))
+                    .First(
+                        (teamsNotifyParams, next) =>
+                        {
+                            return teamsNotifyParams.Value.First(
+                                (teamsNotifyParam, next) => teamsNotifyParam,
+                                () => default(string));
+                        },
+                        () => default(string));
+            }
+
+            bool HasReportableError()
+            {
+                if (((int)response.StatusCode) < 400)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return false;
+                if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                    return false;
+                return true;
+            }
+
+            bool RequestTeamsNotify() => teamsNotifyParam != default;
+            bool ShouldNotify()
+            {
+                if (RequestTeamsNotify())
+                    return true;
+                if (HasReportableError())
+                    return true;
+                return false;
+            }
         }
 
-        public async Task<string> TeamsNotifyAsync(HttpResponseMessage response, string teamsNotifyParam,
-            IApplication httpApp, HttpRequestMessage request, string routeName)
+        public async Task<string> TeamsNotifyAsync(IHttpResponse response, string teamsNotifyParam,
+            IApplication httpApp, IHttpRequest request)
         {
             var message = await CreateMessageCardAsync(
-                teamsNotifyParam ?? string.Empty, $"{routeName} = {response.StatusCode} / {response.ReasonPhrase}", 
+                teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
                 httpApp, request,
                 () => new MessageCard.Section
                 {
@@ -88,33 +131,34 @@ namespace EastFive.Azure.Monitoring
                         new MessageCard.Section.Fact
                         {
                             name = "Route Name:",
-                            value = routeName,
+                            value = "TODO",
                         },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Http Method:",
-                            value = request.Method.Method,
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "URL:",
-                            value = request.RequestUri.OriginalString,
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Status Code:",
-                            value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Reason:",
-                            value = response.ReasonPhrase,
-                        },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Http Method:",
+                                    value = request.Method.Method,
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "URL:",
+                                    value = request.GetAbsoluteUri().OriginalString,
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Status Code:",
+                                    value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                                },
+                                new MessageCard.Section.Fact
+                                {
+                                    name = "Reason:",
+                                    value = response.ReasonPhrase,
+                                },
                     }
                 });
-            
+
             return await message.SendAsync(teamsHookUrl);
         }
+
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
         //        KeyValuePair<ParameterInfo, object>[] queryParameters,
@@ -154,9 +198,11 @@ namespace EastFive.Azure.Monitoring
         //}
 
         private static async Task<MessageCard> CreateMessageCardAsync(Exception ex, MethodInfo method,
-            IApplication httpApp, HttpRequestMessage request)
+            IApplication httpApp, IHttpRequest request)
         {
-            var messageCard = await CreateMessageCardAsync(method, ex.Message, summary:"Server Exception", httpApp, request);
+       
+            var messageCard = await CreateMessageCardAsync(method, ex.Message,
+                summary:"Server Exception", httpApp, request);
 
             var stackTrackSection = new MessageCard.Section
             {
@@ -205,7 +251,7 @@ namespace EastFive.Azure.Monitoring
 
         private static Task<MessageCard> CreateMessageCardAsync(MethodInfo method,
              string title, string summary,
-             IApplication httpApp, HttpRequestMessage request)
+             IApplication httpApp, IHttpRequest request)
         {
             return CreateMessageCardAsync(title, summary, httpApp, request,
                 () => new MessageCard.Section
@@ -232,7 +278,7 @@ namespace EastFive.Azure.Monitoring
                             new MessageCard.Section.Fact
                             {
                                 name = "URL",
-                                value = request.RequestUri.OriginalString,
+                                value = request.GetAbsoluteUri().OriginalString,
                             },
                             new MessageCard.Section.Fact
                             {
@@ -245,7 +291,7 @@ namespace EastFive.Azure.Monitoring
 
         private static async Task<MessageCard> CreateMessageCardAsync(
              string title, string summary,
-             IApplication httpApp, HttpRequestMessage request,
+             IApplication httpApp, IHttpRequest request,
              Func<MessageCard.Section> getRequestInformation)
         {
             var appName = AppSettings.ApplicationInsights.TeamsAppIdentification
@@ -256,14 +302,10 @@ namespace EastFive.Azure.Monitoring
                 .ConfigurationString(
                     x => new Uri(x),
                     (why) => default);
-            var content = string.Empty;
-            if (!request.Content.IsDefaultOrNull())
-            {
-                //var contentData = await request.Content.ReadAsByteArrayAsync();
-                content = await request.Content.ReadAsStringAsync();
-            }
-            var utcOffset = TimeZoneInfo
-                .FindSystemTimeZoneById("Central Standard Time")
+            var content = await ReadContentAsync();
+
+            var utcOffset = "Central Standard Time"
+                .FindSystemTimeZone()
                 .GetUtcOffset(DateTime.UtcNow);
 
             var sections = new MessageCard.Section[]
@@ -389,7 +431,25 @@ namespace EastFive.Azure.Monitoring
                 }
             };
             return message;
-        }
 
+            async Task<string> ReadContentAsync()
+            {
+                if (!request.HasBody) 
+                    return string.Empty;
+
+                try
+                {
+                    if (request.RequestHeaders.ContentType.IsTextType())
+                        return await request.ReadContentAsStringAsync();
+
+                    var byteContent = await request.ReadContentAsync();
+                    return byteContent.ToBase64String();
+                }
+                catch (Exception)
+                {
+                    return string.Empty;
+                }
+            }
+        }
     }
 }

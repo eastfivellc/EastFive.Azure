@@ -7,10 +7,9 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.RetryPolicies;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
 using EastFive;
 using EastFive.Linq;
@@ -20,34 +19,41 @@ using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using BlackBarLabs.Extensions;
-using BlackBarLabs.Web;
+using EastFive.Web.Configuration;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
     public partial class AzureStorageRepository : EastFive.Azure.StorageTables.Driver.AzureStorageDriver
     {
         public readonly CloudTableClient TableClient;
-        public readonly CloudBlobClient BlobClient;
+        public readonly BlobServiceClient BlobClient;
         private const int retryHttpStatus = 200;
 
         private readonly Exception retryException = new Exception();
 
-        public AzureStorageRepository(CloudStorageAccount storageAccount)
+        public AzureStorageRepository(CloudStorageAccount storageAccount,
+            string connectionString)
         {
             TableClient = storageAccount.CreateCloudTableClient();
             TableClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
 
-            BlobClient = storageAccount.CreateCloudBlobClient();
-            BlobClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
+            BlobClient = new BlobServiceClient(connectionString,
+                new BlobClientOptions
+                {
+                    // Retry = new global::Azure.Core.RetryOptions()
+                });
         }
 
         public static AzureStorageRepository CreateRepository(
             string storageSettingConfigurationKeyName)
         {
-            var storageSetting = ConfigurationContext.Instance.AppSettings[storageSettingConfigurationKeyName];
-            var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);
-            var azureStorageRepository = new AzureStorageRepository(cloudStorageAccount);
-            return azureStorageRepository;
+            return storageSettingConfigurationKeyName.ConfigurationString(
+                connectionString =>
+                {
+                    var cloudStorageAccount = CloudStorageAccount.Parse(connectionString);
+                    var azureStorageRepository = new AzureStorageRepository(cloudStorageAccount, connectionString);
+                    return azureStorageRepository;
+                });
         }
 
         #region Blob methods
@@ -61,27 +67,32 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             try
             {
                 var blockId = id.AsRowKey();
-                var container = BlobClient.GetContainerReference(containerReference);
-                if (!container.Exists())
-                    return await SaveBlobAsync(containerReference, id, data, new Dictionary<string, string>(), contentType, success, failure);
+                var container = BlobClient.GetBlobContainerClient(containerReference);
+                if (!await container.ExistsAsync())
+                    return await SaveBlobAsync(containerReference, id, data,
+                        metadata,
+                        contentType, success, failure);
 
-                var blockBlob = container.GetBlockBlobReference(blockId);
-                if (blockBlob.Exists())
+                var blockBlob = container.GetBlobClient(blockId);
+                if (await blockBlob.ExistsAsync())
                     return blobAlreadyExists();
-
-                foreach (var item in metadata)
-                {
-                    blockBlob.Metadata[item.Key] = item.Value;
-                }
-                if (metadata.Count > 0)
-                    await blockBlob.SetMetadataAsync();
-
-                return await SaveBlobAsync(containerReference, id, data, new Dictionary<string, string>(), contentType, success, failure);
+                
+                return await SaveBlobAsync(containerReference, id, data,
+                    metadata,
+                    contentType, success, failure);
             }
             catch (Exception ex)
             {
                 return failure(ex.Message);
             }
+        }
+
+        async Task<BlobClient> GetBlobClientAsync(string containerReference, string blockId)
+        {
+            var container = BlobClient.GetBlobContainerClient(containerReference);
+            var createResponse = await container.CreateIfNotExistsAsync();
+            //global::Azure.ETag created = createResponse.Value.ETag;
+            return container.GetBlobClient(blockId);
         }
 
         public async Task<TResult> SaveBlobAsync<TResult>(string containerReference, Guid id, byte[] data,
@@ -92,23 +103,19 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             try
             {
                 var blockId = id.AsRowKey();
-                var container = BlobClient.GetContainerReference(containerReference);
-                container.CreateIfNotExists();
-                var blockBlob = container.GetBlockBlobReference(blockId);
+                var blockClient = await GetBlobClientAsync(containerReference, blockId);
 
-                await blockBlob.UploadFromByteArrayAsync(data, 0, data.Length);
-
-                foreach (var item in metadata)
+                using (var stream = new MemoryStream(data))
                 {
-                    blockBlob.Metadata[item.Key] = item.Value;
-                }
-                if (metadata.Count > 0)
-                    await blockBlob.SetMetadataAsync();
-
-                if (!string.IsNullOrEmpty(contentType))
-                {
-                    blockBlob.Properties.ContentType = contentType;
-                    await blockBlob.SetPropertiesAsync();
+                    await blockClient.UploadAsync(stream, 
+                        new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+                        {
+                            Metadata = metadata,
+                            HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                            {
+                                ContentType = contentType,
+                            }
+                        });
                 }
 
                 return success();
@@ -126,12 +133,17 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         {
             try
             {
-                var container = BlobClient.GetContainerReference(containerReference);
-                bool created = await container.CreateIfNotExistsAsync();
                 var blockId = id.AsRowKey();
-                var blob = await container.GetBlobReferenceFromServerAsync(blockId);
-                var returnStream = await blob.OpenReadAsync();
-                return success(returnStream, blob.Properties, blob.Metadata);
+                var blockClient = await GetBlobClientAsync(containerReference, blockId);
+                var returnStream = await blockClient.OpenReadAsync(
+                    new BlobOpenReadOptions(true)
+                    {
+                        Conditions = new BlobRequestConditions()
+                        {
+                        }
+                    });
+                var properties = await blockClient.GetPropertiesAsync();
+                return success(returnStream, properties.Value, properties.Value.Metadata);
             }
             catch (StorageException storageEx)
             {
@@ -164,11 +176,10 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         {
             try
             {
-                var container = BlobClient.GetContainerReference(containerReference);
-                bool created = await container.CreateIfNotExistsAsync();
                 var blockId = id.AsRowKey();
-                var blob = await container.GetBlobReferenceFromServerAsync(blockId);
-                return success(blob.Properties, blob.Metadata);
+                var blockClient = await GetBlobClientAsync(containerReference, blockId);
+                var properties = await blockClient.GetPropertiesAsync();
+                return success(properties.Value, properties.Value.Metadata);
             }
             catch (StorageException storageEx)
             {
@@ -200,11 +211,9 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         {
             try
             {
-                var container = BlobClient.GetContainerReference(containerReference);
-                bool created = await container.CreateIfNotExistsAsync();
                 var blockId = id.AsRowKey();
-                var blob = container.GetBlobReference(blockId);
-                var result = await blob.DeleteIfExistsAsync();
+                var blockClient = await GetBlobClientAsync(containerReference, blockId);
+                var result = await blockClient.DeleteIfExistsAsync();
 
                 return onSuccess();
             }
@@ -757,7 +766,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         {
                             var innerException = ex.InnerException as System.Net.WebException;
                             var responseContentStream = innerException.Response.GetResponseStream();
-                            var responseContentBytes = responseContentStream.ToBytes();
+                            var responseContentBytes = await responseContentStream.ToBytesAsync();
                             var responseString = responseContentBytes.ToText();
                             throw new Exception(responseString);
                         }

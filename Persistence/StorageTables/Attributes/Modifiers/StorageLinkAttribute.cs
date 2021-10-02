@@ -9,8 +9,7 @@ using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,7 +58,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onMissing: () => new RowKeyPrefixAttribute());
             return repository
                 .FindByIdAsync<StorageLookupTable, IEnumerableAsync<IRefAst>>(rowKey, partitionKey,
-                    (dictEntity, etag) =>
+                    (dictEntity, tableResult) =>
                     {
                         var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
                             .NullToEmpty()
@@ -70,6 +69,37 @@ namespace EastFive.Persistence.Azure.StorageTables
                     () => EnumerableAsync.Empty<IRefAst>(),
                     tableName: tableName)
                 .FoldTask();
+        }
+
+        public Task<TResult> GetLookupInfoAsync<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<string, DateTime, int, TResult> onEtagLastModifedFound,
+            Func<TResult> onNoLookupInfo)
+        {
+            if (queries.IsDefaultNullOrEmpty())
+                throw new ArgumentException("Exactly one query param is required for StorageLinkAttribute.");
+            if (queries.Length != 1)
+                throw new ArgumentException("Exactly one query param is valid for StorageLinkAttribute.");
+
+            var tableName = GetLookupTableName(memberInfo);
+            var memberValue = queries.First().Value;
+            var queryMemberInfo = queries.First().Key;
+            var rowKey = queryMemberInfo.StorageComputeRowKey(memberValue,
+                onMissing: () => new RowKeyAttribute());
+            var partitionKey = queryMemberInfo.StorageComputePartitionKey(memberValue, rowKey,
+                onMissing: () => new RowKeyPrefixAttribute());
+            return repository.FindByIdAsync<StorageLookupTable, TResult>(
+                    rowKey, partitionKey,
+                (dictEntity, tableResult) =>
+                {
+                    return onEtagLastModifedFound(tableResult.Etag,
+                        dictEntity.lastModified,
+                        dictEntity.rowAndPartitionKeys
+                            .NullToEmpty().Count());
+                },
+                () => onNoLookupInfo(),
+                tableName: tableName);
         }
 
         public Task<PropertyLookupInformation[]> GetInfoAsync(
@@ -86,6 +116,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             [ParititionKey]
             public string partitionKey;
+
+            [LastModified]
+            public DateTime lastModified;
 
             [Storage]
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
@@ -167,7 +200,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                         fieldToModifyFieldInfo.SetValue(ref entity, valueMutated);
 
-                        await saveAsync(entity);
+                        var result = await saveAsync(entity);
                         Func<Task> rollback =
                             async () =>
                             {
@@ -242,6 +275,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onFailure);
         }
 
+        public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,
@@ -252,10 +292,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onFailure().AsTask();
         }
 
-        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
@@ -278,6 +317,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 repository,
                 onSuccessWithRollback,
                 onFailure);
+        }
+
+        public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
         }
     }
 }

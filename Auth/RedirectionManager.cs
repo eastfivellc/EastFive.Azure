@@ -15,19 +15,21 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
-using Microsoft.WindowsAzure.Storage;
-using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
-    [FunctionViewController6(
+    [FunctionViewController(
         Route = "RedirectionManager",
-        Resource = typeof(RedirectionManager),
         ContentType = "x-application/auth-redirection-manager",
         ContentTypeVersion = "0.1")]
     public struct RedirectionManager : IReferenceable
     {
+        #region Properties
+
+        #region Base
+
         [JsonIgnore]
         public Guid id => redirectionManagerRef.id;
 
@@ -37,6 +39,8 @@ namespace EastFive.Azure.Auth
         [RowKey]
         [StandardParititionKey]
         public IRef<RedirectionManager> redirectionManagerRef;
+
+        #endregion
 
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
@@ -62,16 +66,22 @@ namespace EastFive.Azure.Auth
         [Storage]
         public Uri redirection { get; set; }
 
+        #endregion
+
+        #region HTTP Methods
+
+        #region GET
+
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public async static Task<HttpResponseMessage> GetAllSecureAsync(
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public async static Task<IHttpResponse> GetAllSecureAsync(
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
                 [OptionalQueryParameter(Name = "search")]string search,
                 [OptionalQueryParameter(Name = "months")]int? monthsMaybe,
                 AzureApplication application,
                 EastFive.Api.Security security,
-                HttpRequestMessage request,
+                IHttpRequest request,
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure,
@@ -213,14 +223,15 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        [RequiredClaim(Microsoft.IdentityModel.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        public static Task<HttpResponseMessage> GetRedirection(
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static Task<IHttpResponse> GetRedirection(
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
                 AzureApplication application,
                 IInvokeApplication endpoints,
                 EastFive.Api.Security security,
-                HttpRequestMessage request,
+                IHttpRequest request,
             RedirectResponse onRedirection,
+            NotFoundResponse onNotFound,
             GeneralFailureResponse onFailure,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure)
@@ -276,45 +287,50 @@ namespace EastFive.Azure.Auth
                     authorization.expired = false;
                     await saveAsync(authorization);
                     return onRedirection(url);
-                });
+                },
+                () => onNotFound());
         }
 
-        //[Api.HttpGet]
-        //public static async Task<HttpResponseMessage> GetAllSecureAsync(
-        //        [QueryParameter(Name = "ApiKeySecurity")]ApiSecurity apiSecurity,
-        //        [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
-        //        AzureApplication application,
-        //        IInvokeApplication endpoints,
-        //        HttpRequestMessage request,
-        //    MultipartResponseAsync<Authorization> onContent,
-        //    RedirectResponse onSuccess,
-        //    NotFoundResponse onNotFound,
-        //    ForbiddenResponse onFailure)
-        //{
-        //    return await await authorizationRef.StorageGetAsync(
-        //        async authorization =>
-        //        {
-        //            return await await Method.ById(authorization.Method, application,
-        //                async method =>
-        //                {
-        //                    return await await method.ParseTokenAsync(authorization.parameters, application,
-        //                        (externalId, loginProvider) =>
-        //                        {
-        //                            return Auth.Redirection.ProcessAsync(authorization,
-        //                                    async updatedAuth =>
-        //                                    {
+        [Api.HttpGet]
+        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        public static async Task<IHttpResponse> GetAllSecureAsync(
+                [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
+                AzureApplication application,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
+            MultipartAsyncResponse<Authorization> onContent,
+            RedirectResponse onSuccess,
+            NotFoundResponse onNotFound,
+            ForbiddenResponse onFailure)
+        {
+            return await await authorizationRef.StorageGetAsync(
+                async authorization =>
+                {
+                    return await await Method.ById(authorization.Method, application,
+                        async method =>
+                        {
+                            return await await method.ParseTokenAsync(authorization.parameters, application,
+                                (externalId, loginProvider) =>
+                                {
+                                    return Auth.Redirection.ProcessAsync(authorization,
+                                            async updatedAuth =>
+                                            {
 
-        //                                    }, method, externalId, authorization.parameters,
-        //                                    application, request, endpoints, loginProvider, request.RequestUri,
-        //                                (uri, accountIdMaybe, modifier) => onSuccess(uri),
-        //                                (why) => onFailure().AddReason(why),
-        //                                application.Telemetry);
-        //                        },
-        //                        why => onFailure().AddReason(why).AsTask());
-        //                },
-        //                () => onFailure().AddReason("Method no longer supported").AsTask());
-        //        },
-        //        () => onNotFound().AsTask());
-        //}
+                                            }, method, externalId, authorization.parameters,
+                                            application, request, endpoints, loginProvider, request.RequestUri,
+                                        (uri, accountIdMaybe, modifier) => onSuccess(uri),
+                                        (why) => onFailure().AddReason(why),
+                                        application.Telemetry);
+                                },
+                                why => onFailure().AddReason(why).AsTask());
+                        },
+                        () => onFailure().AddReason("Method no longer supported").AsTask());
+                },
+                () => onNotFound().AsTask());
+        }
+
+        #endregion
+
+        #endregion
     }
 }
