@@ -35,6 +35,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [JsonProperty(PropertyName = IdPropertyName)]
         [RowKey]
         [StandardParititionKey]
+        [ResourceIdentifier]
         public IRef<VoucherToken> voucherTokenRef;
 
         [LastModified]
@@ -44,6 +45,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [Storage(Name = KeySignaturePropertyName)]
         [ApiProperty(PropertyName = KeySignaturePropertyName)]
         [JsonProperty(PropertyName = KeySignaturePropertyName)]
+        [ResourceTitle]
         public string keySignature { get; set; }
 
         public const string DescriptionPropertyName = "description";
@@ -84,11 +86,22 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
         #region Http Methods
 
+        [EastFive.Api.Meta.Flows.WorkflowStep(
+            StepName = "Get Voucher Token",
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 5.0)]
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
+                [Api.Meta.Flows.WorkflowNewId]
                 [Property(Name = IdPropertyName)]IRef<VoucherToken> voucherTokenRef,
+                
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{XAuthorization}}")]
                 [PropertyOptional(Name = AuthIdPropertyName)]Guid? authorizationIdMaybe,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "PFJTQ...1ZT4=")]
                 [Property(Name = KeyPropertyName)] string key,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{$randomDateFuture}}")]
                 [Property(Name = ExpirationPropertyName)] DateTime expiration,
                 [Resource] VoucherToken voucherToken,
             CreatedBodyResponse<VoucherToken> onCreated,
