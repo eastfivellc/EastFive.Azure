@@ -1164,11 +1164,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
-<<<<<<< HEAD
-            Func<TResult> onSuccess,
-=======
             Func<TEntity, TResult> onDeleted,
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             where TEntity : IReferenceable
@@ -1179,15 +1175,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         rowKey,
                         entityRef.StorageComputePartitionKey(rowKey),
-<<<<<<< HEAD
-                    onSuccess,
-                    onNotFound,
-                    onFailure);
-=======
                     onDeleted,
                     onNotFound,
                     onFailure:onFailure);
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
         }
 
         public static Task<TResult> StorageDeleteIfAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
@@ -1203,22 +1193,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         rowKey, partitionKey,
                     (entity, deleteAsync) => onFound(entity, () => deleteAsync()),
-<<<<<<< HEAD
-                    onNotFound,
-=======
                     onNotFound, 
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                     onFailure);
         }
 
         public static Task<TResult> StorageDeleteIfAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
             Func<TEntity, Func<Task>, Task<TResult>> onFound,
             Func<TResult> onNotFound = default,
-<<<<<<< HEAD
              Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
-=======
-            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
             where TEntity : IReferenceable
         {
             var rowKey = entityQuery.StorageComputeRowKey();
@@ -1228,9 +1210,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         rowKey, partitionKey,
                     (entity, deleteAsync) => onFound(entity, () => deleteAsync()),
-<<<<<<< HEAD
-                    onNotFound, onFailure);
-=======
                     onNotFound,
                     onFailure);
         }
@@ -1258,18 +1237,13 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         return onFound(entity);
                     },
                     onNotFound: onDoesNotExists);
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
         }
 
         public static Task<TResult> StorageDeleteAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
                 string partitionKey,
             Func<TResult> onSuccess,
             Func<TResult> onNotFound = default,
-<<<<<<< HEAD
-             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
-=======
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
             where TEntity : struct, IReferenceable
         {
             return AzureTableDriverDynamic
@@ -1277,15 +1251,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .DeleteAsync<TEntity, TResult>(
                         entityRef.StorageComputeRowKey(),
                         partitionKey,
-<<<<<<< HEAD
-                    onSuccess,
-                    onNotFound,
-                    onFailure);
-=======
                     (discard) => onSuccess(),
                     onNotFound,
                     onFailure:onFailure);
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
         }
 
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<IRef<TEntity>> entityRefs,
@@ -1481,14 +1449,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         Func<Task> rollback = (() =>
                         {
                             return driver.DeleteAsync<TEntity, bool>(tableEntity.RowKey, tableEntity.PartitionKey,
-<<<<<<< HEAD
-                                () => true,
-                                () => false,
-                                (codes, why) => false);
-=======
                                 (discard) => true,
-                                () => false);
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
+                                onNotFound: () => false,
+                                onModified: (updatedEntity, saveNewEntity) => false.AsTask(),
+                                onFailure: (codes, why) => false);
                         });
                         return rollback.TransactionResultSuccess<TResult>();
                     },

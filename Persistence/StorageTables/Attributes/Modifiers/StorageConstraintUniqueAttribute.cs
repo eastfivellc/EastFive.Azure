@@ -179,11 +179,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-<<<<<<< HEAD
-                                    (codes, why) => false,
-=======
                                     onFailure:(codes, why) => false,
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -242,11 +238,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-<<<<<<< HEAD
-                                    (codes, why) => false,
-=======
                                     onFailure: (codes, why) => false,
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
@@ -315,11 +307,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return await repository.DeleteAsync<StorageLookupTable, bool>(hashRowKey, hashPartitionKey,
                                     (discard) => true,
                                     () => false,
-<<<<<<< HEAD
-                                    (codes, why) => false,
-=======
                                     onFailure: (codes, why) => false,
->>>>>>> 7bbbeded33b3702dce64905244a4b0a5c410124d
                                     tableName: tableName);
                         };
                     return onSuccessWithRollback(rollback);
