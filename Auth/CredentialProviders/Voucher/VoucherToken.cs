@@ -103,7 +103,17 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{$randomDateFuture}}")]
                 [Property(Name = ExpirationPropertyName)] DateTime expiration,
+
+                [Api.Meta.Flows.WorkflowObjectParameter(
+                    Key0 ="http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                    Value0 = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role?id=fb7f557f458c4eadb08652c4a7315fd6",
+                    Key1 = "http://schemas.xmlsoap.org/ws/2009/09/identity/claims/actor",
+                    Value1 = "{{Account}}")]
+                [Property(Name = ClaimsPropertyName)] Dictionary<string, string> extraClaims,
+
                 [Resource] VoucherToken voucherToken,
+
+            [Api.Meta.Flows.WorkflowVariable(Workflows.AuthorizationFlow.Variables.ApiVoucher, TokenPropertyName)]
             CreatedBodyResponse<VoucherToken> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onFailure)
@@ -125,6 +135,13 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                             .Distinct(kvp => kvp.Key)
                             .ToDictionary();
                     }
+
+                    voucherToken.claims = voucherToken.claims
+                            .NullToEmpty()
+                            .Concat(extraClaims.NullToEmpty())
+                            .Distinct(kvp => kvp.Key)
+                            .ToDictionary();
+
                     return voucherToken.StorageCreateAsync(
                         createdId => onCreated(voucherToken),
                         () => onAlreadyExists());

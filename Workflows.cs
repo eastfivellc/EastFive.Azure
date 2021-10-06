@@ -15,6 +15,7 @@ namespace EastFive.Azure
             {
                 public const string TokenName = "TOKEN";
                 public const string AuthHeaderName = "AuthorizationHeaderName";
+                public const string ApiVoucher = "ApiVoucher";
             }
         }
     }
