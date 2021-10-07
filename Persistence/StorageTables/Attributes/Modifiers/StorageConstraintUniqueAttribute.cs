@@ -254,17 +254,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                 tableName: tableName);
         }
 
-        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo, 
-                string rowKeyRef, string partitionKeyRef, 
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated, 
+        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+                IAzureStorageTableEntity<TEntity> updatedEntity,
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
+            var valueExisting = existingEntity.Entity;
             var existingRowKey = valueExisting.StorageGetRowKey();
             var existingPartitionKey = valueExisting.StorageGetPartitionKey();
 
+            var valueUpdated = updatedEntity.Entity;
+            var rowKeyRef = updatedEntity.RowKey;
+            var partitionKeyRef = updatedEntity.PartitionKey;
+            var dictionaryExisting = existingEntity.WriteEntity(null);
             if (IsIgnored(memberInfo, valueUpdated))
             {
                 if (IsIgnored(memberInfo, valueExisting))

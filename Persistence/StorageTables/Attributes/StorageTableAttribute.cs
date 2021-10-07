@@ -388,9 +388,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         (memberInfo, storageModifier) =>
                         {
                             return storageModifier.ExecuteUpdateAsync(memberInfo,
-                                this.RowKey, this.PartitionKey,
-                                current.Entity, current.WriteEntity(null),
-                                this.Entity, this.WriteEntity(null),
+                                this, current,
                                 repository,
                                 rollback =>
                                 {

@@ -930,7 +930,6 @@ namespace EastFive.Azure.Synchronization
             return CreateOrUpdateInternalExternalConnection(resourceIdInternal.ToString("N"), resourceKeyExternal, externalSystemIntegrationId, resourceType, onSuccess);
         }
 
-
         public static Task<TResult> CreateOrUpdateConnection<TResult>(Guid resourceIdInternal,
             string resourceKeyExternal, Guid externalSystemIntegrationId,
             string resourceType,
@@ -1007,17 +1006,17 @@ namespace EastFive.Azure.Synchronization
                             adapterExternalId = adapterExternal.adapterId,
                             synchronizationMethod = method,
                         };
-                        return adapterInternal.PairWithValue(adapterExternal).PairWithValue(connector);
+                        return (connector, adapterInternal, adapterExternal);
                     });
 
             var connectors = resourceIdKeyConnections
-                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Value); // Get connectors
+                .Select(resourceIdKeyConnection => resourceIdKeyConnection.connector); // Get connectors
             return Persistence.ConnectorDocument.CreateBatch(connectors, method)
                 .JoinTask(
                     async () =>
                     {
                         var adaptersInternal = resourceIdKeyConnections
-                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Key.Key) // Get internal adapters
+                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.adapterInternal) // Get internal adapters
                                 .Distinct(internalAdapter => internalAdapter.key);
                         Adapter[] adaptersInternalSaved = await Persistence.AdapterDocument
                             .CreateOrUpdateBatch(adaptersInternal, defaultInternalIntegrationId, resourceType)
@@ -1027,7 +1026,7 @@ namespace EastFive.Azure.Synchronization
                     async () =>
                     {
                         var externalAdapters = resourceIdKeyConnections
-                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.Key.Value) // Get external adapters
+                                .Select(resourceIdKeyConnection => resourceIdKeyConnection.adapterExternal) // Get external adapters
                                 .Distinct(externalAdapter => externalAdapter.key);
                         Adapter[] adaptersExternalSaved = await Persistence.AdapterDocument
                                 .CreateOrUpdateBatch(externalAdapters,

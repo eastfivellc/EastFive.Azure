@@ -27,9 +27,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onFailure);
         
         Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
-                string rowKeyRef, string partitionKeyRef,
-                TEntity valueExisting, IDictionary<string, EntityProperty> dictionaryExisting,
-                TEntity valueUpdated, IDictionary<string, EntityProperty> dictionaryUpdated,
+                IAzureStorageTableEntity<TEntity> updatedEntity, 
+                IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure);

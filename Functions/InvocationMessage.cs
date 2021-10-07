@@ -53,15 +53,15 @@ namespace EastFive.Azure.Functions
 
         public const string LastModifiedPropertyName = "last_modified";
         [LastModified]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         [JsonProperty]
         public DateTimeOffset lastModified;
 
         [JsonProperty]
         [StorageOverflow]
-        [UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery, ShouldHashRowKey = true)]
+        //[UrlMD5Lookup(Characters = 3, Components = UriComponents.PathAndQuery, ShouldHashRowKey = true)]
         public Uri requestUri;
 
         [JsonProperty]
@@ -70,7 +70,7 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
-        [UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
+        //[UrlMD5Lookup(Characters = 3, Components = UriComponents.AbsoluteUri)]
         public Uri referrer;
 
         public const string InvocationMessageSourcePropertyName = "InvocationMessageSource";
@@ -91,9 +91,9 @@ namespace EastFive.Azure.Functions
         [JsonProperty(PropertyName = LastExecutedPropertyName)]
         [ApiProperty(PropertyName = LastExecutedPropertyName)]
         [Storage]
-        [DateTimeLookup(
-            Partition = TimeSpanUnits.days,
-            Row = TimeSpanUnits.hours)]
+        //[DateTimeLookup(
+        //    Partition = TimeSpanUnits.days,
+        //    Row = TimeSpanUnits.hours)]
         public DateTime? lastExecuted;
 
         public const string ExecutionHistoryPropertyName = "execution_history";
