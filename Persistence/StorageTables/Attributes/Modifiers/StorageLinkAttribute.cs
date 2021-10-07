@@ -282,6 +282,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new NotImplementedException();
         }
 
+        public IEnumerable<IBatchModify> GetBatchUpdateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey, TEntity priorEntity, TEntity entity,
+            IDictionary<string, EntityProperty> serializedEntity)
+        {
+            throw new NotImplementedException();
+        }
+
         public Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary,

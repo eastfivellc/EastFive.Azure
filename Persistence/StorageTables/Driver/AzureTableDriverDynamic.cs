@@ -1508,6 +1508,54 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
+        public async Task<(TableResult, TDocument)[]> UpdateBatchAsync<TDocument>(string partitionKey, TDocument[] entities,
+            CloudTable table = default(CloudTable),
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+            where TDocument : class, ITableEntity
+        {
+            if (!entities.Any())
+                return new TableResult[] { };
+
+            if (table.IsDefaultOrNull())
+                table = GetTable<TDocument>();
+
+            diagnostics.Trace($"{entities.Length} rows for partition `{partitionKey}`.");
+
+            var batch = new TableBatchOperation();
+            var rowKeyHash = new HashSet<string>();
+            foreach (var row in entities)
+            {
+                if (rowKeyHash.Contains(row.RowKey))
+                {
+                    diagnostics.Warning($"Duplicate rowkey `{row.RowKey}`.");
+                    continue;
+                }
+                rowKeyHash.Add(row.RowKey);
+                batch.Replace(row);
+            }
+
+            // submit
+            while (true)
+            {
+                try
+                {
+                    diagnostics.Trace($"Saving {batch.Count} records.");
+                    var resultList = await table.ExecuteBatchAsync(batch);
+                    return resultList.ToArray();
+                }
+                catch (StorageException storageException)
+                {
+                    var shouldRetry = await storageException.ResolveCreate(table,
+                        () => true,
+                        onTimeout: onTimeout);
+                    if (shouldRetry)
+                        continue;
+
+                }
+            }
+        }
+
         public IEnumerableAsync<TableResult> DeleteAll<TEntity>(
             Expression<Func<TEntity, bool>> filter,
             CloudTable table = default(CloudTable),
@@ -2464,6 +2512,82 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             .Select(set => set.ToArray().PairWithKey(grp.Key));
                     })
                 .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, table: table, diagnostics: diagnostics))
+                .AsyncEnumerable()
+                .SelectMany(
+                    trs =>
+                    {
+                        return trs
+                            .Select(
+                                tableResult =>
+                                {
+                                    var resultDocument = (tableResult.Result as TDocument);
+                                    var itemResult = perItemCallback(resultDocument, tableResult);
+                                    var modifierResult = resultDocument.GetType()
+                                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+                                        (resultDocument as IAzureStorageTableEntityBatchable)
+                                            .BatchCreateModifiers()
+                                        :
+                                        new IBatchModify[] { };
+                                    return (itemResult, modifierResult);
+                                });
+                    })
+                .OnCompleteAsync(
+                    (itemResultAndModifiers) =>
+                    {
+                        return itemResultAndModifiers
+                            .SelectMany(tpl => tpl.modifierResult)
+                            .GroupBy(modifier => $"{modifier.PartitionKey}|{modifier.RowKey}")
+                            .Where(grp => grp.Any())
+                            .Select(
+                                async grp =>
+                                {
+                                    var modifier = grp.First();
+                                    var rowKey = modifier.RowKey;
+                                    var partitionKey = modifier.PartitionKey;
+                                    return await modifier.CreateOrUpdateAsync(this,
+                                        async (resourceToModify, saveAsync) =>
+                                        {
+                                            var modifiedResource = grp.Aggregate(resourceToModify,
+                                                (resource, modifier) =>
+                                                {
+                                                    return modifier.Modify(resource);
+                                                });
+                                            await saveAsync(modifiedResource);
+                                            return modifiedResource;
+                                        });
+                                })
+                            .AsyncEnumerable()
+                            .ToArrayAsync();
+                    })
+                .Select(itemResultAndModifiers => itemResultAndModifiers.itemResult);
+        }
+
+        public IEnumerableAsync<TResult> UpdateBatch<TDocument, TResult>(IEnumerable<TDocument> entities,
+                Func<TDocument, string> getRowKey,
+                Func<TDocument, string> getPartitionKey,
+                Func<TDocument, TableResult, TResult> perItemCallback,
+                CloudTable table,
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
+            where TDocument : class, ITableEntity
+        {
+            return entities
+                .Select(
+                    row =>
+                    {
+                        row.RowKey = getRowKey(row);
+                        row.PartitionKey = getPartitionKey(row);
+                        return row;
+                    })
+                .GroupBy(row => row.PartitionKey)
+                .SelectMany(
+                    grp =>
+                    {
+                        return grp
+                            .Split(index => 100)
+                            .Select(set => set.ToArray().PairWithKey(grp.Key));
+                    })
+                .Select(grp => UpdateBatchAsync(grp.Key, grp.Value, table: table, diagnostics: diagnostics))
                 .AsyncEnumerable()
                 .SelectMany(
                     trs =>

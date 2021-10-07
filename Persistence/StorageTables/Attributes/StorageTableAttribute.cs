@@ -464,6 +464,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .ToArray();
             }
 
+            public IBatchModify[] BatchUpdateModifiers(object priorEntity)
+            {
+                return typeof(EntityType)
+                    .GetPropertyAndFieldsWithAttributesInterface<IModifyAzureStorageTableSave>()
+                    .SelectMany(memberInfoAndModifier =>
+                        memberInfoAndModifier.Item2.GetBatchUpdateModifier(memberInfoAndModifier.Item1,
+                            this.RowKey, this.PartitionKey,
+                            (EntityType)priorEntity,
+                            this.Entity, this.WriteEntity(null)))
+                    .ToArray();
+            }
+
             public IBatchModify[] BatchInsertOrReplaceModifiers()
             {
                 throw new NotImplementedException();

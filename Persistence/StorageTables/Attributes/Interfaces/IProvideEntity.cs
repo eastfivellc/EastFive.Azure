@@ -53,6 +53,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         IBatchModify[] BatchCreateModifiers();
 
+        IBatchModify[] BatchUpdateModifiers(object priorEntity);
+
         IBatchModify[] BatchInsertOrReplaceModifiers();
 
         IBatchModify[] BatchDeleteModifiers();

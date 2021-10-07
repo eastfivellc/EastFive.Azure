@@ -45,6 +45,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             string rowKey, string partitionKey,
             TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
 
+        IEnumerable<IBatchModify> GetBatchUpdateModifier<TEntity>(MemberInfo member,
+            string rowKey, string partitionKey,
+            TEntity priorEntity,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity);
+
         IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,
             string rowKey, string partitionKey,
             TEntity entity, IDictionary<string, EntityProperty> serializedEntity);

@@ -453,6 +453,29 @@ namespace EastFive.Persistence.Azure.StorageTables
             return onSuccessWithRollback(allRollback);
         }
 
+        public IEnumerable<IBatchModify> GetBatchUpdateModifier<TEntity>(MemberInfo memberInfo,
+            string rowKey, string partitionKey,
+            TEntity priorEntity,
+            TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
+        {
+            var tableName = GetLookupTableName(memberInfo);
+            return GetKeys(memberInfo, entity)
+                .Select(
+                    lookupKey =>
+                    {
+                        return (IBatchModify)new BatchModifier(tableName, lookupKey,
+                            rowAndPartitionKeys =>
+                            {
+                                return rowAndPartitionKeys
+                                    .Where(
+                                        kvp =>
+                                            kvp.Key != rowKey ||
+                                            kvp.Value != partitionKey);
+                            });
+                    })
+                .ToArray();
+        }
+
         public Task<TResult> ExecuteDeleteAsync<TEntity, TResult>(MemberInfo memberInfo, 
                 string rowKeyRef, string partitionKeyRef,
                 TEntity value, IDictionary<string, EntityProperty> dictionary, 
