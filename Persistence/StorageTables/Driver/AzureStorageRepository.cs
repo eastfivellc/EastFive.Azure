@@ -20,6 +20,7 @@ using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using BlackBarLabs.Extensions;
 using EastFive.Web.Configuration;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
@@ -279,7 +280,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                                         var operation = TableOperation.Retrieve<TDocument>(partitionKey, rowKey);
                                         try
                                         {
-                                            var result = await table.ExecuteAsync(operation);
+                                            var result = await new E5CloudTable(table).ExecuteAsync(operation);
                                             return result.PairWithKey(entityId);
                                         }
                                         catch (StorageException)
@@ -604,7 +605,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             {
                 var table = GetTable<TData>();
                 var update = TableOperation.Replace(data);
-                await table.ExecuteAsync(update);
+                await new E5CloudTable(table).ExecuteAsync(update);
                 return success();
             }
             catch (StorageException ex)
@@ -662,7 +663,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             var delete = TableOperation.Delete(document);
             try
             {
-                await table.ExecuteAsync(delete);
+                await new E5CloudTable(table).ExecuteAsync(delete);
                 return success();
             }
             catch (StorageException se)
@@ -722,7 +723,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                 {
                     TableResult tableResult = null;
                     var insert = TableOperation.Insert(document);
-                    tableResult = await table.ExecuteAsync(insert);
+                    tableResult = await new E5CloudTable(table).ExecuteAsync(insert);
                     return onSuccess();
                 }
                 catch (StorageException ex)
@@ -801,7 +802,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             var operation = TableOperation.Retrieve<TEntity>(partitionKey, rowKey);
             try
             {
-                var result = await table.ExecuteAsync(operation);
+                var result = await new E5CloudTable(table).ExecuteAsync(operation);
                 if (404 == result.HttpStatusCode)
                 {
                     scopedLogger.Trace($"FAILURE retrieving Table = `{table.Name}`; result = {result.Result}; OperationType = {operation.OperationType}");

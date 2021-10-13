@@ -35,7 +35,7 @@ namespace EastFive.Azure
                     DeploymentOverrides.Suggested,
                     Location = "Resolved by performance testing.",
                     DeploymentSecurityConcern = false)]
-                public const string ConnectionCountGrowthStoppingPoint = "EastFive.Azure.Persistence.StorageTables.ConnectionCountGrowthStoppingPoint";
+                public const string MinimumParallelConnections = "EastFive.Azure.Persistence.StorageTables.MinimumParallelConnections";
             }
         }
 

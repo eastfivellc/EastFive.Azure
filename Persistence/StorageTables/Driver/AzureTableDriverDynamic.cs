@@ -390,7 +390,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             table = GetTable<TEntity>();
                     try
                     {
-                        var result = await table.ExecuteAsync(operation);
+                        var result = await new E5CloudTable(table).ExecuteAsync(operation);
                         if (404 == result.HttpStatusCode)
                             return onNotFound();
                         var entity = (TEntity)result.Result;
@@ -439,7 +439,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 {
                     try
                     {
-                        var result = await table.ExecuteAsync(update);
+                        var result = await new E5CloudTable(table).ExecuteAsync(update);
                         var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
                         return success(created);
                     }
@@ -543,7 +543,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
             try
             {
-                var result = await table.ExecuteAsync(operation);
+                var result = await new E5CloudTable(table).ExecuteAsync(operation);
                 if (404 == result.HttpStatusCode)
                     return onNotFound();
                 return onSuccess(result.Result);
@@ -1066,7 +1066,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 {
                     try
                     {
-                        var tableResult = await table.ExecuteAsync(update);
+                        var tableResult = await new E5CloudTable(table).ExecuteAsync(update);
                         return onUpdated(tableResult);
                     }
                     catch (StorageException ex)
@@ -1150,7 +1150,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var update = TableOperation.Replace(tableData);
             try
             {
-                await table.ExecuteAsync(update);
+                await new E5CloudTable(table).ExecuteAsync(update);
                 return success();
             }
             catch (StorageException ex)
@@ -1223,7 +1223,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 (members) => throw new Exception("Modifiers failed to execute."));
             try
             {
-                await table.ExecuteAsync(update);
+                await new E5CloudTable(table).ExecuteAsync(update);
                 return success();
             }
             catch (StorageException ex)
@@ -1313,7 +1313,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var update = TableOperation.Replace(tableEntity);
             try
             {
-                await table.ExecuteAsync(update);
+                await new E5CloudTable(table).ExecuteAsync(update);
                 return success();
             }
             catch (StorageException ex)
@@ -1360,7 +1360,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var update = TableOperation.InsertOrReplace(tableEntity);
             try
             {
-                TableResult result = await table.ExecuteAsync(update);
+                TableResult result = await new E5CloudTable(table).ExecuteAsync(update);
                 var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
                 var entity = result.Result as IAzureStorageTableEntity<TData>;
                 return success(created, entity);
@@ -1410,7 +1410,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var delete = TableOperation.Delete(entity);
             try
             {
-                var response = await table.ExecuteAsync(delete);
+                var response = await new E5CloudTable(table).ExecuteAsync(delete);
                 if (response.HttpStatusCode == (int)HttpStatusCode.NotFound)
                     return onNotFound();
                 return onSuccess();
@@ -2790,7 +2790,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var delete = TableOperation.Delete(entity);
             try
             {
-                var response = await table.ExecuteAsync(delete);
+                var response = await new E5CloudTable(table).ExecuteAsync(delete);
                 if (response.HttpStatusCode == (int)HttpStatusCode.NotFound)
                     return onNotFound();
                 return success();

@@ -44,6 +44,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         /// </summary>
         public static int MinimumParallelConnections = 20;
 
+        static E5CloudTable()
+        {
+            LoadConfigurations();
+        }
+
         public static void LoadConfigurations()
         {
             ConnectionCountReductionPoint = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionCountReductionPoint
@@ -86,9 +91,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var operation = GetOperation();
             try
             {
-                System.Diagnostics.Debug.WriteLine($"START: {tableOperation.Entity.GetHashCode()}");
                 var result = await cloudTable.ExecuteAsync(tableOperation);
-                System.Diagnostics.Debug.WriteLine($"END--: {tableOperation.Entity.GetHashCode()}");
                 return result;
             } finally
             {
@@ -122,7 +125,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     operations = operations
                                         .Append(waitEventToUse)
                                         .ToArray();
-                                    System.Diagnostics.Debug.WriteLine($"BUMP {operations.Length-1} => {operations.Length} [{connectionCount}]");
                                     operationsSet = operations.AsCopy();
                                     return waitEventToUse;
                                 }
@@ -157,7 +159,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                         operations = operations
                                             .Take(operations.Length - 1)
                                             .ToArray();
-                                        System.Diagnostics.Debug.WriteLine($"DROP {operations.Length + 1} => {operations.Length} [{connectionCount}]");
                                     }
                                 }
                                 return operations.AsCopy();
