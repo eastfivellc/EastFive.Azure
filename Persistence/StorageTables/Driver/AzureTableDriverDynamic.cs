@@ -75,6 +75,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             return TableFromEntity(tableType, this.TableClient);
         }
 
+        private E5CloudTable GetE5Table<TEntity>()
+        {
+            var cloudTable = GetTable<TEntity>();
+            return new E5CloudTable(cloudTable);
+        }
+
         private static CloudTable TableFromEntity(Type tableType, CloudTableClient tableClient)
         {
             return tableType.GetAttributesInterface<IProvideTable>()
@@ -962,14 +968,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
            AzureStorageDriver.RetryDelegate onTimeout = default,
-           CloudTable table = default)
+           E5CloudTable table = default)
         {
             var tableEntity = GetEntity(entity);
             if (tableEntity.RowKey.IsNullOrWhiteSpace())
                 throw new ArgumentException("RowKey must have value.");
 
             if (table.IsDefaultOrNull())
-                table = GetTable<TEntity>();
+                table = GetE5Table<TEntity>();
             return await await tableEntity.ExecuteCreateModifiersAsync<Task<TResult>>(this,
                 async rollback =>
                 {
@@ -983,7 +989,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         }
                         catch (StorageException ex)
                         {
-                            return await await ex.ResolveCreate(table,
+                            return await await ex.ResolveCreate(table.cloudTable,
                                 async () => await await CreateAsync<Task<TResult>>(tableEntity, table,
                                     (ite, tr) => onSuccess(tableEntity, tr).AsTask(),
                                     onAlreadyExists:
@@ -1263,7 +1269,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         #region Mutation
 
         public async Task<TResult> CreateAsync<TResult>(ITableEntity tableEntity,
-                CloudTable table,
+                E5CloudTable table,
             Func<ITableEntity, TableResult, TResult> onSuccess,
             Func<TResult> onAlreadyExists,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -1279,20 +1285,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 }
                 catch (StorageException ex)
                 {
-                    bool shouldRetry = false; // TODO: This is funky
-                    var r = await ex.ResolveCreate(table,
-                        () =>
-                        {
-                            shouldRetry = true;
-                            return default;
-                        },
-                        onFailure: onFailure,
-                        onAlreadyExists: onAlreadyExists,
+                    var (isComplete, result) = await ex.ResolveCreate(table.cloudTable,
+                        () => (false, default(TResult)),
+                        onFailure:(codes, why) => (true, onFailure(codes, why)),
+                        onAlreadyExists:() => (true, onAlreadyExists()),
                         onTimeout: onTimeout);
 
-                    if (shouldRetry)
-                        continue;
-                    return r;
+                    if (isComplete)
+                        return result;
+
+                    continue;
                 }
                 catch (Exception generalEx)
                 {
@@ -1610,7 +1612,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
             var table = this.TableClient.GetTableReference(tableName);
-            return this.CreateAsync(tableEntity, table,
+            return this.CreateAsync(tableEntity, new E5CloudTable(table),
                 onSuccess: (entity, tr) => onSuccess(entity),
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
@@ -1636,7 +1638,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
             var table = GetTable<TEntity>();
-            return this.CreateAsync(tableEntity, table,
+            return this.CreateAsync(tableEntity, new E5CloudTable(table),
                 onSuccess: (entity, tr) => onSuccess(entity),
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
@@ -1662,7 +1664,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
             var table = TableFromEntity(entityType, this.TableClient);
-            return this.CreateAsync(tableEntity, table,
+            return this.CreateAsync(tableEntity, new E5CloudTable(table),
                 onSuccess: (entity, tr) => onSuccess(entity),
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
@@ -1756,7 +1758,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 //        throw new NotImplementedException();
                                 //        return true.AsTask();
                                 //    },
-                                table: table);
+                                table: new E5CloudTable(table));
                             useGlobal = useGlobalTableResult.Item1;
                             return useGlobalTableResult.Item2;
                         });

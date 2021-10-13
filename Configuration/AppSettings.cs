@@ -13,6 +13,33 @@ namespace EastFive.Azure
         public const string ASTConnectionStringKey = "EastFive.Azure.StorageTables.ConnectionString";
         public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
 
+        [Config]
+        public static class Persistence
+        {
+            [Config]
+            public static class StorageTables
+            {
+                [ConfigKey("When the total of HTTP connections reaches this point the connection poolb will _begin_ being reduced.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Total connections allowed on a given machine.",
+                    DeploymentSecurityConcern = false)]
+                public const string ConnectionCountReductionPoint = "EastFive.Azure.Persistence.StorageTables.ConnectionCountReductionPoint";
+
+                [ConfigKey("When the total of HTTP connections reaches this point the connection pool will stop growing.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Total connections allowed on a given machine.",
+                    DeploymentSecurityConcern = false)]
+                public const string ConnectionCountGrowthStoppingPoint = "EastFive.Azure.Persistence.StorageTables.ConnectionCountGrowthStoppingPoint";
+
+                [ConfigKey("Size of the connection pool will not go below this point.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Resolved by performance testing.",
+                    DeploymentSecurityConcern = false)]
+                public const string ConnectionCountGrowthStoppingPoint = "EastFive.Azure.Persistence.StorageTables.ConnectionCountGrowthStoppingPoint";
+            }
+        }
+
+
         public static class SPA
         {
             public const string BuildConfigPath = "EastFive.Azure.SPA.BuildConfigPath";
