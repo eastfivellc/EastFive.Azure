@@ -88,15 +88,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public async Task<TableResult> ExecuteAsync(TableOperation tableOperation)
         {
-            var operation = GetOperation();
-            try
-            {
+            //var operation = GetOperation();
+            //try
+            //{
                 var result = await cloudTable.ExecuteAsync(tableOperation);
                 return result;
-            } finally
-            {
-                operation.Set();
-            }
+            //} finally
+            //{
+            //    operation.Set();
+            //}
 
             AutoResetEvent GetOperation()
             {
