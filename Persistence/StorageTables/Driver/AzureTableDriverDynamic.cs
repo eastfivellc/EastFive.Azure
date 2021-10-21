@@ -35,6 +35,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public const int DefaultNumberOfTimesToRetry = 10;
         protected static readonly TimeSpan DefaultBackoffForRetry = TimeSpan.FromSeconds(4);
 
+        private static object tableClientsLock = new object();
+        private static IDictionary<string, CloudTableClient> tableClients = new Dictionary<string, CloudTableClient>();
+
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
 
@@ -42,7 +45,17 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public AzureTableDriverDynamic(CloudStorageAccount storageAccount, string connectionString)
         {
-            TableClient = storageAccount.CreateCloudTableClient();
+            lock (tableClientsLock)
+            {
+                (TableClient, tableClients) = tableClients.AddIfMissing(
+                        storageAccount.TableEndpoint.AbsoluteUri,
+                        onAddValueSinceMissing: (save) =>
+                        {
+                            var newCloudClient = storageAccount.CreateCloudTableClient();
+                            return save(newCloudClient);
+                        },
+                        (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
+            }
             TableClient.DefaultRequestOptions.RetryPolicy =
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
 

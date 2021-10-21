@@ -13,19 +13,23 @@ using Azure.Storage.Blobs.Models;
 
 using EastFive;
 using EastFive.Linq;
+using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
-using BlackBarLabs.Extensions;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
+
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
     public partial class AzureStorageRepository : EastFive.Azure.StorageTables.Driver.AzureStorageDriver
     {
+        private static object tableClientsLock = new object();
+        private static IDictionary<string, CloudTableClient> tableClients = new Dictionary<string, CloudTableClient>();
+
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
         private const int retryHttpStatus = 200;
@@ -35,7 +39,18 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         public AzureStorageRepository(CloudStorageAccount storageAccount,
             string connectionString)
         {
-            TableClient = storageAccount.CreateCloudTableClient();
+            lock (tableClientsLock)
+            {
+                (TableClient, tableClients) = tableClients.AddIfMissing(
+                        storageAccount.TableEndpoint.AbsoluteUri,
+                        onAddValueSinceMissing: (save) =>
+                         {
+                             var newCloudClient = storageAccount.CreateCloudTableClient();
+                             return save(newCloudClient);
+                         },
+                        (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
+            }
+
             TableClient.DefaultRequestOptions.RetryPolicy = retryPolicy;
 
             BlobClient = new BlobServiceClient(connectionString,
@@ -906,7 +921,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         async (documentNew) =>
                         {
                             useGlobalResult = await await this.UpdateIfNotModifiedAsync(documentNew,
-                                () => false.ToTask(),
+                                () => false.AsTask(),
                                 async () =>
                                 {
                                     globalResult = await this.CreateOrUpdateAsync(rowKey, partitionKey, success, onFailure, onTimeout);
@@ -926,7 +941,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         async (documentNew) =>
                         {
                             useGlobalResult = await await this.CreateAsync(rowKey, partitionKey, documentNew,
-                                () => false.ToTask(),
+                                () => false.AsTask(),
                                 async () =>
                                 {
                                     // TODO: backoff here
@@ -977,7 +992,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                 {
                     document = mutate(document);
                     updated = await await this.UpdateIfNotModifiedAsync(document,
-                        () => true.PairWithValue(document).ToTask(),
+                        () => true.PairWithValue(document).AsTask(),
                         async () =>
                         {
                             document = await this.FindByIdAsync(rowKey, partitionKey,
