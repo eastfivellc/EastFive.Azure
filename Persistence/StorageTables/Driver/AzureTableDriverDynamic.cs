@@ -2536,6 +2536,41 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .ToArrayAsync();
         }
 
+        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,
+                Func<ITableEntity, TableResult, TResult> perItemCallback,
+                string tableName = default(string),
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+                int? readAhead = default)
+            where TData : IReferenceable
+        {
+            var table = tableName.HasBlackSpace() ?
+                this.TableClient.GetTableReference(tableName)
+                :
+                GetTable<TData>();
+
+            return datas
+                .Select(data => GetEntity(data))
+                .Split(x => 100)
+                .Select(
+                    async rows =>
+                    {
+                        var x = CreateOrReplaceBatch(rows,
+                                row => row.RowKey,
+                                row => row.PartitionKey,
+                                perItemCallback, table,
+                                out Task<object[]> modifiersTask,
+                                onTimeout: onTimeout,
+                                diagnostics: diagnostics,
+                                readAhead: readAhead)
+                            .ToArrayAsync();
+                        await modifiersTask;
+                        return await x;
+                    })
+                .AsyncEnumerable(readAhead: 50)
+                .SelectMany();
+        }
+
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
