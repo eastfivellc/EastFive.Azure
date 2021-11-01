@@ -385,7 +385,7 @@ namespace EastFive.Azure.Auth
             return await await authorizationRef.StorageGetAsync(
                 async (authorization) =>
                 {
-                    if (!authorization.authorized)
+                    if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
 
                     var methodRef = authorization.Method;

@@ -77,7 +77,7 @@ namespace EastFive.Azure.Monitoring
 
         [HttpGet]
         public static IHttpResponse GetAll(
-            IQueryable<TeamsNotification> teamsNotifications,
+            RequestMessage<TeamsNotification> teamsNotifications,
             MultipartAsyncResponse<TeamsNotification> onFound)
         {
             return teamsNotifications
@@ -138,7 +138,7 @@ namespace EastFive.Azure.Monitoring
         [HttpDelete]
         public static IHttpResponse ClearAsync(
                 [QueryParameter(Name = "clear")] bool clear,
-                IQueryable<TeamsNotification> teamsNotifications,
+                RequestMessage<TeamsNotification> teamsNotifications,
                 EastFive.Api.Security security,
             MultipartAsyncResponse<TeamsNotification> onDeleted)
         {
@@ -154,7 +154,7 @@ namespace EastFive.Azure.Monitoring
 
         [HttpAction("Load")]
         public static async Task<IHttpResponse> LoadAsync(
-            IQueryable<TeamsNotification> teamsNotificationsStorage,
+            RequestMessage<TeamsNotification> teamsNotificationsStorage,
             ContentTypeResponse<TeamsNotification[]> onFound)
         {
             teamsNotifications = await teamsNotificationsStorage
@@ -170,11 +170,25 @@ namespace EastFive.Azure.Monitoring
 
         private static TeamsNotification[] teamsNotifications;
 
-        internal static bool IsMatch(IHttpResponse response)
+        internal static bool IsMatch(IHttpRequest request)
         {
-            throw new NotImplementedException();
-        }
+            return teamsNotifications
+                .NullToEmpty()
+                .Where(
+                    tn =>
+                    {
+                        var routeMatch = tn.routeFilters
+                            .TryWhere(
+                                (string rf, out (string, string)[] matches) =>
+                                    request.RequestUri.PathAndQuery.TryMatchRegex(rf, out matches))
+                            .Any();
+                        if (routeMatch)
+                            return true;
 
+                        return false;
+                    })
+                .Any();
+        }
     }
 }
 
