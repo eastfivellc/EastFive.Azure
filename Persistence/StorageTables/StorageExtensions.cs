@@ -982,6 +982,29 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     readAhead: readAhead);
         }
 
+        public static IEnumerableAsync<TResult> StorageCreateOrReplaceBatch<TEntity, TResult>(
+            this IEnumerable<TEntity> entities,
+            Func<TEntity, TableResult, TResult> perItemCallback,
+            string tableName = default(string),
+            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = default,
+            EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+            int? readAhead = default)
+            where TEntity : IReferenceable
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .CreateOrReplaceBatch<TEntity, TResult>(entities,
+                    (tableEntity, result) =>
+                    {
+                        var entity = (result.Result as IAzureStorageTableEntity<TEntity>).Entity;
+                        return perItemCallback(entity, result);
+                    },
+                    tableName: tableName,
+                    onTimeout: onTimeout,
+                    diagnostics: diagnostics,
+                    readAhead: readAhead);
+        }
+
         #endregion
 
         #region Update

@@ -35,6 +35,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public const int DefaultNumberOfTimesToRetry = 10;
         protected static readonly TimeSpan DefaultBackoffForRetry = TimeSpan.FromSeconds(4);
 
+        private static object tableClientsLock = new object();
+        private static IDictionary<string, CloudTableClient> tableClients = new Dictionary<string, CloudTableClient>();
+
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
 
@@ -42,7 +45,17 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public AzureTableDriverDynamic(CloudStorageAccount storageAccount, string connectionString)
         {
-            TableClient = storageAccount.CreateCloudTableClient();
+            lock (tableClientsLock)
+            {
+                (TableClient, tableClients) = tableClients.AddIfMissing(
+                        storageAccount.TableEndpoint.AbsoluteUri,
+                        onAddValueSinceMissing: (save) =>
+                        {
+                            var newCloudClient = storageAccount.CreateCloudTableClient();
+                            return save(newCloudClient);
+                        },
+                        (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
+            }
             TableClient.DefaultRequestOptions.RetryPolicy =
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
 
@@ -2527,6 +2540,41 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     })
                 .AsyncEnumerable()
                 .ToArrayAsync();
+        }
+
+        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,
+                Func<ITableEntity, TableResult, TResult> perItemCallback,
+                string tableName = default(string),
+                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
+                int? readAhead = default)
+            where TData : IReferenceable
+        {
+            var table = tableName.HasBlackSpace() ?
+                this.TableClient.GetTableReference(tableName)
+                :
+                GetTable<TData>();
+
+            return datas
+                .Select(data => GetEntity(data))
+                .Split(x => 100)
+                .Select(
+                    async rows =>
+                    {
+                        var x = CreateOrReplaceBatch(rows,
+                                row => row.RowKey,
+                                row => row.PartitionKey,
+                                perItemCallback, table,
+                                out Task<object[]> modifiersTask,
+                                onTimeout: onTimeout,
+                                diagnostics: diagnostics,
+                                readAhead: readAhead)
+                            .ToArrayAsync();
+                        await modifiersTask;
+                        return await x;
+                    })
+                .AsyncEnumerable(readAhead: 50)
+                .SelectMany();
         }
 
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerable<ITableEntity> entities,
