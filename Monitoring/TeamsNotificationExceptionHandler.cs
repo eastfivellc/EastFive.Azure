@@ -91,7 +91,10 @@ namespace EastFive.Azure.Monitoring
                                 (teamsNotifyParam, next) => teamsNotifyParam,
                                 () => default(string));
                         },
-                        () => default(string));
+                        () =>
+                        {
+                            return default(string);
+                        });
             }
 
             bool HasReportableError()
@@ -112,6 +115,9 @@ namespace EastFive.Azure.Monitoring
                     return true;
                 if (HasReportableError())
                     return true;
+                if (TeamsNotification.IsMatch(response))
+                    return true;
+
                 return false;
             }
         }

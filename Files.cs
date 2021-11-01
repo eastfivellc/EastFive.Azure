@@ -19,8 +19,7 @@ namespace EastFive.Azure.Meta
 {
     [FunctionViewController(
         Route = "Files",
-        Namespace = "admin",
-        Prefix = "admin")]
+        Namespace = "admin")]
     public class Files
     {
         [EastFive.Api.HttpGet]

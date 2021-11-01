@@ -1717,6 +1717,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var table = default(CloudTable);
             if (tableName.HasBlackSpace())
                 table = this.TableClient.GetTableReference(tableName);
+            if (table.IsDefaultOrNull())
+                table = tableName.HasBlackSpace() ?
+                    this.TableClient.GetTableReference(tableName)
+                    :
+                    table = GetTable<TData>();
+
             return this.UpdateAsyncAsync<TData, TResult>(rowKey, partitionKey,
                 (doc, saveAsync) => onUpdate(false, doc, saveAsync),
                 onNotFound: async () =>
