@@ -68,7 +68,13 @@ namespace EastFive.Azure.Monitoring
         [ApiProperty(PropertyName = ResponseFiltersPropertyName)]
         [JsonProperty(PropertyName = ResponseFiltersPropertyName)]
         [Storage]
-        public string[] responseFilters;
+        public int[] responseFilters;
+
+        public const string MethodFiltersPropertyName = "method_filters";
+        [ApiProperty(PropertyName = MethodFiltersPropertyName)]
+        [JsonProperty(PropertyName = MethodFiltersPropertyName)]
+        [Storage]
+        public string[] methodFilters;
 
         #endregion
 
@@ -110,20 +116,20 @@ namespace EastFive.Azure.Monitoring
 
         #endregion
 
-        #region PUT
+        #region PATCH
 
-        [HttpPut]
+        [HttpPatch]
         public static Task<IHttpResponse> UpdateAsync(
                 [UpdateId] IRef<TeamsNotification> teamsNotificationRef,
-                MutateResource<TeamsNotification> updated,
-            CreatedResponse onCreated,
-            AlreadyExistsResponse onAlreadyExists,
+                [MutateResource]MutateResource<TeamsNotification> updated,
+            ContentTypeResponse<TeamsNotification> onUpdated,
+            NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
         {
             return teamsNotificationRef
-                .HttpPostAsync(
-                    onCreated,
-                    onAlreadyExists);
+                .HttpPatchAsync(updated,
+                    onUpdated,
+                    onNotFound);
         }
 
         #endregion
@@ -187,22 +193,42 @@ namespace EastFive.Azure.Monitoring
 
         private static TeamsNotification[] teamsNotifications;
 
-        internal static bool IsMatch(IHttpRequest request)
+        internal static bool IsMatch(IHttpRequest request, IHttpResponse response)
         {
             return teamsNotifications
                 .NullToEmpty()
                 .Where(
                     tn =>
                     {
-                        var routeMatch = tn.routeFilters
-                            .TryWhere(
-                                (string rf, out (string, string)[] matches) =>
-                                    request.RequestUri.PathAndQuery.TryMatchRegex(rf, out matches))
-                            .Any();
-                        if (routeMatch)
-                            return true;
+                        if (tn.routeFilters.Any())
+                            if (!IsRouteMatch())
+                                return false;
 
-                        return false;
+                        if(tn.methodFilters.Any())
+                            if (!IsMethodMatch())
+                                return false;
+
+                        if (tn.responseFilters.Any())
+                            if(!IsResponseMatch())
+                                return false;
+
+                        return true;
+
+                        bool IsRouteMatch() => tn.routeFilters
+                           .TryWhere(
+                               (string rf, out (string, string)[] matches) =>
+                                   request.RequestUri.PathAndQuery.TryMatchRegex(rf, out matches))
+                           .Any();
+
+                        bool IsMethodMatch() => tn.methodFilters
+                            .Where(mf =>request.Method.Method.Contains(
+                                mf, StringComparison.OrdinalIgnoreCase))
+                           .Any();
+
+                        bool IsResponseMatch() => tn.responseFilters
+                            .Where(rfTpl => ((int)response.StatusCode) == rfTpl)
+                            .Any();
+
                     })
                 .Any();
         }

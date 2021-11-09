@@ -115,7 +115,7 @@ namespace EastFive.Azure.Monitoring
                     return true;
                 if (HasReportableError())
                     return true;
-                if (TeamsNotification.IsMatch(request))
+                if (TeamsNotification.IsMatch(request, response))
                     return true;
 
                 return false;
