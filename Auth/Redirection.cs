@@ -105,7 +105,7 @@ namespace EastFive.Azure.Auth
             return await await authentication.RedeemTokenAsync(values, application,
                 async (externalAccountKey, authorizationRefMaybe, loginProvider, extraParams) =>
                 {
-                    #region Handle case where there was a direct link
+                    #region Handle case where there was a direct link or a POST
 
                     if (!authorizationRefMaybe.HasValue)
                     {

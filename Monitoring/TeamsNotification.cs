@@ -33,6 +33,7 @@ namespace EastFive.Azure.Monitoring
     [FunctionViewController(
         Namespace = "admin",
         Route = "TeamsNotification")]
+    [StorageTable]
     [DisplayEntryPoint]
     public class TeamsNotification : IReferenceable
     {
@@ -82,6 +83,11 @@ namespace EastFive.Azure.Monitoring
         {
             return teamsNotifications
                 .StorageGet()
+                .Select(
+                    n =>
+                    {
+                        return n;
+                    })
                 .HttpResponse(onFound);
         }
 
@@ -143,8 +149,12 @@ namespace EastFive.Azure.Monitoring
             MultipartAsyncResponse<TeamsNotification> onDeleted)
         {
             return teamsNotifications
+                .StorageGet()
                 .StorageDeleteBatch(
-                    tr => (TeamsNotification)tr.Result)
+                    tr =>
+                    {
+                        return (TeamsNotification)tr.Result;
+                    })
                 .HttpResponse(onDeleted);
         }
 

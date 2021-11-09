@@ -199,10 +199,10 @@ namespace EastFive.Azure.Auth
             return await await Auth.Method.ById(methodRef, application,
                 (method) =>
                 {
-                    var paramsUpdated = parameters
-                        .Append(
-                            authorizationRef.id.ToString().PairWithKey("state"))
-                        .ToDictionary();
+                    var paramsUpdated = parameters;
+                        //.Append(
+                        //    authorizationRef.id.ToString().PairWithKey("state"))
+                        //.ToDictionary();
 
                     return Redirection.AuthenticationAsync(
                             method,
