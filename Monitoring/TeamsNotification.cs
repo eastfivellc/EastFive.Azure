@@ -174,6 +174,13 @@ namespace EastFive.Azure.Monitoring
             return onFound(teamsNotifications);
         }
 
+        [HttpAction("Active")]
+        public static IHttpResponse Active(
+            ContentTypeResponse<TeamsNotification[]> onFound)
+        {
+            return onFound(teamsNotifications);
+        }
+
         #endregion
 
         #endregion
