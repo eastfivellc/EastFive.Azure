@@ -591,23 +591,8 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             }
 
             // submit
-            while (true)
-            {
-                try
-                {
-                    var resultList = await table.ExecuteBatchAsync(batch);
-                    return resultList.ToArray();
-                }
-                catch (StorageException storageException)
-                {
-                    var shouldRetry = await storageException.ResolveCreate(table,
-                        () => true,
-                        onTimeout:onTimeout);
-                    if (shouldRetry)
-                        continue;
-
-                }
-            }
+            var resultList = await table.ExecuteBatchWithCreateAsync(batch);
+            return resultList.ToArray();
         }
 
         public override async Task<TResult> UpdateIfNotModifiedAsync<TData, TResult>(TData data,

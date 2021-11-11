@@ -17,6 +17,7 @@ using EastFive.Azure.Functions;
 using EastFive.Analytics;
 using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -439,22 +440,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
             }
 
             // submit
-            while (true)
-            {
-                try
-                {
-                    var resultList = await table.ExecuteBatchAsync(batch);
-                    return resultList.ToArray();
-                }
-                catch (StorageException storageException)
-                {
-                    var shouldRetry = await storageException.ResolveCreate(table,
-                        () => true);
-                    if (shouldRetry)
-                        continue;
-
-                }
-            }
+            var resultList = await table.ExecuteBatchWithCreateAsync(batch);
+            return resultList.ToArray();
         }
 
         #endregion

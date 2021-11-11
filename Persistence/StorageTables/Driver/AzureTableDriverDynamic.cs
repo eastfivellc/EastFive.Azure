@@ -7,26 +7,29 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using System.Xml;
 using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
 using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 
-using BlackBarLabs.Persistence.Azure;
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Azure.StorageTables.Driver;
 using EastFive.Collections.Generic;
-using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
-using System.Xml;
-using Newtonsoft.Json;
-using Azure.Storage.Blobs.Models;
+
+using BlackBarLabs.Persistence.Azure;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -1506,24 +1509,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
 
             // submit
-            while (true)
-            {
-                try
-                {
-                    diagnostics.Trace($"Saving {batch.Count} records.");
-                    var resultList = await table.ExecuteBatchAsync(batch);
-                    return resultList.ToArray();
-                }
-                catch (StorageException storageException)
-                {
-                    var shouldRetry = await storageException.ResolveCreate(table,
-                        () => true,
-                        onTimeout: onTimeout);
-                    if (shouldRetry)
-                        continue;
-
-                }
-            }
+            diagnostics.Trace($"Saving {batch.Count} records.");
+            var resultList = await table.ExecuteBatchWithCreateAsync(batch);
+            return resultList.ToArray();
         }
 
         public IEnumerableAsync<TableResult> DeleteAll<TEntity>(
@@ -1578,20 +1566,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 batch.Delete(row);
             }
 
-            // submit
-            while (true)
+            try
             {
-                try
-                {
-                    var resultList = await table.ExecuteBatchAsync(batch);
-                    return resultList.ToArray();
-                }
-                catch (StorageException storageException)
-                {
-                    if (storageException.IsProblemTableDoesNotExist())
-                        return new TableResult[] { };
-                    throw storageException;
-                }
+                var resultList = await table.ExecuteBatchAsync(batch);
+                return resultList.ToArray();
+            }
+            catch (StorageException storageException)
+            {
+                if (storageException.IsProblemTableDoesNotExist())
+                    return new TableResult[] { };
+                throw storageException;
             }
         }
 
