@@ -13,7 +13,7 @@ using EastFive.Collections.Generic;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
 
-namespace EastFive.Azure.Auth
+namespace EastFive.Azure.Auth.Google
 {
     [FunctionViewController(
         Namespace = "auth",
@@ -66,12 +66,14 @@ namespace EastFive.Azure.Auth
                 requestParams.Add(GoogleProvider.responseParamCode, code);
             if (scope.HasBlackSpace())
                 requestParams.Add(GoogleProvider.responseParamScope, scope);
-            if (scope.HasBlackSpace())
-                requestParams.Add(GoogleProvider.responseParamRedirectUri, request.RequestUri.OriginalString);
             if (authUser.HasBlackSpace())
                 requestParams.Add(AuthUserPropertyName, authUser);
             if (prompt.HasBlackSpace())
                 requestParams.Add(PromptPropertyName, prompt);
+
+            var builder = new UriBuilder(request.RequestUri);
+            builder.Query = string.Empty;
+            requestParams.Add(GoogleProvider.responseParamRedirectUri, builder.Uri.AbsoluteUri);
 
             return await ProcessRequestAsync(method,
                     requestParams,

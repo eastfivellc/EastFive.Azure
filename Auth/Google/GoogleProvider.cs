@@ -35,10 +35,10 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Auth.CredentialProviders;
 using EastFive.Net;
 
-namespace EastFive.Azure.Auth
+namespace EastFive.Azure.Auth.Google
 {
     [IntegrationName(GoogleProvider.IntegrationName)]
-    public class GoogleProvider : IProvideLogin, IProvideSession
+    public class GoogleProvider : IProvideLogin, IProvideSession//, IProvideAccountInformation
     {
         public const string IntegrationName = "Google";
         public string Method => IntegrationName;
@@ -148,15 +148,19 @@ namespace EastFive.Azure.Auth
         private string clientSecret;
         private Uri authorizationApiBase;
         private Uri tokenEndpoint;
+        private string issuer;
+        private OAuth.Keys keys;
         #endregion
 
         public GoogleProvider(string clientId, string clientSecret,
-            Uri authorizationApiBase, Uri tokenEndpoint)
+            Uri authorizationApiBase, Uri tokenEndpoint, string issuer, OAuth.Keys keys)
         {
             this.clientId = clientId;
             this.clientSecret = clientSecret;
             this.authorizationApiBase = authorizationApiBase;
             this.tokenEndpoint = tokenEndpoint;
+            this.issuer = issuer;
+            this.keys = keys;
         }
 
         //[IntegrationName(AppleProvider.IntegrationName)]
@@ -188,21 +192,6 @@ namespace EastFive.Azure.Auth
 
         public Type CallbackController => typeof(GoogleRedirect);
 
-        public class Keys
-        {
-            public Key[] keys { get; set; }
-        }
-
-        public class Key
-        {
-            public string kty { get; set; }
-            public string kid { get; set; }
-            public string use { get; set; }
-            public string alg { get; set; }
-            public string n { get; set; }
-            public string e { get; set; }
-        }
-
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
@@ -219,56 +208,18 @@ namespace EastFive.Azure.Auth
                 return onInvalidCredentials($"`{GoogleProvider.responseParamRedirectUri}` code was not provided");
             var redirectUri = responseParams[GoogleProvider.responseParamRedirectUri];
 
-            using (var httpClient = new HttpClient())
-            {
-                var postValues = new Dictionary<string, string>()
-                    {
-                        { "code", code },
-                        { "client_id", this.clientId },
-                        { "client_secret", this.clientSecret },
-                        { "redirect_uri", "http://localhost:54610/auth/GoogleRedirect" }, //redirectUri },
-                        { "grant_type", "authorization_code" },
-                    };
-                using (var body = new FormUrlEncodedContent(postValues))
+            return await TokenResponse.LoadAsync(this.tokenEndpoint,
+                code, this.clientId, this.clientSecret, redirectUri,
+                (tokenResponse) =>
                 {
-                        try
-                        {
-                            var response = await httpClient.PostAsync(this.tokenEndpoint, body);
-                            var content = await response.Content.ReadAsStringAsync();
-                            if (!response.IsSuccessStatusCode)
-                                return onFailure(content);
+                    var extraParamsWithTokenValues = tokenResponse.AppendResponseParameters(responseParams);
 
-                            var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(content);
-                            return Parse(tokenResponse.id_token, responseParams,
-                                (subject, authorizationId, extraParamsWithTokenValues) =>
-                                    onSuccess(subject, authorizationId, default(Guid?), extraParamsWithTokenValues),
-                                (why) => onFailure(why));
-                        }
-                        catch (System.Net.Http.HttpRequestException ex)
-                        {
-                            return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
-                        }
-                        catch (Exception exGeneral)
-                        {
-                            return onCouldNotConnect(exGeneral.Message);
-                        }
-                }
-            }
-        }
-
-        public class TokenResponse
-        {
-            public string access_token;
-            public int expires_in;
-            public string scope;
-            /// <summary>
-            /// Bearer
-            /// </summary>
-            public string token_type;
-            /// <summary>
-            /// JWT
-            /// </summary>
-            public string id_token;
+                    return Parse(tokenResponse.id_token, extraParamsWithTokenValues,
+                        (subject, authorizationId, extraParamsWithClaimValues) =>
+                            onSuccess(subject, authorizationId, default(Guid?), extraParamsWithClaimValues),
+                        (why) => onFailure(why));
+                },
+                onFailure);
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
@@ -291,79 +242,52 @@ namespace EastFive.Azure.Auth
 
             TResult GetSubject(Func<string, TResult> callback)
             {
-                if (responseParams.ContainsKey("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"))
+                if (responseParams.ContainsKey(claimParamSub))
                 {
-                    var subject = responseParams["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+                    var subject = responseParams[claimParamSub];
                     if (subject.HasBlackSpace())
                         return callback(subject);
                 }
-                if (responseParams.ContainsKey(AppleProvider.responseParamIdToken))
+                
+                if (responseParams.ContainsKey(GoogleProvider.tokenParamIdToken))
                 {
-                    var jwtEncodedString = responseParams[AppleProvider.responseParamIdToken];
-                    var handler = new JwtSecurityTokenHandler();
-                    var token = handler.ReadJwtToken(jwtEncodedString);
-                    return token.Claims
-                        .Where(claim => claim.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")
-                        .First(
-                            (claim, next) => callback(claim.Value),
-                            () => onFailure("No claim http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"));
+                    var jwtEncodedString = responseParams[GoogleProvider.tokenParamIdToken];
+                    return Parse(jwtEncodedString, responseParams,
+                        (subject, state, updatedParamsDiscard) => callback(subject),
+                        onFailure);
                 }
 
-                return onFailure($"Could not locate http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier in params or claims.");
+                return onFailure($"Could not locate {claimParamSub} in params or claims.");
             }
         }
 
-        private static TResult Parse<TResult>(string jwtEncodedString,
+        private TResult Parse<TResult>(string jwtEncodedString,
                 IDictionary<string, string> responseParams,
             Func<string, Guid?, IDictionary<string, string>, TResult> onSuccess,
             Func<string, TResult> onInvalidToken)
         {
-            try
-            {
-                var handler = new JwtSecurityTokenHandler();
-                var jwtSecurityToken = handler.ReadJwtToken(jwtEncodedString);
+            return this.keys.Parse(jwtEncodedString,
+                    issuer, clientId.AsArray(),
+                (subject, jwtSecurityToken, principal) =>
+                {
+                    var state = responseParams.TryGetValue(responseParamState, out string stateStr) ?
+                        Guid.TryParse(stateStr, out Guid stateParsedGuid) ?
+                            stateParsedGuid
+                            :
+                            default(Guid?)
+                        :
+                        default(Guid?);
 
-                var claims = jwtSecurityToken.Claims.ToArray();
-                return claims
-                    .Where(claim => claim.Type == claimParamSub)
-                    .First(
-                        (claim, next) =>
-                        {
-                            var subject = claim.Value;
-                            var state = responseParams.ContainsKey(responseParamState) ?
-                                Guid.TryParse(responseParams[responseParamState], out Guid stateParsedGuid) ?
-                                    stateParsedGuid
-                                    :
-                                    default(Guid?)
-                                :
-                                default(Guid?);
+                    var updatedArgs = principal
+                        .Claims
+                        .Select(claim => claim.Type.PairWithValue(claim.Value))
+                        .Concat(responseParams)
+                        .Distinct(kvp => kvp.Key)
+                        .ToDictionary();
 
-                            var updatedArgs = claims
-                                .Select(claim => claim.Type.PairWithValue(claim.Value))
-                                .Concat(responseParams)
-                                .Distinct(kvp => kvp.Key)
-                                .ToDictionary();
-
-                            return onSuccess(subject, state, updatedArgs);
-                        },
-                        () => onInvalidToken("Token does not identify any specific user."));
-            }
-            catch (ArgumentException ex)
-            {
-                return onInvalidToken(ex.Message);
-            }
-            catch (Microsoft.IdentityModel.Tokens.SecurityTokenInvalidIssuerException ex)
-            {
-                return onInvalidToken(ex.Message);
-            }
-            catch (Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException ex)
-            {
-                return onInvalidToken(ex.Message);
-            }
-            catch (Microsoft.IdentityModel.Tokens.SecurityTokenException ex)
-            {
-                return onInvalidToken(ex.Message);
-            }
+                    return onSuccess(subject, state, updatedArgs);
+                },
+                onInvalidToken: onInvalidToken);
         }
 
         #region IProvideLogin
@@ -413,7 +337,19 @@ namespace EastFive.Azure.Auth
             return (name, email);
         }
 
-        #endregion 
+        public Task<TResult> CreateAccount<TResult>(string subject,
+            IDictionary<string, string> extraParameters,
+            Method authentication, Authorization authorization,
+            Uri baseUri, IApiApplication webApiApplication,
+            Func<Guid, TResult> onCreatedMapping,
+            Func<TResult> onAllowSelfServeAccounts,
+            Func<Uri, TResult> onInterceptProcess,
+            Func<TResult> onNoChange)
+        {
+            return onNoChange().AsTask();
+        }
+
+        #endregion
     }
 
     public class GoogleProviderAttribute : Attribute, IProvideLoginProvider
@@ -425,19 +361,24 @@ namespace EastFive.Azure.Auth
             return AppSettings.Auth.Google.ClientId.ConfigurationString(
                 applicationId =>
                 {
-                    return AppSettings.Auth.Google.ClientSecret.ConfigurationString(
-                        (clientSecret) =>
-                        {
-                            return new Uri(discoveryDocumentUrl).HttpClientGetResource(
-                                (DiscoveryDocument discDoc) =>
+                            return AppSettings.Auth.Google.ClientSecret.ConfigurationString(
+                                async (clientSecret) =>
                                 {
-                                    var provider = new GoogleProvider(applicationId, clientSecret,
-                                        discDoc.authorization_endpoint, discDoc.token_endpoint);
-                                    return onProvideAuthorization(provider);
+                                    return await await new Uri(discoveryDocumentUrl).HttpClientGetResource(
+                                        (DiscoveryDocument discDoc) =>
+                                        {
+                                            return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
+                                                keys =>
+                                                {
+                                                    var provider = new GoogleProvider(applicationId, clientSecret,
+                                                        discDoc.authorization_endpoint, discDoc.token_endpoint, discDoc.issuer, keys);
+                                                    return onProvideAuthorization(provider);
+                                                },
+                                                onNotAvailable);
+                                        },
+                                        onFailure: (why) => onNotAvailable(why).AsTask());
                                 },
-                                onFailure: (why) => onNotAvailable(why));
-                        },
-                        (why) => onNotAvailable(why).AsTask());
+                                (why) => onNotAvailable(why).AsTask());
                 },
                 (why) => onNotAvailable(why).AsTask());
         }
@@ -450,6 +391,7 @@ namespace EastFive.Azure.Auth
             public Uri token_endpoint;
             public Uri userinfo_endpoint;
             public Uri jwks_uri;
+            public string issuer; //https://accounts.google.com
         }
     }
 }
