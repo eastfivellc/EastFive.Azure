@@ -125,6 +125,15 @@ namespace EastFive.Azure.Monitoring
         public async Task<string> TeamsNotifyAsync(IHttpResponse response, string teamsNotifyParam,
             IApplication httpApp, IHttpRequest request)
         {
+            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(request);
+
+            var responseParam = response.Headers
+                .Where(hdr => hdr.Key == Middleware.HeaderStatusName)
+                .Where(hdr => hdr.Value.AnyNullSafe())
+                .First(
+                    (hdr, next) => hdr.Value.First(),
+                    () => "");
+
             var message = await CreateMessageCardAsync(
                 teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
                 httpApp, request,
@@ -136,29 +145,34 @@ namespace EastFive.Azure.Monitoring
                     {
                         new MessageCard.Section.Fact
                         {
-                            name = "Route Name:",
-                            value = "TODO",
+                            name = "Response Param:",
+                            value = responseParam,
                         },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Http Method:",
-                                    value = request.Method.Method,
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "URL:",
-                                    value = request.GetAbsoluteUri().OriginalString,
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Status Code:",
-                                    value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
-                                },
-                                new MessageCard.Section.Fact
-                                {
-                                    name = "Reason:",
-                                    value = response.ReasonPhrase,
-                                },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Http Method:",
+                            value = request.Method.Method,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "URL:",
+                            value = request.GetAbsoluteUri().OriginalString,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Status Code:",
+                            value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "Reason:",
+                            value = response.ReasonPhrase,
+                        },
+                        new MessageCard.Section.Fact
+                        {
+                            name = "RequestID:",
+                            value = monitoringRequest.id.ToString(),
+                        },
                     }
                 });
 

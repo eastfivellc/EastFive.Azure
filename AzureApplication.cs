@@ -567,16 +567,6 @@ namespace EastFive.Api.Azure
                 .SetQueryParam(AzureApplication.QueryRequestIdentfier, authorization.authorizationRef.id.ToString());
             return redirectUrl;
         }
-
-        //public EastFive.Security.SessionServer.Context AzureContext
-        //{
-        //    get
-        //    {
-        //        return new EastFive.Security.SessionServer.Context(
-        //            () => new EastFive.Security.SessionServer.Persistence.DataContext(
-        //                EastFive.Azure.AppSettings.ASTConnectionStringKey));
-        //    }
-        //}
         
         public TResult StoreMonitoring<TResult>(
             Func<StoreMonitoringDelegate, TResult> onMonitorUsingThisCallback,
