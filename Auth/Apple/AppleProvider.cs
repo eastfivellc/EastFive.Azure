@@ -63,8 +63,15 @@ namespace EastFive.Azure.Auth
         public const string responseParamUser = "user";
         #endregion
 
-        public AppleProvider()
+        #region Configured Settings
+        private string applicationId;
+        private string[] validAudiences;
+        #endregion
+
+        public AppleProvider(string applicationId, string [] validAudiences)
         {
+            this.applicationId = applicationId;
+            this.validAudiences = validAudiences;
         }
 
         [IntegrationName(AppleProvider.IntegrationName)]
@@ -73,7 +80,19 @@ namespace EastFive.Azure.Auth
             Func<TResult> onProvideNothing,
             Func<string, TResult> onFailure)
         {
-            return onProvideAuthorization(new AppleProvider()).AsTask();
+            return AppSettings.Auth.Apple.ClientId.ConfigurationString(
+                applicationId =>
+                {
+                    return AppSettings.Auth.Apple.ValidAudiences.ConfigurationString(
+                        (validAudiencesStr) =>
+                        {
+                            var validAudiences = validAudiencesStr.Split(','.AsArray());
+                            var provider = new AppleProvider(applicationId, validAudiences);
+                            return onProvideAuthorization(provider);
+                        },
+                        (why) => onProvideNothing());
+                },
+                (why) => onProvideNothing()).AsTask();
         }
 
         public Type CallbackController => typeof(AppleRedirect);
@@ -106,46 +125,40 @@ namespace EastFive.Azure.Auth
                 return onInvalidCredentials($"`{AppleProvider.responseParamIdToken}` code was not provided");
             var idTokenJwt = responseParams[AppleProvider.responseParamIdToken];
 
-            return await AppSettings.Auth.Apple.ValidAudiences.ConfigurationString(
-                async (validAudiencesStr) =>
+            using (var httpClient = new HttpClient())
+            {
+                var keysUrl = new Uri(appleKeyServerUrl);
+
+                var request = new HttpRequestMessage(HttpMethod.Get, keysUrl);
+                try
                 {
-                    var validAudiences = validAudiencesStr.Split(','.AsArray());
-                    using (var httpClient = new HttpClient())
+                    var response = await httpClient.SendAsync(request);
+                    var content = await response.Content.ReadAsStringAsync();
+                    if (!response.IsSuccessStatusCode)
+                        return onFailure(content);
+                    try
                     {
-                        var keysUrl = new Uri(appleKeyServerUrl);
+                        var keys = JsonConvert.DeserializeObject<Keys>(content);
 
-                        var request = new HttpRequestMessage(HttpMethod.Get, keysUrl);
-                        try
-                        {
-                            var response = await httpClient.SendAsync(request);
-                            var content = await response.Content.ReadAsStringAsync();
-                            if (!response.IsSuccessStatusCode)
-                                return onFailure(content);
-                            try
-                            {
-                                var keys = JsonConvert.DeserializeObject<Keys>(content);
-
-                                return Parse(idTokenJwt, validAudiences, keys, responseParams,
-                                    (subject, authorizationId, extraParamsWithTokenValues) =>
-                                        onSuccess(subject, authorizationId, default(Guid?), extraParamsWithTokenValues),
-                                    (why) => onFailure(why));
-                            }
-                            catch (Newtonsoft.Json.JsonReaderException)
-                            {
-                                return onCouldNotConnect($"Apple returned non-json response:{content}");
-                            }
-                        }
-                        catch (System.Net.Http.HttpRequestException ex)
-                        {
-                            return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
-                        }
-                        catch (Exception exGeneral)
-                        {
-                            return onCouldNotConnect(exGeneral.Message);
-                        }
+                        return Parse(idTokenJwt, validAudiences, keys, responseParams,
+                            (subject, authorizationId, extraParamsWithTokenValues) =>
+                                onSuccess(subject, authorizationId, default(Guid?), extraParamsWithTokenValues),
+                            (why) => onFailure(why));
                     }
-                },
-                (why) => onUnspecifiedConfiguration(why).AsTask());
+                    catch (Newtonsoft.Json.JsonReaderException)
+                    {
+                        return onCouldNotConnect($"Apple returned non-json response:{content}");
+                    }
+                }
+                catch (System.Net.Http.HttpRequestException ex)
+                {
+                    return onCouldNotConnect($"{ex.GetType().FullName}:{ex.Message}");
+                }
+                catch (Exception exGeneral)
+                {
+                    return onCouldNotConnect(exGeneral.Message);
+                }
+            }
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
@@ -294,19 +307,15 @@ namespace EastFive.Azure.Auth
 
         public Uri GetLoginUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {
-            return AppSettings.Auth.Apple.ClientId.ConfigurationString(
-                applicationId =>
-                {
-                    var tokenUrl = new Uri(appleAuthServerUrl)
-                                .AddQueryParameter(requestParamClientId, applicationId)
-                                .AddQueryParameter(requestParamResponseMode, "form_post")
-                                .AddQueryParameter(requestParamResponseType, $"{responseParamCode} {responseParamIdToken}")
-                                .AddQueryParameter(requestParamScope, "name email")
-                                .AddQueryParameter(requestParamState, state.ToString("N"))
-                                .AddQueryParameter(requestParamNonce, Guid.NewGuid().ToString("N"))
-                                .AddQueryParameter(requestParamRedirectUri, responseControllerLocation.AbsoluteUri);
-                    return tokenUrl;
-                });
+            var tokenUrl = new Uri(appleAuthServerUrl)
+                .AddQueryParameter(requestParamClientId, applicationId)
+                .AddQueryParameter(requestParamResponseMode, "form_post")
+                .AddQueryParameter(requestParamResponseType, $"{responseParamCode} {responseParamIdToken}")
+                .AddQueryParameter(requestParamScope, "name email")
+                .AddQueryParameter(requestParamState, state.ToString("N"))
+                .AddQueryParameter(requestParamNonce, Guid.NewGuid().ToString("N"))
+                .AddQueryParameter(requestParamRedirectUri, responseControllerLocation.AbsoluteUri);
+            return tokenUrl;
         }
 
         public Uri GetSignupUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
@@ -370,12 +379,24 @@ namespace EastFive.Azure.Auth
 
     public class AppleProviderAttribute : Attribute, IProvideLoginProvider
     {
-        public TResult ProvideLoginProvider<TResult>(
+        public Task<TResult> ProvideLoginProviderAsync<TResult>(
             Func<IProvideLogin, TResult> onLoaded,
             Func<string, TResult> onNotAvailable)
         {
-            var appleProvider = new AppleProvider();
-            return onLoaded(appleProvider);
+            return AppSettings.Auth.Apple.ClientId.ConfigurationString(
+                applicationId =>
+                {
+                    return AppSettings.Auth.Apple.ValidAudiences.ConfigurationString(
+                        (validAudiencesStr) =>
+                        {
+                            var validAudiences = validAudiencesStr.Split(','.AsArray());
+                            var provider = new AppleProvider(applicationId, validAudiences);
+                            return onLoaded(provider);
+                        },
+                        (why) => onNotAvailable(why));
+                },
+                (why) => onNotAvailable(why)).AsTask();
+
             //return AppSettings.ClientKey.ConfigurationGuid(
             //    (clientKey) =>
             //    {

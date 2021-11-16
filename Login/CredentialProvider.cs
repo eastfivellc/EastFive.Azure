@@ -182,7 +182,7 @@ namespace EastFive.Azure.Login
 
     public class CredentialProviderAttribute : Attribute, IProvideLoginProvider
     {
-        public TResult ProvideLoginProvider<TResult>(
+        public Task<TResult> ProvideLoginProviderAsync<TResult>(
             Func<IProvideLogin, TResult> onLoaded,
             Func<string, TResult> onNotAvailable)
         {
@@ -197,7 +197,7 @@ namespace EastFive.Azure.Login
                         },
                         onNotAvailable);
                 },
-                onNotAvailable);
+                onNotAvailable).AsTask();
         }
     }
 }

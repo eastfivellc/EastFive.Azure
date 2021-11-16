@@ -54,4 +54,10 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Auth\Apple %28copy%29\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Auth\Google\" />
+  </ItemGroup>
 </Project>
