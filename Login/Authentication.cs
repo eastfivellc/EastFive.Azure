@@ -143,6 +143,12 @@ namespace EastFive.Azure.Login
                 () => onInvalidClient().AsTask());
         }
 
+        public struct AuthorizationParameters
+        {
+            public IRef<Authentication> state;
+            public string token;
+        }
+
         [Api.HttpPatch]
         [HtmlAction(Label = "Login")]
         public static async Task<IHttpResponse> UpdateAsync(
@@ -152,6 +158,7 @@ namespace EastFive.Azure.Login
                 [Property(Name = PasswordPropertyName)]string password,
                 IHttpRequest httpRequest,
             RedirectResponse onUpdated,
+            ContentTypeResponse<AuthorizationParameters> onJsonPreferred,
             ContentTypeResponse<string> onHeldup,
             NotFoundResponse onNotFound,
             GeneralConflictResponse onInvalidPassword)
@@ -165,19 +172,21 @@ namespace EastFive.Azure.Login
                         .StorageGetAsync(
                             async account =>
                             {
+                                if(httpRequest.RequestHeaders.Accept.Any(hdr => "application/json".Equals(hdr.MediaType.ToString(), StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    var authorizationParameters = new AuthorizationParameters
+                                    {
+                                        state = authentication.authenticationRef,
+                                        token = authentication.state,
+                                    };
+                                    return onJsonPreferred(authorizationParameters);
+                                }
                                 var passwordHash = Account.GeneratePasswordHash(userIdentification, password);
                                 if (passwordHash != account.password)
                                     return onInvalidPassword("Incorrect username or password.");
                                 authentication.userIdentification = userIdentification;
                                 authentication.authenticated = DateTime.UtcNow;
                                 await saveAsync(authentication);
-                                //var related = request
-                                //    .Related<Login.Redirection>();
-                                //var whered = related
-                                //    .Where(redir => redir.state == authentication.state);
-                                //var authorizationUrl = whered
-                                //    // .ById(authentication.st)
-                                //    .RenderLocation();
                                 var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.state}");
 
                                 if (hold.HasValue && hold.Value)

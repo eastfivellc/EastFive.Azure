@@ -48,5 +48,30 @@ namespace EastFive.Azure.Login
                 (why) => onNoServiceResponse().AddReason(why),
                 (why) => onFailure(why));
         }
+
+        [HttpPatch(MatchAllParameters = false)]
+        public static async Task<IHttpResponse> PatchAsync(
+                IAzureApplication application, IProvideUrl urlHelper,
+                IHttpRequest request,
+                IInvokeApplication endpoints,
+            RedirectResponse onRedirectResponse,
+            ServiceUnavailableResponse onNoServiceResponse,
+            BadRequestResponse onBadCredentials,
+            GeneralConflictResponse onFailure)
+        {
+            var parameters = request.RequestUri.ParseQuery();
+            parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
+            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
+                CredentialProvider.IntegrationName, application);
+
+            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication,
+                    parameters,
+                    application,
+                    request, endpoints, urlHelper,
+                (redirect, accountIdMaybe) => onRedirectResponse(redirect).AddReason("success"),
+                (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
+                (why) => onNoServiceResponse().AddReason(why),
+                (why) => onFailure(why));
+        }
     }
 }

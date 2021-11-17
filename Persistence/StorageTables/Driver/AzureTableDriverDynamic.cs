@@ -1232,12 +1232,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         {
             var table = GetTable<TData>();
             var update = TableOperation.Replace(tableData);
-            //var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
-            //    rollbacks => rollbacks,
-            //    (members) => throw new Exception("Modifiers failed to execute."));
-            var rollback = await tableData.ExecuteCreateModifiersAsync(this,
+            var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
                 rollbacks => rollbacks,
                 (members) => throw new Exception("Modifiers failed to execute."));
+            //var rollback = await tableData.ExecuteCreateModifiersAsync(this,
+            //    rollbacks => rollbacks,
+            //    (members) => throw new Exception("Modifiers failed to execute."));
             try
             {
                 await new E5CloudTable(table).ExecuteAsync(update);

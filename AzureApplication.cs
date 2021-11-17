@@ -191,18 +191,20 @@ namespace EastFive.Api.Azure
             }
         }
 
+        private IDictionary<string, IProvideLogin> loginProviders;
         public IDictionary<string, IProvideLogin> LoginProviders
         {
             get
             {
-                return this.GetType()
-                    .GetAttributesInterface<IProvideLoginProvider>(true, true)
-                    .Select(
-                        loginProviderProvider => loginProviderProvider.ProvideLoginProvider(
-                            loginProvider => loginProvider,
-                            (why) => default))
-                    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
-                    .ToDictionary(ktem => ktem.Method);
+                return loginProviders;
+                //return this.GetType()
+                //    .GetAttributesInterface<IProvideLoginProvider>(true, true)
+                //    .Select(
+                //        loginProviderProvider => loginProviderProvider.ProvideLoginProvider(
+                //            loginProvider => loginProvider,
+                //            (why) => default))
+                //    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
+                //    .ToDictionary(ktem => ktem.Method);
 
                 //return this.InstantiateAll<IProvideLogin>()
                 //    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
@@ -341,7 +343,33 @@ namespace EastFive.Api.Azure
 
         protected override async Task<Initialized> InitializeAsync()
         {
-            return await base.InitializeAsync();
+            var applicationType = this.GetType();
+            var loginProviderProviders = applicationType
+                .GetAttributesInterface<IProvideLoginProvider>(true, true)
+                .ToArray();
+            var loginProviders = await loginProviderProviders
+                .Select(
+                    async loginProviderProvider =>
+                    {
+                        try
+                        {
+                            return await loginProviderProvider.ProvideLoginProviderAsync(
+                                loginProvider => (true, loginProvider),
+                                (why) => (false, default(IProvideLogin)));
+                        }
+                        catch (Exception)
+                        {
+                            return (false, default(IProvideLogin));
+                        }
+                    })
+                .AsyncEnumerable()
+                .SelectWhere()
+                .ToArrayAsync();
+
+            this.loginProviders = loginProviders.ToDictionary(ktem => ktem.Method);
+
+            var initialized = await base.InitializeAsync();
+            return initialized;
         }
 
         //internal virtual IManageAuthorizationRequests AuthorizationRequestManager
@@ -539,16 +567,6 @@ namespace EastFive.Api.Azure
                 .SetQueryParam(AzureApplication.QueryRequestIdentfier, authorization.authorizationRef.id.ToString());
             return redirectUrl;
         }
-
-        //public EastFive.Security.SessionServer.Context AzureContext
-        //{
-        //    get
-        //    {
-        //        return new EastFive.Security.SessionServer.Context(
-        //            () => new EastFive.Security.SessionServer.Persistence.DataContext(
-        //                EastFive.Azure.AppSettings.ASTConnectionStringKey));
-        //    }
-        //}
         
         public TResult StoreMonitoring<TResult>(
             Func<StoreMonitoringDelegate, TResult> onMonitorUsingThisCallback,

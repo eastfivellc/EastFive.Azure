@@ -246,6 +246,24 @@ namespace EastFive.Azure
                 public const string ValidAudiences = "EastFive.Apple.ValidAudiences";
             }
 
+            [Config]
+            public static class Google
+            {
+                [ConfigKey("ID used to identify the application to Google.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Google API Console: https://console.cloud.google.com/apis/credentials?authuser=2&project=east-five-framework&supportedpurview=project",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientId = "EastFive.Google.ClientID";
+
+                [ConfigKey("Key used to redeem a token code to Google.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Google API Console: https://console.cloud.google.com/apis/credentials?authuser=2&project=east-five-framework&supportedpurview=project",
+                    DeploymentSecurityConcern = true,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientSecret = "EastFive.Google.ClientSecret";
+            }
+
             public const string OpenApiCollectionName = "EastFive.Azure.Auth";
         }
     }
