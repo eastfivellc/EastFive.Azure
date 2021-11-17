@@ -530,6 +530,18 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onFailure,
             TelemetryClient telemetry)
         {
+            // applies when intercept process is used
+            if (authorization.accountIdMaybe.IsDefault())
+            {
+                authorization = await authorization.authorizationRef.StorageUpdateAsync(
+                    async (a, saveAsync) =>
+                    {
+                        a.accountIdMaybe = internalAccountId;
+                        await saveAsync(a);
+                        return a;
+                    });
+            }
+
             return await await AccountMapping.CreateByMethodAndKeyAsync(authorization, externalAccountKey,
                 internalAccountId,
                 ProcessAsync,
