@@ -336,11 +336,16 @@ namespace EastFive.Azure.Auth
         #endregion
 
         public async static Task<Session> CreateAsync(
-            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe)
+            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
+            IRefOptional<Session> sessionToCreateMaybe)
         {
+            var sessionId = sessionToCreateMaybe.HasValueNotNull() ?
+                sessionToCreateMaybe.Ref
+                :
+                Ref<Session>.SecureRef();
             var session = new Session()
             {
-                sessionId = Ref<Session>.SecureRef(),
+                sessionId = sessionId,
                 refreshToken = Security.SecureGuid.Generate().ToString("N"),
                 authorization = authorizationRefMaybe,
             };

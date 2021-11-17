@@ -229,60 +229,75 @@ namespace EastFive.Azure.Auth
             CreatedBodyResponse<Session> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onAuthorizationFailed,
-            ServiceUnavailableResponse onServericeUnavailable,
+            ServiceUnavailableResponse onServiceUnavailable,
             ForbiddenResponse onInvalidMethod,
             GeneralConflictResponse onFailure)
         {
-            return await await Auth.Method.ById(methodRef, application,
-                async (method) =>
+            return await AuthenticateWithSessionAsync(authorizationRef, sessionRef,
+                methodRef, parameters,
+                application, endpoints, request,
+                onAuthorized: (sessionCreated, redirect) =>
                 {
-                    var paramsUpdated = parameters
-                        .Append(
-                            authorizationRef.id.ToString().PairWithKey("state"))
-                        .ToDictionary();
-                    //var authorizationRequestManager = application.AuthorizationRequestManager;
-                    return await await Redirection.AuthenticationAsync(
-                            method,
-                            paramsUpdated,
-                            application, request,
-                            endpoints,
-                            request.RequestUri,
-                            authorizationRef.Optional(),
-                        async (redirect, accountIdMaybe, modifier) =>
-                        {
-                            var session = new Session()
-                            {
-                                sessionId = sessionRef,
-                                account = accountIdMaybe,
-                                authorization = authorizationRef.Optional(),
-                            };
-                            var responseCreated = await Session.CreateAsync(sessionRef, authorizationRef.Optional(),
-                                    session,
-                                    application,
-                                (sessionCreated, contentType) =>
-                                {
-                                    var response = onCreated(sessionCreated, contentType: contentType);
-                                    response.SetLocation(redirect);
-                                    return response;
-                                },
-                                onAlreadyExists,
-                                onAuthorizationFailed,
-                                (why1, why2) => onServericeUnavailable(),
-                                onFailure);
-                            var modifiedResponse = modifier(responseCreated);
-                            return modifiedResponse;
-                        },
-                        () => onAuthorizationFailed()
-                            .AddReason("Authorization was not found")
-                            .AsTask(), // Bad credentials
-                        why => onServericeUnavailable()
-                            .AddReason(why)
-                            .AsTask(),
-                        why => onAuthorizationFailed()
-                            .AddReason(why)
-                            .AsTask());
+                    var response = onCreated(sessionCreated, contentType: "application/json");
+                    response.SetLocation(redirect);
+                    return response;
                 },
-                () => onInvalidMethod().AddReason("The method was not found.").AsTask());
+                onAuthorizationDoesNotExist: () => onAuthorizationFailed()
+                    .AddReason("Authorization does not exists"),
+                onServiceUnavailable: (why) => onServiceUnavailable().AddReason(why),
+                onInvalidMethod: (why) => onInvalidMethod().AddReason(why),
+                onAuthorizationFailed: why => onAuthorizationFailed().AddReason(why));
+
+            //return await await Auth.Method.ById(methodRef, application,
+            //    async (method) =>
+            //    {
+            //        var paramsUpdated = parameters
+            //            .Append(
+            //                authorizationRef.id.ToString().PairWithKey("state"))
+            //            .ToDictionary();
+            //        //var authorizationRequestManager = application.AuthorizationRequestManager;
+            //        return await await Redirection.AuthenticationAsync(
+            //                method,
+            //                paramsUpdated,
+            //                application, request,
+            //                endpoints,
+            //                request.RequestUri,
+            //                authorizationRef.Optional(),
+            //            async (redirect, accountIdMaybe, modifier) =>
+            //            {
+            //                var session = new Session()
+            //                {
+            //                    sessionId = sessionRef,
+            //                    account = accountIdMaybe,
+            //                    authorization = authorizationRef.Optional(),
+            //                };
+            //                var responseCreated = await Session.CreateAsync(sessionRef, authorizationRef.Optional(),
+            //                        session,
+            //                        application,
+            //                    (sessionCreated, contentType) =>
+            //                    {
+            //                        var response = onCreated(sessionCreated, contentType: contentType);
+            //                        response.SetLocation(redirect);
+            //                        return response;
+            //                    },
+            //                    onAlreadyExists,
+            //                    onAuthorizationFailed,
+            //                    (why1, why2) => onServericeUnavailable(),
+            //                    onFailure);
+            //                var modifiedResponse = modifier(responseCreated);
+            //                return modifiedResponse;
+            //            },
+            //            () => onAuthorizationFailed()
+            //                .AddReason("Authorization was not found")
+            //                .AsTask(), // Bad credentials
+            //            why => onServericeUnavailable()
+            //                .AddReason(why)
+            //                .AsTask(),
+            //            why => onAuthorizationFailed()
+            //                .AddReason(why)
+            //                .AsTask());
+            //    },
+            //    () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }
 
         #endregion
@@ -314,6 +329,41 @@ namespace EastFive.Azure.Auth
                     return onUpdated();
                 },
                 () => onNotFound());
+        }
+
+        [Api.HttpPatch]
+        public async static Task<IHttpResponse> AuthorizeAsync(
+                [QueryParameter(Name = "session")] IRef<Session> sessionRef,
+                [UpdateId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
+                [Property(Name = ParametersPropertyName)] IDictionary<string, string> parameters,
+                Api.Azure.AzureApplication application,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
+            CreatedBodyResponse<Session> onCreated,
+            NotFoundResponse onAuthorizationDoesNotExist,
+            ForbiddenResponse onAuthorizationFailed,
+            ServiceUnavailableResponse onServiceUnavailable,
+            ForbiddenResponse onInvalidMethod,
+            GeneralConflictResponse onFailure)
+        {
+            return await await authorizationRef.StorageGetAsync(
+                (authorization) =>
+                {
+                    return AuthenticateWithSessionAsync(authorizationRef, sessionRef,
+                            authorization.Method, parameters,
+                            application, endpoints, request,
+                        onAuthorized: (sessionCreated, redirect) =>
+                        {
+                            var response = onCreated(sessionCreated, contentType: "application/json");
+                            response.SetLocation(redirect);
+                            return response;
+                        },
+                        onAuthorizationDoesNotExist: () => onAuthorizationDoesNotExist(),
+                        onServiceUnavailable: (why) => onServiceUnavailable().AddReason(why),
+                        onInvalidMethod: (why) => onInvalidMethod().AddReason(why),
+                        onAuthorizationFailed: why => onAuthorizationFailed().AddReason(why));
+                },
+                () => onAuthorizationDoesNotExist().AsTask());
         }
 
         #endregion
@@ -446,6 +496,46 @@ namespace EastFive.Azure.Auth
         #endregion
 
         #endregion
+
+        private static async Task<TResult> AuthenticateWithSessionAsync<TResult>(
+                IRef<Authorization> authorizationRef, IRef<Session> sessionRef,
+                IRef<Method> methodRef,
+                IDictionary<string, string> parameters,
+                Api.Azure.AzureApplication application,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
+            Func<Session, Uri, TResult> onAuthorized,
+            Func<TResult> onAuthorizationDoesNotExist,
+            Func<string, TResult> onServiceUnavailable,
+            Func<string, TResult> onInvalidMethod,
+            Func<string, TResult> onAuthorizationFailed)
+        {
+            return await await Auth.Method.ById(methodRef, application,
+                async (method) =>
+                {
+                    var paramsUpdated = parameters
+                        .Append(authorizationRef.id.ToString().PairWithKey("state"))
+                        .ToDictionary();
+
+                    return await await Redirection.AuthenticationAsync(
+                            method,
+                            paramsUpdated,
+                            application, request,
+                            endpoints,
+                            request.RequestUri,
+                            authorizationRef.Optional(),
+                        async (redirect, accountIdMaybe, modifier) =>
+                        {
+                            var session = await Session.CreateAsync(application,
+                                authorizationRef.Optional(), sessionRef.Optional());
+                            return onAuthorized(session, redirect);
+                        },
+                        () => onAuthorizationDoesNotExist().AsTask(),
+                        onCouldNotConnect:why => onServiceUnavailable(why).AsTask(),
+                        onGeneralFailure:why => onAuthorizationFailed(why).AsTask());
+                },
+                () => onInvalidMethod("The method was not found.").AsTask());
+        }
 
         public async Task<TResult> ParseCredentailParameters<TResult>(
                 IAuthApplication application,

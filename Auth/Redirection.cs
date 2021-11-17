@@ -14,6 +14,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Api;
 using EastFive.Web.Configuration;
+using EastFive.Api.Azure.Credentials;
 
 namespace EastFive.Azure.Auth
 {
@@ -381,6 +382,20 @@ namespace EastFive.Azure.Auth
         {
             authorization.authorized = true;
             authorization.LocationAuthentication = null;
+
+            if(application is IProvideAccountInformation)
+            {
+                var accountInfoProvider = (IProvideAccountInformation)application;
+                accountInfoProvider.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
+                    onFound:internalAccountId =>
+                    {
+                        return onLocated(
+                                internalAccountId,
+                                (isAccountInvalid) => OnNotFound(isAccountInvalid))
+                            .AsTask();
+                    },
+                    () => OnNotFound(false));
+            }
 
             return await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
                     authorization,
