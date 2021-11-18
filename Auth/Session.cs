@@ -114,7 +114,16 @@ namespace EastFive.Azure.Auth
                         },
                         (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
                 },
-                (why) => onClaims(new Dictionary<string, string>(), default(Guid?), false).AsTask());
+                (why) =>
+                {
+                    return GetSessionAcountAsync(authorizationRef, application,
+                        (accountId, authorized) =>
+                        {
+                            var claims = new Dictionary<string, string>();
+                            return onClaims(claims, accountId, authorized);
+                        },
+                        (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
+                });
         }
 
         #region Http Methods
@@ -393,6 +402,9 @@ namespace EastFive.Azure.Auth
                     if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
 
+                    if (authorization.accountIdMaybe.HasValue)
+                        return onSuccess(authorization.accountIdMaybe.Value, authorization.authorized);
+
                     var methodRef = authorization.Method;
                     return await await Method.ById(methodRef, application,
                         async method =>
@@ -400,6 +412,14 @@ namespace EastFive.Azure.Auth
                             return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
                                 (externalUserKey) =>
                                 {
+                                    if (application is Api.Azure.Credentials.IProvideAccountInformation)
+                                    {
+                                        return (application as Api.Azure.Credentials.IProvideAccountInformation)
+                                            .FindOrCreateAccountByMethodAndKeyAsync(
+                                                    methodRef, externalUserKey,
+                                                    accountId => onSuccess(accountId, authorization.authorized),
+                                                () => onFailure("No mapping to that account.", authorization.authorized));
+                                    }
                                     return Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
                                             authorization,
                                         accountId => onSuccess(accountId, authorization.authorized),

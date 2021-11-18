@@ -166,6 +166,9 @@ namespace EastFive.Azure.Auth
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Method> onAuthenticationDoesNotExist)
         {
+            authorization.accountIdMaybe = default;
+            authorization.authorized = false;
+
             return await await Auth.Method.ById(method, application,
                 async (authentication) =>
                 {
@@ -196,6 +199,8 @@ namespace EastFive.Azure.Auth
             ServiceUnavailableResponse onServericeUnavailable,
             ForbiddenResponse onInvalidMethod)
         {
+            authorization.accountIdMaybe = default;
+            authorization.authorized = false;
             return await await Auth.Method.ById(methodRef, application,
                 (method) =>
                 {

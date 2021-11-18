@@ -39,7 +39,7 @@ namespace EastFive.Azure.Auth.Google
 
         public const string AuthUserPropertyName = "authuser";
         public const string PromptPropertyName = "prompt";
-
+        public const string HdPropertyName = "hd";
 
         [HttpGet]
         public static async Task<IHttpResponse> Redirected(
@@ -48,6 +48,7 @@ namespace EastFive.Azure.Auth.Google
                 [QueryParameter(Name = ScopePropertyName)]string scope,
                 [OptionalQueryParameter(Name = AuthUserPropertyName)] string authUser,
                 [OptionalQueryParameter(Name = PromptPropertyName)] string prompt,
+                [OptionalQueryParameter(Name = HdPropertyName)] string hd,
                 IAzureApplication application,
                 IHttpRequest request,
                 IProvideUrl urlHelper,
@@ -70,6 +71,8 @@ namespace EastFive.Azure.Auth.Google
                 requestParams.Add(AuthUserPropertyName, authUser);
             if (prompt.HasBlackSpace())
                 requestParams.Add(PromptPropertyName, prompt);
+            if(hd.HasBlackSpace())
+                requestParams.Add(HdPropertyName, hd);
 
             var builder = new UriBuilder(request.RequestUri);
             builder.Query = string.Empty;

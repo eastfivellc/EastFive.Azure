@@ -191,6 +191,7 @@ namespace EastFive.Azure.Auth
                 {
                     authorization.parameters = extraParams;
                     authorization.accountIdMaybe = internalAccountId;
+                    authorization.authorized = true;
                     return await await CreateLoginResponseAsync(
                                 internalAccountId, extraParams,
                                 authentication, authorization,
@@ -222,6 +223,8 @@ namespace EastFive.Azure.Auth
                 async (internalAccountId) =>
                 {
                     authorization.parameters = extraParams;
+                    authorization.accountIdMaybe = internalAccountId;
+                    authorization.authorized = true;
                     await saveAsync(authorization);
                     return await CreateLoginResponseAsync(
                                             internalAccountId, extraParams,
