@@ -48,17 +48,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public AzureTableDriverDynamic(CloudStorageAccount storageAccount, string connectionString)
         {
-            lock (tableClientsLock)
-            {
-                (TableClient, tableClients) = tableClients.AddIfMissing(
-                        storageAccount.TableEndpoint.AbsoluteUri,
-                        onAddValueSinceMissing: (save) =>
-                        {
-                            var newCloudClient = storageAccount.CreateCloudTableClient();
-                            return save(newCloudClient);
-                        },
-                        (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
-            }
+            TableClient = storageAccount.CreateCloudTableClient();
+            //lock (tableClientsLock)
+            //{
+            //    (TableClient, tableClients) = tableClients.AddIfMissing(
+            //            storageAccount.TableEndpoint.AbsoluteUri,
+            //            onAddValueSinceMissing: (save) =>
+            //            {
+            //                var newCloudClient = storageAccount.CreateCloudTableClient();
+            //                return save(newCloudClient);
+            //            },
+            //            (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
+            //}
             TableClient.DefaultRequestOptions.RetryPolicy =
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
 
