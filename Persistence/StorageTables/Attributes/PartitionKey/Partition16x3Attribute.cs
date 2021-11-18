@@ -1,17 +1,22 @@
-﻿using BlackBarLabs.Persistence.Azure;
-using EastFive.Linq.Expressions;
-using EastFive.Reflection;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
+using EastFive;
+using EastFive.Azure.Persistence;
+using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Linq.Expressions;
+using EastFive.Reflection;
+
+
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class Partition16x3Attribute : Attribute,
-        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey
+        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey, IGenerateAzureStorageTablePartitionIndex
     {
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
@@ -40,6 +45,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             return Enumerable
                 .Range(skip, top)
                 .Select((paritionNum) => paritionNum.ToString("X3").ToLower());
+        }
+
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            return GetValue(rowKey);
         }
     }
 }

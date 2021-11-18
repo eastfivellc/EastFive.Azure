@@ -12,6 +12,5 @@ namespace EastFive.Azure.Auth
         Uri GetLogoutUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation);
         
         Uri GetSignupUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation);
-        
     }
 }

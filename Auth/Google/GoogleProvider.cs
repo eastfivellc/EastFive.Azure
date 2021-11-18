@@ -38,7 +38,7 @@ using EastFive.Net;
 namespace EastFive.Azure.Auth.Google
 {
     [IntegrationName(GoogleProvider.IntegrationName)]
-    public class GoogleProvider : IProvideLogin, IProvideSession//, IProvideAccountInformation
+    public class GoogleProvider : IProvideLogin, IProvideSession, IProvideClaims
     {
         public const string IntegrationName = "Google";
         public string Method => IntegrationName;
@@ -278,10 +278,15 @@ namespace EastFive.Azure.Auth.Google
                         :
                         default(Guid?);
 
+                    var sourceClaims = jwtSecurityToken.Claims
+                        .Select(claim => claim.Type.PairWithValue(claim.Value))
+                        .ToArray();
+
                     var updatedArgs = principal
                         .Claims
                         .Select(claim => claim.Type.PairWithValue(claim.Value))
                         .Concat(responseParams)
+                        .Concat(sourceClaims)
                         .Distinct(kvp => kvp.Key)
                         .ToDictionary();
 
@@ -318,6 +323,46 @@ namespace EastFive.Azure.Auth.Google
         public Task<bool> SupportsSessionAsync(EastFive.Azure.Auth.Session session)
         {
             return true.AsTask();
+        }
+
+        #endregion
+
+        #region IProvideClaims
+
+        public bool GetStandardClaimValue(string claimType,
+            IDictionary<string, string> parameters, out string claimValue)
+        {
+            if (claimType.IsNullOrWhiteSpace())
+            {
+                claimValue = default;
+                return false;
+            }
+            if (parameters.ContainsKey(claimType))
+            {
+                claimValue = parameters[claimType];
+                return true;
+            }
+            if (System.Security.Claims.ClaimTypes.NameIdentifier.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+                if (parameters.ContainsKey(claimParamSub))
+                {
+                    claimValue = parameters[claimParamSub];
+                    return true;
+                }
+            if (System.Security.Claims.ClaimTypes.Email.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+                if (parameters.ContainsKey(claimParamEmail))
+                {
+                    claimValue = parameters[claimParamEmail];
+                    return true;
+                }
+            if (System.Security.Claims.ClaimTypes.GivenName.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+                if (parameters.ContainsKey(claimParamGivenName))
+                {
+                    claimValue = parameters[claimParamGivenName];
+                    return true;
+                }
+
+            claimValue = default;
+            return false;
         }
 
         #endregion

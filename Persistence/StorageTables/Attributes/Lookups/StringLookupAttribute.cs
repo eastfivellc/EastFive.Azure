@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 
 using EastFive.Extensions;
+using EastFive.Reflection;
 using EastFive.Linq.Expressions;
 using EastFive.Serialization;
 

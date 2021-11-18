@@ -17,5 +17,26 @@ namespace EastFive.Api.Azure.Credentials
             Func<TResult> onAllowSelfServeAccounts,
             Func<Uri, TResult> onInterceptProcess,
             Func<TResult> onNoChange);
+
+        Task<TResult> FindOrCreateAccountByMethodAndKeyAsync<TResult>(
+                IRef<Method> methodRef, string externalAccountKey,
+            Func<Guid, TResult> onFound,
+            Func<TResult> onNotFound);
+
+        Task<TResult> CreateUnpopulatedAccountAsync<TResult>(
+                IRef<Method> methodRef, string externalAccountKey,
+            Func<IAccount, Func<IAccount, Task>, Task<TResult>> onNeedsPopulated,
+            Func<Uri, TResult> onInterupted,
+            Func<string, TResult> onNotCreated);
+    }
+
+    public static class ClaimsList
+    {
+
+    }
+
+    public interface IProvideClaims
+    {
+        bool GetStandardClaimValue(string claimType, IDictionary<string, string> parameters, out string claimValue);
     }
 }

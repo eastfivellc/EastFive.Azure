@@ -9,7 +9,6 @@ using EastFive.Async;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using BlackBarLabs.Persistence.Azure.StorageTables;
@@ -867,6 +866,98 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     default);
         }
 
+        public static async Task<TResult> FindIdByAsync<TProperty, TEntity, TResult>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> propertyExpr,
+                Func<IRefAst<TEntity>, TResult> onFound,
+                Func<TResult> onNotFound,
+            Expression<Func<TEntity, bool>> additionalQuery1 = default,
+            Expression<Func<TEntity, bool>> additionalQuery2 = default,
+            Expression<Func<TEntity, bool>> additionalQuery3 = default,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+                params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            return await storageDriver
+                .FindIdsBy(propertyValue,
+                    propertyExpr,
+                    queries: new Expression<Func<TEntity, bool>>[] { }
+                        .AppendIf(additionalQuery1, additionalQuery1.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery2, additionalQuery2.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery3, additionalQuery3.IsNotDefaultOrNull())
+                        .ToArray())
+                .FirstAsync(
+                    (index) => onFound(index.Cast<TEntity>()),
+                    () => onNotFound());
+        }
+
+        public static async Task<TResult> StorageCreateOrUpdateByIndexAsync<TProperty, TEntity, TResult>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> propertyExpr,
+            // Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Expression<Func<TEntity, bool>> additionalQuery1 = default,
+            Expression<Func<TEntity, bool>> additionalQuery2 = default,
+            Expression<Func<TEntity, bool>> additionalQuery3 = default,
+            Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onReadyForUpdate = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            return await await propertyValue.FindIdByAsync<TProperty, TEntity, Task<TResult>>(
+                propertyExpr: propertyExpr,
+                onFound: astRef =>
+                {
+                    return AzureTableDriverDynamic
+                        .FromSettings()
+                        .UpdateOrCreateAsync(astRef.RowKey, astRef.PartitionKey,
+                            onUpdate: onReadyForUpdate,
+                            onModificationFailures: onModificationFailures,
+                            onFailure: onFailure);
+                },
+                onNotFound: () =>
+                {
+                    var rowKey = typeof(TEntity)
+                        .GetPropertyAndFieldsWithAttributesInterface<IGenerateAzureStorageTableRowKeyIndex>()
+                        .First(
+                            (tpl, next) =>
+                            {
+                                var (memberInfo, attr) = tpl;
+                                return attr.GenerateRowKeyIndex(tpl.Item1);
+                            },
+                            () =>
+                            {
+                                throw new Exception("Could not generate row key.");
+                                return "";
+                            });
+                    var partitionKey = typeof(TEntity)
+                        .GetPropertyAndFieldsWithAttributesInterface<IGenerateAzureStorageTablePartitionIndex>()
+                        .First(
+                            (tpl, next) =>
+                            {
+                                var (memberInfo, attr) = tpl;
+                                return attr.GeneratePartitionIndex(memberInfo, rowKey);
+                            },
+                            () =>
+                            {
+                                throw new Exception("Could not generate row key.");
+                                return "";
+                            });
+
+                    return AzureTableDriverDynamic
+                        .FromSettings()
+                        .UpdateOrCreateAsync<TEntity, TResult>(rowKey, partitionKey,
+                            onUpdate:(created, newEntity, saveEntity) =>
+                            {
+                                if (propertyExpr.TryGetMemberExpression(out MemberInfo property))
+                                    newEntity = (TEntity)property.SetPropertyOrFieldValue(newEntity, propertyValue);
+                                return onReadyForUpdate(created, newEntity, saveEntity);
+                            },
+                            onModificationFailures: onModificationFailures,
+                            onFailure: onFailure);
+
+                },
+                onModificationFailures: default); // TODO:
+        }
+
         public static Task<TResult> StorageCreateOrUpdateAsync<TEntity, TResult>(this IQueryable<TEntity> entityQuery,
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -1051,6 +1142,39 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         },
                     onNotFound: onDoesNotExists,
                     onModificationFailures: onModificationFailures);
+        }
+
+        public static async Task<TResult> StorageUpdateAsync<TProperty, TEntity, TResult>(this TProperty entityRef,
+            Expression<Func<TEntity, TProperty>> property1,
+            Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
+            Func<TResult> onDoesNotExists = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryById = query.StorageQueryByProperty(entityRef, property1);
+            var queryFull = additionalProperties(queryById);
+
+            var rowKey = queryFull.StorageComputeRowKey();
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+            return await storageDriver
+                .UpdateAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageUpdateTableResult(tr);
+                                });
+                        },
+                    onNotFound: onDoesNotExists,
+                    onModificationFailures: onModificationFailures,
+                    onFailure: onFailure);
         }
 
         public static async Task<TResult> StorageUpdateAsync<TEntity, TResult>(this IRef<TEntity> entityRef,

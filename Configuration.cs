@@ -25,6 +25,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web;
 using EastFive.Web.Configuration;
 using Newtonsoft.Json;
+using EastFive.Reflection;
 
 namespace EastFive.Azure.Configuration
 {

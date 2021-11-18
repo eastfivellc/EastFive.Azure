@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -6,7 +7,9 @@ using Microsoft.ApplicationInsights;
 
 using Newtonsoft.Json;
 
+using EastFive;
 using EastFive.Extensions;
+using EastFive.Reflection;
 using EastFive.Security.SessionServer.Exceptions;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -15,6 +18,7 @@ using EastFive.Persistence;
 using EastFive.Api;
 using EastFive.Web.Configuration;
 using EastFive.Api.Azure.Credentials;
+using EastFive.Linq;
 
 namespace EastFive.Azure.Auth
 {
@@ -368,7 +372,7 @@ namespace EastFive.Azure.Auth
         }
 
         public static async Task<TResult> IdentifyAccountAsync<TResult>(Authorization authorization,
-                Method authentication, string externalAccountKey,
+                Method authenticationMethod, string externalAccountKey,
                 IDictionary<string, string> extraParams,
                 IAzureApplication application,
                 IProvideLogin loginProvider,
@@ -383,21 +387,63 @@ namespace EastFive.Azure.Auth
             authorization.authorized = true;
             authorization.LocationAuthentication = null;
 
-            if(application is IProvideAccountInformation)
+            if (loginProvider is IProvideClaims)
             {
-                var accountInfoProvider = (IProvideAccountInformation)application;
-                accountInfoProvider.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
-                    onFound:internalAccountId =>
+                var claimProvider = (IProvideClaims)loginProvider;
+                if (application is IProvideAccountInformation)
+                {
+                    var accountInfoProvider = (IProvideAccountInformation)application;
+                    return await await accountInfoProvider.FindOrCreateAccountByMethodAndKeyAsync(
+                            authenticationMethod.authenticationId, externalAccountKey,
+                        onFound: internalAccountId =>
+                        {
+                            return onLocated(
+                                     internalAccountId,
+                                     (isAccountInvalid) => CreateAccountAsync())
+                                 .AsTask();
+                        },
+                        () => CreateAccountAsync());
+
+                    Task<TResult> CreateAccountAsync()
                     {
-                        return onLocated(
-                                internalAccountId,
-                                (isAccountInvalid) => OnNotFound(isAccountInvalid))
-                            .AsTask();
-                    },
-                    () => OnNotFound(false));
+                        return accountInfoProvider.CreateUnpopulatedAccountAsync(
+                                authenticationMethod.authenticationId, externalAccountKey,
+                            onNeedsPopulated: async (account, saveAsync) =>
+                            {
+                                var accountLinksToEdit = account.AccountLinks;
+                                accountLinksToEdit.accountLinks = account.AccountLinks.accountLinks
+                                    .NullToEmpty()
+                                    .Where(al => al.method.id != authenticationMethod.authenticationId.id)
+                                    .Append(
+                                        new AccountLink()
+                                        {
+                                            externalAccountKey = externalAccountKey,
+                                            method = authenticationMethod.authenticationId,
+                                        })
+                                    .ToArray();
+                                account.AccountLinks = accountLinksToEdit;
+
+                                var populatedAccount = account.GetType()
+                                    .GetPropertyAndFieldsWithAttributesInterface<PopulatedByAuthorizationClaim>()
+                                    .Aggregate(account,
+                                        (accountToUpdate, tpl) =>
+                                        {
+                                            var (member, populationAttr) = tpl;
+                                            return populationAttr.PopulateValue(accountToUpdate, member,
+                                                (string claimType, out string claimValue) =>
+                                                    claimProvider.GetStandardClaimValue(claimType, extraParams, out claimValue));
+                                        });
+                                await saveAsync(populatedAccount);
+
+                                return onCreated(populatedAccount.id);
+                            },
+                            onInterupted: (uri) => onInterupted(uri),
+                            onNotCreated: (string why) => onGeneralFailure(why));
+                    }
+                }
             }
 
-            return await await AccountMapping.FindByMethodAndKeyAsync(authentication.authenticationId, externalAccountKey,
+            return await await AccountMapping.FindByMethodAndKeyAsync(authenticationMethod.authenticationId, externalAccountKey,
                     authorization,
                 // Found
                 internalAccountId =>
@@ -412,7 +458,7 @@ namespace EastFive.Azure.Auth
             async Task<TResult> OnNotFound(bool isAccountInvalid)
             {
                 return await await UnmappedCredentialAsync(externalAccountKey, extraParams,
-                            authentication, authorization,
+                            authenticationMethod, authorization,
                             loginProvider, application, baseUri,
 
                         // Create mapping

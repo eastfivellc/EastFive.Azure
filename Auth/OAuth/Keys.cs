@@ -19,8 +19,6 @@ namespace EastFive.Azure.Auth.OAuth
 {
     public class Keys
     {
-        private const string SubjectClaimKey = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
-
         public static Task<TResult> LoadTokenKeysAsync<TResult>(Uri jwksUri,
             Func<Keys, TResult> onSuccess,
             Func<string, TResult> onFailure)
@@ -89,7 +87,7 @@ namespace EastFive.Azure.Auth.OAuth
                             out SecurityToken validatedToken);
 
                         return principal.Claims
-                            .Where(claim => SubjectClaimKey.Equals(claim.Type, StringComparison.OrdinalIgnoreCase))
+                            .Where(claim => System.Security.Claims.ClaimTypes.NameIdentifier.Equals(claim.Type, StringComparison.OrdinalIgnoreCase))
                             .First(
                                 (claim, next) =>
                                 {

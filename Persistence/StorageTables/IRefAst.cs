@@ -29,11 +29,34 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
     }
 
+    public class RefAst<TEntity> : IRefAst<TEntity>
+    {
+        public string RowKey { get; private set; }
+
+        public string PartitionKey { get; private set; }
+
+        public RefAst(string rowKey, string partitionKey)
+        {
+            this.RowKey = rowKey;
+            this.PartitionKey = partitionKey;
+        }
+    }
+
     public static class RefAstExtensions
     {
         public static IRefAst AsAstRef(this string rowKey, string partitionKey)
         {
             return new RefAst(rowKey, partitionKey);
+        }
+
+        public static IRefAst<TRef> AsAstRef<TRef>(this string rowKey, string partitionKey)
+        {
+            return new RefAst<TRef>(rowKey, partitionKey);
+        }
+
+        public static IRefAst<TRef> Cast<TRef>(this IRefAst astRef)
+        {
+            return new RefAst<TRef>(astRef.RowKey, astRef.PartitionKey);
         }
     }
 }

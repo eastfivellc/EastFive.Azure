@@ -1,6 +1,7 @@
 ﻿using BlackBarLabs.Persistence.Azure.StorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,7 @@ using System.Threading.Tasks;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class RowKeyAttribute : Attribute,
-        IModifyAzureStorageTableRowKey, IComputeAzureStorageTableRowKey
+        IModifyAzureStorageTableRowKey, IComputeAzureStorageTableRowKey, IGenerateAzureStorageTableRowKeyIndex
     {
         public virtual string ComputeRowKey(object memberValue, MemberInfo memberInfo)
         {
@@ -41,6 +42,31 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return stringValue;
             }
             var message = $"`{this.GetType().FullName}` Cannot determine row key from type `{propertyValueType.FullName}` on `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}`";
+            throw new NotImplementedException(message);
+        }
+
+        public string GenerateRowKeyIndex(MemberInfo member)
+            => GenerateRowKeyIndexEx(member, this.GetType());
+
+        public static string GenerateRowKeyIndexEx(MemberInfo member, Type callingAttrType)
+        {
+            var propertyValueType = member.GetPropertyOrFieldType();
+
+            if (typeof(Guid).IsAssignableTo(propertyValueType))
+                return Guid.NewGuid().AsRowKey();
+
+            if (typeof(IReferenceable).IsAssignableFrom(propertyValueType))
+                return Guid.NewGuid().AsRowKey();
+
+            if (typeof(IReferenceableOptional).IsAssignableFrom(propertyValueType))
+                return Guid.NewGuid().AsRowKey();
+
+            if (typeof(string).IsAssignableTo(propertyValueType))
+                return System.IO.Path
+                    .GetRandomFileName()
+                    .Replace(".", "");
+
+            var message = $"`{callingAttrType.FullName}` Cannot generate index of type `{propertyValueType.FullName}` on `{member.DeclaringType.FullName}..{member.Name}`";
             throw new NotImplementedException(message);
         }
 

@@ -2,6 +2,7 @@
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using Microsoft.Azure.Cosmos.Table;
 using System;

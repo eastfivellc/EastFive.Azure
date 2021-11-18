@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class StandardParititionKeyAttribute : Attribute,
-       IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey
+       IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey, IGenerateAzureStorageTablePartitionIndex
     {
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
@@ -48,6 +48,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                     -1 * (KeyExtensions.PartitionKeyRemainder - 1),
                     (KeyExtensions.PartitionKeyRemainder * 2) - 1)
                 .Select(index => index.ToString());
+        }
+
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            return GetValue(rowKey);
         }
     }
 }

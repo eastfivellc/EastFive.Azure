@@ -17,7 +17,8 @@ namespace EastFive.Persistence.Azure.StorageTables
         IModifyAzureStorageTablePartitionKey, 
         IProvideTableQuery,
         ParititionKeyAttribute.IModifyPartitionScope,
-        IComputeAzureStorageTablePartitionKey
+        IComputeAzureStorageTablePartitionKey,
+        IGenerateAzureStorageTablePartitionIndex
     {
         public interface IModifyPartitionScope
         {
@@ -215,6 +216,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new Exception(
                 $"{nameof(ParititionKeyAttribute)} only works on string members." + 
                 $" Issue is on {memberInfo.DeclaringType.FullName}..{memberInfo.Name}.");
+        }
+
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            return RowKeyAttribute.GenerateRowKeyIndexEx(member, this.GetType());
         }
     }
 

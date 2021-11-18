@@ -8,7 +8,7 @@ using System.Reflection;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class PartitionByIdAttribute : Attribute,
-        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey
+        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey, IGenerateAzureStorageTablePartitionIndex
     {
         public string GeneratePartitionKey(string rowKey, object entityValue, MemberInfo memberInfo)
         {
@@ -40,5 +40,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new NotImplementedException();
         }
 
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            return RowKeyAttribute.GenerateRowKeyIndexEx(member, this.GetType());
+        }
     }
 }

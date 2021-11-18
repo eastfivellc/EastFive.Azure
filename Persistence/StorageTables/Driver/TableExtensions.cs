@@ -25,7 +25,6 @@ using EastFive.Azure.StorageTables.Driver;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
 

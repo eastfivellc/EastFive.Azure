@@ -16,7 +16,8 @@ namespace EastFive.Persistence.Azure.StorageTables
     public class PartitionByDayAttribute : Attribute,
         IModifyAzureStorageTablePartitionKey,
         IComputeAzureStorageTablePartitionKey,
-        IProvideTableQuery
+        IProvideTableQuery,
+        IGenerateAzureStorageTablePartitionIndex
     {
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
@@ -116,6 +117,20 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             var dateTimeValue = (DateTime)dateTimeValueObj;
             return $"{dateTimeValue.Year}_{dateTimeValue.DayOfYear}";
+        }
+
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            var propertyValueType = member.GetPropertyOrFieldType();
+
+            if (typeof(DateTime).IsAssignableTo(propertyValueType))
+            {
+                var dateTimeValue = DateTime.UtcNow;
+                return ComputePartitionKey(dateTimeValue);
+            }
+
+            var message = $"`{this.GetType().FullName}` Cannot generate partition index of type `{propertyValueType.FullName}` on `{member.DeclaringType.FullName}..{member.Name}`";
+            throw new NotImplementedException(message);
         }
     }
 

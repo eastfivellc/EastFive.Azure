@@ -15,7 +15,7 @@ using EastFive.Reflection;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class ScopedPartitionAttribute : Attribute,
-        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey, IProvideTableQuery
+        IModifyAzureStorageTablePartitionKey, IComputeAzureStorageTablePartitionKey, IProvideTableQuery, IGenerateAzureStorageTablePartitionIndex
     {
         public const string Scoping = "__PartitionKeyScoping__";
 
@@ -138,7 +138,12 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new NotImplementedException();
         }
 
-
+        public string GeneratePartitionIndex(MemberInfo member, string rowKey)
+        {
+            var propertyValueType = member.GetPropertyOrFieldType();
+            var message = $"`{this.GetType().FullName}` Cannot generate index of type `{propertyValueType.FullName}` on `{member.DeclaringType.FullName}..{member.Name}`";
+            throw new NotImplementedException(message);
+        }
     }
 
 }

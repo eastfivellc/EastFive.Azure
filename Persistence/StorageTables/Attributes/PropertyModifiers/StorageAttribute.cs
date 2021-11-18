@@ -25,6 +25,7 @@ namespace EastFive.Persistence
         string Name { get; }
 
         KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo);
+
         object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values);
 
         string GetTablePropertyName(MemberInfo member);
@@ -53,6 +54,16 @@ namespace EastFive.Persistence
     {
         string ComputePartitionKey(object memberValue, MemberInfo memberInfo,
             string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues);
+    }
+
+    public interface IGenerateAzureStorageTableRowKeyIndex
+    {
+        string GenerateRowKeyIndex(MemberInfo member);
+    }
+
+    public interface IGenerateAzureStorageTablePartitionIndex
+    {
+        string GeneratePartitionIndex(MemberInfo member, string rowKey);
     }
 
     public interface IGenerateAzureStorageTablePartitionKey

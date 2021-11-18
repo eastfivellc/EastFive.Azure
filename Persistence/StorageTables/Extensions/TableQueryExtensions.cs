@@ -7,10 +7,11 @@ using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
 
+using EastFive;
+using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Linq;
-using EastFive.Extensions;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {

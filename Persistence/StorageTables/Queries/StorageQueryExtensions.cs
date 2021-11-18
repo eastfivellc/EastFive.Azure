@@ -13,6 +13,26 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public static class StorageQueryExtensions
     {
+        [MutatePropertyQuery]
+        public static IQueryable<TResource> StorageQueryByProperty<TProperty, TResource>(this IQueryable<TResource> query,
+            TProperty propertyValue, Expression<Func<TResource, TProperty>> memberExpression)
+            where TResource : IReferenceable
+        {
+            if (!typeof(StorageQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(StorageQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var storageQuery = query as StorageQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(StorageQueryExtensions), nameof(StorageQueryExtensions.StorageQueryByProperty),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                    Expression.Constant(propertyValue, typeof(TProperty)),
+                    Expression.Constant(memberExpression, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = storageQuery.FromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
         [MutateRefQuery]
         public static IQueryable<TResource> StorageQueryById<TResource>(this IQueryable<TResource> query, IRef<TResource> resourceRef)
             where TResource : IReferenceable
@@ -93,6 +113,26 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .First();
                 var idValue = arguments.First().ResolveExpression();
                 var value = (idMember, idValue);
+                return value.AsArray();
+            }
+        }
+
+        public class MutatePropertyQueryAttribute : MutateIdQueryAttribute
+        {
+            public override (MemberInfo, object)[] BindStorageQueryValue(
+                MethodInfo method,
+                Expression[] arguments)
+            {
+                var resType = method
+                    .GetGenericArguments()
+                    .Skip(1)
+                    .First();
+                var memberExpressionExpression = (Expression)arguments.Skip(1).First().ResolveExpression();
+                var memberExpression = (MemberExpression)memberExpressionExpression;
+                if (!memberExpressionExpression.TryGetMemberExpression(out MemberInfo propertyMember))
+                    throw new ArgumentException($"Could not extract field reference from {memberExpressionExpression.GetType().FullName}");
+                var idValue = arguments.First().ResolveExpression();
+                var value = (propertyMember, idValue);
                 return value.AsArray();
             }
         }

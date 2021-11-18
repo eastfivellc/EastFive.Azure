@@ -8,6 +8,7 @@ using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Serialization;
+using EastFive.Reflection;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {

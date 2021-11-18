@@ -337,7 +337,7 @@ namespace EastFive.Azure.Auth
 
         public async static Task<Session> CreateAsync(
             IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
-            IRefOptional<Session> sessionToCreateMaybe)
+            IRefOptional<Session> sessionToCreateMaybe = default)
         {
             var sessionId = sessionToCreateMaybe.HasValueNotNull() ?
                 sessionToCreateMaybe.Ref

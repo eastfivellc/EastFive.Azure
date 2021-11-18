@@ -156,7 +156,8 @@ namespace EastFive.Azure.Login
 
                                 Task<Auth.Session> CreateSessionAsync(Auth.Authorization authorization)
                                 {
-                                    return Auth.Session.CreateAsync(application, authorization.authorizationRef.Optional());
+                                    return Auth.Session.CreateAsync(application,
+                                        authorization.authorizationRef.Optional());
                                 }
                             },
                             (aId, paramsSet) => throw new Exception("Logout was not provided."),
