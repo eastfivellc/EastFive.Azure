@@ -393,11 +393,16 @@ namespace EastFive.Azure.Auth
             if (loginProvider is IProvideClaims)
             {
                 var claimProvider = (IProvideClaims)loginProvider;
+                var accountLink = new AccountLink
+                {
+                    method = authenticationMethod.authenticationId,
+                    externalAccountKey = externalAccountKey,
+                };
                 if (application is IProvideAccountInformation)
                 {
                     var accountInfoProvider = (IProvideAccountInformation)application;
                     return await await accountInfoProvider.FindOrCreateAccountByMethodAndKeyAsync(
-                            authenticationMethod.authenticationId, externalAccountKey,
+                            accountLink, application,
                         onFound: internalAccountId =>
                         {
                             return onLocated(
@@ -405,12 +410,13 @@ namespace EastFive.Azure.Auth
                                      (isAccountInvalid) => CreateAccountAsync())
                                  .AsTask();
                         },
-                        () => CreateAccountAsync());
+                        () => CreateAccountAsync(),
+                        onNoEffect:() => OnLegacy());
 
                     Task<TResult> CreateAccountAsync()
                     {
                         return accountInfoProvider.CreateUnpopulatedAccountAsync(
-                                authenticationMethod.authenticationId, externalAccountKey,
+                                accountLink, application,
                             onNeedsPopulated: async (account, saveAsync) =>
                             {
                                 var accountLinksToEdit = account.AccountLinks;
@@ -441,22 +447,26 @@ namespace EastFive.Azure.Auth
                                 return onCreated(populatedAccount.id);
                             },
                             onInterupted: (uri) => onInterupted(uri),
-                            onNotCreated: (string why) => onGeneralFailure(why));
+                            onNotCreated: (string why) => onGeneralFailure(why),
+                            onNoEffect: () => throw new Exception("IProvideAccountInformation created account but did not want to populate it."));
                     }
                 }
             }
 
-            return await await AccountMapping.FindByMethodAndKeyAsync(authenticationMethod.authenticationId, externalAccountKey,
-                    authorization,
-                // Found
-                internalAccountId =>
-                {
-                    return onLocated(
-                            internalAccountId, 
-                            (isAccountInvalid) => OnNotFound(isAccountInvalid))
-                        .AsTask();
-                },
-                () => OnNotFound(false));
+            return await OnLegacy();
+
+            async Task<TResult> OnLegacy() =>
+                await await AccountMapping.FindByMethodAndKeyAsync(authenticationMethod.authenticationId, externalAccountKey,
+                        authorization,
+                    // Found
+                    internalAccountId =>
+                    {
+                        return onLocated(
+                                internalAccountId,
+                                (isAccountInvalid) => OnNotFound(isAccountInvalid))
+                            .AsTask();
+                    },
+                    () => OnNotFound(false));
 
             async Task<TResult> OnNotFound(bool isAccountInvalid)
             {
