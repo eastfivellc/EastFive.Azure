@@ -170,10 +170,10 @@ namespace EastFive.Azure.Auth
             authorization.authorized = false;
 
             return await await Auth.Method.ById(method, application,
-                async (authentication) =>
+                async (method) =>
                 {
                     //var authorizationIdSecure = authentication.authenticationId;
-                    authorization.LocationAuthentication = await authentication.GetLoginUrlAsync(
+                    authorization.LocationAuthentication = await method.GetLoginUrlAsync(
                         application, urlHelper, authorizationRef.id);
 
                     //throw new ArgumentNullException();

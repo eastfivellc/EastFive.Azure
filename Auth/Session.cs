@@ -190,7 +190,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public static Task<IHttpResponse> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
-                [QueryParameter(Name = "request_id")]IRef<Authorization> authorization,
+                [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]IRef<Authorization> authorization,
                 //EastFive.Api.SessionToken security,
                 IAuthApplication application, IProvideUrl urlHelper,
             ContentTypeResponse<Session> onUpdated,
