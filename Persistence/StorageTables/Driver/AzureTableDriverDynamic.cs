@@ -43,6 +43,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
+        public readonly global::Azure.Storage.StorageSharedKeyCredential StorageSharedKeyCredential;
 
         #region Init / Setup / Utility
 
@@ -70,6 +71,55 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 });
             //BlobClient.DefaultRequestOptions.RetryPolicy =
             //    new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
+
+            StorageSharedKeyCredential = GetCredentialFromConnectionString(connectionString);
+        }
+
+        static global::Azure.Storage.StorageSharedKeyCredential GetCredentialFromConnectionString(string connectionString)
+        {
+            const string accountNameLabel = "AccountName";
+            const string accountKeyLabel = "AccountKey";
+            const string devStoreLabel = "UseDevelopmentStorage";
+
+            const string devStoreAccountName = "devstoreaccount1";
+            const string devStoreAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
+            const string errorMessage = "The connection string must have an AccountName and AccountKey or UseDevelopmentStorage=true";
+
+            try
+            {
+                var connectionStringValues = connectionString.Split(';')
+                    .Select(s => s.Split(new char[] { '=' }, 2))
+                    .ToDictionary(s => s[0], s => s[1]);
+
+                string accountName;
+                string accountKey;
+                if (connectionStringValues.TryGetValue(devStoreLabel, out var devStoreValue) && devStoreValue == "true")
+                {
+                    accountName = devStoreAccountName;
+                    accountKey = devStoreAccountKey;
+                }
+                else
+                {
+                    if (connectionStringValues.TryGetValue(accountNameLabel, out var accountNameValue)
+                        && accountNameValue.HasBlackSpace()
+                        && connectionStringValues.TryGetValue(accountKeyLabel, out var accountKeyValue)
+                        && accountKeyValue.HasBlackSpace())
+                    {
+                        accountName = accountNameValue;
+                        accountKey = accountKeyValue;
+                    }
+                    else
+                    {
+                        throw new ArgumentException(errorMessage);
+                    }
+                }
+
+                return new global::Azure.Storage.StorageSharedKeyCredential(accountName, accountKey);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                throw new ArgumentException(errorMessage);
+            }
         }
 
         public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.ASTConnectionStringKey)

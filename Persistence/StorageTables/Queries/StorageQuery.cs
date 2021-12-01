@@ -8,18 +8,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.AspNetCore.Http;
+
 using Newtonsoft.Json;
 
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Linq.Expressions;
-using Microsoft.AspNetCore.Http;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Api;
 using EastFive.Extensions;
 using EastFive.Reflection;
 
-namespace EastFive.Persistence.Azure.StorageTables
+namespace EastFive.Azure.Persistence.AzureStorageTables
 {
     [StorageQueryInvocation]
     public class StorageQuery<TResource>

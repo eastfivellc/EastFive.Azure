@@ -13,6 +13,7 @@ using System.Linq;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq;
 using EastFive.Linq.Async;
+using EastFive.Azure.Persistence.Blobs;
 
 namespace EastFive.Api.Azure.Monitoring
 {

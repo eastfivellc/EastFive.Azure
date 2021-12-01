@@ -57,9 +57,11 @@
   <ItemGroup>
     <None Remove="Auth\Apple %28copy%29\" />
     <None Remove="Auth\OAuth\" />
+    <None Remove="Persistence\Blobs\" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Auth\Google\" />
     <Folder Include="Auth\OAuth\" />
+    <Folder Include="Persistence\Blobs\" />
   </ItemGroup>
 </Project>
