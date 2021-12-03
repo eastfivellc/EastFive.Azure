@@ -23,7 +23,7 @@ namespace EastFive.Azure.Auth.OAuth
             Func<Keys, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-            return jwksUri.HttpClientGetResource(
+            return jwksUri.HttpClientGetResourceAsync(
                 onSuccess,
                 onFailureToParse: (why, content) => onFailure("Key server returned a non-JSON response."),
                 onFailure: onFailure);

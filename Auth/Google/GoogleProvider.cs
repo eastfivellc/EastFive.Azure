@@ -409,7 +409,7 @@ namespace EastFive.Azure.Auth.Google
                             return AppSettings.Auth.Google.ClientSecret.ConfigurationString(
                                 async (clientSecret) =>
                                 {
-                                    return await await new Uri(discoveryDocumentUrl).HttpClientGetResource(
+                                    return await await new Uri(discoveryDocumentUrl).HttpClientGetResourceAsync(
                                         (DiscoveryDocument discDoc) =>
                                         {
                                             return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
