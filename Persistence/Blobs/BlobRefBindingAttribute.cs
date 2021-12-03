@@ -199,6 +199,15 @@ namespace EastFive.Azure.Persistence.Blobs
                     return onParsed(urlBlobRef);
                 }
 
+                if (Guid.TryParse(stringValue, out Guid guidValue))
+                {
+                    var valueGuid = new BlobRefStorage()
+                    {
+                        Id = guidValue.AsBlobName(),
+                    };
+                    return onParsed(valueGuid);
+                }
+
                 var value = new BlobRefStorage()
                 {
                     Id = stringValue,
