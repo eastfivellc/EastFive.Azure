@@ -18,5 +18,17 @@ namespace EastFive.Azure
                 public const string ApiVoucher = "ApiVoucher";
             }
         }
+
+        public class TeamsFlow
+        {
+            public const string FlowName = "Teams";
+
+            public class Variables
+            {
+                public const string TokenName = "TOKEN";
+                public const string AuthHeaderName = "AuthorizationHeaderName";
+                public const string ApiVoucher = "ApiVoucher";
+            }
+        }
     }
 }
