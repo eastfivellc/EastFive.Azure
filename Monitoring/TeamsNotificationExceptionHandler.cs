@@ -67,19 +67,20 @@ namespace EastFive.Azure.Monitoring
 
             string teamsNotifyParam = GetTeamsNotifyParameter();
             
-            if (!ShouldNotify())
+            if (!ShouldNotify(out Guid? collectionIdMaybe))
                 return response;
 
             try
             {
-                string messageId = await TeamsNotifyAsync(response, teamsNotifyParam,
+                string messageId = await TeamsNotifyAsync(response,
+                    teamsNotifyParam, collectionIdMaybe,
                     httpApp, request);
             } catch(HttpRequestException)
             {
 
             }
             return response;
-
+            
             string GetTeamsNotifyParameter()
             {
                 return request.Headers
@@ -109,23 +110,25 @@ namespace EastFive.Azure.Monitoring
             }
 
             bool RequestTeamsNotify() => teamsNotifyParam != default;
-            bool ShouldNotify()
+            bool ShouldNotify(out Guid? collectionIdMaybe)
             {
+                collectionIdMaybe = default;
                 if (RequestTeamsNotify())
                     return true;
                 if (HasReportableError())
                     return true;
-                if (TeamsNotification.IsMatch(request, response))
+                if (TeamsNotification.IsMatch(request, response, out collectionIdMaybe))
                     return true;
 
                 return false;
             }
         }
 
-        public async Task<string> TeamsNotifyAsync(IHttpResponse response, string teamsNotifyParam,
+        public async Task<string> TeamsNotifyAsync(IHttpResponse response,
+            string teamsNotifyParam, Guid? collectionIdMaybe,
             IApplication httpApp, IHttpRequest request)
         {
-            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(request);
+            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(request, collectionIdMaybe);
 
             var responseParam = response.Headers
                 .Where(hdr => hdr.Key == Middleware.HeaderStatusName)

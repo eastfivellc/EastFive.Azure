@@ -76,6 +76,12 @@ namespace EastFive.Azure.Monitoring
         [Storage]
         public string[] methodFilters;
 
+        public const string CollectionPropertyName = "collection";
+        [ApiProperty(PropertyName = CollectionPropertyName)]
+        [JsonProperty(PropertyName = CollectionPropertyName)]
+        [Storage]
+        public Guid? Collection;
+
         #endregion
 
         #region Http Methods
@@ -193,26 +199,27 @@ namespace EastFive.Azure.Monitoring
 
         private static TeamsNotification[] teamsNotifications;
 
-        internal static bool IsMatch(IHttpRequest request, IHttpResponse response)
+        internal static bool IsMatch(IHttpRequest request, IHttpResponse response, out Guid? collectionIdMaybe)
         {
-            return teamsNotifications
+            bool matched;
+            (matched, collectionIdMaybe) = teamsNotifications
                 .NullToEmpty()
-                .Where(
+                .Select(
                     tn =>
                     {
                         if (tn.routeFilters.Any())
                             if (!IsRouteMatch())
-                                return false;
+                                return (false, default(Guid?));
 
                         if(tn.methodFilters.Any())
                             if (!IsMethodMatch())
-                                return false;
+                                return (false, default(Guid?));
 
                         if (tn.responseFilters.Any())
                             if(!IsResponseMatch())
-                                return false;
+                                return (false, default(Guid?));
 
-                        return true;
+                        return (false, tn.Collection);
 
                         bool IsRouteMatch() => tn.routeFilters
                            .TryWhere(
@@ -230,7 +237,11 @@ namespace EastFive.Azure.Monitoring
                             .Any();
 
                     })
-                .Any();
+                .Where(tpl => tpl.Item1)
+                .First(
+                    (tpl, next) => tpl,
+                    () => (false, default(Guid?)));
+            return matched;
         }
     }
 }
