@@ -61,12 +61,9 @@ namespace EastFive.Azure.Persistence.Blobs
                 application: application,
                 onParsed: (blobRefStorageAsObj) =>
                 {
-                    if (!parameter.TryGetBlobContainerName(out string containerName))
-                        return onDidNotBind("Could not connect parameter with property");
-
-                    var blobRefStorage = (BlobRefStorage)blobRefStorageAsObj;
-                    blobRefStorage.ContainerName = containerName;
-                    return onParsed(blobRefStorage);
+                    return ContainerizeBlob(parameter, blobRefStorageAsObj,
+                        onParsed: onParsed,
+                        onDidNotBind: onDidNotBind);
                 },
                 onDidNotBind: onDidNotBind,
                 onBindingFailure: onBindingFailure);
@@ -100,6 +97,15 @@ namespace EastFive.Azure.Persistence.Blobs
         {
             if (!typeof(IBlobRef).IsAssignableFrom(type))
                 return onDidNotBind($"{nameof(BlobRefBindingAttribute)} only binds {nameof(IBlobRef)}");
+
+            if(Guid.TryParse(content, out Guid blobId))
+            {
+                var guidBlobRefValue = new BlobRefStorage()
+                {
+                    Id = blobId.AsBlobName(),
+                };
+                return onParsed(guidBlobRefValue);
+            }
 
             if (Uri.TryCreate(content, UriKind.Absolute, out Uri urlContent))
             {
@@ -158,12 +164,9 @@ namespace EastFive.Azure.Persistence.Blobs
                 application: application,
                 onParsed: (blobRefStorageAsObj) =>
                 {
-                    if (!parameter.TryGetBlobContainerName(out string containerName))
-                        return onDidNotBind("Could not connect parameter with property");
-
-                    var blobRefStorage = (BlobRefStorage)blobRefStorageAsObj;
-                    blobRefStorage.ContainerName = containerName;
-                    return onParsed(blobRefStorage);
+                    return ContainerizeBlob(parameter, blobRefStorageAsObj,
+                        onParsed: onParsed,
+                        onDidNotBind: onDidNotBind);
                 },
                 onDidNotBind: onDidNotBind,
                 onBindingFailure: onBindingFailure);
@@ -391,5 +394,30 @@ namespace EastFive.Azure.Persistence.Blobs
         #endregion
 
         #endregion
+
+        private TResult ContainerizeBlob<TResult>(ParameterInfo parameter,
+                object blobRefStorageAsObj,
+            Func<object, TResult> onParsed,
+            Func<string, TResult> onDidNotBind)
+        {
+            if (!parameter.TryGetBlobContainerName(out string containerName))
+                return onDidNotBind("Could not connect parameter with property");
+
+            if (blobRefStorageAsObj is BlobRefStorage)
+            {
+                var blobRefStorage = (BlobRefStorage)blobRefStorageAsObj;
+                blobRefStorage.ContainerName = containerName;
+                return onParsed(blobRefStorage);
+            }
+
+            if (blobRefStorageAsObj is BlobRefUrl)
+            {
+                var blobRefUrl = (BlobRefUrl)blobRefStorageAsObj;
+                blobRefUrl.ContainerName = containerName;
+                return onParsed(blobRefUrl);
+            }
+
+            throw new Exception();
+        }
     }
 }

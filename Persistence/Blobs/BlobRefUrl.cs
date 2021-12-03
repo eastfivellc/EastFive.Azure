@@ -8,12 +8,13 @@ using EastFive;
 using EastFive.Extensions;
 using EastFive.Api;
 using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Serialization;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
     internal class BlobRefUrl : IApiBoundBlobRef
     {
-        public string Id { get; private set; }
+        public string Id { get; set; }
 
         private string containerName = default;
          
@@ -37,7 +38,7 @@ namespace EastFive.Azure.Persistence.Blobs
 
         public BlobRefUrl(Uri content)
         {
-            Id = Guid.NewGuid().ToString("N");
+            Id = content.AbsoluteUri.MD5HashGuid().AsBlobName();
             this.content = content;
         }
 
