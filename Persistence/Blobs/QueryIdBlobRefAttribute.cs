@@ -14,6 +14,7 @@ using EastFive.Api;
 using EastFive.Serialization;
 using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Azure.Persistence.Blobs;
 
 namespace EastFive.Azure.Persistence
 {
@@ -38,10 +39,14 @@ namespace EastFive.Azure.Persistence
                         return bindingData.fetchQueryParam(parameterRequiringValidation,
                             v =>
                             {
-                                var blobRef = (v as IApiBoundBlobRef);
-                                blobRef.ContainerName = blobContainerName;
+                                var blobRef = (v as IBlobRef);
+                                if(blobRef.ContainerName.HasBlackSpace())
+                                    return SelectParameterResult.Query(blobRef, key, parameterRequiringValidation);
 
-                                return SelectParameterResult.Query(blobRef, key, parameterRequiringValidation);
+                                var apiBlobRef = (v as IApiBoundBlobRef);
+                                apiBlobRef.ContainerName = blobContainerName;
+
+                                return SelectParameterResult.Query(apiBlobRef, key, parameterRequiringValidation);
                             },
                             whyQuery =>
                             {
@@ -87,24 +92,33 @@ namespace EastFive.Azure.Persistence
                 .First(
                     (memberAndAttr, next) =>
                     {
-                        var blobContainerName = ContainerName.HasBlackSpace() ?
-                            ContainerName
-                            :
-                            memberAndAttr.Item1.BlobContainerName();
                         return bindingData.fetchBodyParam(parameterRequiringValidation,
                             v =>
                             {
-                                var blobRef = (v as IApiBoundBlobRef);
-                                blobRef.ContainerName = blobContainerName;
-                                return SelectParameterResult.Query(blobRef, key, parameterRequiringValidation);
+                                var blobRef = (v as IBlobRef);
+                                if (blobRef.ContainerName.HasBlackSpace())
+                                    return SelectParameterResult.Body(blobRef, key, parameterRequiringValidation);
+
+                                if(!(v is IApiBoundBlobRef))
+                                    return SelectParameterResult.FailureBody(
+                                        $"{v.GetType().FullName} is not {nameof(IApiBoundBlobRef)} and has empty {nameof(IBlobRef.ContainerName)}",
+                                        key, parameterRequiringValidation);
+
+                                var apiBlobRef = (v as IApiBoundBlobRef);
+                                apiBlobRef.ContainerName = ContainerName.HasBlackSpace() ?
+                                    ContainerName
+                                    :
+                                    memberAndAttr.Item1.BlobContainerName();
+
+                                return SelectParameterResult.Body(apiBlobRef, key, parameterRequiringValidation);
                             },
                             whyQuery =>
                             {
-                                return SelectParameterResult.FailureQuery(
+                                return SelectParameterResult.FailureBody(
                                     whyQuery, key, parameterRequiringValidation);
                             });
                     },
-                    () => SelectParameterResult.FailureQuery(
+                    () => SelectParameterResult.FailureBody(
                         $"Could not match API field with key:`{key}` of type IBlobRef",
                         key,
                         parameterRequiringValidation));

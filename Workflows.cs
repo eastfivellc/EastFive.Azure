@@ -22,6 +22,12 @@ namespace EastFive.Azure
         public class HijackLoginFlow
         {
             public const string FlowName = "Hijack Login";
+        }
+
+        public class TeamsFlow
+        {
+            public const string FlowName = "Teams";
+
             public class Variables
             {
                 public const string TokenName = "TOKEN";

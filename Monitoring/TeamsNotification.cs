@@ -27,6 +27,7 @@ using EastFive.Persistence.Azure;
 using EastFive.Analytics;
 using EastFive.Azure;
 using EastFive.Azure.Persistence;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -82,6 +83,10 @@ namespace EastFive.Azure.Monitoring
 
         #region GET
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 1.0,
+            StepName = "List Notifications")]
         [HttpGet]
         public static IHttpResponse GetAll(
             RequestMessage<TeamsNotification> teamsNotifications,
@@ -101,9 +106,16 @@ namespace EastFive.Azure.Monitoring
 
         #region POST
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 2.0,
+            StepName = "Create Notification")]
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
-                [UpdateId] IRef<TeamsNotification> teamsNotificationRef,
+                [EastFive.Api.Meta.Flows.WorkflowNewId]
+                [UpdateId]
+                IRef<TeamsNotification> teamsNotificationRef,
+
                 [Resource] TeamsNotification storyBoard,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,

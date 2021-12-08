@@ -36,6 +36,19 @@ namespace EastFive.Api
 
         public Uri RequestUri { get; set; }
 
+        public Uri ServerLocation
+        {
+            get
+            {
+                var builder = new UriBuilder(this.RequestUri);
+                builder.Query = default;
+                builder.Path = default;
+                builder.Password = default;
+                builder.UserName = default;
+                return builder.Uri;
+            }
+        }
+
         public CancellationToken CancellationToken { get; private set; }
 
         public HttpMethod Method { get; set; }
