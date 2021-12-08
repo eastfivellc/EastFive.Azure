@@ -96,6 +96,10 @@ namespace EastFive.Azure.Auth
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Step = 1.0,
             StepName = "List Methods")]
+        [WorkflowStep2(
+            FlowName = Workflows.HijackLoginFlow.FlowName,
+            Step = 1.0,
+            StepName = "List Methods")]
         public static IHttpResponse QueryAsync(
             IAuthApplication application,
             MultipartAcceptArrayResponse<Method> onContent)

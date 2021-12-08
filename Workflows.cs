@@ -18,5 +18,16 @@ namespace EastFive.Azure
                 public const string ApiVoucher = "ApiVoucher";
             }
         }
+
+        public class HijackLoginFlow
+        {
+            public const string FlowName = "Hijack Login";
+            public class Variables
+            {
+                public const string TokenName = "TOKEN";
+                public const string AuthHeaderName = "AuthorizationHeaderName";
+                public const string ApiVoucher = "ApiVoucher";
+            }
+        }
     }
 }

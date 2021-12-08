@@ -44,8 +44,7 @@ namespace EastFive.Azure.Auth.Google
         public string Method => IntegrationName;
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        private const string appleAuthServerUrl = "https://appleid.apple.com/auth/authorize";
-        private const string appleKeyServerUrl = "https://appleid.apple.com/auth/keys";
+        #region Parameters
 
         #region Request pararmeters
         private const string requestParamClientId = "client_id";
@@ -73,7 +72,7 @@ namespace EastFive.Azure.Auth.Google
         public const string tokenParamRefreshToken = "refresh_token";
         #endregion
 
-        #region Claim Tokens
+        #region Parameters from the Claim Token
 
         // https://developers.google.com/identity/protocols/oauth2/openid-connect
 
@@ -140,6 +139,8 @@ namespace EastFive.Azure.Auth.Google
         /// Note that this claim is never guaranteed to be present.
         /// </summary>
         public const string claimParamProfile = "profile";
+
+        #endregion
 
         #endregion
 

@@ -26,6 +26,7 @@ using EastFive.Web;
 using EastFive.Web.Configuration;
 using Newtonsoft.Json;
 using EastFive.Reflection;
+using EastFive.Azure.Meta;
 
 namespace EastFive.Azure.Configuration
 {
@@ -111,8 +112,7 @@ namespace EastFive.Azure.Configuration
 
         #endregion
 
-        [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [ApiKeyClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static IHttpResponse GetAsync(
             IApplication application,
             ContentTypeResponse<Configuration[]> onFound)
