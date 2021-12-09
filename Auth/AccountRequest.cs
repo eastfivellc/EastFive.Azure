@@ -51,9 +51,15 @@ namespace EastFive.Azure.Auth
         #region Actions
 
         public const string LaunchAction = "Launch";
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = 1.9)]
         [HttpAction(LaunchAction)]
         public static async Task<IHttpResponse> LaunchAsync(
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
+
                 RequestMessage<AccountRequest> api,
                 IHttpRequest request,
                 IAzureApplication application,

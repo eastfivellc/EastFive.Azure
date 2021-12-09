@@ -410,17 +410,20 @@ namespace EastFive.Azure.Auth
                         async method =>
                         {
                             return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
-                                (externalUserKey) =>
+                                async (externalUserKey) =>
                                 {
                                     if (application is Api.Azure.Credentials.IProvideAccountInformation)
                                     {
-                                        return (application as Api.Azure.Credentials.IProvideAccountInformation)
+                                        return await await (application as Api.Azure.Credentials.IProvideAccountInformation)
                                             .FindOrCreateAccountByMethodAndKeyAsync(
-                                                    methodRef, externalUserKey,
-                                                    accountId => onSuccess(accountId, authorization.authorized),
-                                                () => onFailure("No mapping to that account.", authorization.authorized));
+                                                    new AccountLink { method = methodRef, externalAccountKey = externalUserKey, },
+                                                    application,
+                                                    accountId => onSuccess(accountId, authorization.authorized).AsTask(),
+                                                () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
+                                                onNoEffect: () => OnContinue());
                                     }
-                                    return Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
+                                    return await OnContinue();
+                                    Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
                                             authorization,
                                         accountId => onSuccess(accountId, authorization.authorized),
                                         () => onFailure("No mapping to that account.", authorization.authorized));

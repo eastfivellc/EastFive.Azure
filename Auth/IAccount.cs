@@ -48,6 +48,7 @@ namespace EastFive.Azure.Auth
                 .Single();
 
             return accountLinks.accountLinks
+                .NullToEmpty()
                 .Select(
                     accountLink =>
                     {
@@ -72,6 +73,7 @@ namespace EastFive.Azure.Auth
         {
             var accountLinks = (AccountLinks)value;
             return accountLinks.accountLinks
+                .NullToEmpty()
                 .Select(
                     accountLink =>
                     {

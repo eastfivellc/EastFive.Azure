@@ -27,6 +27,7 @@ using EastFive.Persistence.Azure;
 using EastFive.Analytics;
 using EastFive.Azure;
 using EastFive.Azure.Persistence;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -80,7 +81,7 @@ namespace EastFive.Azure.Monitoring
         [ApiProperty(PropertyName = CollectionPropertyName)]
         [JsonProperty(PropertyName = CollectionPropertyName)]
         [Storage]
-        public Guid? Collection;
+        public string folder;
 
         #endregion
 
@@ -88,6 +89,10 @@ namespace EastFive.Azure.Monitoring
 
         #region GET
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 1.0,
+            StepName = "List Notifications")]
         [HttpGet]
         public static IHttpResponse GetAll(
             RequestMessage<TeamsNotification> teamsNotifications,
@@ -107,9 +112,16 @@ namespace EastFive.Azure.Monitoring
 
         #region POST
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 2.0,
+            StepName = "Create Notification")]
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
-                [UpdateId] IRef<TeamsNotification> teamsNotificationRef,
+                [EastFive.Api.Meta.Flows.WorkflowNewId]
+                [UpdateId]
+                IRef<TeamsNotification> teamsNotificationRef,
+
                 [Resource] TeamsNotification storyBoard,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
@@ -199,27 +211,27 @@ namespace EastFive.Azure.Monitoring
 
         private static TeamsNotification[] teamsNotifications;
 
-        internal static bool IsMatch(IHttpRequest request, IHttpResponse response, out Guid? collectionIdMaybe)
+        internal static bool IsMatch(IHttpRequest request, IHttpResponse response, out string collectionFolder)
         {
             bool matched;
-            (matched, collectionIdMaybe) = teamsNotifications
+            (matched, collectionFolder) = teamsNotifications
                 .NullToEmpty()
                 .Select(
                     tn =>
                     {
                         if (tn.routeFilters.Any())
                             if (!IsRouteMatch())
-                                return (false, default(Guid?));
+                                return (false, default(string));
 
                         if(tn.methodFilters.Any())
                             if (!IsMethodMatch())
-                                return (false, default(Guid?));
+                                return (false, default(string));
 
                         if (tn.responseFilters.Any())
                             if(!IsResponseMatch())
-                                return (false, default(Guid?));
+                                return (false, default(string));
 
-                        return (false, tn.Collection);
+                        return (true, tn.folder);
 
                         bool IsRouteMatch() => tn.routeFilters
                            .TryWhere(
@@ -240,7 +252,7 @@ namespace EastFive.Azure.Monitoring
                 .Where(tpl => tpl.Item1)
                 .First(
                     (tpl, next) => tpl,
-                    () => (false, default(Guid?)));
+                    () => (false, default(string)));
             return matched;
         }
     }

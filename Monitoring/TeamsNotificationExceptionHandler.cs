@@ -16,6 +16,7 @@ using EastFive.Api;
 using EastFive.Api.Core;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
+using EastFive.Api.Azure.Monitoring;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -67,13 +68,13 @@ namespace EastFive.Azure.Monitoring
 
             string teamsNotifyParam = GetTeamsNotifyParameter();
             
-            if (!ShouldNotify(out Guid? collectionIdMaybe))
+            if (!ShouldNotify(out string collectionFolder))
                 return response;
 
             try
             {
                 string messageId = await TeamsNotifyAsync(response,
-                    teamsNotifyParam, collectionIdMaybe,
+                    teamsNotifyParam, collectionFolder,
                     httpApp, request);
             } catch(HttpRequestException)
             {
@@ -110,14 +111,14 @@ namespace EastFive.Azure.Monitoring
             }
 
             bool RequestTeamsNotify() => teamsNotifyParam != default;
-            bool ShouldNotify(out Guid? collectionIdMaybe)
+            bool ShouldNotify(out string collectionFolder)
             {
-                collectionIdMaybe = default;
+                collectionFolder = default;
                 if (RequestTeamsNotify())
                     return true;
                 if (HasReportableError())
                     return true;
-                if (TeamsNotification.IsMatch(request, response, out collectionIdMaybe))
+                if (TeamsNotification.IsMatch(request, response, out collectionFolder))
                     return true;
 
                 return false;
@@ -125,10 +126,11 @@ namespace EastFive.Azure.Monitoring
         }
 
         public async Task<string> TeamsNotifyAsync(IHttpResponse response,
-            string teamsNotifyParam, Guid? collectionIdMaybe,
+            string teamsNotifyParam, string collectionFolder,
             IApplication httpApp, IHttpRequest request)
         {
-            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(request, collectionIdMaybe);
+            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(request, collectionFolder);
+            var monitoringRequestId = monitoringRequest.id.ToString();
 
             var responseParam = response.Headers
                 .Where(hdr => hdr.Key == Middleware.HeaderStatusName)
@@ -139,6 +141,7 @@ namespace EastFive.Azure.Monitoring
 
             var message = await CreateMessageCardAsync(
                 teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
+                monitoringRequest,
                 httpApp, request,
                 () => new MessageCard.Section
                 {
@@ -174,7 +177,7 @@ namespace EastFive.Azure.Monitoring
                         new MessageCard.Section.Fact
                         {
                             name = "RequestID:",
-                            value = monitoringRequest.id.ToString(),
+                            value = monitoringRequestId,
                         },
                     }
                 });
@@ -276,7 +279,9 @@ namespace EastFive.Azure.Monitoring
              string title, string summary,
              IApplication httpApp, IHttpRequest request)
         {
-            return CreateMessageCardAsync(title, summary, httpApp, request,
+            return CreateMessageCardAsync(title, summary,
+                    default(MonitoringRequest),
+                    httpApp, request,
                 () => new MessageCard.Section
                 {
                     title = "Request Information",
@@ -313,7 +318,7 @@ namespace EastFive.Azure.Monitoring
         }
 
         private static async Task<MessageCard> CreateMessageCardAsync(
-             string title, string summary,
+             string title, string summary, MonitoringRequest monitoringRequest,
              IApplication httpApp, IHttpRequest request,
              Func<MessageCard.Section> getRequestInformation)
         {
@@ -373,6 +378,14 @@ namespace EastFive.Azure.Monitoring
                     .ToArray();
             }
 
+            var postmanLink = new QueryableServer<Api.Azure.Monitoring.MonitoringRequest>(request)
+                .Where(mr => mr.monitoringRequestRef == monitoringRequest.monitoringRequestRef)
+                .Where(mr => mr.when == monitoringRequest.when)
+                .HttpAction(MonitoringRequest.PostmanAction)
+                .Location()
+                .SignWithAccessTokenAccount(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddYears(1),
+                    url => url);
+
             var message = new MessageCard
             {
                 summary = summary,
@@ -383,20 +396,20 @@ namespace EastFive.Azure.Monitoring
                 {
                     new MessageCard.ActionCard
                     {
-                        name = "Application Insights",
+                        name = "Postman",
                         type = "OpenUri",
                         targets = new MessageCard.ActionCard.Target[]
                         {
                             new MessageCard.ActionCard.Target
                             {
                                 os = "default",
-                                uri = new Uri("https://www.example.com/ai/message/1234"),
+                                uri = postmanLink,
                             }
                         }
                     },
                     new MessageCard.ActionCard
                     {
-                        name = "Postman",
+                        name = "Application Insights",
                         type = "OpenUri",
                         targets = new MessageCard.ActionCard.Target[]
                         {

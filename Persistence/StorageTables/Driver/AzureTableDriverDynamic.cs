@@ -43,6 +43,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
+        public readonly global::Azure.Storage.StorageSharedKeyCredential StorageSharedKeyCredential;
 
         #region Init / Setup / Utility
 
@@ -70,6 +71,55 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 });
             //BlobClient.DefaultRequestOptions.RetryPolicy =
             //    new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
+
+            StorageSharedKeyCredential = GetCredentialFromConnectionString(connectionString);
+        }
+
+        static global::Azure.Storage.StorageSharedKeyCredential GetCredentialFromConnectionString(string connectionString)
+        {
+            const string accountNameLabel = "AccountName";
+            const string accountKeyLabel = "AccountKey";
+            const string devStoreLabel = "UseDevelopmentStorage";
+
+            const string devStoreAccountName = "devstoreaccount1";
+            const string devStoreAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
+            const string errorMessage = "The connection string must have an AccountName and AccountKey or UseDevelopmentStorage=true";
+
+            try
+            {
+                var connectionStringValues = connectionString.Split(';')
+                    .Select(s => s.Split(new char[] { '=' }, 2))
+                    .ToDictionary(s => s[0], s => s[1]);
+
+                string accountName;
+                string accountKey;
+                if (connectionStringValues.TryGetValue(devStoreLabel, out var devStoreValue) && devStoreValue == "true")
+                {
+                    accountName = devStoreAccountName;
+                    accountKey = devStoreAccountKey;
+                }
+                else
+                {
+                    if (connectionStringValues.TryGetValue(accountNameLabel, out var accountNameValue)
+                        && accountNameValue.HasBlackSpace()
+                        && connectionStringValues.TryGetValue(accountKeyLabel, out var accountKeyValue)
+                        && accountKeyValue.HasBlackSpace())
+                    {
+                        accountName = accountNameValue;
+                        accountKey = accountKeyValue;
+                    }
+                    else
+                    {
+                        throw new ArgumentException(errorMessage);
+                    }
+                }
+
+                return new global::Azure.Storage.StorageSharedKeyCredential(accountName, accountKey);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                throw new ArgumentException(errorMessage);
+            }
         }
 
         public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.ASTConnectionStringKey)
@@ -439,75 +489,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         ex.GetType();
                         throw ex;
                     }
-                });
-        }
-
-        public async Task<TResult> InsertOrReplaceAsync<TData, TResult>(TData tableData,
-            Func<bool, TResult> success,
-            IHandleFailedModifications<TResult>[] onModificationFailures = default,
-            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
-        {
-            var entity = GetEntity(tableData);
-            var table = GetTable<TData>();
-            var update = TableOperation.InsertOrReplace(entity);
-            return await await entity.ExecuteInsertOrReplaceModifiersAsync(this,
-                async rollback =>
-                {
-                    try
-                    {
-                        var result = await new E5CloudTable(table).ExecuteAsync(update);
-                        var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
-                        return success(created);
-                    }
-                    catch (StorageException ex)
-                    {
-                        await rollback();
-                        return await ex.ParseStorageException(
-                            async (errorCode, errorMessage) =>
-                            {
-                                switch (errorCode)
-                                {
-                                    case ExtendedErrorInformationCodes.Timeout:
-                                        {
-                                            var timeoutResult = default(TResult);
-                                            if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                                onTimeout = AzureStorageDriver.GetRetryDelegate();
-                                            await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
-                                                async () =>
-                                                {
-                                                    timeoutResult = await InsertOrReplaceAsync(tableData,
-                                                        success, onModificationFailures, onFailure, onTimeout);
-                                                });
-                                            return timeoutResult;
-                                        }
-                                    default:
-                                        {
-                                            if (onFailure.IsDefaultOrNull())
-                                                throw ex;
-                                            return onFailure(errorCode, errorMessage);
-                                        }
-                                }
-                            },
-                            () =>
-                            {
-                                throw ex;
-                            });
-                    }
-                },
-                (membersWithFailures) =>
-                {
-                    return onModificationFailures
-                        .NullToEmpty()
-                        .Where(
-                            onModificationFailure =>
-                            {
-                                return onModificationFailure.DoesMatchMember(membersWithFailures);
-                            })
-                        .First<IHandleFailedModifications<TResult>, TResult>(
-                            (onModificationFailure, next) => onModificationFailure.ModificationFailure(membersWithFailures),
-                            () => throw new Exception("Modifiers failed to execute."))
-                        .AsTask();
                 });
         }
 
@@ -976,7 +957,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #endregion
 
-
         #region With modifiers
 
         public async Task<TResult> CreateAsync<TEntity, TResult>(TEntity entity,
@@ -1277,6 +1257,94 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         throw ex;
                     });
             }
+        }
+
+
+        public async Task<TResult> InsertOrReplaceAsync<TData, TResult>(TData tableData,
+            Func<bool, TResult> onSuccess,
+            IHandleFailedModifications<TResult>[] onModificationFailures = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            var tableEntity = GetEntity(tableData);
+            var table = GetTable<TData>();
+            var update = TableOperation.InsertOrReplace(tableEntity);
+            return await await tableEntity.ExecuteInsertOrReplaceModifiersAsync(this,
+                async rollback =>
+                {
+                    try
+                    {
+                        var result = await new E5CloudTable(table).ExecuteAsync(update);
+                        var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
+                        return onSuccess(created);
+                    }
+                    catch (StorageException ex)
+                    {
+                        return await await ex.ResolveCreate(table,
+                            async () => await await InsertOrReplaceAsync<TData, Task<TResult>>(tableData,
+                                (created) => onSuccess(created).AsTask(),
+                                onFailure:
+                                        async (code, msg) =>
+                                        {
+                                            await rollback();
+                                            return onFailure(code, msg);
+                                        },
+                                    onTimeout: onTimeout), // TODO: Handle rollback with timeout
+                                onFailure:
+                                    async (code, msg) =>
+                                    {
+                                        await rollback();
+                                        return onFailure(code, msg);
+                                    },
+                                onTimeout: onTimeout);
+
+                        //await rollback();
+                        //return await ex.ParseStorageException(
+                        //    async (errorCode, errorMessage) =>
+                        //    {
+                        //        switch (errorCode)
+                        //        {
+                        //            case ExtendedErrorInformationCodes.Timeout:
+                        //                {
+                        //                    var timeoutResult = default(TResult);
+                        //                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
+                        //                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                        //                    await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
+                        //                        async () =>
+                        //                        {
+                        //                            timeoutResult = await InsertOrReplaceAsync(tableData,
+                        //                                success, onModificationFailures, onFailure, onTimeout);
+                        //                        });
+                        //                    return timeoutResult;
+                        //                }
+                        //            default:
+                        //                {
+                        //                    if (onFailure.IsDefaultOrNull())
+                        //                        throw ex;
+                        //                    return onFailure(errorCode, errorMessage);
+                        //                }
+                        //        }
+                        //    },
+                        //    () =>
+                        //    {
+                        //        throw ex;
+                        //    });
+                    }
+                },
+                (membersWithFailures) =>
+                {
+                    return onModificationFailures
+                        .NullToEmpty()
+                        .Where(
+                            onModificationFailure =>
+                            {
+                                return onModificationFailure.DoesMatchMember(membersWithFailures);
+                            })
+                        .First<IHandleFailedModifications<TResult>, TResult>(
+                            (onModificationFailure, next) => onModificationFailure.ModificationFailure(membersWithFailures),
+                            () => throw new Exception("Modifiers failed to execute."))
+                        .AsTask();
+                });
         }
 
         #endregion

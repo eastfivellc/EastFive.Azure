@@ -20,6 +20,8 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence;
+using EastFive.Azure.Persistence.Blobs;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -57,12 +59,18 @@ namespace EastFive.Api.Azure.Monitoring
 
         #endregion
 
-        public const string CollectionPropertyName = "collection";
-        [ApiProperty(PropertyName = CollectionPropertyName)]
-        [JsonProperty(PropertyName = CollectionPropertyName)]
-        [IdHashXX32Lookup]
+        public const string TitlePropertyName = "title";
+        [ApiProperty(PropertyName = TitlePropertyName)]
+        [JsonProperty(PropertyName = TitlePropertyName)]
         [Storage]
-        public Guid? Collection;
+        public string title;
+
+        public const string FolderNamePropertyName = "folder_name";
+        [ApiProperty(PropertyName = FolderNamePropertyName)]
+        [JsonProperty(PropertyName = FolderNamePropertyName)]
+        [StringLookupHashXX32(IgnoreNullWhiteSpace = true)]
+        [Storage]
+        public string folderName;
 
         public const string UrlPropertyName = "url";
         [ApiProperty(PropertyName = UrlPropertyName)]
@@ -155,12 +163,12 @@ namespace EastFive.Api.Azure.Monitoring
 
         #region ACTION
 
-        [HttpAction("Postman")]
+        public const string PostmanAction = "Postman";
+        [HttpAction(PostmanAction)]
         public static async Task<IHttpResponse> SendToPostman(
                 [QueryId] IRef<MonitoringRequest> monitoringRequestRef,
                 [QueryParameter(Name = WhenPropertyName)] DateTime when,
-                [QueryParameter(Name = CollectionPropertyName)] IRef<Collection> collectionRef,
-            // Security security,
+            Security security,
             ContentTypeResponse<Meta.Postman.Resources.Collection.Item> onContent,
             NotFoundResponse onNotFound,
             GeneralFailureResponse onFailure)
@@ -170,7 +178,7 @@ namespace EastFive.Api.Azure.Monitoring
                     additionalProperties: (query) => query.Where(item => item.when == when),
                     onFound: async mr =>
                     {
-                        return await PostMonitoringRequestAsync(mr, collectionRef,
+                        return await PostMonitoringRequestAsync(mr, mr.folderName,
                             (postmanItem) =>
                             {
                                 return onContent(postmanItem);
@@ -184,7 +192,7 @@ namespace EastFive.Api.Azure.Monitoring
 
         #endregion
 
-        public static async Task<MonitoringRequest> CreateAsync(IHttpRequest request, Guid? collectionIdMaybe)
+        public static async Task<MonitoringRequest> CreateAsync(IHttpRequest request, string folderName)
         {
             var doc = new MonitoringRequest();
             doc.monitoringRequestRef = Ref<MonitoringRequest>.NewRef();
@@ -200,7 +208,7 @@ namespace EastFive.Api.Azure.Monitoring
                         value = kvp.Value.First(),
                     })
                 .ToArray();
-            doc.Collection = collectionIdMaybe;
+            doc.folderName = folderName;
 
             if (request.HasFormContentType)
             {
@@ -252,55 +260,112 @@ namespace EastFive.Api.Azure.Monitoring
         }
 
         public static async Task<TResult> PostMonitoringRequestAsync<TResult>(
-                MonitoringRequest itemToCreateOrUpdate, IRef<Collection> collectionRef,
+                MonitoringRequest itemToCreateOrUpdate, string collectionFolder,
             Func<Api.Meta.Postman.Resources.Collection.Item, TResult> onCreatedOrUpdated,
             Func<string, TResult> onFailure)
         {
             var postmanItem = await itemToCreateOrUpdate.ConvertToPostmanItemAsync();
-            return await await EastFive.Api.Meta.Postman.Resources.Collection.Collection.GetAsync(collectionRef,
-                collection =>
+            return await EastFive.Api.AppSettings.Postman.MonitoringCollectionId.ConfigurationString(
+                async collectionId =>
                 {
-                    var collectionWithItem = new Collection
-                    {
-                        info = collection.info,
-                        item = collection.item.Append(postmanItem).ToArray(),
-                        variable = collection.variable,
-                    };
-                    return collectionWithItem.UpdateAsync<TResult>(
-                        (updatedCollection) =>
+                    return await await EastFive.Api.Meta.Postman.Resources.Collection.Collection.GetAsync(collectionId,
+                        collection =>
                         {
-                            return onCreatedOrUpdated(postmanItem);
-                        });
-                },
-                () =>
-                {
-                    var collection = new Collection()
-                    {
-                        info = new Info
-                        {
-                            name = $"MonitoringRequest - {itemToCreateOrUpdate.when}",
-                            schema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-                            // _postman_id = collectionRef.id,
-                        },
-                        variable = new Variable[]
-                        {
-                            new Variable
+                            var collectionWithItem = collectionFolder.HasBlackSpace() ?
+                                MutateCollectionWithFolderName(collectionFolder)
+                                :
+                                MutateCollection();
+                            return collectionWithItem.UpdateAsync<TResult>(
+                                (updatedCollection) =>
+                                {
+                                    return onCreatedOrUpdated(postmanItem);
+                                },
+                                onFailure:onFailure);
+
+                            Collection MutateCollection()
                             {
-                                id = "baseUrl",
-                                key = "baseUrl",
-                                value = itemToCreateOrUpdate.url.BaseUri().OriginalString,
-                                type = "string",
+                                return new Collection
+                                {
+                                    info = collection.info,
+                                    item = collection.item.Append(postmanItem).ToArray(),
+                                    variable = collection.variable,
+                                };
+                            }
+
+                            Collection MutateCollectionWithFolderName(string folderName)
+                            {
+                                return collection.item
+                                    .NullToEmpty()
+                                    .Where(item => collectionFolder.Equals(item.name))
+                                    .First(
+                                        (folderItem, next) =>
+                                        {
+                                            folderItem.item = folderItem.item
+                                                .Where(item => !postmanItem.name.Equals(item.name, StringComparison.CurrentCultureIgnoreCase))
+                                                .Append(postmanItem)
+                                                .ToArray();
+
+                                            var collectionItems = collection.item
+                                                .Where(item => !collectionFolder.Equals(item.name, StringComparison.CurrentCultureIgnoreCase))
+                                                .Append(folderItem)
+                                                .ToArray();
+                                            return new Collection
+                                            {
+                                                info = collection.info,
+                                                item = collectionItems,
+                                                variable = collection.variable,
+                                            };
+                                        },
+                                        () =>
+                                        {
+                                            var folderItem = new Item
+                                            {
+                                                name = folderName,
+                                                item = postmanItem.AsArray(),
+                                            };
+                                            return new Collection
+                                            {
+                                                info = collection.info,
+                                                item = collection.item
+                                                    .NullToEmpty()
+                                                    .Append(folderItem)
+                                                    .ToArray(),
+                                                variable = collection.variable,
+                                            };
+                                        });
                             }
                         },
-                        item = new Item[] { postmanItem }
-                    };
-                    return collection.CreateAsync(
-                        (createdCollection) =>
+                        () =>
                         {
-                            return onCreatedOrUpdated(postmanItem);
+                            var collection = new Collection()
+                            {
+                                info = new Info
+                                {
+                                    name = $"MonitoringRequest - {itemToCreateOrUpdate.when}",
+                                    schema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+                                    // _postman_id = collectionRef.id,
+                                },
+                                variable = new Variable[]
+                                {
+                                    new Variable
+                                    {
+                                        id = Url.VariableHostName,
+                                        key = Url.VariableHostName,
+                                        value = itemToCreateOrUpdate.url.BaseUri().OriginalString,
+                                        type = "string",
+                                    }
+                                },
+                                item = new Item[] { postmanItem }
+                            };
+                            return collection.CreateAsync(
+                                (createdCollection) =>
+                                {
+                                    return onCreatedOrUpdated(postmanItem);
+                                });
                         });
-                });
-            
+                },
+                onUnspecified: onFailure.AsAsyncFunc());
+
         }
 
         private async Task<Item> ConvertToPostmanItemAsync()
@@ -312,7 +377,7 @@ namespace EastFive.Api.Azure.Monitoring
                 {
                     url = new Url
                     {
-                        host = new string[] { "{localUrl}" },
+                        host = new string[] { Url.VariableHostName },
                         path = this.url.ParsePath(),
                         raw = this.url.OriginalString,
                         query = this.url.ParseQuery()
