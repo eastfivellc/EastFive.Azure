@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Api.Azure;
+using EastFive.Azure.Meta;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
@@ -72,16 +73,30 @@ namespace EastFive.Azure.Auth
 
         #region GET
 
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.HijackLoginFlow.FlowName,
+            StepName = "Find Authorization To Hijack",
+            Step = 2.0)]
         [Api.HttpGet]
-        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [ApiKeyClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public async static Task<IHttpResponse> GetAllSecureAsync(
-                [QueryParameter(Name = "method")]IRef<Method> methodRef,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
+                [QueryParameter(Name = "method")]
+                IRef<Method> methodRef,
+
                 [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
-                [OptionalQueryParameter(Name = "search")]string search,
+
+                [Api.Meta.Flows.WorkflowParameter(Description = "ACP,Dash,TCM,HUDDLE", Value = "")]
+                [OptionalQueryParameter(Name = "search")]
+                string search,
+
                 [OptionalQueryParameter(Name = "months")]int? monthsMaybe,
                 AzureApplication application,
                 EastFive.Api.Security security,
                 IHttpRequest request,
+
+            [Api.Meta.Flows.WorkflowVariable(AuthorizationPropertyName, "authorization{0}")]
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure,
@@ -135,11 +150,19 @@ namespace EastFive.Azure.Auth
 
                             if (search.HasBlackSpace())
                             {
+                                var searchSet = search.Contains(',') ?
+                                    search.Split(',')
+                                    :
+                                    search.AsArray();
                                 var match = parameters.Values
                                     .SelectWhereNotNull()
-                                    .Any(val => val.IndexOf(search, StringComparison.OrdinalIgnoreCase) != -1);
+                                    .Any(val => searchSet.Any(searchItem => val.IndexOf(searchItem, StringComparison.OrdinalIgnoreCase) != -1));
                                 if (!match)
+                                {
+                                    if(parameters.Count() < 10)
+                                        return default(RedirectionManager?);
                                     return default(RedirectionManager?);
+                                }
                             }
 
                             RedirectionManager? Failure(string why)
@@ -222,9 +245,15 @@ namespace EastFive.Azure.Auth
             //return onContent(results.ToArray());
         }
 
+
+        [Api.Meta.Flows.WorkflowStep(
+            FlowName = Workflows.HijackLoginFlow.FlowName,
+            StepName = "Launch UI",
+            Step = 3.0)]
         [Api.HttpGet]
-        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [ApiKeyClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
         public static Task<IHttpResponse> GetRedirection(
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{Authorization}}")]
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
                 AzureApplication application,
                 IInvokeApplication endpoints,
