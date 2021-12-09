@@ -81,6 +81,7 @@ namespace EastFive.Azure.Monitoring
         [ApiProperty(PropertyName = CollectionPropertyName)]
         [JsonProperty(PropertyName = CollectionPropertyName)]
         [Storage]
+        [ResourceTitle]
         public string folder;
 
         #endregion
@@ -119,10 +120,12 @@ namespace EastFive.Azure.Monitoring
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
                 [EastFive.Api.Meta.Flows.WorkflowNewId]
+                [WorkflowVariableRequest(Workflows.TeamsFlow.Variables.CreatedNotification, "id")]
                 [UpdateId]
                 IRef<TeamsNotification> teamsNotificationRef,
 
                 [Resource] TeamsNotification storyBoard,
+
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             UnauthorizedResponse onUnauthorized)
@@ -136,8 +139,13 @@ namespace EastFive.Azure.Monitoring
 
         #region PATCH
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 3.0,
+            StepName = "Modify Notification")]
         [HttpPatch]
         public static Task<IHttpResponse> UpdateAsync(
+                [WorkflowParameter(Value = "{{TeamsNotification}}")]
                 [UpdateId] IRef<TeamsNotification> teamsNotificationRef,
                 [MutateResource]MutateResource<TeamsNotification> updated,
             ContentTypeResponse<TeamsNotification> onUpdated,
@@ -154,8 +162,13 @@ namespace EastFive.Azure.Monitoring
 
         #region DELETE
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 6.0,
+            StepName = "Delete Notification")]
         [HttpDelete]
         public static Task<IHttpResponse> DeleteByIdAsync(
+                [WorkflowParameter(Value = "{{TeamsNotification_}}")]
                 [UpdateId(Name = IdPropertyName)] IRef<TeamsNotification> teamsNotificationId,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound)
@@ -165,9 +178,16 @@ namespace EastFive.Azure.Monitoring
                 onNotFound);
         }
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 7.0,
+            StepName = "Clear Notifications")]
         [HttpDelete]
         public static IHttpResponse ClearAsync(
-                [QueryParameter(Name = "clear")] bool clear,
+                [WorkflowParameter(Value = "true")]
+                [QueryParameter(Name = "clear")]
+                bool clear,
+
                 RequestMessage<TeamsNotification> teamsNotifications,
                 EastFive.Api.Security security,
             MultipartAsyncResponse<TeamsNotification> onDeleted)
@@ -186,6 +206,10 @@ namespace EastFive.Azure.Monitoring
 
         #region Action
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 4.0,
+            StepName = "Load and Activate Notifications")]
         [HttpAction("Load")]
         public static async Task<IHttpResponse> LoadAsync(
             RequestMessage<TeamsNotification> teamsNotificationsStorage,
@@ -198,6 +222,10 @@ namespace EastFive.Azure.Monitoring
             return onFound(teamsNotifications);
         }
 
+        [WorkflowStep(
+            FlowName = Workflows.TeamsFlow.FlowName,
+            Step = 5.0,
+            StepName = "List Active Notifications")]
         [HttpAction("Active")]
         public static IHttpResponse Active(
             ContentTypeResponse<TeamsNotification[]> onFound)

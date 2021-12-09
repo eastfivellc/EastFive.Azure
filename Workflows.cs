@@ -25,9 +25,7 @@ namespace EastFive.Azure
 
             public class Variables
             {
-                public const string TokenName = "TOKEN";
-                public const string AuthHeaderName = "AuthorizationHeaderName";
-                public const string ApiVoucher = "ApiVoucher";
+                public const string CreatedNotification = "TeamsNotification";
             }
         }
     }
