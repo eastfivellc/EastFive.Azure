@@ -16,6 +16,7 @@ using EastFive.Security;
 using EastFive.Serialization;
 using System.Net.Http;
 using EastFive.Api.Auth;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Login
 {
@@ -52,12 +53,28 @@ namespace EastFive.Azure.Login
         [HtmlInput(Label = "Password")]
         public string password;
 
+        [WorkflowStep(
+            FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Step = 1.0,
+            StepName = "Create New Account")]
         [Api.HttpPost]
         [HtmlAction(Label = "Create")]
         public static async Task<IHttpResponse> UpdateAsync(
-                [Property(Name = UserIdentificationPropertyName)]string userIdentification,
-                [Property(Name = PasswordPropertyName)]string password,
-            CreatedResponse onUpdated,
+                [WorkflowVariable(
+                    Workflows.PasswordLoginCreateAccount.Variables.UserId,
+                    UserIdentificationPropertyName)]
+                [WorkflowParameter(Value = "{{$randomUserName}}")]
+                [Property(Name = UserIdentificationPropertyName)]
+                string userIdentification,
+
+                [WorkflowVariable(
+                    Workflows.PasswordLoginCreateAccount.Variables.Password,
+                    PasswordPropertyName)]
+                [WorkflowParameter(Value = "{{$randomPassword}}")]
+                [Property(Name = PasswordPropertyName)]
+                string password,
+
+            CreatedResponse onCreated,
             AlreadyExistsResponse onUsernameAlreadyTaken,
             GeneralConflictResponse onInvalidPassword)
         {
@@ -77,14 +94,14 @@ namespace EastFive.Azure.Login
                         account.userIdentification = userIdentification;
                         account.password = Account.GeneratePasswordHash(userIdentification, password);
                         await saveAsync(account);
-                        return onUpdated();
+                        return onCreated();
                     });
         }
 
         [Api.HttpGet]
         [RequiredClaim(
             System.Security.Claims.ClaimTypes.Role,
-            Auth.ClaimValues.Roles.SuperAdmin)]
+            EastFive.Api.Auth.ClaimValues.Roles.SuperAdmin)]
         public static IHttpResponse List(
             MultipartAsyncResponse<Account> onFound)
         {
@@ -123,7 +140,7 @@ namespace EastFive.Azure.Login
         [Api.HttpPatch]
         [RequiredClaim(
             System.Security.Claims.ClaimTypes.Role,
-            Auth.ClaimValues.Roles.SuperAdmin)]
+            EastFive.Api.Auth.ClaimValues.Roles.SuperAdmin)]
         public static Task<IHttpResponse> Update(
                 [UpdateId]IRef<Account> accountRef,
                 [Property(Name = PasswordPropertyName)] string password,
