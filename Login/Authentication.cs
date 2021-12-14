@@ -223,15 +223,6 @@ namespace EastFive.Azure.Login
                         .StorageGetAsync(
                             async account =>
                             {
-                                if(acceptsTypes.Any(hdr => "application/json".Equals(hdr.MediaType.ToString(), StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    var authorizationParameters = new AuthorizationParameters
-                                    {
-                                        state = authentication.authenticationRef,
-                                        token = authentication.state,
-                                    };
-                                    return onJsonPreferred(authorizationParameters);
-                                }
                                 var passwordHash = Account.GeneratePasswordHash(userIdentification, password);
                                 if (passwordHash != account.password)
                                     return onInvalidPassword("Incorrect username or password.");
@@ -241,7 +232,18 @@ namespace EastFive.Azure.Login
                                 var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.state}");
 
                                 if (hold.HasValue && hold.Value)
+                                {
+                                    if (acceptsTypes.Any(hdr => "application/json".Equals(hdr.MediaType.ToString(), StringComparison.OrdinalIgnoreCase)))
+                                    {
+                                        var authorizationParameters = new AuthorizationParameters
+                                        {
+                                            state = authentication.authenticationRef,
+                                            token = authentication.state,
+                                        };
+                                        return onJsonPreferred(authorizationParameters);
+                                    }
                                     return onHeldup(authorizationUrl.AbsoluteUri);
+                                }
                                 return onUpdated(authorizationUrl);
                             },
                             () => onInvalidPassword("Incorrect username or password.").AsTask());

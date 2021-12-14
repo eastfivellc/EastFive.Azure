@@ -310,7 +310,7 @@ namespace EastFive.Azure.Auth
 
         #region PATCH
 
-        [Api.HttpPatch(MatchAllBodyParameters = false)]
+        [Api.HttpPatch]
         public async static Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = LocationLogoutReturnPropertyName)]Uri locationLogoutReturn,
@@ -536,8 +536,13 @@ namespace EastFive.Azure.Auth
                 async (method) =>
                 {
                     var paramsUpdated = parameters
-                        .Append(authorizationRef.id.ToString().PairWithKey("state"))
-                        .ToDictionary();
+                            .Where(kvp => kvp.Key == "state")
+                            .Any()?
+                        parameters
+                        :
+                        parameters
+                            .Append(authorizationRef.id.ToString().PairWithKey("state"))
+                            .ToDictionary();
 
                     return await await Redirection.AuthenticationAsync(
                             method,

@@ -66,25 +66,25 @@ namespace EastFive.Azure.Login
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            //if (!tokenParameters.ContainsKey(CredentialProvider.tokenKey))
-            //    return onInvalidCredentials($"Parameter with name [{CredentialProvider.tokenKey}] was not provided");
-            //var accessToken = tokenParameters[CredentialProvider.tokenKey];
+            if (!tokenParameters.ContainsKey(CredentialProvider.tokenKey))
+                return onInvalidCredentials($"Parameter with name [{CredentialProvider.tokenKey}] was not provided");
+            var accessToken = tokenParameters[CredentialProvider.tokenKey];
 
             if (!tokenParameters.ContainsKey(CredentialProvider.stateKey))
                 return onInvalidCredentials($"Parameter with name [{CredentialProvider.stateKey}] was not provided");
             var stateLookup = tokenParameters[CredentialProvider.stateKey];
 
-            if (!tokenParameters.ContainsKey(CredentialProvider.referrerKey))
-                return onInvalidCredentials($"Parameter with name [{CredentialProvider.referrerKey}] was not provided");
-            var referrerString = tokenParameters[CredentialProvider.referrerKey];
+            //if (!tokenParameters.ContainsKey(CredentialProvider.referrerKey))
+            //    return onInvalidCredentials($"Parameter with name [{CredentialProvider.referrerKey}] was not provided");
+            //var referrerString = tokenParameters[CredentialProvider.referrerKey];
 
-            if (!Uri.TryCreate(referrerString, UriKind.Absolute, out Uri referrer))
-                return onInvalidCredentials($"Referrer:`{referrerString}` is not a valid absolute url.");
+            //if (!Uri.TryCreate(referrerString, UriKind.Absolute, out Uri referrer))
+            //    return onInvalidCredentials($"Referrer:`{referrerString}` is not a valid absolute url.");
 
             try
             {
-                using (var client = new HttpClient())
-                {
+                //using (var client = new HttpClient())
+                //{
                     //var validationUrl = new Uri(referrer, $"/api/Authentication/{stateLookup}");
                     //client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                     //var result = await client.GetAsync(validationUrl);
@@ -116,7 +116,7 @@ namespace EastFive.Azure.Login
                         {
                             return onInvalidCredentials($"`stateLookup` is not a valid {typeof(Authentication).FullName}");
                         });
-                }
+                //}
             }
             catch (Exception ex)
             {
