@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EastFive.Api;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
+using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
@@ -57,7 +60,7 @@ namespace EastFive.Azure.Auth
         [HttpAction(LaunchAction)]
         public static async Task<IHttpResponse> LaunchAsync(
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod_Ping}}")]
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
 
                 RequestMessage<AccountRequest> api,
@@ -115,6 +118,23 @@ namespace EastFive.Azure.Auth
                 {
                     return onCompleted("Your account has been requested. Thank you.");
                 });
+        }
+
+        public const string ListAction = "List";
+        [HttpAction(ListAction)]
+        public static IHttpResponse List(
+                RequestMessage<AccountRequest> api,
+            MultipartAsyncResponse<(Authorization, IDictionary<string, string>)> onListed)
+        {
+            return api
+                .StorageGet()
+                .Select(
+                    request => request.authorization.StorageGetAsync(
+                        auth => (auth, auth.parameters),
+                        () => (default((Authorization, IDictionary<string, string>)?))))
+                .Await()
+                .SelectWhereHasValue()
+                .HttpResponse(onListed);
         }
 
         #endregion
