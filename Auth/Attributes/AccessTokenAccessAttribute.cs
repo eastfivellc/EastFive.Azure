@@ -13,7 +13,7 @@ namespace EastFive.Azure.Auth
 {
     public class AccessTokenAccessAttribute : Attribute, IHandleRoutes
     {
-        public Task<IHttpResponse> HandleRouteAsync(Type controllerType,
+        public Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
