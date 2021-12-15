@@ -115,7 +115,7 @@ namespace EastFive.Azure.Functions
         #region GET
 
         [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> GetByIdAsync(
             [QueryId]IRef<InvocationMessage> invocationMessageRef,
             ContentTypeResponse<InvocationMessage> onFound,
@@ -127,7 +127,7 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
@@ -144,7 +144,7 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse ListByRequestUrlAsync(
             [QueryParameter(Name = "request_uri")]Uri requestUri,
             MultipartAsyncResponse<InvocationMessage> onRun)
@@ -159,7 +159,7 @@ namespace EastFive.Azure.Functions
         #region Actions
 
         [HttpAction("Invoke")]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse InvokeAsync(
                 [UpdateId]IRefs<InvocationMessage> invocationMessageRefs,
                 [HeaderLog]ILogger analyticsLog,
@@ -177,7 +177,7 @@ namespace EastFive.Azure.Functions
         }
 
         [HttpAction("Enqueue")]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> EnqueueAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
                 IAzureApplication application,
@@ -192,7 +192,7 @@ namespace EastFive.Azure.Functions
         #region Update
 
         [Api.HttpPatch]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> UpdateByIdAsync(
                 [UpdateId]IRef<InvocationMessage> invocationMessageRef,
                 [Property(Name = ExecutionLimitPropertyName)]int executionLimit,

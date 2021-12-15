@@ -106,8 +106,8 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
                 [Api.Meta.Flows.WorkflowObjectParameter(
                     Key0 ="http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
-                    Value0 = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role?id=fb7f557f458c4eadb08652c4a7315fd6",
-                    Key1 = "http://schemas.xmlsoap.org/ws/2009/09/identity/claims/actor",
+                    Value0 = ClaimValues.RoleType + "fb7f557f458c4eadb08652c4a7315fd6",
+                    Key1 = ClaimValues.AccountType,
                     Value1 = "{{Account}}")]
                 [Property(Name = ClaimsPropertyName)] Dictionary<string, string> extraClaims,
 
@@ -151,9 +151,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
         [HttpAction("whoami")]
         [ApiKeyAccess]
-        [RequiredClaim(
-            System.Security.Claims.ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse WhoAmI(
                 EastFive.Api.Security security,
             ContentTypeResponse<Guid> onFound)

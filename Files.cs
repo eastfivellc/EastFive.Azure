@@ -23,7 +23,7 @@ namespace EastFive.Azure.Meta
     public class Files
     {
         [EastFive.Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse List(
             IApiApplication httpApp,
             IHttpRequest request)

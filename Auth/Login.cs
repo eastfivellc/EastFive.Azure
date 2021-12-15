@@ -80,9 +80,7 @@ namespace EastFive.Azure.Auth
         //}
 
         [Api.HttpGet]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse AllAsync(
                 [QueryParameter(Name = "start_time")]DateTime startTime,
                 [QueryParameter(Name = "end_time")]DateTime endTime,

@@ -17,6 +17,7 @@ using EastFive.Serialization;
 using System.Net.Http;
 using EastFive.Api.Auth;
 using EastFive.Api.Meta.Flows;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {
@@ -99,9 +100,7 @@ namespace EastFive.Azure.Login
         }
 
         [Api.HttpGet]
-        [RequiredClaim(
-            System.Security.Claims.ClaimTypes.Role,
-            EastFive.Api.Auth.ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse List(
             MultipartAsyncResponse<Account> onFound)
         {
@@ -138,9 +137,7 @@ namespace EastFive.Azure.Login
         }
 
         [Api.HttpPatch]
-        [RequiredClaim(
-            System.Security.Claims.ClaimTypes.Role,
-            EastFive.Api.Auth.ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> Update(
                 [UpdateId]IRef<Account> accountRef,
                 [Property(Name = PasswordPropertyName)] string password,

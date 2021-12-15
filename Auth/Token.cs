@@ -74,14 +74,5 @@ namespace EastFive.Azure.Auth
 
             return onFound(token);
         }
-
-        //[Api.HttpAction("Generate")]
-        //[RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
-        //public static IHttpResponse Generate(
-        //    TextResponse onFound)
-        //{
-        //    return EastFive.Security.RSA.Generate(
-        //        (key, keyPrivate) => onFound(keyPrivate));
-        //}
     }
 }

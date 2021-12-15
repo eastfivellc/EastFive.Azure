@@ -443,7 +443,7 @@ namespace EastFive.Azure.Auth
         #region ACTION
 
         [HttpAction("Replay")]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> ReplayAsync(
                 [QueryId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
                 Api.Azure.AzureApplication application,

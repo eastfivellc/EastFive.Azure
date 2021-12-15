@@ -67,10 +67,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 
         #region Http Methods
 
-        [RequiredClaim(
-            System.Security.Claims.ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
         [HttpPost]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> QueueUpBackupPartitions(
                 [Property(Name = IdPropertyName)]IRef<RepositoryBackup> repositoryBackupRef,
                 [Property(Name = StorageSettingCopyFromPropertyName)]string storageSettingCopyFrom,

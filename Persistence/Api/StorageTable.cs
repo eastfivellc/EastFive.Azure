@@ -66,9 +66,7 @@ namespace EastFive.Azure.Persistence
         #region Http Methods
 
         [Api.HttpGet]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse All(
             HttpApplication httpApp,
             ContentTypeResponse<StorageTable[]> onFound)
@@ -78,9 +76,7 @@ namespace EastFive.Azure.Persistence
         }
 
         [Api.HttpGet]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse List(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
@@ -122,9 +118,7 @@ namespace EastFive.Azure.Persistence
         }
 
         [Api.HttpAction("Information")]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> Information(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,
@@ -144,9 +138,7 @@ namespace EastFive.Azure.Persistence
         }
 
         [Api.HttpAction("PropertyInformation")]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
                 [QueryParameter(Name = "property")]string propertyName,
@@ -180,9 +172,7 @@ namespace EastFive.Azure.Persistence
         }
 
         [Api.HttpGet]
-        [RequiredClaim(
-            ClaimTypes.Role, 
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> List2(
                 [QueryParameter(Name = NamePropertyName)]string name,
                 HttpApplication httpApp,

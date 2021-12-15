@@ -112,7 +112,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpPost]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<Claim> claimRef,
                 [Property(Name = ActorPropertyName)]Guid actorId,

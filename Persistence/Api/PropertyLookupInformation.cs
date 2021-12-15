@@ -60,9 +60,7 @@ namespace EastFive.Azure.Persistence
         #region Http Methods
 
         [Api.HttpGet]
-        [RequiredClaim(
-            ClaimTypes.Role,
-            ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> PropertyInformation(
                 [QueryParameter(Name = "table")]string tableName,
                 [QueryParameter(Name = "property")]string propertyName,

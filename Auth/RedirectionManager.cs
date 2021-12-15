@@ -78,7 +78,7 @@ namespace EastFive.Azure.Auth
             StepName = "Find Authorization To Hijack",
             Step = 2.0)]
         [Api.HttpGet]
-        [ApiKeyClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [PIIAdminClaim]
         public async static Task<IHttpResponse> GetAllSecureAsync(
 
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
@@ -251,7 +251,7 @@ namespace EastFive.Azure.Auth
             StepName = "Launch UI",
             Step = 3.0)]
         [Api.HttpGet]
-        [ApiKeyClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [PIIAdminClaim]
         public static Task<IHttpResponse> GetRedirection(
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{Authorization}}")]
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
@@ -321,7 +321,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpGet]
-        [RequiredClaim(System.Security.Claims.ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [PIIAdminClaim]
         public static async Task<IHttpResponse> GetAllSecureAsync(
                 [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
                 AzureApplication application,

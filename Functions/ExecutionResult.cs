@@ -87,7 +87,7 @@ namespace EastFive.Azure.Functions
         #endregion
 
         [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse GetByInvocationMessageAsync(
             [QueryParameter(Name = InvocationMessagePropertyName)]IRef<InvocationMessage> message,
             MultipartAsyncResponse<ExecutionResult> onResults)
@@ -98,7 +98,7 @@ namespace EastFive.Azure.Functions
         }
 
         [Api.HttpGet]
-        [RequiredClaim(ClaimTypes.Role, ClaimValues.Roles.SuperAdmin)]
+        [SuperAdminClaim]
         public static IHttpResponse ListAsync(
             [QueryParameter(Name = "start_time")]DateTime startTime,
             [QueryParameter(Name = "end_time")]DateTime endTime,
