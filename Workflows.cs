@@ -33,5 +33,20 @@ namespace EastFive.Azure
                 public const string CreatedNotification = "TeamsNotification";
             }
         }
+
+        public class PasswordLoginCreateAccount
+        {
+            public const string FlowName = "Create Account";
+            public class Variables
+            {
+                public const string UserId = "UserId";
+                public const string Password = "Password";
+                public const string State = "InternalAuthState";
+                public const string Token = "InternalAuthToken";
+                public const string AuthenticationId = "AuthenticationId";
+                public const string Authorization = "AuthorizationId";
+                public const string AuthorizationRedirect = "AuthorizationRedirect";
+            }
+        }
     }
 }

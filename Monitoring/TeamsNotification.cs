@@ -120,7 +120,7 @@ namespace EastFive.Azure.Monitoring
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
                 [EastFive.Api.Meta.Flows.WorkflowNewId]
-                [WorkflowVariableRequest(Workflows.TeamsFlow.Variables.CreatedNotification, "id")]
+                [WorkflowVariable(Workflows.TeamsFlow.Variables.CreatedNotification, "id")]
                 [UpdateId]
                 IRef<TeamsNotification> teamsNotificationRef,
 

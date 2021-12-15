@@ -192,9 +192,12 @@ namespace EastFive.Api.Azure.Monitoring
 
         #endregion
 
-        public static async Task<MonitoringRequest> CreateAsync(IHttpRequest request, string folderName)
+        public static async Task<MonitoringRequest> CreateAsync(
+            Type controllerType, IInvokeResource resourceInvoker,
+            IApplication httpApp, IHttpRequest request, string folderName)
         {
             var doc = new MonitoringRequest();
+            doc.title = $"{request.Method.Method} {resourceInvoker.Namespace} {resourceInvoker.Route}";
             doc.monitoringRequestRef = Ref<MonitoringRequest>.NewRef();
             doc.when = DateTime.UtcNow;
             doc.url = request.RequestUri;
@@ -397,6 +400,7 @@ namespace EastFive.Api.Azure.Monitoring
                                 key = header.key,
                                 type = header.type,
                                 value = header.value,
+                                disabled = Meta.Postman.Resources.Collection.Header.IsGeneratedHeader(header.key),
                             })
                         .ToArray(),
                     method = this.method,
@@ -404,6 +408,8 @@ namespace EastFive.Api.Azure.Monitoring
                 }
             };
             return item;
+
+            
         }
 
         async Task<Body> GetPostmanBodyAsync()

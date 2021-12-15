@@ -27,7 +27,7 @@ namespace EastFive.Azure.Monitoring
 
         internal const string HttpRequestMessagePropertyRequestTelemetryKey = "e5_monitoring_requesttelemetry_key";
 
-        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType,
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
                 IApplication httpApp, IHttpRequest routeData,
             RouteHandlingDelegate continueExecution)
         {

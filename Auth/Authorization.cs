@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Api.Azure;
+using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -309,7 +310,7 @@ namespace EastFive.Azure.Auth
 
         #region PATCH
 
-        [Api.HttpPatch] //(MatchAllBodyParameters = false)]
+        [Api.HttpPatch]
         public async static Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = LocationLogoutReturnPropertyName)]Uri locationLogoutReturn,
@@ -336,11 +337,27 @@ namespace EastFive.Azure.Auth
                 () => onNotFound());
         }
 
+        [WorkflowStep(
+            FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Step = 4.0,
+            StepName = "Trade Authorization ID for Session")]
         [Api.HttpPatch]
         public async static Task<IHttpResponse> AuthorizeAsync(
-                [QueryParameter(Name = "session")] IRef<Session> sessionRef,
-                [UpdateId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
-                [Property(Name = ParametersPropertyName)] IDictionary<string, string> parameters,
+                [WorkflowNewId]
+                [QueryParameter(Name = "session")]
+                IRef<Session> sessionRef,
+
+                [WorkflowParameterFromVariable(
+                    Value = Workflows.PasswordLoginCreateAccount.Variables.Authorization)]
+                [UpdateId(Name = AuthorizationIdPropertyName)]
+                IRef<Authorization> authorizationRef,
+
+                [WorkflowObjectParameter(
+                    Key0 = "state", Value0 = "{{InternalAuthState}}",
+                    Key1 = "token", Value1 = "{{InternalAuthToken}}")]
+                [Property(Name = ParametersPropertyName)]
+                IDictionary<string, string> parameters,
+
                 Api.Azure.AzureApplication application,
                 IInvokeApplication endpoints,
                 IHttpRequest request,
@@ -519,8 +536,13 @@ namespace EastFive.Azure.Auth
                 async (method) =>
                 {
                     var paramsUpdated = parameters
-                        .Append(authorizationRef.id.ToString().PairWithKey("state"))
-                        .ToDictionary();
+                            .Where(kvp => kvp.Key == "state")
+                            .Any()?
+                        parameters
+                        :
+                        parameters
+                            .Append(authorizationRef.id.ToString().PairWithKey("state"))
+                            .ToDictionary();
 
                     return await await Redirection.AuthenticationAsync(
                             method,

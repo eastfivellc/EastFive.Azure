@@ -2,14 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+
+using Newtonsoft.Json;
+
 using EastFive.Api;
 using EastFive.Azure.Persistence;
+using EastFive.Api.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
 {
@@ -102,10 +105,10 @@ namespace EastFive.Azure.Auth
 
         public const string ResponseAction = "Response";
         [HttpAction(ResponseAction)]
+        [SecurityRoleRequired(RolesAllowed = new string[] { ClaimValues.Roles.SuperAdmin })]
         public static Task<IHttpResponse> ResponseAsync(
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]
                     IRef<Authorization> authorizationRef,
-                RequestMessage<AccountRequest> api,
             TextResponse onCompleted)
         {
             var accountRequest = new AccountRequest()

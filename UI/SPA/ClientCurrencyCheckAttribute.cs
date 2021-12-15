@@ -27,7 +27,7 @@ namespace EastFive.Azure.Modules
                 () => default);
         }
 
-        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType, 
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {

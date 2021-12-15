@@ -366,11 +366,11 @@ namespace EastFive.Azure.Auth
                         async (tokenExpirationInMinutes) =>
                         {
                             return await await GetClaimsAsync(application, authorizationRefMaybe,
-                                (claims, accountIdMaybe, authorized) =>
+                                async (claims, accountIdMaybe, authorized) =>
                                 {
                                     session.account = accountIdMaybe;
                                     session.authorized = authorized;
-                                    return session.StorageCreateAsync(
+                                    return await await session.StorageCreateAsync(
                                         (sessionIdCreated) =>
                                         {
                                             return Api.Auth.JwtTools.CreateToken(session.id,
@@ -381,7 +381,27 @@ namespace EastFive.Azure.Auth
                                                     return session;
                                                 },
                                                 (missingConfig) => throw new Exception(missingConfig),
-                                                (configName, issue) => throw new Exception(issue));
+                                                (configName, issue) => throw new Exception(issue)).AsTask();
+                                        },
+                                        onAlreadyExists:() =>
+                                        {
+                                            return sessionId.StorageUpdateAsync(
+                                                async (sessionToUpdate, saveAsync) =>
+                                                {
+                                                    sessionToUpdate.authorization = authorizationRefMaybe;
+                                                    sessionToUpdate.account = accountIdMaybe;
+                                                    sessionToUpdate.authorized = authorized;
+                                                    await saveAsync(sessionToUpdate);
+                                                    return Api.Auth.JwtTools.CreateToken(sessionToUpdate.id,
+                                                        scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
+                                                        (tokenNew) =>
+                                                        {
+                                                            sessionToUpdate.token = tokenNew;
+                                                            return sessionToUpdate;
+                                                        },
+                                                        (missingConfig) => throw new Exception(missingConfig),
+                                                        (configName, issue) => throw new Exception(issue));
+                                                });
                                         });
                                 },
                                 (why) => throw new Exception(why));

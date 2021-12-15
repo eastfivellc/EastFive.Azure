@@ -128,14 +128,6 @@ namespace EastFive.Azure.Auth
         }
     }
 
-    public static class ClaimValues
-    {
-        public static class Roles
-        {
-            public const string SuperAdmin = "superadmin";
-        }
-    }
-
     public class ClaimEnableRolesAttribute : Attribute, IDeclareClaim
     {
         public const string Type = ClaimTypes.Role;
