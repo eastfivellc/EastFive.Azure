@@ -98,7 +98,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{XAuthorization}}")]
                 [PropertyOptional(Name = AuthIdPropertyName)]Guid? authorizationIdMaybe,
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "PFJTQ...1ZT4=")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "PFJTQ...1ZT4=", Description = "Found in Appsettings as EastFive.Security.Token.Key")]
                 [Property(Name = KeyPropertyName)] string key,
 
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{$randomDateFuture}}")]
