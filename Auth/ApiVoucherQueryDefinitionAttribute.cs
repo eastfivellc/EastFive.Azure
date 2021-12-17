@@ -21,9 +21,14 @@ namespace EastFive.Azure.Auth
                 .AsArray();
         }
 
-        public QueryItem? GetQueryItem(EastFive.Api.Resources.Method method, ParameterInfo parameter)
+        public QueryItem[] GetQueryItem(EastFive.Api.Resources.Method method, ParameterInfo parameter)
         {
-            return default;
+            return new QueryItem()
+            {
+                key = ApiKeyAccessAttribute.ParameterName,
+                value = $"{{{{{EastFive.Azure.Workflows.AuthorizationFlow.Variables.ApiVoucher}}}}}",
+            }
+                .AsArray();
         }
     }
 }

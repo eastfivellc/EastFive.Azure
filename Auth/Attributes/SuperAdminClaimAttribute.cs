@@ -8,7 +8,6 @@ using EastFive.Extensions;
 
 namespace EastFive.Azure.Auth
 {
-    [ApiVoucherQueryDefinition]
     public class SuperAdminClaimAttribute : Attribute, IValidateHttpRequest
     {
         private const string ClaimType = System.Security.Claims.ClaimTypes.Role;
