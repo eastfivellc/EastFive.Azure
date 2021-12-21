@@ -47,14 +47,14 @@ namespace EastFive.Azure
 
         Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security);
 
-        Task<TResult> OnUnmappedUserAsync<TResult>(
-                string subject, IDictionary<string, string> extraParameters,
-                EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
-                IProvideAuthorization authorizationProvider, Uri baseUri,
-            Func<Guid, TResult> onCreatedMapping,
-            Func<TResult> onAllowSelfServeAccounts,
-            Func<Uri, TResult> onInterceptProcess,
-            Func<TResult> onNoChange);
+        //Task<TResult> OnUnmappedUserAsync<TResult>(
+        //        string subject, IDictionary<string, string> extraParameters,
+        //        EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
+        //        IProvideAuthorization authorizationProvider, Uri baseUri,
+        //    Func<Guid, TResult> onCreatedMapping,
+        //    Func<TResult> onAllowSelfServeAccounts,
+        //    Func<Uri, TResult> onInterceptProcess,
+        //    Func<TResult> onNoChange);
 
         Task<bool> ShouldAuthorizeIntegrationAsync(XIntegration integration, EastFive.Azure.Auth.Authorization authorization);
 
@@ -403,29 +403,29 @@ namespace EastFive.Api.Azure
             return onCredentialSystemNotAvailable();
         }
         
-        public virtual async Task<TResult> OnUnmappedUserAsync<TResult>(
-                string subject, IDictionary<string, string> extraParameters,
-                EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
-                IProvideAuthorization authorizationProvider, Uri baseUri,
-            Func<Guid, TResult> onCreatedMapping,
-            Func<TResult> onAllowSelfServeAccounts,
-            Func<Uri, TResult> onInterceptProcess,
-            Func<TResult> onNoChange)
-        {
-            if (authorizationProvider is Credentials.IProvideAccountInformation)
-            {
-                var accountInfoProvider = authorizationProvider as Credentials.IProvideAccountInformation;
-                return await accountInfoProvider
-                    .CreateAccount(subject, extraParameters,
-                            authentication, authorization, baseUri,
-                            this,
-                        onCreatedMapping,
-                        onAllowSelfServeAccounts,
-                        onInterceptProcess,
-                        onNoChange);
-            }
-            return onNoChange();
-        }
+        //public virtual async Task<TResult> OnUnmappedUserAsync<TResult>(
+        //        string subject, IDictionary<string, string> extraParameters,
+        //        EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
+        //        IProvideAuthorization authorizationProvider, Uri baseUri,
+        //    Func<Guid, TResult> onCreatedMapping,
+        //    Func<TResult> onAllowSelfServeAccounts,
+        //    Func<Uri, TResult> onInterceptProcess,
+        //    Func<TResult> onNoChange)
+        //{
+        //    if (authorizationProvider is Credentials.IProvideAccountInformation)
+        //    {
+        //        var accountInfoProvider = authorizationProvider as Credentials.IProvideAccountInformation;
+        //        return await accountInfoProvider
+        //            .CreateAccount(subject, extraParameters,
+        //                    authentication, authorization, baseUri,
+        //                    this,
+        //                onCreatedMapping,
+        //                onAllowSelfServeAccounts,
+        //                onInterceptProcess,
+        //                onNoChange);
+        //    }
+        //    return onNoChange();
+        //}
 
         public virtual Web.Services.ISendMessageService SendMessageService
         { get => Web.Services.ServiceConfiguration.SendMessageService(); }

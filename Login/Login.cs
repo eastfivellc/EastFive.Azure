@@ -48,7 +48,7 @@ namespace EastFive.Azure.Login
         [Api.HttpAction("Authenticate")]
         public static async Task<IHttpResponse> AuthenticateAsync(
                 [Resource]Login login,
-                IAzureApplication application,
+                IAzureApplication application, IHttpRequest httpRequest,
             CreatedBodyResponse<Auth.Session> onSuccess,
             AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onInvalidUserNameOrPassword)
@@ -61,7 +61,7 @@ namespace EastFive.Azure.Login
                         if (!account.IsPasswordValid(login.password))
                             return onInvalidUserNameOrPassword("Invalid username or password");
 
-                        var session = await CreateSession(login.username, application);
+                        var session = await CreateSession(login.username, application, httpRequest);
                         return onSuccess(session);
                     },
                     () => onInvalidUserNameOrPassword("Invalid username or password").AsTask());
@@ -71,7 +71,7 @@ namespace EastFive.Azure.Login
         public static async Task<IHttpResponse> CreateAccountAsync(
                 [Property(Name = UserNamePropertyName)]string username,
                 [Property(Name = PasswordPropertyName)]string password,
-                IAzureApplication application,
+                IAzureApplication application, IHttpRequest httpRequest,
             CreatedBodyResponse<Auth.Session> onCreated,
             AlreadyExistsResponse onUsernameAlreadyTaken,
             GeneralConflictResponse onInvalidPassword)
@@ -90,13 +90,13 @@ namespace EastFive.Azure.Login
                         account.userIdentification = username;
                         account.password = Account.GeneratePasswordHash(username, password);
                         await saveAsync(account);
-                        var session = await CreateSession(username, application);
+                        var session = await CreateSession(username, application, httpRequest);
                         return onCreated(session);
                     });
         }
 
         private static async Task<Auth.Session> CreateSession(string userIdentification,
-            IAzureApplication application)
+            IAzureApplication application, IHttpRequest request)
         {
             var authentication = new Authentication
             {
@@ -131,28 +131,24 @@ namespace EastFive.Azure.Login
                                     authorized = true,
                                 };
 
-
-                                return await await Auth.Redirection.IdentifyAccountAsync(authorization, method,
+                                return await await Auth.Redirection.AuthorizeWithAccountAsync(
+                                        authorization,
+                                        async (authorizationToSave) =>
+                                        {
+                                            bool created = await authorizationToSave.StorageCreateAsync(
+                                                discard => true);
+                                        },
+                                        method,
                                         externalAccountKey, extraParams,
-                                        application, loginProvider, default,
-                                    async (accountId, onRecreate) =>
-                                    {
-                                        authorization.accountIdMaybe = accountId;
-                                        bool created = await authorization.StorageCreateAsync(
-                                            discard => true);
-                                        return await CreateSessionAsync(authorization);
-                                    },
+                                        application, request, loginProvider,
+                                        request.RequestUri,
                                     async (accountId) =>
                                     {
-                                        authorization.accountIdMaybe = accountId;
-                                        bool created = await authorization.StorageCreateAsync(
-                                            discard => true);
                                         return await CreateSessionAsync(authorization);
                                     },
-                                    () => throw new Exception(),
-                                    (interruptTo) => throw new Exception($"Cannot redirect to `{interruptTo}`"),
+                                    (interruptTo, accountId) => throw new Exception($"Cannot redirect to `{interruptTo}`"),
                                     why => throw new Exception(why),
-                                    default);
+                                        default);
 
                                 Task<Auth.Session> CreateSessionAsync(Auth.Authorization authorization)
                                 {

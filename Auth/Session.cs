@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using EastFive.Api;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Collections.Generic;
 using EastFive.Extensions;
+using EastFive.Linq;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
@@ -104,23 +107,24 @@ namespace EastFive.Azure.Auth
                 (accountIdClaimType) =>
                 {
                     return GetSessionAcountAsync(authorizationRef, application,
-                        (accountId, authorized) =>
+                        (accountId, claims, authorized) =>
                         {
-                            var claims = new Dictionary<string, string>()
-                            {
-                                { accountIdClaimType, accountId.ToString() }
-                            };
-                            return onClaims(claims, accountId, authorized);
+                            var claimsWithAccountId = claims
+                                .Append(accountIdClaimType.PairWithValue(accountId.ToString()))
+                                .ToDictionary();
+                            return onClaims(claimsWithAccountId, accountId, authorized);
                         },
                         (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
                 },
                 (why) =>
                 {
                     return GetSessionAcountAsync(authorizationRef, application,
-                        (accountId, authorized) =>
+                        (accountId, claims, authorized) =>
                         {
-                            var claims = new Dictionary<string, string>();
-                            return onClaims(claims, accountId, authorized);
+                            var claimsDictionary = claims
+                                .NullToEmpty()
+                                .ToDictionary();
+                            return onClaims(claimsDictionary, accountId, authorized);
                         },
                         (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
                 });
@@ -413,56 +417,60 @@ namespace EastFive.Azure.Auth
 
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
                 IAuthApplication application,
-            Func<Guid, bool, TResult> onSuccess,
+            Func<Guid, IDictionary<string, string>, bool, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {
-            return await await authorizationRef.StorageGetAsync(
-                async (authorization) =>
+            return await authorizationRef.StorageGetAsync(
+                (authorization) =>
                 {
                     if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
 
                     if (authorization.accountIdMaybe.HasValue)
-                        return onSuccess(authorization.accountIdMaybe.Value, authorization.authorized);
+                        return onSuccess(authorization.accountIdMaybe.Value, authorization.claims, authorization.authorized);
 
-                    var methodRef = authorization.Method;
-                    return await await Method.ById(methodRef, application,
-                        async method =>
-                        {
-                            return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
-                                async (externalUserKey) =>
-                                {
-                                    if (application is Api.Azure.Credentials.IProvideAccountInformation)
-                                    {
-                                        return await await (application as Api.Azure.Credentials.IProvideAccountInformation)
-                                            .FindOrCreateAccountByMethodAndKeyAsync(
-                                                    new AccountLink { method = methodRef, externalAccountKey = externalUserKey, },
-                                                    application,
-                                                    accountId => onSuccess(accountId, authorization.authorized).AsTask(),
-                                                () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
-                                                onNoEffect: () => OnContinue());
-                                    }
-                                    return await OnContinue();
-                                    Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
-                                            authorization,
-                                        accountId => onSuccess(accountId, authorization.authorized),
-                                        () => onFailure("No mapping to that account.", authorization.authorized));
-                                },
-                                (why) => onFailure(why, authorization.authorized).AsTask(),
-                                () => onFailure("This login method is no longer supported.", false).AsTask());
-                        },
-                        () =>
-                        {
-                            return CheckSuperAdminBeforeFailure(authorizationRef,
-                                    "Authorization method is no longer valid on this system.", authorization.authorized,
-                                onSuccess, onFailure).AsTask();
-                        });
+                    return onFailure("Authorization is not connected to an account.", false);
+
+                    //var methodRef = authorization.Method;
+                    //return await await Method.ById(methodRef, application,
+                    //    async method =>
+                    //    {
+                    //        return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
+                    //            async (externalUserKey) =>
+                    //            {
+                    //                if (application is Api.Azure.Credentials.IProvideAccountInformation)
+                    //                {
+                    //                    var accountInformationProvider = application as Api.Azure.Credentials.IProvideAccountInformation;
+                    //                    return await await accountInformationProvider
+                    //                        .FindOrCreateAccountByMethodAndKeyAsync(
+                    //                                method, externalUserKey,
+                    //                                authorization.parameters,
+                    //                            (accountId, claims) => onSuccess(accountId, claims, authorization.authorized).AsTask(),
+                    //                            why => onFailure(why, false).AsTask(),
+                    //                            () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
+                    //                            onNoEffect: () => OnContinue());
+                    //                }
+                    //                return await OnContinue();
+                    //                Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
+                    //                        authorization,
+                    //                    accountId => onSuccess(accountId, authorization.claims, authorization.authorized),
+                    //                    () => onFailure("No mapping to that account.", authorization.authorized));
+                    //            },
+                    //            (why) => onFailure(why, authorization.authorized).AsTask(),
+                    //            () => onFailure("This login method is no longer supported.", false).AsTask());
+                    //    },
+                    //    () => onFailure("Authorization method is no longer valid on this system.", authorization.authorized).AsTask());
+                        //{
+                        //    return CheckSuperAdminBeforeFailure(authorizationRef,
+                        //            "Authorization method is no longer valid on this system.", authorization.authorized,
+                        //        onSuccess, onFailure).AsTask();
+                        //});
                 },
-                () =>
-                {
-                    return CheckSuperAdminBeforeFailure(authorizationRef, "Authorization not found.", false,
-                        onSuccess, onFailure).AsTask();
-                });
+                () => onFailure("Authorization not found.", false));
+                //{
+                //    return CheckSuperAdminBeforeFailure(authorizationRef, "Authorization not found.", false,
+                //        onSuccess, onFailure).AsTask();
+                //});
           
         }
 

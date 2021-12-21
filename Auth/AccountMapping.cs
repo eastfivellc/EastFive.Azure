@@ -271,7 +271,7 @@ namespace EastFive.Azure.Auth
         }
     
 
-        internal static async Task<TResult> FindByMethodAndKeyAsync<TResult>(IRef<Method> authenticationId, string authorizationKey,
+        public static async Task<TResult> FindByMethodAndKeyAsync<TResult>(IRef<Method> authenticationId, string authorizationKey,
                 Authorization authorization,
             Func<Guid, TResult> onFound,
             Func<TResult> onNotFound)

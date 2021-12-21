@@ -10,38 +10,35 @@ namespace EastFive.Api.Azure.Credentials
 {
     public interface IProvideAccountInformation
     {
-        Task<TResult> CreateAccount<TResult>(
-                string subject, IDictionary<string, string> extraParameters,
-                Method authentication, Authorization authorization, Uri baseUri,
-                IApiApplication webApiApplication,
-            Func<Guid, TResult> onCreatedMapping,
-            Func<TResult> onAllowSelfServeAccounts,
-            Func<Uri, TResult> onInterceptProcess,
-            Func<TResult> onNoChange);
+        //Task<TResult> CreateAccount<TResult>(
+        //        string subject, IDictionary<string, string> extraParameters,
+        //        Method authentication, Authorization authorization, Uri baseUri,
+        //        IApiApplication webApiApplication,
+        //    Func<Guid, TResult> onCreatedMapping,
+        //    Func<TResult> onAllowSelfServeAccounts,
+        //    Func<Uri, TResult> onInterceptProcess,
+        //    Func<TResult> onNoChange);
 
         Task<TResult> FindOrCreateAccountByMethodAndKeyAsync<TResult>(
-                AccountLink accountLink,
-                IAuthApplication application,
-            Func<Guid, TResult> onFound,
-            Func<TResult> onNotFound,
-            Func<TResult> onNoEffect);
+                Method authenticationMethod, string externalAccountKey,
+                Authorization authorization, IDictionary<string, string> extraParams,
+                IProvideLogin loginProvider, IHttpRequest request,
+                Func<IAccount, IAccount> populateAccount,
+            Func<Guid, IDictionary<string, string>, TResult> onAccountReady,
+            Func<Uri, Guid, IDictionary<string, string>, TResult> onInterceptProcess,
+            Func<string, TResult> onReject);
 
-        Task<TResult> CreateUnpopulatedAccountAsync<TResult>(
-                AccountLink accountLink,
-                IAuthApplication application,
-            Func<IAccount, Func<IAccount, Task>, Task<TResult>> onNeedsPopulated,
-            Func<Uri, TResult> onInterupted,
-            Func<string, TResult> onNotCreated,
-            Func<TResult> onNoEffect);
-    }
-
-    public static class ClaimsList
-    {
-
+        //Task<TResult> CreateUnpopulatedAccountAsync<TResult>(
+        //        Method authenticationMethod, string externalAccountKey,
+        //        IAuthApplication application,
+        //    Func<IAccount, Func<IAccount, Task>, Task<TResult>> onNeedsPopulated,
+        //    Func<Uri, TResult> onInterupted,
+        //    Func<string, TResult> onNotCreated,
+        //    Func<TResult> onNoEffect);
     }
 
     public interface IProvideClaims
     {
-        bool GetStandardClaimValue(string claimType, IDictionary<string, string> parameters, out string claimValue);
+        bool TryGetStandardClaimValue(string claimType, IDictionary<string, string> parameters, out string claimValue);
     }
 }

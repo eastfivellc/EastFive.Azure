@@ -98,6 +98,10 @@ namespace EastFive.Azure.Auth
 
         [Storage]
         [JsonIgnore]
+        public IDictionary<string, string> claims;
+
+        [Storage]
+        [JsonIgnore]
         public DateTime? deleted;
 
         #endregion

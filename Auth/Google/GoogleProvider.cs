@@ -41,8 +41,6 @@ namespace EastFive.Azure.Auth.Google
     public class GoogleProvider : IProvideLogin, IProvideSession, IProvideClaims
     {
         public const string IntegrationName = "Google";
-        public string Method => IntegrationName;
-        public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
         #region Parameters
 
@@ -164,32 +162,47 @@ namespace EastFive.Azure.Auth.Google
             this.keys = keys;
         }
 
-        //[IntegrationName(AppleProvider.IntegrationName)]
-        //public static Task<TResult> InitializeAsync<TResult>(
-        //    Func<IProvideAuthorization, TResult> onProvideAuthorization,
-        //    Func<TResult> onProvideNothing,
-        //    Func<string, TResult> onFailure)
-        //{
-        //    return AppSettings.Auth.Google.ClientId.ConfigurationString(
-        //        applicationId =>
-        //        {
-        //            return AppSettings.Auth.Google.ClientSecret.ConfigurationString(
-        //                (clientSecret) =>
-        //                {
-        //                    return new Uri(discoveryDocumentUrl).HttpClientGetResource(
-        //                        (DiscoveryDocument discDoc) =>
-        //                        {
-        //                            var provider = new GoogleProvider(applicationId, clientSecret,
-        //                                discDoc.authorization_endpoint, discDoc.token_endpoint);
-        //                            return onProvideAuthorization(provider);
-        //                        },
-        //                        onFailure: (why) => onFailure(why));
-                            
-        //                },
-        //                (why) => onProvideNothing().AsTask());
-        //        },
-        //        (why) => onProvideNothing().AsTask());
-        //}
+        private TResult Parse<TResult>(string jwtEncodedString,
+                IDictionary<string, string> responseParams,
+            Func<string, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<string, TResult> onInvalidToken)
+        {
+            return this.keys.Parse(jwtEncodedString,
+                    issuer, clientId.AsArray(),
+                (subject, jwtSecurityToken, principal) =>
+                {
+                    var state = responseParams.TryGetValue(responseParamState, out string stateStr) ?
+                        Guid.TryParse(stateStr, out Guid stateParsedGuid) ?
+                            stateParsedGuid
+                            :
+                            default(Guid?)
+                        :
+                        default(Guid?);
+
+                    var sourceClaims = jwtSecurityToken.Claims
+                        .Select(claim => claim.Type.PairWithValue(claim.Value))
+                        .ToArray();
+
+                    var updatedArgs = principal
+                        .Claims
+                        .Select(claim => claim.Type.PairWithValue(claim.Value))
+                        .Concat(responseParams)
+                        .Concat(sourceClaims)
+                        .Distinct(kvp => kvp.Key)
+                        .ToDictionary();
+
+                    return onSuccess(subject, state, updatedArgs);
+                },
+                onInvalidToken: onInvalidToken);
+        }
+
+        #region IProvideLogin
+
+        #region IProvideAuthorization
+
+        public string Method => IntegrationName;
+
+        public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
         public Type CallbackController => typeof(GoogleRedirect);
 
@@ -249,7 +262,7 @@ namespace EastFive.Azure.Auth.Google
                     if (subject.HasBlackSpace())
                         return callback(subject);
                 }
-                
+
                 if (responseParams.ContainsKey(GoogleProvider.tokenParamIdToken))
                 {
                     var jwtEncodedString = responseParams[GoogleProvider.tokenParamIdToken];
@@ -262,41 +275,7 @@ namespace EastFive.Azure.Auth.Google
             }
         }
 
-        private TResult Parse<TResult>(string jwtEncodedString,
-                IDictionary<string, string> responseParams,
-            Func<string, Guid?, IDictionary<string, string>, TResult> onSuccess,
-            Func<string, TResult> onInvalidToken)
-        {
-            return this.keys.Parse(jwtEncodedString,
-                    issuer, clientId.AsArray(),
-                (subject, jwtSecurityToken, principal) =>
-                {
-                    var state = responseParams.TryGetValue(responseParamState, out string stateStr) ?
-                        Guid.TryParse(stateStr, out Guid stateParsedGuid) ?
-                            stateParsedGuid
-                            :
-                            default(Guid?)
-                        :
-                        default(Guid?);
-
-                    var sourceClaims = jwtSecurityToken.Claims
-                        .Select(claim => claim.Type.PairWithValue(claim.Value))
-                        .ToArray();
-
-                    var updatedArgs = principal
-                        .Claims
-                        .Select(claim => claim.Type.PairWithValue(claim.Value))
-                        .Concat(responseParams)
-                        .Concat(sourceClaims)
-                        .Distinct(kvp => kvp.Key)
-                        .ToDictionary();
-
-                    return onSuccess(subject, state, updatedArgs);
-                },
-                onInvalidToken: onInvalidToken);
-        }
-
-        #region IProvideLogin
+        #endregion
 
         public Uri GetLogoutUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {
@@ -321,6 +300,10 @@ namespace EastFive.Azure.Auth.Google
             return default(Uri);
         }
 
+        #endregion
+
+        #region IProvideSession
+
         public Task<bool> SupportsSessionAsync(EastFive.Azure.Auth.Session session)
         {
             return true.AsTask();
@@ -330,7 +313,7 @@ namespace EastFive.Azure.Auth.Google
 
         #region IProvideClaims
 
-        public bool GetStandardClaimValue(string claimType,
+        public bool TryGetStandardClaimValue(string claimType,
             IDictionary<string, string> parameters, out string claimValue)
         {
             if (claimType.IsNullOrWhiteSpace())
@@ -368,34 +351,6 @@ namespace EastFive.Azure.Auth.Google
 
         #endregion
 
-        #region IProvideAccountInformation
-
-        protected (string, string) ParseAccountInfo(IDictionary<string, string> extraParameters)
-        {
-            var name = "Google User";
-            var email = string.Empty;
-            if (extraParameters.ContainsKey(claimParamName))
-                name = extraParameters[claimParamName];
-
-            if (extraParameters.ContainsKey(claimParamEmail))
-                email = extraParameters[claimParamName];
-
-            return (name, email);
-        }
-
-        public Task<TResult> CreateAccount<TResult>(string subject,
-            IDictionary<string, string> extraParameters,
-            Method authentication, Authorization authorization,
-            Uri baseUri, IApiApplication webApiApplication,
-            Func<Guid, TResult> onCreatedMapping,
-            Func<TResult> onAllowSelfServeAccounts,
-            Func<Uri, TResult> onInterceptProcess,
-            Func<TResult> onNoChange)
-        {
-            return onNoChange().AsTask();
-        }
-
-        #endregion
     }
 
     public class GoogleProviderAttribute : Attribute, IProvideLoginProvider
@@ -440,4 +395,13 @@ namespace EastFive.Azure.Auth.Google
             public string issuer; //https://accounts.google.com
         }
     }
+
+    public static class GoogleProviderExtensions
+    {
+        public static bool IsGoogle(this Method authMethod)
+        {
+            return authMethod.name == GoogleProvider.IntegrationName;
+        }
+    }
+
 }

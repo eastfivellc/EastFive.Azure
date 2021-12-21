@@ -22,6 +22,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using BlackBarLabs.Api;
 using EastFive.Security.SessionServer;
 using EastFive.Api.Meta.Flows;
+using System.Linq.Expressions;
 
 namespace EastFive.Azure.Auth
 {
@@ -81,7 +82,7 @@ namespace EastFive.Azure.Auth
 
         [HttpGet]
         public static Task<IHttpResponse> QueryByIdAsync(
-                [QueryId]IRef<Method> methodRef,
+                [QueryId] IRef<Method> methodRef,
             IAuthApplication application,
             ContentTypeResponse<Method> onFound,
             NotFoundResponse onNotFound)
@@ -119,7 +120,7 @@ namespace EastFive.Azure.Auth
 
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAsync(
-            [QueryParameter(Name = "integration")]IRef<XIntegration> integrationRef,
+            [QueryParameter(Name = "integration")] IRef<XIntegration> integrationRef,
             IAuthApplication application, EastFive.Api.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized,
@@ -162,7 +163,7 @@ namespace EastFive.Azure.Auth
 
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAccountAsync(
-            [QueryParameter(Name = "integration_account")]Guid accountId,
+            [QueryParameter(Name = "integration_account")] Guid accountId,
             IAuthApplication application, EastFive.Api.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized)
@@ -189,7 +190,7 @@ namespace EastFive.Azure.Auth
                         return new Method
                         {
                             authenticationId = new Ref<Method>(loginProvider.Value.Id),
-                            name = integrationProvider.GetDefaultName(new Dictionary<string,string>()),
+                            name = integrationProvider.GetDefaultName(new Dictionary<string, string>()),
                         };
                     });
             return onContent(integrationProviders);
@@ -197,7 +198,7 @@ namespace EastFive.Azure.Auth
 
         [HttpGet]
         public static Task<IHttpResponse> QueryBySessionAsync(
-                [QueryParameter(Name = "session")]IRef<Session> sessionRef,
+                [QueryParameter(Name = "session")] IRef<Session> sessionRef,
                 IAuthApplication application,
             MultipartAsyncResponse<Method> onContent,
             ReferencedDocumentNotFoundResponse<Session> onSessionNotFound,
@@ -368,6 +369,51 @@ namespace EastFive.Azure.Auth
                     (externalUserKey, authenticationIdMaybe, scopeMaybeDiscard) => onAuthorizeKey(externalUserKey),
                     why => onFailure(why)),
                 () => loginMethodNoLongerSupported());
+        }
+
+        public IEnumerableAsync<TAccount> StorageFindAccountsFromAccountLinks<TAccount>(string accountKey,
+                Expression<Func<TAccount, AccountLinks>> accountLinksProperty)
+            where TAccount : IAccount, IReferenceable
+        {
+            var accountLinks = new AccountLinks
+            {
+                accountLinks = new AccountLink[]
+                {
+                    new AccountLink
+                    {
+                        externalAccountKey = accountKey,
+                        method = this.authenticationId,
+                    }
+                }
+            };
+
+            var thisMethodId = this.id;
+            return accountLinks
+                .StorageGetBy<AccountLinks, TAccount>(accountLinksProperty)
+                .Where(account => account.AccountLinks.accountLinks
+                    .Contains(al => al.method.id == thisMethodId));
+        }
+
+        public Task<TResult> StorageCreateOrUpdateAccountFromAccountLinks<TAccount, TResult>(string accountKey,
+                Expression<Func<TAccount, AccountLinks>> accountLinksProperty,
+                Func<bool, TAccount, Func<TAccount, Task>, Task<TResult>> onReadyForUpdate)
+            where TAccount : IAccount, IReferenceable
+        {
+            var accountLinks = new AccountLinks
+            {
+                accountLinks = new AccountLink[]
+                {
+                    new AccountLink
+                    {
+                        externalAccountKey = accountKey,
+                        method = this.authenticationId,
+                    }
+                }
+            };
+
+            return accountLinks.StorageCreateOrUpdateByIndexAsync<AccountLinks, TAccount, TResult>(
+                    accountLinksProperty,
+                onReadyForUpdate: onReadyForUpdate);
         }
     }
 }

@@ -39,7 +39,7 @@ namespace EastFive.Azure.Auth
         {
             if (!typeof(AccountLinks).IsAssignableFrom(decoratedMember.GetPropertyOrFieldType()))
                 throw new ArgumentException(
-                    $"{nameof(AccountLinksAttribute)} shouuld not be used to decorate any type other than {nameof(AccountLinks)}." +
+                    $"{nameof(AccountLinksAttribute)} should not be used to decorate any type other than {nameof(AccountLinks)}." +
                     $" Please modify {decoratedMember.DeclaringType.FullName}..{decoratedMember.Name}");
 
             var accountLinks = (AccountLinks)lookupValues
@@ -165,5 +165,26 @@ namespace EastFive.Azure.Auth
             throw new NotImplementedException($"{nameof(FromAuthorization)} cannot cast claim to type {memberType.FullName}");
         }
     }
+
+    public static class AccountLinksExtensions
+    {
+        public static AccountLinks AppendCredentials(this AccountLinks accountLinks,
+            Method authMethod, string accountKey)
+        {
+            accountLinks.accountLinks = accountLinks.accountLinks
+                .NullToEmpty()
+                .Where(al => al.method.id != authMethod.authenticationId.id)
+                .Append(
+                    new AccountLink
+                    {
+                        method = authMethod.authenticationId,
+                        externalAccountKey = accountKey,
+                    })
+                .ToArray();
+            return accountLinks;
+
+        }
+    }
+
 }
 
