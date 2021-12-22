@@ -38,7 +38,7 @@ namespace EastFive.Azure.Auth
 
         public PreserverRedirectionAttribute()
         {
-            redirections = AppSettings.Redirections.ConfigurationJson(
+            redirections = EastFive.Azure.AppSettings.Auth.Redirections.ConfigurationJson(
                 (RedirectionConfiguration[] kvps) =>
                 {
                     return kvps

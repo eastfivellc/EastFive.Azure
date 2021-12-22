@@ -72,11 +72,11 @@ namespace EastFive.Azure.Auth
             return await await redirection.StorageCreateAsync(
                 discard =>
                 {
-                    return AppSettings.PauseRedirections.ConfigurationBoolean(
+                    return EastFive.Azure.AppSettings.Auth.PauseRedirections.ConfigurationBoolean(
                         async pauseRedirections =>
                         {
                             if (pauseRedirections)
-                                request.CreateResponse(System.Net.HttpStatusCode.OK, requestId);
+                                return request.CreateResponse(System.Net.HttpStatusCode.OK, requestId);
                             return await ContinueAsync();
                         },
                         why => ContinueAsync(),

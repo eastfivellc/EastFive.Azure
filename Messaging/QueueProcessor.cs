@@ -23,7 +23,7 @@ namespace EastFive.Messaging
             subscription = subscription.ToLower();
             subscriptions = subscriptions.Append(subscription).ToArray();
             var xexecutionThread = Web.Configuration.Settings.GetString(
-                    EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString,
+                    Azure.AppSettings.ServiceBusConnectionString,
                 serviceBusConnectionString =>
                 {
                     var receiveClient = new Microsoft.Azure.ServiceBus.QueueClient(serviceBusConnectionString, subscription);
@@ -196,7 +196,7 @@ namespace EastFive.Messaging
              where TQueueProcessor : QueueProcessor<TMessageParam>
         {
             return Web.Configuration.Settings.GetString(
-                    Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString,
+                    EastFive.Azure.AppSettings.ServiceBusConnectionString,
                 async serviceBusConnectionString =>
                 {
                     var message = new Microsoft.Azure.ServiceBus.Message();
@@ -224,8 +224,7 @@ namespace EastFive.Messaging
         public int Flush()
         {
             return Web.Configuration.Settings.GetString(
-                    EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString,
-                    //EastFive.Azure.Persistence.AppSettings.Storage,
+                    EastFive.Azure.AppSettings.ServiceBusConnectionString,
                 serviceBusConnectionString =>
                 {
                     do

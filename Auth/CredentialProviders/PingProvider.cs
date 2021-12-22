@@ -75,7 +75,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             var agentId = extraParams[PingProvider.AgentId];
             var restAuthUsername = extraParams[PingProvider.RestApiKey];
 
-            return await Web.Configuration.Settings.GetString<Task<TResult>>(EastFive.Security.SessionServer.Configuration.AppSettings.PingIdentityAthenaRestApiKey,
+            return await Web.Configuration.Settings.GetString<Task<TResult>>(EastFive.Azure.AppSettings.Auth.Ping.PingIdentityAthenaRestApiKey,
                 async (restApiKey) =>
                 {
                     using (var httpClient = new HttpClient())

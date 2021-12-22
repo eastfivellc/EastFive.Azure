@@ -39,7 +39,14 @@ namespace EastFive.Azure
             }
         }
 
+        [ConfigKey("Connection string that is used for the service bus.",
+            DeploymentOverrides.Suggested,
+            DeploymentSecurityConcern = true,
+            PrivateRepositoryOnly = true,
+            Location = "The URL that the webUI is deployed")]
+        public const string ServiceBusConnectionString = "EastFive.Api.Workers.ServiceBusConnectionString";
 
+        [Config]
         public static class SPA
         {
             public const string BuildConfigPath = "EastFive.Azure.SPA.BuildConfigPath";
@@ -65,6 +72,7 @@ namespace EastFive.Azure
             public const string SpaStorage = "EastFive.Azure.Spa.ConnectionString";
         }
 
+        [Config]
         public static class ApplicationInsights
         {
             [ConfigKey("Identifies the application insights endpoint to which data is posted.",
@@ -97,6 +105,7 @@ namespace EastFive.Azure
             public const string TeamsAppImage = "EastFive.Azure.ApplicationInsights.TeamsAppImage";
         }
 
+        [Config]
         public static class Search
         {
             [ConfigKey("Identifies the search endpoint to use.",
@@ -114,7 +123,6 @@ namespace EastFive.Azure
         }
 
         public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
-
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
         public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
@@ -169,6 +177,7 @@ namespace EastFive.Azure
             public const string AppleAppSiteAssociationId = "EastFive.Azure.Apple.AppleAppSiteAssociation.AppId";
         }
 
+        [Config]
         public static class AzureADB2C
         {
             [ConfigKey("Identifies this Tenant to AADB2C",
@@ -215,12 +224,12 @@ namespace EastFive.Azure
             public const string ClientSecret = "EastFive.Azure.AzureADB2C.ClientSecret";
         }
 
-        public const string Redirections = "EastFive.Azure.Auth.Redirections";
-        public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
-
         [Config]
         public static class Auth
         {
+            public const string Redirections = "EastFive.Azure.Auth.Redirections";
+            public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
+
             [Config]
             public static class Apple
             {
@@ -264,7 +273,37 @@ namespace EastFive.Azure
                 public const string ClientSecret = "EastFive.Google.ClientSecret";
             }
 
+            [Config]
+            public static class Ping
+            {
+                public const string PingIdentityAthenaRestApiKey = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestApiKey";
+                public const string PingIdentityAthenaRestAuthUsername = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestAuthUsername";
+
+            }
+
+            [ConfigKey("Link that is sent (emailed) to the user to login to the application",
+            DeploymentOverrides.Desireable,
+            DeploymentSecurityConcern = false,
+            Location = "The URL that the webUI is deployed")]
+            public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
+
             public const string OpenApiCollectionName = "EastFive.Azure.Auth";
+        }
+
+        [Config]
+        public static class Communications
+        {
+            public static class SendGrid
+            {
+                [ConfigKey("API Key to access SendGrid", DeploymentOverrides.Suggested,
+                    DeploymentSecurityConcern = false,
+                    Location = "SendGrid admin portal",
+                    PrivateRepositoryOnly = true)]
+                public const string ApiKey = "EastFive.SendGrid.ApiKey";
+            }
+
+            public const string MuteEmailToAddress = "EastFive.SendGrid.MuteToAddress";
+            public const string BccAllAddresses = "EastFive.SendGrid.BlindCopyAllAddresses";
         }
     }
 }
@@ -277,22 +316,6 @@ namespace EastFive.Security.SessionServer.Configuration
         //public const string Storage = "EastFive.Security.SessionServer.Storage";
         public const string TokenExpirationInMinutes = "EastFive.Security.SessionServer.tokenExpirationInMinutes";
         public const string LoginIdClaimType = "EastFive.Security.SessionServer.LoginProvider.LoginIdClaimType";
-
-        public const string PingIdentityAthenaRestApiKey = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestApiKey";
-        public const string PingIdentityAthenaRestAuthUsername = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestAuthUsername";
-        
-        [ConfigKey("Link that is sent (emailed) to the user to login to the application",
-            DeploymentOverrides.Desireable,
-            DeploymentSecurityConcern = false,
-            Location = "The URL that the webUI is deployed")]
-        public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
-
-        [ConfigKey("Connection string that is used for the service bus.",
-            DeploymentOverrides.Suggested,
-            DeploymentSecurityConcern = true,
-            PrivateRepositoryOnly = true,
-            Location = "The URL that the webUI is deployed")]
-        public const string ServiceBusConnectionString = "EastFive.Api.Workers.ServiceBusConnectionString";
 
         
 

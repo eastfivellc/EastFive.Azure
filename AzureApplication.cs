@@ -82,6 +82,7 @@ namespace EastFive.Api.Azure
     public class AzureApplication : EastFive.Api.HttpApplication, EastFive.Azure.IAzureApplication
     {
         public const string QueryRequestIdentfier = "request_id";
+        public const string ParameterRedirectUrl = "REDIRECT_URI";
 
         public TelemetryClient Telemetry { get; private set; }
 
@@ -247,7 +248,7 @@ namespace EastFive.Api.Azure
             if (!listOfBytes.Any())
                 return;
 
-            var client = EastFive.Security.SessionServer.Configuration.AppSettings.ServiceBusConnectionString.ConfigurationString(
+            var client = EastFive.Azure.AppSettings.ServiceBusConnectionString.ConfigurationString(
                 (connectionString) =>
                 {
                     return new Microsoft.Azure.ServiceBus.QueueClient(connectionString, queueName);
@@ -538,10 +539,10 @@ namespace EastFive.Api.Azure
                 }
             }
 
-            if (null != authParams && authParams.ContainsKey(EastFive.Security.SessionServer.Configuration.AuthorizationParameters.RedirectUri))
+            if (null != authParams && authParams.ContainsKey(ParameterRedirectUrl))
             {
                 Uri redirectUri;
-                var redirectUriString = authParams[EastFive.Security.SessionServer.Configuration.AuthorizationParameters.RedirectUri];
+                var redirectUriString = authParams[ParameterRedirectUrl];
                 if (!Uri.TryCreate(redirectUriString, UriKind.Absolute, out redirectUri))
                     return onInvalidParameter("REDIRECT", $"BAD URL in redirect call:{redirectUriString}");
                 var redirectUrl = SetRedirectParameters(authorization, redirectUri);
@@ -549,7 +550,7 @@ namespace EastFive.Api.Azure
             }
 
             return await EastFive.Web.Configuration.Settings.GetUri(
-                EastFive.Security.SessionServer.Configuration.AppSettings.LandingPage,
+                EastFive.Azure.AppSettings.Auth.LandingPage,
                 (redirectUriLandingPage) =>
                 {
                     var redirectUrl = SetRedirectParameters(authorization, redirectUriLandingPage);

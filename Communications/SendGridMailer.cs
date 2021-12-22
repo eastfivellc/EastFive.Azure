@@ -9,6 +9,7 @@ using EastFive.Web.Services;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Api;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Communications.Azure
 {
@@ -25,7 +26,7 @@ namespace EastFive.Communications.Azure
             Func<SendGridMailer,TResult> onSuccess,
             Func<string,TResult> onFailure)
         {
-            return EastFive.Web.Configuration.Settings.GetString(EastFive.Communications.Azure.AppSettings.ApiKey,
+            return EastFive.Azure.AppSettings.Communications.SendGrid.ApiKey.ConfigurationString(
                 key => onSuccess(new SendGridMailer(key)),
                 onFailure);
         }
@@ -61,21 +62,21 @@ namespace EastFive.Communications.Azure
             message.SetClickTracking(false, true);
             //message.TemplateId = templateName;
 
-            var emailMute = false;
-            var toAddressEmail = EastFive.Web.Configuration.Settings.GetString(AppSettings.MuteEmailToAddress,
+            var (emailMute, toAddressEmail) = EastFive.Azure.AppSettings.Communications.MuteEmailToAddress.ConfigurationString(
                 (emailMuteString) =>
                 {
                     if (emailMuteString.IsNullOrWhiteSpace())
-                        return new EmailAddress(toAddress, toName);
-                    emailMute = true;
-                    return new EmailAddress(emailMuteString, $"MUTED[{toAddress}:{toName}]");
+                        return (false, new EmailAddress(toAddress, toName));
+                    
+                    var muteAddr = new EmailAddress(emailMuteString, $"MUTED[{toAddress}:{toName}]");
+                    return (true, muteAddr);
                 },
-                (why) => new EmailAddress(toAddress, toName));
+                (why) => (false, new EmailAddress(toAddress, toName)));
 
             message.AddTo(toAddressEmail);
             // message.SetClickTracking(false, false);
 
-            var bccAddressesAdded = Web.Configuration.Settings.GetString(AppSettings.BccAllAddresses,
+            var bccAddressesAdded = EastFive.Azure.AppSettings.Communications.BccAllAddresses.ConfigurationString(
                 copyEmail =>
                 {
                     var bccAddresses = (copyEmail.IsNullOrWhiteSpace() ? "" : copyEmail)
