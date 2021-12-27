@@ -1370,30 +1370,40 @@ namespace EastFive.Azure.Synchronization
                     async connectorId =>
                     {
                         bool deleted = await await Persistence.ConnectorDocument.DeleteByIdAsync(connectorId,
-                            (adapterId1, adapterId2) =>
+                            async (adapterId1, adapterId2) =>
                             {
                                 var otherAdapterId = adapterId1 == adapter.adapterId ?
                                     adapterId2
                                     :
                                     adapterId1;
-                                return Persistence.AdapterDocument.UpdateAsync(otherAdapterId,
-                                    async (otherAdapter, updateOtherAdapterAsync) =>
-                                    {
-                                        await updateOtherAdapterAsync(otherAdapter.connectorIds.Where(cId => cId != connectorId).ToArray(), otherAdapter.name, otherAdapter.identifiers);
-                                        return true;
-                                    },
+                                var otherTask = Persistence.AdapterDocument.DeleteByIdAsync(otherAdapterId,
+                                    () => true,
                                     () => false);
+                                var original = await Persistence.AdapterDocument.DeleteByIdAsync(adapter.adapterId,
+                                    () => true,
+                                    () => false);
+
+                                return await otherTask;
+                                //return Persistence.AdapterDocument.UpdateAsync(otherAdapterId,
+                                //    async (otherAdapter, updateOtherAdapterAsync) =>
+                                //    {
+                                //        if (otherAdapter.connectorIds.Length == 0)
+                                //            return true;
+
+                                //        await updateOtherAdapterAsync(otherAdapter.connectorIds.Where(cId => cId != connectorId).ToArray(), otherAdapter.name, otherAdapter.identifiers);
+                                //        return true;
+                                //    },
+                                //    () => false);
                             },
                             () => false.AsTask());
                         return deleted;
                     })
                 .AsyncEnumerable()
-                .JoinTask(Persistence.AdapterDocument.DeleteByIdAsync(adapter.adapterId,
-                    () => true,
-                    () => false))
+                //.JoinTask(Persistence.AdapterDocument.DeleteByIdAsync(adapter.adapterId,
+                //    () => true,
+                //    () => false))
                 .ToArrayAsync();
             return onDeleted();
-
         }
     }
 }

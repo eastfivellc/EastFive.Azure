@@ -376,17 +376,17 @@ namespace EastFive.Azure.Synchronization.Persistence
                 });
         }
 
-        internal static Task<TResult> DeleteByIdAsync<TResult>(Guid synchronizationId,
+        internal static Task<TResult> DeleteByIdAsync<TResult>(Guid adapterId,
             Func<TResult> onDeleted,
             Func<TResult> onNotFound)
         {
             return AzureStorageRepository.Connection(
                 azureStorageRepository =>
                 {
-                    return azureStorageRepository.DeleteIfAsync<ConnectorDocument, TResult>(synchronizationId,
-                        (syncDoc, deleteSyncDocAsync) =>
+                    return azureStorageRepository.DeleteIfAsync<AdapterDocument, TResult>(adapterId,
+                        async (syncDoc, deleteAsync) =>
                         {
-                            throw new NotImplementedException();
+                            //throw new NotImplementedException();
                             // return onDeleted();
                             //if (syncDoc.LocalIdMaybe.HasValue)
                             //{
@@ -418,8 +418,8 @@ namespace EastFive.Azure.Synchronization.Persistence
                             //    },
                             //    () => false);
 
-                            //await deleteSyncDocAsync();
-                            //return onDeleted();
+                            await deleteAsync();
+                            return onDeleted();
                         },
                         onNotFound);
                 });
