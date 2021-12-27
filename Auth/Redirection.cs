@@ -323,49 +323,12 @@ namespace EastFive.Azure.Auth
                     return account;
                 var claimProvider = (IProvideClaims)loginProvider;
 
-                return account.GetType()
-                    .GetPropertyAndFieldsWithAttributesInterface<PopulatedByAuthorizationClaim>()
-                    .Aggregate(account,
-                        (accountToUpdate, tpl) =>
-                        {
-                            var (member, populationAttr) = tpl;
-                            return populationAttr.PopulateValue(accountToUpdate, member,
-                                (string claimType, out string claimValue) =>
-                                    claimProvider.TryGetStandardClaimValue(claimType, extraParams, out claimValue));
-                        });
+                var accountPopulatedFromClaims = claimProvider.PopulateResourceFromClaims(account, extraParams);
+                return accountPopulatedFromClaims;
             }
-
-            //Task<TResult> CreateAccountAsync()
-            //{
-            //    return accountInfoProvider.CreateUnpopulatedAccountAsync(
-            //            authenticationMethod, externalAccountKey, application,
-            //        onNeedsPopulated: async (account, saveAsync) =>
-            //        {
-            //            account.AccountLinks = account.AccountLinks
-            //                .AppendCredentials(authenticationMethod, externalAccountKey);
-
-            //            var populatedAccount = PopulateAccount();
-            //            await saveAsync(populatedAccount);
-
-            //            return onCreated(populatedAccount.id);
-
-                        
-            //        },
-            //        onInterupted: (uri) => onInterupted(uri),
-            //        onNotCreated: (string why) => onGeneralFailure(why),
-            //        onNoEffect: () => throw new Exception("IProvideAccountInformation created account but did not want to populate it."));
-            //}
-
-            //Task<TResult> OnLegacy() => LegacyAccountMappingAsync(authorization,
-            //    authenticationMethod, externalAccountKey,
-            //    extraParams, application, loginProvider, baseUri,
-            //    onLocated: onLocated,
-            //    onCreated: onCreated,
-            //    onSelfServe: onSelfServe,
-            //    onInterupted: onInterupted,
-            //    onGeneralFailure: onGeneralFailure,
-            //        telemetry: telemetry);
         }
+
+        
 
         //public static async Task<TResult> LegacyAccountMappingAsync<TResult>(Authorization authorization,
         //        Method authenticationMethod, string externalAccountKey,

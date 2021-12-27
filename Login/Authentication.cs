@@ -182,7 +182,7 @@ namespace EastFive.Azure.Login
         [HtmlAction(Label = "Login")]
         public static async Task<IHttpResponse> UpdateAsync(
                 [WorkflowParameterFromVariable(
-                    Value = Workflows.PasswordLoginCreateAccount.Variables.AuthenticationId)]
+                    Value = Workflows.PasswordLoginCreateAccount.Variables.Authorization)]
                 [UpdateId(Name = AuthenticationPropertyName)]
                 IRef<Authentication> authenticationRef,
 
@@ -214,41 +214,61 @@ namespace EastFive.Azure.Login
             NotFoundResponse onNotFound,
             GeneralConflictResponse onInvalidPassword)
         {
-            return await await authenticationRef.StorageUpdateAsync(
-                (authentication, saveAsync) =>
+            return await authenticationRef.StorageUpdateAsync(
+                async (authentication, saveAsync) =>
                 {
-                    return userIdentification
-                        .MD5HashGuid()
-                        .AsRef<Account>()
-                        .StorageGetAsync(
-                            async account =>
-                            {
-                                var passwordHash = Account.GeneratePasswordHash(userIdentification, password);
-                                if (passwordHash != account.password)
-                                    return onInvalidPassword("Incorrect username or password.");
-                                authentication.userIdentification = userIdentification;
-                                authentication.authenticated = DateTime.UtcNow;
-                                await saveAsync(authentication);
-                                var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.state}");
+                    return await await CheckCredentialsAsync(userIdentification, password,
+                        async (account) =>
+                        {
+                            authentication.userIdentification = userIdentification;
+                            authentication.authenticated = DateTime.UtcNow;
+                            await saveAsync(authentication);
+                            var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.state}");
 
-                                if (hold.HasValue && hold.Value)
+                            if (hold.HasValue && hold.Value)
+                            {
+                                if (acceptsTypes.Any(hdr => "application/json".Equals(hdr.MediaType.ToString(), StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    if (acceptsTypes.Any(hdr => "application/json".Equals(hdr.MediaType.ToString(), StringComparison.OrdinalIgnoreCase)))
+                                    var authorizationParameters = new AuthorizationParameters
                                     {
-                                        var authorizationParameters = new AuthorizationParameters
-                                        {
-                                            state = authentication.authenticationRef,
-                                            token = authentication.state,
-                                        };
-                                        return onJsonPreferred(authorizationParameters);
-                                    }
-                                    return onHeldup(authorizationUrl.AbsoluteUri);
+                                        state = authentication.authenticationRef,
+                                        token = authentication.state,
+                                    };
+                                    return onJsonPreferred(authorizationParameters);
                                 }
-                                return onUpdated(authorizationUrl);
-                            },
-                            () => onInvalidPassword("Incorrect username or password.").AsTask());
+                                return onHeldup(authorizationUrl.AbsoluteUri);
+                            }
+                            return onUpdated(authorizationUrl);
+                        },
+                        why => onInvalidPassword(why).AsTask());
                 },
-                () => onNotFound().AsTask());
+                () => onNotFound());
+        }
+
+        public static Task<TResult> CheckCredentialsAsync<TResult>(
+                string userIdentification,
+                string password,
+            Func<Account, TResult> onValid,
+            Func<string, TResult> onInvalidPassword)
+        {
+            return userIdentification
+                .MD5HashGuid()
+                .AsRef<Account>()
+                .StorageUpdateAsync(
+                    async (account, saveAync) =>
+                    {
+                        if(account.userIdentification.IsNullOrWhiteSpace())
+                        {
+                            account.userIdentification = userIdentification;
+                            await saveAync(account);
+                        }
+
+                        if (account.IsPasswordValid(password))
+                            return onValid(account);
+
+                        return onInvalidPassword("Incorrect username or password.");
+                    },
+                    () => onInvalidPassword("Incorrect username or password."));
         }
 
         #endregion

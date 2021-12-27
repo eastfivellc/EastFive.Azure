@@ -37,8 +37,10 @@ using EastFive.Azure.Auth.CredentialProviders;
 namespace EastFive.Azure.Auth
 {
     [IntegrationName(AppleProvider.IntegrationName)]
-    public class AppleProvider : IProvideLogin, IProvideSession
+    public class AppleProvider : IProvideLogin, IProvideSession, IProvideClaims
     {
+        #region Properties
+
         public const string IntegrationName = "Apple";
         public string Method => IntegrationName;
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
@@ -69,6 +71,8 @@ namespace EastFive.Azure.Auth
         private OAuth.Keys keys;
         #endregion
 
+        #endregion
+
         public AppleProvider(string applicationId, string [] validAudiences, OAuth.Keys keys)
         {
             this.applicationId = applicationId;
@@ -76,31 +80,9 @@ namespace EastFive.Azure.Auth
             this.keys = keys;
         }
 
-        //[IntegrationName(AppleProvider.IntegrationName)]
-        //public static Task<TResult> InitializeAsync<TResult>(
-        //    Func<IProvideAuthorization, TResult> onProvideAuthorization,
-        //    Func<TResult> onProvideNothing,
-        //    Func<string, TResult> onFailure)
-        //{
-        //    return AppSettings.Auth.Apple.ClientId.ConfigurationString(
-        //        applicationId =>
-        //        {
-        //            return AppSettings.Auth.Apple.ValidAudiences.ConfigurationString(
-        //                (validAudiencesStr) =>
-        //                {
-        //                    return OAuth.Keys.LoadTokenKeysAsync(new Uri(appleKeyServerUrl),
-        //                        keys =>
-        //                        {
-        //                            var validAudiences = validAudiencesStr.Split(','.AsArray());
-        //                            var provider = new AppleProvider(applicationId, validAudiences, keys);
-        //                            return onProvideAuthorization(provider);
-        //                        },
-        //                        onFailure: onFailure);
-        //                },
-        //                (why) => onProvideNothing().AsTask());
-        //        },
-        //        (why) => onProvideNothing().AsTask());
-        //}
+        #region IProvideLogin
+
+        #region IProvideAuthorization
 
         public Type CallbackController => typeof(AppleRedirect);
 
@@ -183,7 +165,8 @@ namespace EastFive.Azure.Auth
             }
         }
 
-        #region IProvideLogin
+        #endregion
+
 
         public Uri GetLogoutUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {
@@ -215,28 +198,97 @@ namespace EastFive.Azure.Auth
 
         #endregion
 
-        #region IProvideAccountInformation
+        #region IProvideClaims
 
-        protected (string, string) ParseAccountInfo(IDictionary<string, string> extraParameters)
+        public bool TryGetStandardClaimValue(string claimType,
+            IDictionary<string, string> parameters, out string claimValue)
         {
-            var name = "Apple User";
-            var email = string.Empty;
-            if (extraParameters.ContainsKey(responseParamUser))
+            if (claimType.IsNullOrWhiteSpace())
             {
-                var userInfoJson = extraParameters[responseParamUser];
-                var userInfo = JsonConvert.DeserializeObject<UserInfo>(userInfoJson);
-                name = $"{userInfo.name.firstName} {userInfo.name.lastName}";
-                email = userInfo.email;
+                claimValue = default;
+                return false;
             }
-            if (extraParameters.ContainsKey(UserInfo.NamePropertyName))
+            if (parameters.ContainsKey(claimType))
             {
-                name = extraParameters[UserInfo.NamePropertyName];
+                claimValue = parameters[claimType];
+                return true;
             }
-            if (extraParameters.ContainsKey(UserInfo.EmailPropertyName))
+            
+            if (System.Security.Claims.ClaimTypes.NameIdentifier.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+                if(parameters.ContainsKey(responseParamIdToken))
+                {
+                    claimValue = parameters[responseParamIdToken];
+                    return true;
+                }
+
+            if (System.Security.Claims.ClaimTypes.Email.Equals(claimType, StringComparison.OrdinalIgnoreCase))
             {
-                email = extraParameters[UserInfo.EmailPropertyName];
+                if (parameters.ContainsKey(UserInfo.EmailPropertyName))
+                {
+                    claimValue = parameters[UserInfo.EmailPropertyName];
+                    return true;
+                }
+
+                if (TryGetUserInfo(out UserInfo userInfo))
+                {
+                    claimValue = userInfo.email;
+                    return true;
+                }
+
+                claimValue = string.Empty;
+                return true;
             }
-            return (name, email);
+
+            if (System.Security.Claims.ClaimTypes.Name.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+            {
+                if (parameters.ContainsKey(UserInfo.NamePropertyName))
+                {
+                    claimValue = parameters[UserInfo.NamePropertyName];
+                    return true;
+                }
+
+                if (TryGetUserInfo(out UserInfo userInfo))
+                {
+                    claimValue = $"{userInfo.name.firstName} {userInfo.name.lastName}";
+                    return true;
+                }
+
+                claimValue = "Apple User";
+                return true;
+            }
+
+            if (System.Security.Claims.ClaimTypes.GivenName.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+            {
+                if (TryGetUserInfo(out UserInfo userInfo))
+                {
+                    claimValue = userInfo.name.firstName;
+                    return true;
+                }
+            }
+
+            if (System.Security.Claims.ClaimTypes.Surname.Equals(claimType, StringComparison.OrdinalIgnoreCase))
+            {
+                if (TryGetUserInfo(out UserInfo userInfo))
+                {
+                    claimValue = userInfo.name.lastName;
+                    return true;
+                }
+            }
+
+            claimValue = default;
+            return false;
+
+            bool TryGetUserInfo(out UserInfo userInfo)
+            {
+                if (!parameters.ContainsKey(responseParamUser))
+                {
+                    userInfo = default;
+                    return false;
+                }
+                var userInfoJson = parameters[responseParamUser];
+                userInfo = JsonConvert.DeserializeObject<UserInfo>(userInfoJson);
+                return true;
+            }
         }
 
         /// <summary>
@@ -258,36 +310,6 @@ namespace EastFive.Azure.Auth
             public string lastName { get; set; }
         }
 
-        #endregion 
-    }
-
-
-    public class AppleProviderAttribute : Attribute, IProvideLoginProvider
-    {
-        private const string appleKeyServerUrl = "https://appleid.apple.com/auth/keys";
-
-        public Task<TResult> ProvideLoginProviderAsync<TResult>(
-            Func<IProvideLogin, TResult> onLoaded,
-            Func<string, TResult> onNotAvailable)
-        {
-            return AppSettings.Auth.Apple.ClientId.ConfigurationString(
-                applicationId =>
-                {
-                    return AppSettings.Auth.Apple.ValidAudiences.ConfigurationString(
-                        (validAudiencesStr) =>
-                        {
-                            var validAudiences = validAudiencesStr.Split(','.AsArray());
-                            return OAuth.Keys.LoadTokenKeysAsync(new Uri(appleKeyServerUrl),
-                                keys =>
-                                {
-                                    var provider = new AppleProvider(applicationId, validAudiences, keys);
-                                    return onLoaded(provider);
-                                },
-                                onFailure: onNotAvailable);
-                        },
-                        onNotAvailable.AsAsyncFunc());
-                },
-                onNotAvailable.AsAsyncFunc());
-        }
+        #endregion
     }
 }

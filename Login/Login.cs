@@ -47,24 +47,19 @@ namespace EastFive.Azure.Login
 
         [Api.HttpAction("Authenticate")]
         public static async Task<IHttpResponse> AuthenticateAsync(
-                [Resource]Login login,
+                [Property(Name = UserNamePropertyName)]string username,
+                [Property(Name = PasswordPropertyName)] string password,
                 IAzureApplication application, IHttpRequest httpRequest,
             CreatedBodyResponse<Auth.Session> onSuccess,
-            AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onInvalidUserNameOrPassword)
         {
-            return await await Account
-                .GetRef(login.username)
-                .StorageGetAsync(
-                    async (account) =>
-                    {
-                        if (!account.IsPasswordValid(login.password))
-                            return onInvalidUserNameOrPassword("Invalid username or password");
-
-                        var session = await CreateSession(login.username, application, httpRequest);
-                        return onSuccess(session);
-                    },
-                    () => onInvalidUserNameOrPassword("Invalid username or password").AsTask());
+            return await await Authentication.CheckCredentialsAsync(username, password,
+                async account =>
+                {
+                    var session = await CreateSession(username, application, httpRequest);
+                    return onSuccess(session);
+                },
+                why => onInvalidUserNameOrPassword(why).AsTask());
         }
 
         [Api.HttpAction("CreateAccount")]
