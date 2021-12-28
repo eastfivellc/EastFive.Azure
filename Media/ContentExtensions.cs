@@ -16,6 +16,7 @@ using EastFive.Linq;
 using EastFive.Images;
 using EastFive.Web.Configuration;
 using System.Drawing;
+using EastFive.Azure.Persistence.Blobs;
 
 namespace EastFive.Azure.Media
 {
@@ -55,6 +56,27 @@ namespace EastFive.Azure.Media
                         return onNotFound();
 
                     return onInvalidImage(imageStream, contentType);
+                },
+                onNotFound);
+        }
+
+        public static Task<TResult> LoadImageAsync<TResult>(this IBlobRef blobRef,
+            Func<System.Drawing.Image, string, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<byte [], string, TResult> onInvalidImage = default)
+        {
+            return blobRef.LoadAsync(
+                (blobId, imageBytes, mediaType, disposition) =>
+                {
+                    //var image = System.Drawing.Image.FromStream(imageStream);
+                    var contentType = mediaType.MediaType;
+                    if (imageBytes.TryReadImage(out Image image))
+                        return onFound(image, contentType);
+
+                    if (onInvalidImage.IsDefaultOrNull())
+                        return onNotFound();
+
+                    return onInvalidImage(imageBytes, contentType);
                 },
                 onNotFound);
         }
@@ -99,6 +121,83 @@ namespace EastFive.Azure.Media
                 onFailure: onFailure,
                 contentType: contentType,
                 onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> AnalyzeAsync<TResult>(this IBlobRef contentRef,
+            Func<ImageAnalysis, double?, TResult> onAnalyzed,
+            Func<TResult> onInvalidFormat = default,
+            Func<TResult> onNotFound = default)
+        {
+            return AppSettings.CognitiveServices.ComputerVisionSubscriptionKey.ConfigurationString(
+                subscriptionKey =>
+                {
+                    return AppSettings.CognitiveServices.ComputerVisionEndpoint.ConfigurationUri(
+                        async endpointUri =>
+                        {
+                            using (var computerVision = new ComputerVisionClient(
+                                new ApiKeyServiceClientCredentials(subscriptionKey),
+                                new System.Net.Http.DelegatingHandler[] { }))
+                            {
+                                return await await contentRef.LoadAsync(
+                                    async (blobId, imageData, contentType, disposition) =>
+                                    {
+                                        var widthMultiplier = default(double?);
+                                        if (imageData.Length > 4000000)
+                                        {
+                                            if (!imageData.TryReadImage(out Image image))
+                                            {
+                                                if (onInvalidFormat.IsNotDefaultOrNull())
+                                                    return onInvalidFormat();
+                                                if (onNotFound.IsNotDefaultOrNull())
+                                                    return onNotFound();
+
+                                                throw new ArgumentException($"Blob `{blobId}` is not an image.");
+                                            }
+                                            using (var newImageStream = new MemoryStream())
+                                            {
+                                                widthMultiplier = Math.Sqrt(4000000.0 / imageData.Length);
+                                                image
+                                                    .ResizeImage(
+                                                        (int)(image.Width * widthMultiplier),
+                                                        (int)(image.Height * widthMultiplier))
+                                                    .Save(newImageStream, System.Drawing.Imaging.ImageFormat.Jpeg);
+                                                newImageStream.Position = 0;
+                                                imageData = await newImageStream.ToBytesAsync();
+                                            }
+                                        }
+                                        computerVision.Endpoint = endpointUri.OriginalString;
+                                        var featuresToSearchFor = VisualFeatureTypes.Categories.AsArray()
+                                                .Append(VisualFeatureTypes.Description)
+                                                .Append(VisualFeatureTypes.ImageType)
+                                                .Append(VisualFeatureTypes.Objects)
+                                                .Append(VisualFeatureTypes.Tags)
+                                                .Append(VisualFeatureTypes.Brands)
+                                                .Append(VisualFeatureTypes.Color)
+                                                .Append(VisualFeatureTypes.Faces)
+                                                .ToList();
+                                        try
+                                        {
+                                            using (var imageStream = new MemoryStream(imageData))
+                                            {
+                                                var analysis = await computerVision.AnalyzeImageInStreamAsync(
+                                                    imageStream, featuresToSearchFor);
+                                                return onAnalyzed(analysis, widthMultiplier);
+                                            }
+                                        }
+                                        catch (ComputerVisionErrorException ex)
+                                        {
+                                            throw ex;
+                                        }
+                                    },
+                                    () =>
+                                    {
+                                        if (onNotFound.IsDefaultOrNull())
+                                            throw new ResourceNotFoundException();
+                                        return onNotFound().AsTask();
+                                    });
+                            }
+                        });
+                });
         }
 
         public static Task<TResult> AnalyzeAsync<TResult>(this IRef<Content> contentRef,

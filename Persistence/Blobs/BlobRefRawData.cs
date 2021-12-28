@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Net.Mime;
 
 using Newtonsoft.Json;
 
@@ -8,6 +9,7 @@ using EastFive;
 using EastFive.Extensions;
 using EastFive.Api;
 using EastFive.Azure.Persistence.StorageTables;
+using System.Net.Http.Headers;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -27,11 +29,15 @@ namespace EastFive.Azure.Persistence.Blobs
         }
 
         public Task<TResult> LoadAsync<TResult>(
-            Func<string, byte[], string, string, TResult> onFound,
+            Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null)
         {
-            return onFound(this.Id, content, default, default).AsTask();
+            MediaTypeHeaderValue.TryParse(String.Empty,
+                out MediaTypeHeaderValue mediaType);
+            ContentDispositionHeaderValue.TryParse(string.Empty,
+                out ContentDispositionHeaderValue contentDisposition);
+            return onFound(this.Id, content, mediaType, contentDisposition).AsTask();
         }
 
         public void Write(JsonWriter writer, JsonSerializer serializer,

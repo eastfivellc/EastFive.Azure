@@ -18,6 +18,7 @@ using EastFive.Azure.Persistence.Blobs;
 
 namespace EastFive.Azure.Persistence
 {
+    [Obsolete("Please just use standard bindings")]
     public class QueryIdBlobRefAttribute : BlobRefProperty
     {
         public override SelectParameterResult TryCast(BindingData bindingData)
@@ -71,6 +72,7 @@ namespace EastFive.Azure.Persistence
         }
     }
 
+    [Obsolete("Please just use standard bindings")]
     public class BlobRefProperty : PropertyAttribute
     {
         /// <summary>Directly specifies the container name for the IBlobRef.</summary>
@@ -125,6 +127,7 @@ namespace EastFive.Azure.Persistence
         }
     }
 
+    [Obsolete("Please just use standard bindings")]
     public class BlobRefPropertyOptional : BlobRefProperty
     {
         public override SelectParameterResult TryCast(BindingData bindingData)

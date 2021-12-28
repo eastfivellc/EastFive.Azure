@@ -32,9 +32,8 @@ namespace EastFive.Azure.Persistence.Blobs
         string Id { get; }
 
         Task<TResult> LoadAsync<TResult>(
-                Func<string, byte[], string, string, TResult> onFound,
+                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
     }
-
 }

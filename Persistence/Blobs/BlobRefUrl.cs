@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Net.Mime;
 
 using Newtonsoft.Json;
 
@@ -9,6 +10,7 @@ using EastFive.Extensions;
 using EastFive.Api;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization;
+using System.Net.Http.Headers;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -43,7 +45,7 @@ namespace EastFive.Azure.Persistence.Blobs
         }
 
         public async Task<TResult> LoadAsync<TResult>(
-            Func<string, byte[], string, string, TResult> onFound,
+            Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
             Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes,
                 string, TResult> onFailure = null)
         {
@@ -51,9 +53,9 @@ namespace EastFive.Azure.Persistence.Blobs
             using (var response = await client.GetAsync(this.content))
             {
                 var bytes = await response.Content.ReadAsByteArrayAsync();
-                return onFound(this.Id, bytes,
-                    response.GetContentMediaTypeNullSafe(),
-                    response.GetFileNameNullSafe());
+                var disposition = response.GetContentDispositionNullSafe();
+                var mediaType = response.GetContentMediaTypeHeaderNullSafe();
+                return onFound(this.Id, bytes, mediaType, disposition);
             }
         }
 

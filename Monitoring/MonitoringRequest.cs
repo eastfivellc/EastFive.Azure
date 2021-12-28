@@ -22,6 +22,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.Blobs;
 using EastFive.Web.Configuration;
+using System.Net.Http.Headers;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -415,7 +416,7 @@ namespace EastFive.Api.Azure.Monitoring
         async Task<Body> GetPostmanBodyAsync()
         {
             return await await this.body.LoadAsync(
-                (id, data, contentType, fileName) =>
+                (id, data, mediaType, contentDisposition) =>
                 {
                     return new Body
                     {
@@ -448,13 +449,18 @@ namespace EastFive.Api.Azure.Monitoring
                             fd =>
                             {
                                 return fd.contents.LoadAsync(
-                                    (id, data, contentType, fileName) =>
+                                    (id, data, contentType, disposition) =>
                                     {
+                                        var fileName = ContentDispositionHeaderValue.TryParse(fd.contentDisposition,
+                                                out ContentDispositionHeaderValue disHV) ?
+                                            disHV.FileName
+                                            :
+                                            disposition.FileName;
                                         return (true, new Meta.Postman.Resources.Collection.FormData
                                         {
                                             key = fd.name,
                                             value = fd.contentDisposition,
-                                            src = fileName,
+                                            src = disposition.FileName,
                                         });
                                     },
                                     () => (false, default(Meta.Postman.Resources.Collection.FormData)));

@@ -22,6 +22,7 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
 using EastFive.Reflection;
+using System.Net.Mime;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -35,12 +36,15 @@ namespace EastFive.Azure.Persistence.Blobs
 
     public interface IProvideBlobAccess
     {
+        public string Container { get; }
+        public bool UseCDN { get; }
     }
 
     [AttributeUsage(AttributeTargets.Field | AttributeTargets.Method)]
     public class BlobAccessorAttribute : Attribute, IProvideBlobAccess
     {
-
+        public string Container { get; set; }
+        public bool UseCDN { get; set; }
     }
 
     public class BlobRefBindingAttribute : Attribute,
@@ -256,9 +260,12 @@ namespace EastFive.Azure.Persistence.Blobs
 
                     if(content.ContentDisposition.HasBlackSpace())
                     {
-                        var cd = new System.Net.Mime.ContentDisposition(content.ContentDisposition);
-                        if (cd.FileName.HasBlackSpace())
-                            return cd.FileName;
+                        if(ContentDispositionHeaderValue.TryParse(content.ContentDisposition,
+                            out ContentDispositionHeaderValue contentDisposition))
+                        {
+                            if (contentDisposition.FileName.HasBlackSpace())
+                                return contentDisposition.FileName;
+                        }
                     }
 
                     return Guid.NewGuid().AsBlobName();
@@ -266,14 +273,18 @@ namespace EastFive.Azure.Persistence.Blobs
             }
 
             public async Task<TResult> LoadAsync<TResult>(
-                Func<string, byte[], string, string, TResult> onFound, 
+                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound, 
                 Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes, 
                     string, TResult> onFailure = null)
             {
                 using (var stream = content.OpenReadStream())
                 {
                     var bytes = await stream.ToBytesAsync();
-                    return onFound(this.Id, bytes, this.content.ContentType, this.content.FileName);
+                    ContentDispositionHeaderValue.TryParse(content.ContentDisposition,
+                        out ContentDispositionHeaderValue contentDisposition);
+                    MediaTypeHeaderValue.TryParse(content.ContentType,
+                        out MediaTypeHeaderValue mediaType);
+                    return onFound(this.Id, bytes, mediaType, contentDisposition);
                 }
             }
 
@@ -354,6 +365,20 @@ namespace EastFive.Azure.Persistence.Blobs
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .TryWhere(
                     (MethodInfo method, out IProvideBlobAccess attr) => method.TryGetAttributeInterface(out attr))
+                .Where(
+                    tpl =>
+                    {
+                        var (method, attr) = tpl;
+
+                        if (attr.Container.IsNullOrWhiteSpace())
+                            return true;
+
+                        if (attr.Container.Equals(blobRef.ContainerName, StringComparison.OrdinalIgnoreCase))
+                            return true;
+
+                        return false;
+                    })
+                .OrderBy(tpl => tpl.@out.Container.HasBlackSpace()? 1.0 : 0.0)
                 .First(
                     (tpl, next) =>
                     {
@@ -364,7 +389,7 @@ namespace EastFive.Azure.Persistence.Blobs
                             .First();
                         var castBuildUrlMethod = buildUrlMethod.MakeGenericMethod(method.DeclaringType);
                         var url = (Uri)castBuildUrlMethod.Invoke(null,
-                            new object[] { application, httpRequest, method, blobRef });
+                            new object[] { attr, application, httpRequest, method, blobRef });
                         return writer.WriteValueAsync(url.OriginalString);
                     },
                     async () =>
@@ -374,11 +399,15 @@ namespace EastFive.Azure.Persistence.Blobs
                     });
         }
 
-        public static Uri BuildUrl<TResource>(IAzureApplication application, IHttpRequest httpRequest,
+        public static Uri BuildUrl<TResource>(IProvideBlobAccess attr,
+            IAzureApplication application, IHttpRequest httpRequest,
             MethodInfo method, IBlobRef blobRef)
         {
-            var builder = new QueryableServer<TResource>(httpRequest);
-            //var builder = new QueryableServer<TResource>(application.CDN);
+            var builder = attr.UseCDN?
+                new QueryableServer<TResource>(application.CDN)
+                :
+                new QueryableServer<TResource>(httpRequest);
+
             var url = method.ContainsCustomAttribute<HttpActionAttribute>() ?
                 builder
                     .HttpAction(method.GetCustomAttribute<HttpActionAttribute>().Action)

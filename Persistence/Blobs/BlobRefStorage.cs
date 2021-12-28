@@ -10,6 +10,7 @@ using EastFive.Api;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using System.Net.Http.Headers;
+using System.Net.Mime;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -20,7 +21,7 @@ namespace EastFive.Azure.Persistence.Blobs
         public string Id { get; set; }
 
         public Task<TResult> LoadAsync<TResult>(
-            Func<string, byte[], string, string, TResult> onFound,
+            Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
         {
@@ -30,14 +31,11 @@ namespace EastFive.Azure.Persistence.Blobs
                 .BlobLoadBytesAsync(blobName: blobName, containerName: this.ContainerName,
                     (bytes, properties) =>
                     {
-                        ContentDispositionHeaderValue.TryParse(
-                            properties.ContentDisposition, out ContentDispositionHeaderValue fileNameHeaderValue);
-                        var fileName = fileNameHeaderValue.IsDefaultOrNull() ?
-                            string.Empty
-                            :
-                            fileNameHeaderValue.FileName;
-                        return onFound(blobName, bytes,
-                            properties.ContentType, fileName);
+                        ContentDispositionHeaderValue.TryParse(properties.ContentDisposition,
+                            out ContentDispositionHeaderValue disposition);
+                        MediaTypeHeaderValue.TryParse(properties.ContentType,
+                            out MediaTypeHeaderValue mediaType);
+                        return onFound(blobName, bytes, mediaType, disposition);
                     },
                     onNotFound: onNotFound,
                     onFailure: onFailure);

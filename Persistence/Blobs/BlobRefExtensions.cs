@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Mime;
 
 using Microsoft.Azure.Cosmos.Table;
 
@@ -137,17 +138,17 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
         {
             return await await blobRef.LoadAsync(
-                async (blobName, bytes, contentType, fileName) =>
+                async (blobName, bytes, contentType, disposition) =>
                 {
                     return await AzureTableDriverDynamic
                         .FromSettings()
                         .BlobCreateOrUpdateAsync(bytes, blobRef.Id, blobRef.ContainerName,
                             () =>
                             {
-                                return onSaved(false, bytes, contentType, fileName);
+                                return onSaved(false, bytes, contentType.MediaType, disposition.FileName);
                             },
                             onFailure: onFailure,
-                            contentType: contentType);
+                            contentType: disposition.DispositionType);
                 },
                 onNotFound: onCouldNotAccess.AsAsyncFunc());
         }
@@ -155,7 +156,7 @@ namespace EastFive.Azure.Persistence.Blobs
         public static async Task<IBlobRef> CreateBlobRefAsync<TResource>(
             this byte[] blobData,
             Expression<Func<TResource, IBlobRef>> selectProperty,
-            string contentType = default)
+            string contentType = default, string fileName = default)
         {
             selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
             var containerName = memberInfo.BlobContainerName();
@@ -170,7 +171,7 @@ namespace EastFive.Azure.Persistence.Blobs
                             Id = newBlobId,
                             ContainerName = containerName,
                             ContentType = contentType,
-                            FileName = newBlobId,
+                            FileName = fileName.HasBlackSpace()? fileName : newBlobId,
                         };
                     },
                     contentType: contentType);
@@ -187,7 +188,7 @@ namespace EastFive.Azure.Persistence.Blobs
             public string FileName { get; set; }
 
             public Task<TResult> LoadAsync<TResult>(
-                Func<string, byte[], string, string, TResult> onFound,
+                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             {
