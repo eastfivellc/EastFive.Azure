@@ -87,18 +87,18 @@ namespace EastFive.Api.Azure.Resources
         }
 
         [HttpGet]
-        public static async Task<IHttpResponse> QueryByContentIdAsync(
+        public static Task<IHttpResponse> QueryByContentIdAsync(
                 [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
                 [OptionalQueryParameter]string renderer,
-            BytesResponse bytesResponse,
-            ImageRawResponse imageResponse,
+            BytesResponse onRawResponse,
+            ImageRawResponse onImageResponse,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
         {
-            var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
+            var response = EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                 (contentType, image) =>
                 {
                     if (renderer.HasBlackSpace())
@@ -112,7 +112,7 @@ namespace EastFive.Api.Azure.Resources
                                 var zipFile = zipStream.Entries.First();
                                 zipFile.Open().CopyTo(resultStream);
                                 var data = resultStream.ToArray();
-                                return bytesResponse(data, contentType: "application/object", filename: zipFile.Name);
+                                return onRawResponse(data, contentType: "application/object", filename: zipFile.Name);
                                 //return request.CreateFileResponse(data, "application/object", filename: zipFile.Name);
                             }
                         }
@@ -126,7 +126,7 @@ namespace EastFive.Api.Azure.Resources
                     //        width: width, height: height, fill: fill,
                     //        filename: contentId.ToString("N"));
                     //}
-                    return imageResponse(image,
+                    return onImageResponse(image,
                         width: width, height: height, fill: fill,
                         filename: contentId.ToString("N"),
                         contentType: contentType);
