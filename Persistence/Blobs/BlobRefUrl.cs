@@ -11,6 +11,8 @@ using EastFive.Api;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization;
 using System.Net.Http.Headers;
+using System.Linq;
+using EastFive.Linq;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -54,6 +56,17 @@ namespace EastFive.Azure.Persistence.Blobs
             {
                 var bytes = await response.Content.ReadAsByteArrayAsync();
                 var disposition = response.GetContentDispositionNullSafe();
+                if(disposition.IsDefaultOrNull())
+                {
+                    disposition = new ContentDispositionHeaderValue("inline")
+                    {
+                        FileName = content
+                            .ParsePath()
+                            .LastOrEmpty(
+                                (path) => path,
+                                () => this.Id),
+                    };
+                }
                 var mediaType = response.GetContentMediaTypeHeaderNullSafe();
                 return onFound(this.Id, bytes, mediaType, disposition);
             }

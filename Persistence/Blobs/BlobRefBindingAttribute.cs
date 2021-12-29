@@ -282,6 +282,13 @@ namespace EastFive.Azure.Persistence.Blobs
                     var bytes = await stream.ToBytesAsync();
                     ContentDispositionHeaderValue.TryParse(content.ContentDisposition,
                         out ContentDispositionHeaderValue contentDisposition);
+                    if (contentDisposition.IsDefaultOrNull())
+                    {
+                        contentDisposition = new ContentDispositionHeaderValue("inline")
+                        {
+                            FileName = this.Id,
+                        };
+                    }
                     MediaTypeHeaderValue.TryParse(content.ContentType,
                         out MediaTypeHeaderValue mediaType);
                     return onFound(this.Id, bytes, mediaType, contentDisposition);
