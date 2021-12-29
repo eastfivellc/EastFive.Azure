@@ -35,6 +35,13 @@ namespace EastFive.Azure.Persistence.Blobs
                             out ContentDispositionHeaderValue disposition);
                         MediaTypeHeaderValue.TryParse(properties.ContentType,
                             out MediaTypeHeaderValue mediaType);
+                        if(disposition.IsDefaultOrNull())
+                        {
+                            disposition = new ContentDispositionHeaderValue("inline")
+                            {
+                                FileName = blobName,
+                            };
+                        }
                         return onFound(blobName, bytes, mediaType, disposition);
                     },
                     onNotFound: onNotFound,
