@@ -76,7 +76,7 @@ namespace EastFive.Azure.Auth
                         async pauseRedirections =>
                         {
                             if (pauseRedirections)
-                                return request.CreateResponse(System.Net.HttpStatusCode.OK, requestId);
+                                return request.CreateResponse(System.Net.HttpStatusCode.OK, $"All logins have been paused for this system.  Request ID `{requestId}`");
                             return await ContinueAsync();
                         },
                         why => ContinueAsync(),
