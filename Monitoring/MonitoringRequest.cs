@@ -366,10 +366,10 @@ namespace EastFive.Api.Azure.Monitoring
                                 {
                                     return onCreatedOrUpdated(postmanItem);
                                 });
-                        });
+                        },
+                        onFailure:onFailure.AsAsyncFunc());
                 },
                 onUnspecified: onFailure.AsAsyncFunc());
-
         }
 
         private async Task<Item> ConvertToPostmanItemAsync()
