@@ -21,7 +21,7 @@ using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-
+using EastFive.Persistence.Azure.StorageTables;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {

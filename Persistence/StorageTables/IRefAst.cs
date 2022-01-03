@@ -46,12 +46,16 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public static IRefAst AsAstRef(this string rowKey, string partitionKey)
         {
-            return new RefAst(rowKey, partitionKey);
+            return new RefAst(
+                rowKey.AsAzureStorageTablesSafeKey(),
+                partitionKey.AsAzureStorageTablesSafeKey());
         }
 
         public static IRefAst<TRef> AsAstRef<TRef>(this string rowKey, string partitionKey)
         {
-            return new RefAst<TRef>(rowKey, partitionKey);
+            return new RefAst<TRef>(
+                rowKey.AsAzureStorageTablesSafeKey(),
+                partitionKey.AsAzureStorageTablesSafeKey());
         }
 
         public static IRefAst<TRef> Cast<TRef>(this IRefAst astRef)
