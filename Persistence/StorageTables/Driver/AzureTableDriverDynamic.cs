@@ -1211,6 +1211,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             AzureStorageDriver.RetryDelegate onTimeout = null)
         {
             var table = GetTable<TData>();
+            if (tableData.ETag.IsNullOrWhiteSpace())
+                tableData.ETag = "*";
             var update = TableOperation.Replace(tableData);
             var rollback = await tableData.ExecuteUpdateModifiersAsync(tableData, this,
                 rollbacks => rollbacks,
