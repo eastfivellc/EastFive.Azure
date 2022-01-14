@@ -63,7 +63,7 @@ namespace EastFive.Azure.Auth
         [HttpAction(LaunchAction)]
         public static async Task<IHttpResponse> LaunchAsync(
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod_Ping}}")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
                 [QueryParameter(Name = "method")]IRef<Method> methodRef,
 
                 RequestMessage<AccountRequest> api,

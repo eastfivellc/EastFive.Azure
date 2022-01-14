@@ -103,6 +103,7 @@ namespace EastFive.Azure.Auth
             StepName = "List Methods")]
         public static IHttpResponse QueryAsync(
             IAuthApplication application,
+            [WorkflowVariableResourceResponse]
             MultipartAcceptArrayResponse<Method> onContent)
         {
             var methods = application.LoginProviders
@@ -328,7 +329,7 @@ namespace EastFive.Azure.Auth
                 (why) => onFailure(why));
         }
 
-        internal Task<Uri> GetLoginUrlAsync(IAuthApplication application,
+        public Task<Uri> GetLoginUrlAsync(IAuthApplication application,
             IProvideUrl urlHelper, Guid authorizationIdSecure)
         {
             var authenticationId = this.id;
