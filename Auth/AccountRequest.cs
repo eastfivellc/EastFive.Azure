@@ -105,7 +105,7 @@ namespace EastFive.Azure.Auth
 
         public const string ResponseAction = "Response";
         [HttpAction(ResponseAction)]
-        [SecurityRoleRequired(RolesAllowed = new string[] { ClaimValues.Roles.SuperAdmin })]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> ResponseAsync(
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]
                     IRef<Authorization> authorizationRef,
@@ -125,6 +125,7 @@ namespace EastFive.Azure.Auth
 
         public const string ListAction = "List";
         [HttpAction(ListAction)]
+        [SuperAdminClaim]
         public static IHttpResponse List(
                 RequestMessage<AccountRequest> api,
             MultipartAsyncResponse<(Authorization, IDictionary<string, string>)> onListed)
