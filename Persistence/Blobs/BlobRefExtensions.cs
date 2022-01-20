@@ -168,6 +168,7 @@ namespace EastFive.Azure.Persistence.Blobs
                     {
                         return (IBlobRef)new BlobRef
                         {
+                            bytes = blobData,
                             Id = newBlobId,
                             ContainerName = containerName,
                             ContentType = contentType,
@@ -179,6 +180,8 @@ namespace EastFive.Azure.Persistence.Blobs
 
         private class BlobRef : IBlobRef
         {
+            public byte[] bytes;
+
             public string ContainerName { get; set; }
 
             public string Id { get; set; }
@@ -192,7 +195,12 @@ namespace EastFive.Azure.Persistence.Blobs
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             {
-                throw new NotImplementedException();
+                return onFound(Id, bytes,
+                    new MediaTypeHeaderValue(ContentType),
+                    new ContentDispositionHeaderValue("attachment")
+                    {
+                        FileName = FileName,
+                    }).AsTask();
             }
         }
     }
