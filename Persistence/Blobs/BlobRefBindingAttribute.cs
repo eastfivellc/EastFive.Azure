@@ -92,7 +92,6 @@ namespace EastFive.Azure.Persistence.Blobs
                 onBindingFailure: onBindingFailure);
         }
 
-
         public TResult Bind<TResult>(Type type, string content,
                 IApplication application,
             Func<object, TResult> onParsed,
@@ -371,32 +370,47 @@ namespace EastFive.Azure.Persistence.Blobs
             return member.DeclaringType
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .TryWhere(
-                    (MethodInfo method, out IProvideBlobAccess attr) => method.TryGetAttributeInterface(out attr))
-                .Where(
-                    tpl =>
+                    (MethodInfo method, out (IProvideBlobAccess, string) attr) =>
                     {
-                        var (method, attr) = tpl;
+                        if (!method.TryGetAttributeInterface(out attr.Item1))
+                        {
+                            attr = default;
+                            return false;
+                        }
 
-                        if (attr.Container.IsNullOrWhiteSpace())
-                            return true;
+                        attr.Item2 = method.GetParameters()
+                            .Where(param => param.ParameterType.IsAssignableFrom(typeof(IBlobRef)))
+                            .First(
+                                (paramInfo, next) =>
+                                {
+                                    var propertyName = apiValueProvider.PropertyName;
+                                    if (!paramInfo.TryGetAttributeInterface(out IBindApiValue apiBinder))
+                                        return next();
 
-                        if (attr.Container.Equals(blobRef.ContainerName, StringComparison.OrdinalIgnoreCase))
-                            return true;
+                                    if (propertyName.Equals(apiBinder.GetKey(paramInfo)))
+                                        return propertyName;
 
-                        return false;
+                                    return next();
+                                },
+                                () => default(string));
+
+                        return attr.Item2.HasBlackSpace();
                     })
-                .OrderBy(tpl => tpl.@out.Container.HasBlackSpace()? 1.0 : 0.0)
-                .First(
-                    (tpl, next) =>
+                .Single(
+                    (tpl) =>
                     {
-                        var (method, attr) = tpl;
+                        var (method, (attr, queryKey)) = tpl;
                         var buildUrlMethod = typeof(BlobRefBindingAttribute)
                             .GetMethods(BindingFlags.Static | BindingFlags.Public)
                             .Where(method => method.Name == nameof(BuildUrl))
                             .First();
                         var castBuildUrlMethod = buildUrlMethod.MakeGenericMethod(method.DeclaringType);
-                        var url = (Uri)castBuildUrlMethod.Invoke(null,
-                            new object[] { attr, application, httpRequest, method, blobRef });
+                        var urlToUpdate = (Uri)castBuildUrlMethod.Invoke(null,
+                            new object[] { attr, application, httpRequest, method });
+
+                        var queryValue = blobRef.Id;
+                        var url = urlToUpdate.AddQueryParameter(queryKey, queryValue);
+
                         return writer.WriteValueAsync(url.OriginalString);
                     },
                     async () =>
@@ -408,7 +422,7 @@ namespace EastFive.Azure.Persistence.Blobs
 
         public static Uri BuildUrl<TResource>(IProvideBlobAccess attr,
             IAzureApplication application, IHttpRequest httpRequest,
-            MethodInfo method, IBlobRef blobRef)
+            MethodInfo method)
         {
             var builder = attr.UseCDN?
                 new QueryableServer<TResource>(application.CDN)
@@ -421,19 +435,7 @@ namespace EastFive.Azure.Persistence.Blobs
                     .Location()
                 :
                 builder.Location();
-
-            return method.GetParameters()
-                .Where(param => param.ParameterType.IsAssignableFrom(typeof(IBlobRef)))
-                .TryWhere((ParameterInfo param, out IBindApiValue apiValueBinder) =>
-                    param.TryGetAttributeInterface(out apiValueBinder))
-                .Aggregate(url,
-                    (urlToUpdate, itemAndApiValueBinder) =>
-                    {
-                        var (paramInfo, apiValueBinder) = itemAndApiValueBinder;
-                        var queryKey = apiValueBinder.GetKey(paramInfo);
-                        var queryValue = blobRef.Id;
-                        return urlToUpdate.AddQueryParameter(queryKey, queryValue);
-                    });
+            return url;
         }
 
         #endregion
