@@ -17,6 +17,8 @@ using EastFive.Api.Core;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
 using EastFive.Api.Azure.Monitoring;
+using EastFive.Api.Diagnositcs;
+using EastFive.Diagnostics;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -145,43 +147,47 @@ namespace EastFive.Azure.Monitoring
                 teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
                 monitoringRequest,
                 httpApp, request,
-                () => new MessageCard.Section
+                () =>
                 {
-                    title = "Request/Response Information",
-                    markdown = false, // so that underscores are not stripped
-                    facts = new MessageCard.Section.Fact[]
+                    var cardSection = new MessageCard.Section
                     {
-                        new MessageCard.Section.Fact
+                        title = "Request/Response Information",
+                        markdown = false, // so that underscores are not stripped
+                        facts = new MessageCard.Section.Fact[]
                         {
-                            name = "Response Param:",
-                            value = responseParam,
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Response Param:",
+                                value = responseParam,
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Http Method:",
+                                value = request.Method.Method,
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "URL:",
+                                value = request.GetAbsoluteUri().OriginalString,
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Status Code:",
+                                value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "Reason:",
+                                value = response.ReasonPhrase,
+                            },
+                            new MessageCard.Section.Fact
+                            {
+                                name = "RequestID:",
+                                value = monitoringRequestId,
+                            },
                         },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Http Method:",
-                            value = request.Method.Method,
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "URL:",
-                            value = request.GetAbsoluteUri().OriginalString,
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Status Code:",
-                            value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "Reason:",
-                            value = response.ReasonPhrase,
-                        },
-                        new MessageCard.Section.Fact
-                        {
-                            name = "RequestID:",
-                            value = monitoringRequestId,
-                        },
-                    }
+                    };
+                    return cardSection;
                 });
 
             return await message.SendAsync(teamsHookUrl);
@@ -367,6 +373,8 @@ namespace EastFive.Azure.Monitoring
                 }
             };
 
+
+
             if (request.Properties.ContainsKey(HttpApplication.DiagnosticsLogProperty))
             {
                 var diagnosticsLogs = (string[])request.Properties[HttpApplication.DiagnosticsLogProperty];
@@ -376,6 +384,24 @@ namespace EastFive.Azure.Monitoring
                         {
                             title = "Log",
                             text = $"<blockquote>{diagnosticsLogs.Join("<br />")}</blockquote>",
+                        })
+                    .ToArray();
+            }
+
+
+            if (request.Properties.TryGetValue(EnableProfilingAttribute.ResponseProperty, out object profileObj))
+            {
+                var profile = (IProfile)profileObj;
+                var log = profile.Events
+                                .NullToEmpty()
+                                .Select(diagEvent => $"<b>{diagEvent.Key}</b>:<i>{diagEvent.Value}</i>")
+                                .Join("<br />");
+                sections = sections
+                    .Append(
+                        new MessageCard.Section
+                        {
+                            title = "Diagnostics",
+                            text = $"<blockquote>{log}</blockquote>",
                         })
                     .ToArray();
             }
