@@ -156,11 +156,18 @@ namespace EastFive.Azure.Persistence.Blobs
         public static async Task<IBlobRef> CreateBlobRefAsync<TResource>(
             this byte[] blobData,
             Expression<Func<TResource, IBlobRef>> selectProperty,
-            string contentType = default, string fileName = default)
+            string contentType = default, string fileName = default,
+            Guid? blobId = default, string blobName = default)
         {
             selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
             var containerName = memberInfo.BlobContainerName();
-            var newBlobId = Guid.NewGuid().AsBlobName();
+            var newBlobId = blobName.HasBlackSpace()?
+                blobName
+                :
+                blobId.HasValue?
+                    blobId.Value.AsBlobName()
+                    :
+                    Guid.NewGuid().AsBlobName();
             return await AzureTableDriverDynamic
                 .FromSettings()
                 .BlobCreateAsync(blobData, newBlobId, containerName,
@@ -173,6 +180,38 @@ namespace EastFive.Azure.Persistence.Blobs
                             ContainerName = containerName,
                             ContentType = contentType,
                             FileName = fileName.HasBlackSpace()? fileName : newBlobId,
+                        };
+                    },
+                    contentType: contentType);
+        }
+
+        public static async Task<IBlobRef> CreateBlobRefFromStreamAsync<TResource>(
+            this Expression<Func<TResource, IBlobRef>> selectProperty,
+            Func<Stream, Task> writeBlobData,
+            string contentType = default, string fileName = default,
+            Guid? blobId = default, string blobName = default)
+        {
+            selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = blobName.HasBlackSpace() ?
+                blobName
+                :
+                blobId.HasValue ?
+                    blobId.Value.AsBlobName()
+                    :
+                    Guid.NewGuid().AsBlobName();
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(blobName:newBlobId, containerName: containerName,
+                        writeAsync: writeBlobData,
+                    onSuccess:() =>
+                    {
+                        return (IBlobRef)new BlobRef
+                        {
+                            Id = newBlobId,
+                            ContainerName = containerName,
+                            ContentType = contentType,
+                            FileName = fileName.HasBlackSpace() ? fileName : newBlobId,
                         };
                     },
                     contentType: contentType);
