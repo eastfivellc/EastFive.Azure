@@ -262,10 +262,11 @@ namespace EastFive.Azure.Monitoring
                         return (true, tn.folder);
 
                         bool IsRouteMatch() => tn.routeFilters
-                           .TryWhere(
-                               (string rf, out (string, string)[] matches) =>
-                                   request.RequestUri.PathAndQuery.TryMatchRegex(rf, out matches))
-                           .Any();
+                            .TryWhere(
+                                (string rf, out (string, string)[] matches) =>
+                                    request.RequestUri.PathAndQuery.TryMatchRegex(rf, out matches,
+                                        optionsMaybe: System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                            .Any();
 
                         bool IsMethodMatch() => tn.methodFilters
                             .Where(mf =>request.Method.Method.Contains(

@@ -393,9 +393,10 @@ namespace EastFive.Azure.Monitoring
             {
                 var profile = (IProfile)profileObj;
                 var log = profile.Events
-                                .NullToEmpty()
-                                .Select(diagEvent => $"<b>{diagEvent.Key}</b>:<i>{diagEvent.Value}</i>")
-                                .Join("<br />");
+                    .NullToEmpty()
+                    .OrderBy(kvp => kvp.Key)
+                    .Select(diagEvent => $"<b>{diagEvent.Key}</b>:<i>{diagEvent.Value}</i>")
+                    .Join("<br />");
                 sections = sections
                     .Append(
                         new MessageCard.Section
