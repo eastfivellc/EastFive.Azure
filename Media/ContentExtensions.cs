@@ -80,6 +80,25 @@ namespace EastFive.Azure.Media
                 onNotFound);
         }
 
+        public static Task<TResult> LoadImageSharpAsync<TResult>(this IBlobRef blobRef,
+            Func<SixLabors.ImageSharp.Image, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onInvalidImage = default)
+        {
+            return blobRef.LoadAsync(
+                (blobId, imageBytes, mediaType, disposition) =>
+                {
+                    if (imageBytes.TryReadImage(out SixLabors.ImageSharp.Image image, out SixLabors.ImageSharp.Formats.IImageFormat format))
+                        return onFound(image, mediaType, disposition);
+
+                    if (onInvalidImage.IsDefaultOrNull())
+                        return onNotFound();
+
+                    return onInvalidImage(imageBytes, mediaType, disposition);
+                },
+                onNotFound);
+        }
+
         public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
             string contentType = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
