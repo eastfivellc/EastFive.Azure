@@ -46,10 +46,16 @@ namespace EastFive.Azure.Persistence.Blobs
 
         public static bool TryGetBlobContainerName(this ParameterInfo parameter, out string containerName)
         {
+            if(parameter.TryGetAttributeInterface(out IDefineBlobContainer blobContainerDefinition))
+            {
+                containerName = blobContainerDefinition.ContainerName;
+                return true;
+            }
+
             var parameterName = parameter.TryGetAttributeInterface(out Api.IBindApiValue apiBinding) ?
-                        apiBinding.GetKey(parameter)
-                        :
-                        parameter.Name;
+                apiBinding.GetKey(parameter)
+                :
+                parameter.Name;
 
             containerName = parameter.Member.DeclaringType
                 .GetPropertyAndFieldsWithAttributesInterface<Api.IProvideApiValue>()
