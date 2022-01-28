@@ -147,7 +147,7 @@ namespace EastFive.Azure.Persistence.Blobs
                 type = type.GetGenericArguments().First();
             
             if (!typeof(IBlobRef).IsAssignableFrom(type))
-                return onDidNotBind("BlobRefBindingAttribute only binds IBlobRef");
+                return onDidNotBind($"{nameof(BlobRefBindingAttribute)} only binds {nameof(IBlobRef)}");
 
             var value = new BlobRefFormFile(content);
             return onParsed(value);
@@ -235,7 +235,7 @@ namespace EastFive.Azure.Persistence.Blobs
                 {
                     if (containerName.HasBlackSpace())
                         return containerName;
-                    throw new Exception($"{nameof(BlobRefProperty)} must be used as the Http Method Parameter decorator for IBlobRef");
+                    throw new Exception($"{nameof(BlobRefProperty)} must be used as the Http Method Parameter decorator for {nameof(IBlobRef)}");
                 }
                 set
                 {
@@ -367,7 +367,13 @@ namespace EastFive.Azure.Persistence.Blobs
             IHttpRequest httpRequest, IApplication application)
         {
             var blobRef = (IBlobRef)memberValue;
-            return member.DeclaringType
+            var typeToSearch = member.TryGetAttributeInterface(
+                    out IReferenceBlobProperty blobPropertyReference) ?
+                blobPropertyReference.PropertyOrField.DeclaringType
+                :
+                member.DeclaringType;
+
+            return typeToSearch
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .TryWhere(
                     (MethodInfo method, out (IProvideBlobAccess, string) attr) =>

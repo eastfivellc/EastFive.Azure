@@ -44,23 +44,31 @@ namespace EastFive.Azure.Persistence.Blobs
         public string IdName { get; set; }
     }
 
+    public interface IReferenceBlobProperty
+    {
+        public MemberInfo PropertyOrField { get; }
+    }
+
     public class BlobContainerRefAttribute
-        : System.Attribute, IDefineBlobContainer
+        : System.Attribute, IDefineBlobContainer, IReferenceBlobProperty
     {
         private Type type;
         private string propertyName;
+
+        public MemberInfo PropertyOrField => type
+            .GetPropertyOrFieldMembers()
+            .Where(memberInfo => memberInfo.Name.Equals(propertyName, StringComparison.Ordinal))
+            .First();
 
         public string ContainerName
         {
             get
             {
-                return type
-                    .GetPropertyOrFieldMembers()
-                    .Where(memberInfo => memberInfo.Name.Equals(propertyName, StringComparison.Ordinal))
-                    .First()
+                return PropertyOrField
                     .BlobContainerName();
             }
         }
+
 
         public BlobContainerRefAttribute(Type type, string propertyName)
         {
