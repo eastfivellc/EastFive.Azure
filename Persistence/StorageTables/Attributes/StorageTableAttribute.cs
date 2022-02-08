@@ -146,6 +146,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                 set
                 {
                     rawPartitionKey = value;
+                    if (this.Entity == null)
+                        this.Entity = Activator.CreateInstance<EntityType>();
                     this.Entity = SetPartitionKey(this.Entity, value);
                 }
             }
