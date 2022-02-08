@@ -120,9 +120,17 @@ namespace EastFive.Azure.Monitoring
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
                 [EastFive.Api.Meta.Flows.WorkflowNewId]
-                [WorkflowVariable(Workflows.TeamsFlow.Variables.CreatedNotification, "id")]
+                [WorkflowVariable(Workflows.TeamsFlow.Variables.CreatedNotification, IdPropertyName)]
                 [UpdateId]
                 IRef<TeamsNotification> teamsNotificationRef,
+
+                [PropertyOptional(Name = RouteFiltersPropertyName)]
+                [WorkflowArrayObjectParameter(Value0 = "/api/*" )]
+                string routeFilters,
+
+                [PropertyOptional(Name = CollectionPropertyName)]
+                [WorkflowParameter(Value = "Collection1", Disabled = true)]
+                string collection,
 
                 [Resource] TeamsNotification storyBoard,
 
@@ -197,7 +205,7 @@ namespace EastFive.Azure.Monitoring
                 .StorageDeleteBatch(
                     tr =>
                     {
-                        return (TeamsNotification)tr.Result;
+                        return (tr.Result as IWrapTableEntity<TeamsNotification>).Entity;
                     })
                 .HttpResponse(onDeleted);
         }
