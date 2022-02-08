@@ -24,21 +24,12 @@ namespace EastFive.Azure
             public const string FlowName = "Hijack Login";
         }
 
-        public class TeamsFlow
-        {
-            public const string FlowName = "Teams";
-
-            public class Variables
-            {
-                public const string CreatedNotification = "TeamsNotification";
-            }
-        }
-
         public class MonitoringFlow
         {
             public const string FlowName = "Monitoring";
             public class Variables
             {
+                public const string CreatedNotification = "TeamsNotification";
                 public const string FolderName = "FolderName";
             }
         }

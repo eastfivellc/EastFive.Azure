@@ -91,7 +91,7 @@ namespace EastFive.Azure.Monitoring
         #region GET
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 1.0,
             StepName = "List Notifications")]
         [HttpGet]
@@ -114,13 +114,13 @@ namespace EastFive.Azure.Monitoring
         #region POST
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 2.0,
             StepName = "Create Notification")]
         [HttpPost]
         public static Task<IHttpResponse> CreateAsync(
                 [EastFive.Api.Meta.Flows.WorkflowNewId]
-                [WorkflowVariable(Workflows.TeamsFlow.Variables.CreatedNotification, IdPropertyName)]
+                [WorkflowVariable(Workflows.MonitoringFlow.Variables.CreatedNotification, IdPropertyName)]
                 [UpdateId]
                 IRef<TeamsNotification> teamsNotificationRef,
 
@@ -148,7 +148,7 @@ namespace EastFive.Azure.Monitoring
         #region PATCH
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 3.0,
             StepName = "Modify Notification")]
         [HttpPatch]
@@ -171,7 +171,7 @@ namespace EastFive.Azure.Monitoring
         #region DELETE
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 6.0,
             StepName = "Delete Notification")]
         [HttpDelete]
@@ -187,7 +187,7 @@ namespace EastFive.Azure.Monitoring
         }
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 7.0,
             StepName = "Clear Notifications")]
         [HttpDelete]
@@ -215,7 +215,7 @@ namespace EastFive.Azure.Monitoring
         #region Action
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 4.0,
             StepName = "Load and Activate Notifications")]
         [HttpAction("Load")]
@@ -231,7 +231,7 @@ namespace EastFive.Azure.Monitoring
         }
 
         [WorkflowStep(
-            FlowName = Workflows.TeamsFlow.FlowName,
+            FlowName = Workflows.MonitoringFlow.FlowName,
             Step = 5.0,
             StepName = "List Active Notifications")]
         [HttpAction("Active")]
