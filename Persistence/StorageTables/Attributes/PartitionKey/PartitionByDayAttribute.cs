@@ -64,7 +64,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     // TODO: if(memberInAssignmentInfo != memberInfo)?
                     if (expressionType == ExpressionType.Equal)
-                        return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
+                    {
+                        var partitionKeyValue = ComputePartitionKey(partitionValue);
+                        return ExpressionType.Equal.WhereExpression("PartitionKey", partitionKeyValue);
+                    }
 
                     throw new ArgumentException();
                 },
