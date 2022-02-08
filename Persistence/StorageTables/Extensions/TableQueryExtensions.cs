@@ -124,6 +124,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return QueryComparisons.LessThan;
             if (ExpressionType.LessThanOrEqual == comparision)
                 return QueryComparisons.LessThanOrEqual;
+            if (ExpressionType.AndAlso == comparision)
+                return "and";
 
             throw new ArgumentException($"{comparision} is not a supported query comparison.");
         }
@@ -259,20 +261,43 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             if(binaryExpression.NodeType == ExpressionType.AndAlso)
             {
-                if (!(binaryExpression.Left is Expression<Func<TEntity, bool>>))
-                    throw new Exception();
-                var leftExpr = binaryExpression.Left as Expression<Func<TEntity, bool>>;
-                var leftFilter = ResolveFilter<TEntity>(leftExpr, out Func<TEntity, bool> postFilterLeft);
+                var leftFilter = ResolveBinaryExpressionComparisonFilter(
+                    binaryExpression.Left, out Func<TEntity, bool> postFilterLeft);
+                //if (!(binaryExpression.Left is Expression<Func<TEntity, bool>>))
+                //    throw new Exception();
+                //var leftExpr = binaryExpression.Left as Expression<Func<TEntity, bool>>;
+                //var leftFilter = ResolveFilter<TEntity>(leftExpr, out Func<TEntity, bool> postFilterLeft);
 
-                if (!(binaryExpression.Right is Expression<Func<TEntity, bool>>))
-                    throw new Exception();
-                var rightExpr = binaryExpression.Right as Expression<Func<TEntity, bool>>;
-                var rightFilter = ResolveFilter<TEntity>(rightExpr, out Func<TEntity, bool> postFilterRight);
+                var rightFilter = ResolveBinaryExpressionComparisonFilter(
+                    binaryExpression.Right, out Func<TEntity, bool> postFilterRight);
+                //if (!(binaryExpression.Right is Expression<Func<TEntity, bool>>))
+                //    throw new Exception();
+                //var rightExpr = binaryExpression.Right as Expression<Func<TEntity, bool>>;
+                //var rightFilter = ResolveFilter<TEntity>(rightExpr, out Func<TEntity, bool> postFilterRight);
 
                 var queryComparison = binaryExpression.NodeType.ExpressionTypeToQueryComparison();
 
                 postFilter = (e) => postFilterLeft(e) && postFilterRight(e);
                 var filterAnd = $"{leftFilter} {queryComparison} {rightFilter}";
+                return filterAnd;
+
+                string ResolveBinaryExpressionComparisonFilter(Expression expression, out Func<TEntity, bool> postFilterComparison)
+                {
+                    if (expression is Expression<Func<TEntity, bool>>)
+                    {
+                        var exprLambda = expression as Expression<Func<TEntity, bool>>;
+                        var filter = ResolveFilter<TEntity>(exprLambda, out postFilterComparison);
+                        return filter;
+                    }
+
+                    if(expression is BinaryExpression)
+                    {
+                        var exprBind = expression as BinaryExpression;
+                        return ResolveBinaryExpressionFilter(exprBind, out postFilterComparison);
+                    }
+
+                    throw new Exception();
+                }
             }
 
             if (!(binaryExpression.Left is MemberExpression))

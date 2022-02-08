@@ -23,6 +23,9 @@ using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.Blobs;
 using EastFive.Web.Configuration;
 using System.Net.Http.Headers;
+using EastFive.Azure.Monitoring;
+using EastFive.Api.Meta.Postman.Resources;
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -85,6 +88,18 @@ namespace EastFive.Api.Azure.Monitoring
         [Storage]
         public string method;
 
+        public const string NameSpacePropertyName = "ns";
+        [ApiProperty(PropertyName = NameSpacePropertyName)]
+        [JsonProperty(PropertyName = NameSpacePropertyName)]
+        [Storage]
+        public string ns;
+
+        public const string RoutePropertyName = "route";
+        [ApiProperty(PropertyName = RoutePropertyName)]
+        [JsonProperty(PropertyName = RoutePropertyName)]
+        [Storage]
+        public string route;
+
         [Storage]
         public Header[] headers;
 
@@ -143,6 +158,35 @@ namespace EastFive.Api.Azure.Monitoring
 
         #region HttpMethods
 
+        #region OPTIONS
+
+        [WorkflowStep(
+            FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Step = 1.0,
+            StepName = "Available Folders")]
+        [HttpOptions]
+        public static IHttpResponse PossibleFolderNames(
+                [WorkflowParameter(Value = "2022-02-07")]
+                [QueryParameter(Name = WhenPropertyName)]
+                DateTime when,
+            // Security security,
+            [WorkflowVariableArrayIndexedValue(Index = 0,
+                VariableName = EastFive.Azure.Workflows.MonitoringFlow.Variables.FolderName)]
+            MultipartAsyncResponse<string> onList)
+        {
+            return when
+                .StorageGetBy((MonitoringRequest mr) => mr.when)
+                .Select(
+                    mr =>
+                    {
+                        return mr.folderName;
+                    })
+                .Distinct()
+                .HttpResponse(onList);
+        }
+
+        #endregion
+
         #region GET
 
         [HttpGet]
@@ -177,16 +221,121 @@ namespace EastFive.Api.Azure.Monitoring
             return await await monitoringRequestRef
                 .StorageGetAsync(
                     additionalProperties: (query) => query.Where(item => item.when == when),
-                    onFound: async mr =>
+                    onFound: async itemToCreateOrUpdate =>
                     {
-                        return await PostMonitoringRequestAsync(mr, mr.folderName,
-                            (postmanItem) =>
-                            {
-                                return onContent(postmanItem);
-                            },
-                            (why) => onFailure(why));
+                        var postmanItem = await itemToCreateOrUpdate.ConvertToPostmanItemAsync();
+                        return await Collection.CreateOrUpdateMonitoringCollectionAsync(
+                            $"MonitoringRequest - {itemToCreateOrUpdate.when}", itemToCreateOrUpdate.url,
+                                collectionToModify =>
+                                {
+                                    return collectionToModify
+                                        .AppendItem(postmanItem, folderName: itemToCreateOrUpdate.folderName);
+                                },
+                            onCreatedOrUpdated:(discard) => onContent(postmanItem),
+                            onFailure: why => onFailure(why));
                     },
                     onDoesNotExists: () => onNotFound().AsTask());
+        }
+
+        public const string PostmanCollectionAction = "PostmanFolder";
+        [WorkflowStep(
+            FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Step = 2.0,
+            StepName = "Send Folder To Postman")]
+        [HttpAction(PostmanCollectionAction)]
+        public static async Task<IHttpResponse> SendCollectionToPostman(
+                [WorkflowParameterFromVariable(Value =
+                    EastFive.Azure.Workflows.MonitoringFlow.Variables.FolderName)]
+                [QueryParameter(Name = FolderNamePropertyName)]string folderName,
+
+                [OptionalQueryParameter(Name = WhenPropertyName)] DateTime? whenMaybe,
+                IHttpRequest httpRequest,
+            Security security,
+            ContentTypeResponse<CollectionSummary> onPosted,
+            GeneralFailureResponse onFailure)
+        {
+            //var postmanItems = await when
+            //    .StorageGetBy((MonitoringRequest mr) => mr.when)
+            //    .Where(mr => String.Equals(mr.folderName, folderName, StringComparison.CurrentCultureIgnoreCase))
+            //    .Select(mr => mr.ConvertToPostmanItemAsync())
+            //    .Await()
+            //    .ToArrayAsync();
+
+            var postmanItems = await folderName
+                .StorageGetBy((MonitoringRequest mr) => mr.folderName)
+                .Where(mr => whenMaybe.HasValue? whenMaybe.EqualToDay(mr.when) : true)
+                .Select(mr => mr.ConvertToPostmanItemAsync())
+                .Await()
+                .ToArrayAsync();
+
+            return await Collection.CreateOrUpdateMonitoringCollectionAsync(
+                    $"MonitoringRequest - {folderName}", httpRequest.RequestUri,
+                    collectionToModify =>
+                    {
+                        return collectionToModify
+                            .AppendItems(postmanItems, folderName: folderName);
+                    },
+                onCreatedOrUpdated: (collection) => onPosted(collection),
+                why => onFailure(why));
+        }
+
+        public const string ClearPostmanAction = "PostmanClear";
+        [WorkflowStep(
+            FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Step = 3.0,
+            StepName = "Clear Items")]
+        [HttpAction(ClearPostmanAction)]
+        public static async Task<IHttpResponse> ClearPostmanAsync(
+                [WorkflowParameterFromVariable(
+                    Value = EastFive.Azure.Workflows.MonitoringFlow.Variables.FolderName,
+                    Disabled = true)]
+                [OptionalQueryParameter(Name = TeamsNotification.CollectionPropertyName)]
+                string collectionFolder,
+            Security security,
+            ContentTypeResponse<CollectionSummary> onCleared,
+            NotFoundResponse onNotFound,
+            GeneralFailureResponse onFailure)
+        {
+            return await EastFive.Api.AppSettings.Postman.MonitoringCollectionId.ConfigurationString(
+                async collectionId =>
+                {
+                    return await await EastFive.Api.Meta.Postman.Resources.Collection.Collection.GetAsync(collectionId,
+                        collection =>
+                        {
+                            var collectionCleared = collectionFolder.HasBlackSpace() ?
+                                MutateCollectionWithFolderName(collectionFolder)
+                                :
+                                MutateCollection();
+                            return collectionCleared.UpdateAsync<IHttpResponse>(
+                                (updatedCollection) =>
+                                {
+                                    return onCleared(updatedCollection);
+                                },
+                                onFailure:(why) => onFailure(why));
+
+                            Collection MutateCollection()
+                            {
+                                return new Collection
+                                {
+                                    info = collection.info,
+                                    item = new Item[] { },
+                                    variable = collection.variable,
+                                };
+                            }
+
+                            Collection MutateCollectionWithFolderName(string folderName)
+                            {
+                                collection.item = collection.item
+                                    .NullToEmpty()
+                                    .Where(item => !collectionFolder.Equals(item.name))
+                                    .ToArray();
+                                return collection;
+                            }
+                        },
+                        () => onNotFound().AsTask(),
+                        onFailure:why => onFailure(why).AsTask());
+                },
+                onUnspecified:(why) => onFailure("Postman Monitoring not setup").AsTask());
         }
 
         #endregion
@@ -203,6 +352,8 @@ namespace EastFive.Api.Azure.Monitoring
             doc.when = DateTime.UtcNow;
             doc.url = request.RequestUri;
             doc.method = request.Method.Method;
+            doc.ns = resourceInvoker.Namespace;
+            doc.route = resourceInvoker.Route;
             doc.headers = request.Headers
                 .Where(kvp => kvp.Value.AnyNullSafe())
                 .Select(
@@ -275,69 +426,15 @@ namespace EastFive.Api.Azure.Monitoring
                     return await await EastFive.Api.Meta.Postman.Resources.Collection.Collection.GetAsync(collectionId,
                         collection =>
                         {
-                            var collectionWithItem = collectionFolder.HasBlackSpace() ?
-                                MutateCollectionWithFolderName(collectionFolder)
-                                :
-                                MutateCollection();
-                            return collectionWithItem.UpdateAsync<TResult>(
-                                (updatedCollection) =>
-                                {
-                                    return onCreatedOrUpdated(postmanItem);
-                                },
-                                onFailure:onFailure);
+                            return collection
+                                .AppendItem(postmanItem, folderName: collectionFolder)
+                                .UpdateAsync<TResult>(
+                                    (updatedCollection) =>
+                                    {
+                                        return onCreatedOrUpdated(postmanItem);
+                                    },
+                                    onFailure:onFailure);
 
-                            Collection MutateCollection()
-                            {
-                                return new Collection
-                                {
-                                    info = collection.info,
-                                    item = collection.item.Append(postmanItem).ToArray(),
-                                    variable = collection.variable,
-                                };
-                            }
-
-                            Collection MutateCollectionWithFolderName(string folderName)
-                            {
-                                return collection.item
-                                    .NullToEmpty()
-                                    .Where(item => collectionFolder.Equals(item.name))
-                                    .First(
-                                        (folderItem, next) =>
-                                        {
-                                            folderItem.item = folderItem.item
-                                                .Where(item => !postmanItem.name.Equals(item.name, StringComparison.CurrentCultureIgnoreCase))
-                                                .Append(postmanItem)
-                                                .ToArray();
-
-                                            var collectionItems = collection.item
-                                                .Where(item => !collectionFolder.Equals(item.name, StringComparison.CurrentCultureIgnoreCase))
-                                                .Append(folderItem)
-                                                .ToArray();
-                                            return new Collection
-                                            {
-                                                info = collection.info,
-                                                item = collectionItems,
-                                                variable = collection.variable,
-                                            };
-                                        },
-                                        () =>
-                                        {
-                                            var folderItem = new Item
-                                            {
-                                                name = folderName,
-                                                item = postmanItem.AsArray(),
-                                            };
-                                            return new Collection
-                                            {
-                                                info = collection.info,
-                                                item = collection.item
-                                                    .NullToEmpty()
-                                                    .Append(folderItem)
-                                                    .ToArray(),
-                                                variable = collection.variable,
-                                            };
-                                        });
-                            }
                         },
                         () =>
                         {
@@ -376,7 +473,7 @@ namespace EastFive.Api.Azure.Monitoring
         {
             var item = new Item
             {
-                name = this.url.OriginalString,
+                name = GetName(),
                 request = new Request
                 {
                     url = new Url
@@ -396,12 +493,16 @@ namespace EastFive.Api.Azure.Monitoring
                     description = $"{this.method}:{this.url}",
                     header = this.headers
                         .Select(
-                            header => new Meta.Postman.Resources.Collection.Header
+                            header =>
                             {
-                                key = header.key,
-                                type = header.type,
-                                value = header.value,
-                                disabled = Meta.Postman.Resources.Collection.Header.IsGeneratedHeader(header.key),
+                                var isGenerated = Meta.Postman.Resources.Collection.Header.IsGeneratedHeader(header.key);
+                                return new Meta.Postman.Resources.Collection.Header
+                                {
+                                    key = header.key,
+                                    type = header.type,
+                                    value = header.value,
+                                    disabled = isGenerated,
+                                };
                             })
                         .ToArray(),
                     method = this.method,
@@ -410,7 +511,20 @@ namespace EastFive.Api.Azure.Monitoring
             };
             return item;
 
-            
+            string GetName()
+            {
+                if (this.ns.HasBlackSpace() && this.route.HasBlackSpace())
+                {
+                    if ("api".Equals(this.ns, StringComparison.InvariantCultureIgnoreCase))
+                        return $"{this.method} {this.route}";
+                    return $"{this.method} {this.route}[{this.ns}]";
+                }
+
+                if (this.title.HasBlackSpace())
+                    return this.title;
+
+                return $"{this.method} {this.url.AbsolutePath}";
+            }
         }
 
         async Task<Body> GetPostmanBodyAsync()

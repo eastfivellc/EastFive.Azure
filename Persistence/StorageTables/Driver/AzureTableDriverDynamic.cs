@@ -642,22 +642,22 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             return by.MemberInfo(
                 (memberCandidate, expr) =>
                 {
+                    var memberAssignments = queries
+                        .Where(query => !query.IsDefaultOrNull())
+                        .Select(
+                            query =>
+                            {
+                                var memberInfo = (query).MemberComparison(out ExpressionType operand, out object value);
+                                return memberInfo.PairWithValue(value);
+                            })
+                        .Append(findByValue.PairWithKey(memberCandidate))
+                        .ToArray();
+
                     return memberCandidate
                         .GetAttributesInterface<IProvideFindBy>()
                         .First<IProvideFindBy, IEnumerableAsync<TEntity>>(
                             (attr, next) =>
                             {
-                                var memberAssignments = queries
-                                    .Where(query => !query.IsDefaultOrNull())
-                                    .Select(
-                                        query =>
-                                        {
-                                            var memberInfo = (query).MemberComparison(out ExpressionType operand, out object value);
-                                            return memberInfo.PairWithValue(value);
-                                        })
-                                    .Append(findByValue.PairWithKey(memberCandidate))
-                                    .ToArray();
-
                                 return attr.GetKeys(memberCandidate, this, memberAssignments, logger: logger)
                                     .Select(
                                         async rowParitionKeyKvp =>
@@ -681,6 +681,46 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             },
                             () =>
                             {
+                                var table = GetTable<TEntity>();
+
+                                if (memberCandidate.TryGetAttributeInterface(out IProvideTableQuery provideTableQuery))
+                                {
+                                    var propExpr = Expression.Equal(by.Body, Expression.Constant(findByValue));
+
+                                    var lambdaExpr = Expression<Func<TEntity, bool>>.Lambda(propExpr, parameters:by.Parameters);
+                                    var initialAssignment = (Expression<Func<TEntity, bool>>)lambdaExpr;
+
+                                    var filter = queries
+                                        .Where(query => !query.IsDefaultOrNull())
+                                        .Aggregate(
+                                            initialAssignment,
+                                            (current, next) =>
+                                            {
+                                                var combined = Expression.AndAlso(current.Body, next.Body);
+
+                                                var combinedlambdaExpr = Expression<Func<TEntity, bool>>.Lambda(combined, parameters: by.Parameters);
+                                                var combinedCast = (Expression<Func<TEntity, bool>>)combinedlambdaExpr;
+
+                                                return combinedCast;
+                                            });
+
+                                    var whereFilter = provideTableQuery.ProvideTableQuery(memberCandidate,
+                                        filter: filter, out Func<TEntity, bool> postFilter);
+
+                                    return RunQuery<TEntity>(whereFilter, table)
+                                        .Where(item => postFilter(item));
+                                }
+
+                                if (memberCandidate.TryGetAttributeInterface(
+                                    out IComputeAzureStorageTablePartitionKey computeAzureStorageTablePartitionKey))
+                                {
+                                    var partitionValue = computeAzureStorageTablePartitionKey.ComputePartitionKey(findByValue, memberCandidate,
+                                        String.Empty, memberAssignments);
+
+                                    var whereFilter = $"PartitionKey=`{partitionValue}`";
+                                    return RunQuery<TEntity>(whereFilter, table);
+                                }
+
                                 throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy.");
                             });
                 },

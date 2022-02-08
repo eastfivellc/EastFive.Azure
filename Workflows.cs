@@ -34,6 +34,15 @@ namespace EastFive.Azure
             }
         }
 
+        public class MonitoringFlow
+        {
+            public const string FlowName = "Monitoring";
+            public class Variables
+            {
+                public const string FolderName = "FolderName";
+            }
+        }
+
         public class PasswordLoginCreateAccount
         {
             public const string FlowName = "Create Account";
