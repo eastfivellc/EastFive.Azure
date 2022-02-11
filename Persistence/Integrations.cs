@@ -17,7 +17,6 @@ using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Security.SessionServer;
 using EastFive.Extensions;
-using EastFive.Api.Azure.Credentials;
 using EastFive.Linq.Async;
 
 namespace EastFive.Azure.Persistence.Persistence

@@ -60,6 +60,7 @@
     <None Remove="Persistence\Blobs\" />
     <None Remove="Configuration\" />
     <None Remove="Diagnostics\" />
+    <None Remove="Auth\Salesforce\" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Auth\Google\" />
@@ -67,5 +68,6 @@
     <Folder Include="Persistence\Blobs\" />
     <Folder Include="Configuration\" />
     <Folder Include="Diagnostics\" />
+    <Folder Include="Auth\Salesforce\" />
   </ItemGroup>
 </Project>

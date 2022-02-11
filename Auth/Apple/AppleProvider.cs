@@ -29,7 +29,6 @@ using EastFive;
 using EastFive.Api;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using EastFive.Api.Azure.Credentials;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Auth.CredentialProviders;

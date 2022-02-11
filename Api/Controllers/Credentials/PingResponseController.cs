@@ -18,7 +18,6 @@ using EastFive.Azure.Auth;
 using EastFive.Linq;
 using EastFive.Api;
 using EastFive.Api.Azure;
-using EastFive.Api.Azure.Credentials;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {

@@ -17,7 +17,6 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Api;
 using EastFive.Web.Configuration;
-using EastFive.Api.Azure.Credentials;
 using EastFive.Linq;
 
 namespace EastFive.Azure.Auth
@@ -193,31 +192,31 @@ namespace EastFive.Azure.Auth
                     authenticationMethod, externalAccountKey, extraParams,
                     application, request, loginProvider, baseUri,
 
-                onAccountLocated: async (internalAccountId) =>
+                onAccountLocated: (internalAccountId, authorizationUpdated) =>
                 {
-                    return await await CreateLoginResponseAsync(
+                    return CreateLoginResponseAsync(
                                 internalAccountId, extraParams,
-                                authenticationMethod, authorization,
+                                authenticationMethod, authorizationUpdated,
                                 application, request, endpoints, baseUri, loginProvider,
-                            async (url, modifier) =>
+                            (url, modifier) =>
                             {
-                                await saveAsync(authorization);
+                                // await saveAsync(authorization);
                                 return onRedirect(url, internalAccountId, modifier);
                             },
-                            async (why) =>
+                            (why) =>
                             {
-                                await saveAsync(authorization);
+                                //await saveAsync(authorization);
                                 return onGeneralFailure(why);
                             },
                                 telemetry);
                 },
 
-                onInterupted:(interceptionUrl, internalAccountId) =>
+                onInterupted:(interceptionUrl, internalAccountId, authorizationUpdated) =>
                 {
                     return onRedirect(interceptionUrl, internalAccountId, m => m).AsTask();
                 },
 
-                onGeneralFailure:(why) =>
+                onGeneralFailure:(why, authorizationUpdated) =>
                 {
                     return onGeneralFailure(why).AsTask();
                 },
@@ -231,9 +230,9 @@ namespace EastFive.Azure.Auth
                 IAzureApplication application, IHttpRequest request,
                 IProvideLogin loginProvider,
                 Uri baseUri,
-            Func<Guid, TResult> onAccountLocated,
-            Func<Uri, Guid, TResult> onInterupted,
-            Func<string, TResult> onGeneralFailure,
+            Func<Guid, Authorization, TResult> onAccountLocated,
+            Func<Uri, Guid, Authorization, TResult> onInterupted,
+            Func<string, Authorization, TResult> onGeneralFailure,
             TelemetryClient telemetry)
         {
             return await await IdentifyAccountAsync(authorization,
@@ -247,7 +246,7 @@ namespace EastFive.Azure.Auth
                     authorization.authorized = true;
                     authorization.claims = claims;
                     await saveAsync(authorization);
-                    return onAccountLocated(internalAccountId);
+                    return onAccountLocated(internalAccountId, authorization);
                 },
 
                 onInterupted: async (interceptionUrl, internalAccountId, claims) =>
@@ -257,7 +256,7 @@ namespace EastFive.Azure.Auth
                     authorization.authorized = true;
                     authorization.claims = claims;
                     await saveAsync(authorization);
-                    return onInterupted(interceptionUrl, internalAccountId);
+                    return onInterupted(interceptionUrl, internalAccountId, authorization);
                 },
 
                 onGeneralFailure: async (why) =>
@@ -265,7 +264,7 @@ namespace EastFive.Azure.Auth
                     // Save params so they can be used later
                     authorization.parameters = extraParams;
                     await saveAsync(authorization);
-                    return onGeneralFailure(why);
+                    return onGeneralFailure(why, authorization);
                 },
                     telemetry: telemetry);
         }

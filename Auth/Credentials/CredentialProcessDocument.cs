@@ -10,10 +10,8 @@ using EastFive.Serialization;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Extensions;
-using BlackBarLabs.Persistence.Azure;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth
 {
     [Serializable]
     [DataContract]
@@ -23,11 +21,11 @@ namespace EastFive.Api.Azure.Credentials
         {
         }
 
-        public CredentialProcessDocument(string id)
-        {
-            RowKey = id;
-            PartitionKey = RowKey.GeneratePartitionKey();
-        }
+        //public CredentialProcessDocument(string id)
+        //{
+        //    RowKey = id;
+        //    PartitionKey = RowKey.GeneratePartitionKey();
+        //}
 
         public Guid Id => Guid.Parse(this.RowKey);
 
@@ -87,42 +85,42 @@ namespace EastFive.Api.Azure.Credentials
             ValuesCredentialValues = extraParams.NullToEmpty().SelectValues().ToUTF8ByteArrayOfStrings();
         }
         
-        internal static Task CreateAsync(Guid id,
-            CredentialProcessDocument doc, AzureStorageRepository azureStorageRepository)
-        {
-            return azureStorageRepository.CreateAsync(id, doc,
-                () => true,
-                () => false);
-        }
+        //internal static Task CreateAsync(Guid id,
+        //    CredentialProcessDocument doc, AzureStorageRepository azureStorageRepository)
+        //{
+        //    return azureStorageRepository.CreateAsync(id, doc,
+        //        () => true,
+        //        () => false);
+        //}
 
-        public static Task<TResult> FindByIdAsync<TResult>(Guid id,
-            Func<CredentialProcessDocument, TResult> onFound,
-            Func<TResult> onNotFound,
-            AzureStorageRepository azureStorageRepository)
-        {
-            return azureStorageRepository.FindByIdAsync(id,
-                onFound,
-                onNotFound);
-        }
+        //public static Task<TResult> FindByIdAsync<TResult>(Guid id,
+        //    Func<CredentialProcessDocument, TResult> onFound,
+        //    Func<TResult> onNotFound,
+        //    AzureStorageRepository azureStorageRepository)
+        //{
+        //    return azureStorageRepository.FindByIdAsync(id,
+        //        onFound,
+        //        onNotFound);
+        //}
 
-        public static Task<TResult> FindAllAsync<TResult>(
-            Func<CredentialProcessDocument[], TResult> onFound,
-            AzureStorageRepository azureStorageRepository)
-        {
-            return azureStorageRepository.FindAllAsync<CredentialProcessDocument, TResult>(
-                (docs) =>
-                {
-                    return onFound(docs);
-                });
-        }
+        //public static Task<TResult> FindAllAsync<TResult>(
+        //    Func<CredentialProcessDocument[], TResult> onFound,
+        //    AzureStorageRepository azureStorageRepository)
+        //{
+        //    return azureStorageRepository.FindAllAsync<CredentialProcessDocument, TResult>(
+        //        (docs) =>
+        //        {
+        //            return onFound(docs);
+        //        });
+        //}
 
-        public static async Task<TResult> UpdateAsync<TResult>(Guid id,
-            Func<CredentialProcessDocument, Func<CredentialProcessDocument, Task>, Task<TResult>> onSuccess,
-            AzureStorageRepository repo)
-        {
-            return await repo.UpdateAsync<CredentialProcessDocument, TResult>(id,
-                (doc, saveAsync) => onSuccess(doc, (docUpdate) => saveAsync(docUpdate)),
-                () => throw new NotImplementedException());
-        }
+        //public static async Task<TResult> UpdateAsync<TResult>(Guid id,
+        //    Func<CredentialProcessDocument, Func<CredentialProcessDocument, Task>, Task<TResult>> onSuccess,
+        //    AzureStorageRepository repo)
+        //{
+        //    return await repo.UpdateAsync<CredentialProcessDocument, TResult>(id,
+        //        (doc, saveAsync) => onSuccess(doc, (docUpdate) => saveAsync(docUpdate)),
+        //        () => throw new NotImplementedException());
+        //}
     }
 }

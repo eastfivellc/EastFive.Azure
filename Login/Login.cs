@@ -137,12 +137,12 @@ namespace EastFive.Azure.Login
                                         externalAccountKey, extraParams,
                                         application, request, loginProvider,
                                         request.RequestUri,
-                                    async (accountId) =>
+                                    async (accountId, authorizationUpdated) =>
                                     {
                                         return await CreateSessionAsync(authorization);
                                     },
-                                    (interruptTo, accountId) => throw new Exception($"Cannot redirect to `{interruptTo}`"),
-                                    why => throw new Exception(why),
+                                    (interruptTo, accountId, authorizationUpdated) => throw new Exception($"Cannot redirect to `{interruptTo}`"),
+                                    (why, authorizationUpdated) => throw new Exception(why),
                                         default);
 
                                 Task<Auth.Session> CreateSessionAsync(Auth.Authorization authorization)

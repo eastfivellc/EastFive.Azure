@@ -26,6 +26,7 @@ using System.Net.Http.Headers;
 using EastFive.Azure.Monitoring;
 using EastFive.Api.Meta.Postman.Resources;
 using EastFive.Api.Meta.Flows;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -165,11 +166,12 @@ namespace EastFive.Api.Azure.Monitoring
             Step = 10.0,
             StepName = "Available Folders")]
         [HttpOptions]
+        [SuperAdminClaim]
         public static IHttpResponse PossibleFolderNames(
                 [WorkflowParameter(Value = "2022-02-07")]
                 [QueryParameter(Name = WhenPropertyName)]
                 DateTime when,
-            // Security security,
+                Security security,
             [WorkflowVariableArrayIndexedValue(Index = 0,
                 VariableName = EastFive.Azure.Workflows.MonitoringFlow.Variables.FolderName)]
             MultipartAsyncResponse<string> onList)
@@ -190,10 +192,11 @@ namespace EastFive.Api.Azure.Monitoring
         #region GET
 
         [HttpGet]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> GetByIdAsync(
                 [QueryId]IRef<MonitoringRequest> monitoringRequestRef,
                 [QueryParameter(Name = WhenPropertyName)]DateTime when,
-                // Security security,
+                Security security,
             ContentTypeResponse<MonitoringRequest> onContent,
             NotFoundResponse onNotFound)
         {

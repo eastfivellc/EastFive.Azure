@@ -70,6 +70,8 @@ namespace EastFive.Azure.Auth
                 IHttpRequest request,
                 IAzureApplication application,
                 IProvideUrl urlHelper,
+            [Api.Meta.Flows.WorkflowVariableRedirectUrl(
+                VariableName = Workflows.AuthorizationFlow.Variables.RedirectUrl)]
             RedirectResponse onLaunched,
             BadRequestResponse onInvalidMethod)
         {
@@ -105,7 +107,7 @@ namespace EastFive.Azure.Auth
 
         public const string ResponseAction = "Response";
         [HttpAction(ResponseAction)]
-        [SuperAdminClaim]
+        // [SuperAdminClaim]
         public static Task<IHttpResponse> ResponseAsync(
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]
                     IRef<Authorization> authorizationRef,

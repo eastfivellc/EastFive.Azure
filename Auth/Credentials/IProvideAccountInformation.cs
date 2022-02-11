@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+
+using EastFive;
+using EastFive.Api;
 using EastFive.Azure;
 using EastFive.Azure.Auth;
-using EastFive.Security.SessionServer;
 
-namespace EastFive.Api.Azure.Credentials
+namespace EastFive.Azure.Auth
 {
     public interface IProvideAccountInformation
     {
