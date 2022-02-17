@@ -131,11 +131,22 @@ namespace EastFive.Azure.Persistence.Blobs
                 IApplication application,
             Func<object, TResult> onParsed,
             Func<string, TResult> onDidNotBind,
-            Func<string, TResult> onBindingFailure) => Bind(parameter.ParameterType, content,
-                application: application,
-                onParsed: onParsed,
-                onDidNotBind: onDidNotBind,
-                onBindingFailure: onBindingFailure);
+            Func<string, TResult> onBindingFailure)
+        {
+            if (!parameter.TryGetBlobContainerName(out string containerName))
+                return onDidNotBind("Could not connect parameter with property");
+
+            var type = parameter.ParameterType;
+            if (type.IsSubClassOfGeneric(typeof(Property<>)))
+                type = type.GetGenericArguments().First();
+
+            if (!typeof(IBlobRef).IsAssignableFrom(type))
+                return onDidNotBind($"{nameof(BlobRefBindingAttribute)} only binds {nameof(IBlobRef)}");
+
+            var value = new BlobRefFormFile(content);
+            value.ContainerName = containerName;
+            return onParsed(value);
+        }
 
         public TResult Bind<TResult>(Type type, IFormFile content,
                 IApplication application,
