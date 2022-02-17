@@ -18,33 +18,33 @@ namespace EastFive.Api.Azure.Apple
         Route = "apple-app-site-association")]
     public class AppleAppSiteAssociationController
     {
-            [EastFive.Api.HttpGet]
-            public static IHttpResponse Get(
+        [EastFive.Api.HttpGet]
+        public static IHttpResponse Get(
                 ContentResponse onSuccess,
                 NotFoundResponse onNotFound)
-            {
-                return EastFive.Azure.AppSettings.Apple.AppleAppSiteAssociationId.ConfigurationString(
-                    (appId) =>
+        {
+            return EastFive.Azure.AppSettings.Apple.AppleAppSiteAssociationId.ConfigurationString(
+                (appId) =>
+                {
+                    var content = new
                     {
-                        var content = new
+                        applinks = new
                         {
-                            applinks = new
+                            apps = new string[] { },
+                            details = new object[]
                             {
-                                apps = new string[] { },
-                                details = new object[]
-                                {
                                 new
                                 {
                                     appID = appId,
                                     paths = new string [] { "*" },
                                 }
-                                }
                             }
-                        };
-                        return onSuccess(content);
-                    },
-                    (why) => onNotFound().AddReason(why));
-            }
+                        }
+                    };
+                    return onSuccess(content);
+                },
+                (why) => onNotFound().AddReason(why));
+        }
     }
 
     //public class AppleAppSiteAssociation

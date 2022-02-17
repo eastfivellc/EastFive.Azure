@@ -281,10 +281,28 @@ namespace EastFive.Azure
 
             }
 
+            [Config]
+            public static class Salesforce
+            {
+                [ConfigKey("ID used to identify the application to Salesforce.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Manage Connected Apps",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ConsumerKey = "EastFive.Salesforce.ConsumerKey";
+
+                [ConfigKey("Key used to redeem a token code.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Manage Connected Apps",
+                    DeploymentSecurityConcern = true,
+                    PrivateRepositoryOnly = true)]
+                public const string ConsumerSecret = "EastFive.Salesforce.ConsumerSecret";
+            }
+
             [ConfigKey("Link that is sent (emailed) to the user to login to the application",
-            DeploymentOverrides.Desireable,
-            DeploymentSecurityConcern = false,
-            Location = "The URL that the webUI is deployed")]
+                DeploymentOverrides.Desireable,
+                DeploymentSecurityConcern = false,
+                Location = "The URL that the webUI is deployed")]
             public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
 
             public const string OpenApiCollectionName = "EastFive.Azure.Auth";

@@ -35,12 +35,12 @@ using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Auth.CredentialProviders;
 
-namespace EastFive.Azure.Auth.Google
+namespace EastFive.Azure.Auth.Salesforce
 {
-    [IntegrationName(GoogleProvider.IntegrationName)]
-    public class GoogleProvider : IProvideLogin, IProvideSession, IProvideClaims
+    [IntegrationName(SalesforceProvider.IntegrationName)]
+    public class SalesforceProvider : IProvideLogin, IProvideSession, IProvideClaims
     {
-        public const string IntegrationName = "Google";
+        public const string IntegrationName = "Salesforce";
 
         #region Parameters
 
@@ -59,6 +59,15 @@ namespace EastFive.Azure.Auth.Google
         public const string responseParamState = "state";
         public const string responseParamScope = "scope";
         public const string responseParamRedirectUri = "response_uri";
+        #endregion
+
+        #region Parameter that come back in the token exchange
+        public const string tokenParamAccessToken = "access_token";
+        public const string tokenParamExpiresIn = "expires_in";
+        public const string tokenParamIdToken = "id_token";
+        public const string tokenParamScope = "scope";
+        public const string tokenParamTokenType = "token_type";
+        public const string tokenParamRefreshToken = "refresh_token";
         #endregion
 
         #region Parameters from the Claim Token
@@ -142,7 +151,7 @@ namespace EastFive.Azure.Auth.Google
         private OAuth.Keys keys;
         #endregion
 
-        public GoogleProvider(string clientId, string clientSecret,
+        public SalesforceProvider(string clientId, string clientSecret,
             Uri authorizationApiBase, Uri tokenEndpoint, string issuer, OAuth.Keys keys)
         {
             this.clientId = clientId;
@@ -195,7 +204,7 @@ namespace EastFive.Azure.Auth.Google
 
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
-        public Type CallbackController => typeof(GoogleRedirect);
+        public Type CallbackController => typeof(SalesforceRedirect);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
             Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
@@ -205,20 +214,25 @@ namespace EastFive.Azure.Auth.Google
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            if (!responseParams.ContainsKey(GoogleProvider.responseParamCode))
-                return onInvalidCredentials($"`{GoogleProvider.responseParamCode}` code was not provided");
-            var code = responseParams[GoogleProvider.responseParamCode];
+            if (!responseParams.ContainsKey(SalesforceProvider.responseParamCode))
+                return onInvalidCredentials($"`{SalesforceProvider.responseParamCode}` code was not provided");
+            var code = responseParams[SalesforceProvider.responseParamCode];
 
-            if (!responseParams.ContainsKey(GoogleProvider.responseParamRedirectUri))
-                return onInvalidCredentials($"`{GoogleProvider.responseParamRedirectUri}` code was not provided");
-            var redirectUri = responseParams[GoogleProvider.responseParamRedirectUri];
+            if (!responseParams.ContainsKey(SalesforceProvider.responseParamRedirectUri))
+                return onInvalidCredentials($"`{SalesforceProvider.responseParamRedirectUri}` code was not provided");
+            var redirectUri = responseParams[SalesforceProvider.responseParamRedirectUri];
 
-            return await OAuth.TokenResponse.LoadAsync(this.tokenEndpoint,
-                code, this.clientId, this.clientSecret, redirectUri,
+            return await SalesforceTokenResponse.LoadTokenAsync(this.tokenEndpoint,
+                    code, this.clientId, this.clientSecret, redirectUri,
                 (tokenResponse) =>
                 {
                     var extraParamsWithTokenValues = tokenResponse.AppendResponseParameters(responseParams);
 
+                    if(tokenResponse.id.IsNotDefaultOrNull())
+                    {
+                        // https://help.salesforce.com/s/articleView?id=sf.remoteaccess_using_openid.htm&type=5
+                        // tokenResponse.id.HttpClientGetResourceAsync()
+                    }
                     return Parse(tokenResponse.id_token, extraParamsWithTokenValues,
                         (subject, authorizationId, extraParamsWithClaimValues) =>
                             onSuccess(subject, authorizationId, default(Guid?), extraParamsWithClaimValues),
@@ -254,9 +268,9 @@ namespace EastFive.Azure.Auth.Google
                         return callback(subject);
                 }
 
-                if (responseParams.ContainsKey(OAuth.TokenResponse.tokenParamIdToken))
+                if (responseParams.ContainsKey(SalesforceProvider.tokenParamIdToken))
                 {
-                    var jwtEncodedString = responseParams[OAuth.TokenResponse.tokenParamIdToken];
+                    var jwtEncodedString = responseParams[SalesforceProvider.tokenParamIdToken];
                     return Parse(jwtEncodedString, responseParams,
                         (subject, state, updatedParamsDiscard) => callback(subject),
                         onFailure);
@@ -279,7 +293,7 @@ namespace EastFive.Azure.Auth.Google
                 .AddQueryParameter(requestParamClientId, this.clientId)
                 //.AddQueryParameter(requestParamResponseMode, "form_post")
                 .AddQueryParameter(requestParamResponseType, $"{responseParamCode}")
-                .AddQueryParameter(requestParamScope, "openid email")
+                .AddQueryParameter(requestParamScope, "full+refresh_token")
                 .AddQueryParameter(requestParamState, state.ToString("N"))
                 .AddQueryParameter(requestParamNonce, Guid.NewGuid().ToString("N"))
                 .AddQueryParameter(requestParamRedirectUri, responseControllerLocation.AbsoluteUri);
@@ -344,38 +358,38 @@ namespace EastFive.Azure.Auth.Google
 
     }
 
-    public class GoogleProviderAttribute : Attribute, IProvideLoginProvider
+    public class SalesforceProviderAttribute : Attribute, IProvideLoginProvider
     {
         public Task<TResult> ProvideLoginProviderAsync<TResult>(
             Func<IProvideLogin, TResult> onProvideAuthorization,
             Func<string, TResult> onNotAvailable)
         {
-            return AppSettings.Auth.Google.ClientId.ConfigurationString(
-                applicationId =>
+            return AppSettings.Auth.Salesforce.ConsumerKey.ConfigurationString(
+                consumerKey =>
                 {
-                            return AppSettings.Auth.Google.ClientSecret.ConfigurationString(
-                                async (clientSecret) =>
+                    return AppSettings.Auth.Salesforce.ConsumerSecret.ConfigurationString(
+                        async (consumerSecret) =>
+                        {
+                            return await await new Uri(discoveryDocumentUrl).HttpClientGetResourceAsync(
+                                (DiscoveryDocument discDoc) =>
                                 {
-                                    return await await new Uri(discoveryDocumentUrl).HttpClientGetResourceAsync(
-                                        (DiscoveryDocument discDoc) =>
+                                    return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
+                                        keys =>
                                         {
-                                            return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
-                                                keys =>
-                                                {
-                                                    var provider = new GoogleProvider(applicationId, clientSecret,
-                                                        discDoc.authorization_endpoint, discDoc.token_endpoint, discDoc.issuer, keys);
-                                                    return onProvideAuthorization(provider);
-                                                },
-                                                onNotAvailable);
+                                            var provider = new SalesforceProvider(consumerKey, consumerSecret,
+                                                discDoc.authorization_endpoint, discDoc.token_endpoint, discDoc.issuer, keys);
+                                            return onProvideAuthorization(provider);
                                         },
-                                        onFailure: (why) => onNotAvailable(why).AsTask());
+                                        onNotAvailable);
                                 },
-                                (why) => onNotAvailable(why).AsTask());
+                                onFailure: (why) => onNotAvailable(why).AsTask());
+                        },
+                        (why) => onNotAvailable(why).AsTask());
                 },
                 (why) => onNotAvailable(why).AsTask());
         }
 
-        public const string discoveryDocumentUrl = "https://accounts.google.com/.well-known/openid-configuration";
+        public const string discoveryDocumentUrl = "https://login.salesforce.com/.well-known/openid-configuration";
 
         public class DiscoveryDocument
         {
@@ -387,11 +401,11 @@ namespace EastFive.Azure.Auth.Google
         }
     }
 
-    public static class GoogleProviderExtensions
+    public static class SalesforceProviderExtensions
     {
-        public static bool IsGoogle(this Method authMethod)
+        public static bool IsSalesforce(this Method authMethod)
         {
-            return authMethod.name == GoogleProvider.IntegrationName;
+            return authMethod.name == SalesforceProvider.IntegrationName;
         }
     }
 

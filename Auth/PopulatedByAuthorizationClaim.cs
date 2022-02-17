@@ -10,7 +10,6 @@ using EastFive.Linq;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Persistence;
-using EastFive.Api.Azure.Credentials;
 
 namespace EastFive.Azure.Auth
 {
