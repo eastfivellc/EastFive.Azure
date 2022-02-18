@@ -299,8 +299,10 @@ namespace EastFive.Azure.Persistence.Blobs
                             FileName = this.Id,
                         };
                     }
-                    MediaTypeHeaderValue.TryParse(content.ContentType,
-                        out MediaTypeHeaderValue mediaType);
+                    if (!MediaTypeHeaderValue.TryParse(content.ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                        mediaType = new MediaTypeHeaderValue("application/octet-stream");
+                    
                     return onFound(this.Id, bytes, mediaType, contentDisposition);
                 }
             }

@@ -270,8 +270,11 @@ namespace EastFive.Azure.Persistence.Blobs
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             {
+                if (!MediaTypeHeaderValue.TryParse(ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                    mediaType = new MediaTypeHeaderValue("application/octet-stream");
                 return onFound(Id, bytes,
-                    new MediaTypeHeaderValue(ContentType),
+                    mediaType,
                     new ContentDispositionHeaderValue("attachment")
                     {
                         FileName = FileName,

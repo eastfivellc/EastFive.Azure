@@ -68,6 +68,8 @@ namespace EastFive.Azure.Persistence.Blobs
                     };
                 }
                 var mediaType = response.GetContentMediaTypeHeaderNullSafe();
+                if (mediaType.IsDefaultOrNull())
+                    mediaType = new MediaTypeHeaderValue("application/octet-stream");
                 return onFound(this.Id, bytes, mediaType, disposition);
             }
         }

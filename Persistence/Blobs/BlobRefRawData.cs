@@ -21,11 +21,14 @@ namespace EastFive.Azure.Persistence.Blobs
 
         private byte[] content;
 
-        public BlobRefRawData(string containerName, byte [] content)
+        private string contentType;
+
+        public BlobRefRawData(string containerName, byte [] content, string contentType = default)
         {
             Id = Guid.NewGuid().ToString("N");
             this.content = content;
             this.ContainerName = containerName;
+            this.contentType = contentType.HasBlackSpace() ? contentType : "application/octet-stream";
         }
 
         public Task<TResult> LoadAsync<TResult>(
@@ -33,8 +36,10 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null)
         {
-            MediaTypeHeaderValue.TryParse(String.Empty,
-                out MediaTypeHeaderValue mediaType);
+            if (!MediaTypeHeaderValue.TryParse(contentType,
+                            out MediaTypeHeaderValue mediaType))
+                mediaType = new MediaTypeHeaderValue("application/octet-stream");
+
             ContentDispositionHeaderValue.TryParse(string.Empty,
                 out ContentDispositionHeaderValue contentDisposition);
             if (contentDisposition.IsDefaultOrNull())
