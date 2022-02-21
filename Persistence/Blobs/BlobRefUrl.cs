@@ -26,9 +26,7 @@ namespace EastFive.Azure.Persistence.Blobs
         {
             get
             {
-                if (containerName.HasBlackSpace())
-                    return containerName;
-                throw new Exception($"{nameof(BlobRefProperty)} must be used as the Http Method Parameter decorator for IBlobRef");
+                return containerName;
             }
             set
             {
