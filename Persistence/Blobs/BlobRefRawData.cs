@@ -28,7 +28,7 @@ namespace EastFive.Azure.Persistence.Blobs
             Id = Guid.NewGuid().ToString("N");
             this.content = content;
             this.ContainerName = containerName;
-            this.contentType = contentType.HasBlackSpace() ? contentType : "application/octet-stream";
+            this.contentType = contentType.HasBlackSpace() ? contentType : IBlobRef.DefaultMediaType;
         }
 
         public Task<TResult> LoadAsync<TResult>(
@@ -38,7 +38,7 @@ namespace EastFive.Azure.Persistence.Blobs
         {
             if (!MediaTypeHeaderValue.TryParse(contentType,
                             out MediaTypeHeaderValue mediaType))
-                mediaType = new MediaTypeHeaderValue("application/octet-stream");
+                mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
 
             ContentDispositionHeaderValue.TryParse(string.Empty,
                 out ContentDispositionHeaderValue contentDisposition);

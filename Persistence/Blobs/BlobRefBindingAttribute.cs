@@ -299,7 +299,7 @@ namespace EastFive.Azure.Persistence.Blobs
                     }
                     if (!MediaTypeHeaderValue.TryParse(content.ContentType,
                             out MediaTypeHeaderValue mediaType))
-                        mediaType = new MediaTypeHeaderValue("application/octet-stream");
+                        mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
                     
                     return onFound(this.Id, bytes, mediaType, contentDisposition);
                 }

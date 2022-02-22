@@ -25,6 +25,8 @@ namespace EastFive.Azure.Persistence.Blobs
     [BlobRefBinding]
     public interface IBlobRef
     {
+        const string DefaultMediaType = "application/octet-stream";
+
         string ContainerName { get; }
 
         string Id { get; }

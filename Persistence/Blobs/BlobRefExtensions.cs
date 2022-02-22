@@ -272,7 +272,7 @@ namespace EastFive.Azure.Persistence.Blobs
             {
                 if (!MediaTypeHeaderValue.TryParse(ContentType,
                             out MediaTypeHeaderValue mediaType))
-                    mediaType = new MediaTypeHeaderValue("application/octet-stream");
+                    mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
                 return onFound(Id, bytes,
                     mediaType,
                     new ContentDispositionHeaderValue("attachment")
