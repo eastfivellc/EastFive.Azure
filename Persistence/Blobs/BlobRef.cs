@@ -8,8 +8,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-using Microsoft.Azure.Cosmos.Table;
-
 using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -27,6 +25,8 @@ namespace EastFive.Azure.Persistence.Blobs
     [BlobRefBinding]
     public interface IBlobRef
     {
+        const string DefaultMediaType = "application/octet-stream";
+
         string ContainerName { get; }
 
         string Id { get; }

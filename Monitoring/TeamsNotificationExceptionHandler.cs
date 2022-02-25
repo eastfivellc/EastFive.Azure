@@ -81,6 +81,9 @@ namespace EastFive.Azure.Monitoring
             } catch(HttpRequestException)
             {
 
+            } catch(Exception)
+            {
+
             }
             return response;
             

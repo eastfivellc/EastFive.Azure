@@ -140,7 +140,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public static TResult CastEntityProperty<TResult>(this object value, Type valueType,
             Func<EntityProperty, TResult> onValue,
-            Func<TResult> onNoCast)
+            Func<TResult> onNoCast,
+            bool amDesperate = false)
         {
             if (valueType.IsArray)
             {
@@ -340,6 +341,19 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return onValue(ep);
                         }
                         return CastEntityProperty(value, valueTypeOfInstance, onValue, onNoCast);
+                    }
+
+                    if (amDesperate)
+                    {
+                        var dict = valueType
+                            .GetPropertyOrFieldMembers()
+                            .Select(field => (field.Name, field.GetPropertyOrFieldValue(value)))
+                            .Where(tpl => tpl.Item2.IsNotDefaultOrNull())
+                            .Select(tpl => tpl.Item1.PairWithValue(tpl.Item2))
+                            .ToDictionary();
+
+                        if (dict.Any())
+                            return dict.CastEntityProperty(dict.GetType(), onValue: onValue, onNoCast: onNoCast);
                     }
 
                     return onNoCast();
@@ -878,7 +892,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var entityProperties = valueEnumerable
                     .Cast<object>()
                     .Select(
-                        (v) =>
+                        (v, index) =>
                         {
                             return arrayType
                                 .GetAttributesInterface<ICast<EntityProperty>>(true)
@@ -892,10 +906,25 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     },
                                     () =>
                                     {
-                                        return v.CastEntityProperty(arrayType,
-                                            ep => ep,
-                                            () => throw new NotImplementedException(
-                                                $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
+                                        return arrayType
+                                            .GetAttributesInterface<ICast<IDictionary<string, EntityProperty>>>(true)
+                                            .First(
+                                                (epSerializer, next) =>
+                                                {
+                                                    var key = $"{index}";
+                                                    return epSerializer.Cast(v, arrayType, key, default,
+                                                        epKvp => epKvp[key],
+                                                        () => throw new NotImplementedException(
+                                                            $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
+                                                },
+                                                () =>
+                                                {
+                                                    return v.CastEntityProperty(arrayType,
+                                                        ep => ep,
+                                                        () => throw new NotImplementedException(
+                                                            $"Serialization of {arrayType.FullName} is currently not supported on arrays."),
+                                                        amDesperate: true);
+                                                });
                                     });
                         })
                     .ToArray();

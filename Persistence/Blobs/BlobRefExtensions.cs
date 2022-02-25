@@ -223,6 +223,36 @@ namespace EastFive.Azure.Persistence.Blobs
                     contentType: contentType);
         }
 
+        public static IBlobRef CastBlobRef<TResource>(
+            this IBlobRef from,
+            Expression<Func<TResource, IBlobRef>> to)
+        {
+            to.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = from.Id;
+            return new BlobCastRef
+            {
+                from = from,
+                Id = newBlobId,
+                ContainerName = containerName,
+            };
+        }
+
+        public static IBlobRef CastStorageBlobRef<TResource>(
+            this IBlobRef from,
+            Expression<Func<TResource, IBlobRef>> to)
+        {
+            to.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = from.Id;
+            return new BlobRefStorage()
+            {
+                Id = newBlobId,
+                ContainerName = containerName,
+            };
+        }
+
+
         private class BlobRef : IBlobRef
         {
             public byte[] bytes;
@@ -240,13 +270,31 @@ namespace EastFive.Azure.Persistence.Blobs
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             {
+                if (!MediaTypeHeaderValue.TryParse(ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                    mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
                 return onFound(Id, bytes,
-                    new MediaTypeHeaderValue(ContentType),
+                    mediaType,
                     new ContentDispositionHeaderValue("attachment")
                     {
                         FileName = FileName,
                     }).AsTask();
             }
+        }
+
+        private class BlobCastRef : IBlobRef
+        {
+            public IBlobRef from;
+
+            public string ContainerName { get; set; }
+
+            public string Id { get; set; }
+
+            public Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+                 => from.LoadAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
         }
     }
 }
