@@ -20,6 +20,8 @@ using EastFive.Collections.Generic;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
 using EastFive.Reflection;
+using EastFive.Api;
+using Newtonsoft.Json;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -223,6 +225,19 @@ namespace EastFive.Azure.Persistence.Blobs
                     contentType: contentType);
         }
 
+        public static IBlobRef AsBlobUploadRef<TResource>(
+            this string blobName,
+            Expression<Func<TResource, IBlobRef>> asPropertyOf)
+        {
+            asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            return new SerializableBlobRef
+            {
+                Id = blobName,
+                ContainerName = containerName,
+            };
+        }
+
         public static IBlobRef CastBlobRef<TResource>(
             this IBlobRef from,
             Expression<Func<TResource, IBlobRef>> to)
@@ -295,6 +310,37 @@ namespace EastFive.Azure.Persistence.Blobs
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
                  => from.LoadAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
+        }
+
+        private class SerializableBlobRef : IBlobRef, ICastJson
+        {
+            public string ContainerName { get; set; }
+
+            public string Id { get; set; }
+
+            public bool CanConvert(MemberInfo member, ParameterInfo paramInfo,
+                IHttpRequest httpRequest, IApplication application,
+                IProvideApiValue apiValueProvider, object objectValue)
+            {
+                var type = member.GetPropertyOrFieldType();
+                var isBlobRef = typeof(IBlobRef).IsAssignableFrom(type);
+                return isBlobRef;
+            }
+
+            public Task<TResult> LoadAsync<TResult>(
+                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+                 => throw new NotImplementedException();
+
+            public Task WriteAsync(JsonWriter writer, JsonSerializer serializer,
+                MemberInfo member, ParameterInfo paramInfo, IProvideApiValue apiValueProvider,
+                object objectValue, object memberValue,
+                IHttpRequest httpRequest, IApplication application)
+            {
+                var url = this.ContainerName.GenerateBlobFileSasLink(this.Id);
+                return writer.WriteValueAsync(url.OriginalString);
+            }
         }
     }
 }

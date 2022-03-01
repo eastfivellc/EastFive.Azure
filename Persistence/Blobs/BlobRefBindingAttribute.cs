@@ -53,6 +53,8 @@ namespace EastFive.Azure.Persistence.Blobs
         IBindParameter<JToken>, IBindApiParameter<JToken>,
         IConvertJson, ICastJson
     {
+        #region Bind
+
         #region String
 
         public TResult Bind<TResult>(ParameterInfo parameter, string content,
@@ -316,6 +318,10 @@ namespace EastFive.Azure.Persistence.Blobs
             }
         }
 
+        #endregion
+
+        #region Cast
+
         #region IConvertJson
 
         public bool CanConvert(Type objectType, IHttpRequest httpRequest, IApplication application)
@@ -361,6 +367,8 @@ namespace EastFive.Azure.Persistence.Blobs
             return default(IBlobRef);
         }
 
+        #endregion
+
         #region ICastJson
 
         public bool CanConvert(MemberInfo member, ParameterInfo paramInfo,
@@ -377,6 +385,17 @@ namespace EastFive.Azure.Persistence.Blobs
             object objectValue, object memberValue,
             IHttpRequest httpRequest, IApplication application)
         {
+            if(memberValue is ICastJson)
+            {
+                var blobSelfSerializer = (ICastJson)memberValue;
+                if (blobSelfSerializer.CanConvert(member, paramInfo, httpRequest, application, apiValueProvider, objectValue))
+                {
+                    return blobSelfSerializer.WriteAsync(writer, serializer, member, paramInfo, apiValueProvider,
+                        objectValue: objectValue, memberValue: memberValue,
+                        httpRequest: httpRequest, application: application);
+                }
+            }
+
             var blobRef = (IBlobRef)memberValue;
             var typeToSearch = member.TryGetAttributeInterface(
                     out IReferenceBlobProperty blobPropertyReference) ?

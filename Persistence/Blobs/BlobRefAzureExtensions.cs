@@ -33,13 +33,34 @@ namespace EastFive.Azure.Persistence.Blobs
     {
         public const string AzureFileUploadSASUrlHeader = "X-Azure-Blob-Content-Write";
 
-        public static (IBlobRef, Uri) GenerateBlobFileSasLink(this IBlobRef blobRef)
+        public static (IBlobRef, Uri) GenerateBlobFileSasLink(this IBlobRef blobRef,
+            TimeSpan? lifespan = default(TimeSpan?))
         {
+            var sasUrl = GenerateBlobFileSasLink(blobRef.ContainerName, blobRef.Id, lifespan: lifespan);
+            var newBlobRef = new BlobRef(blobRef, sasUrl);
+            return (newBlobRef, sasUrl);
+        }
+
+        public static Uri GenerateBlobFileSasLink(this MemberInfo member, string blobName,
+            TimeSpan? lifespan = default(TimeSpan?))
+        {
+            var containerName = member.BlobContainerName();
+            return GenerateBlobFileSasLink(containerName, blobName, lifespan: lifespan);
+        }
+
+        public static Uri GenerateBlobFileSasLink(this string containerName, string blobName,
+            TimeSpan? lifespan = default(TimeSpan?))
+        {
+            var expiresOn = lifespan.HasValue ?
+                DateTime.UtcNow + lifespan.Value
+                :
+                DateTime.UtcNow.AddMinutes(15);//default SAS token expire after 15 minutes.
+
             var blobSasBuilder = new BlobSasBuilder()
             {
-                BlobContainerName = blobRef.ContainerName,
-                BlobName = blobRef.Id,
-                ExpiresOn = DateTime.UtcNow.AddMinutes(15),//Let SAS token expire after 15 minutes.
+                BlobContainerName = containerName,
+                BlobName = blobName,
+                ExpiresOn = expiresOn,
             };
             blobSasBuilder.SetPermissions(BlobSasPermissions.Write);
 
@@ -48,11 +69,10 @@ namespace EastFive.Azure.Persistence.Blobs
             var sharedKeyCredential = azureDriver.StorageSharedKeyCredential;
             var sasToken = blobSasBuilder.ToSasQueryParameters(sharedKeyCredential).ToString();
             var sasUrl = blobClient.Uri
-                .AppendToPath(blobRef.ContainerName)
-                .AppendToPath(blobRef.Id)
+                .AppendToPath(containerName)
+                .AppendToPath(blobName)
                 .SetQuery(sasToken);
-            var newBlobRef = new BlobRef(blobRef, sasUrl);
-            return (newBlobRef, sasUrl);
+            return sasUrl;
         }
 
         private class BlobRef : IBlobRef, IApiBoundBlobRef
