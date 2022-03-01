@@ -1041,6 +1041,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                         async (code, msg) =>
                                         {
                                             await rollback();
+                                            if (onFailure.IsDefaultOrNull())
+                                                throw new Exception($"[{code}]:{msg}");
                                             return onFailure(code, msg);
                                         },
                                     onTimeout: onTimeout), // TODO: Handle rollback with timeout
@@ -1048,6 +1050,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     async (code, msg) =>
                                     {
                                         await rollback();
+                                        if (onFailure.IsDefaultOrNull())
+                                            throw new Exception($"[{code}]:{msg}");
                                         return onFailure(code, msg);
                                     },
                                 onAlreadyExists:
