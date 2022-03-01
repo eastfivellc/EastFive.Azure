@@ -293,7 +293,7 @@ namespace EastFive.Azure.Auth.Salesforce
                 .AddQueryParameter(requestParamClientId, this.clientId)
                 //.AddQueryParameter(requestParamResponseMode, "form_post")
                 .AddQueryParameter(requestParamResponseType, $"{responseParamCode}")
-                .AddQueryParameter(requestParamScope, "full+refresh_token")
+                .AddQueryParameter(requestParamScope, "full")
                 .AddQueryParameter(requestParamState, state.ToString("N"))
                 .AddQueryParameter(requestParamNonce, Guid.NewGuid().ToString("N"))
                 .AddQueryParameter(requestParamRedirectUri, responseControllerLocation.AbsoluteUri);
