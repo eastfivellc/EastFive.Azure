@@ -227,7 +227,8 @@ namespace EastFive.Azure.Persistence.Blobs
 
         public static IBlobRef AsBlobUploadRef<TResource>(
             this string blobName,
-            Expression<Func<TResource, IBlobRef>> asPropertyOf)
+            Expression<Func<TResource, IBlobRef>> asPropertyOf,
+            TimeSpan? validFor = default)
         {
             asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
             var containerName = memberInfo.BlobContainerName();
@@ -235,6 +236,7 @@ namespace EastFive.Azure.Persistence.Blobs
             {
                 Id = blobName,
                 ContainerName = containerName,
+                ValidFor = validFor,
             };
         }
 
@@ -318,6 +320,8 @@ namespace EastFive.Azure.Persistence.Blobs
 
             public string Id { get; set; }
 
+            internal TimeSpan? ValidFor;
+
             public bool CanConvert(MemberInfo member, ParameterInfo paramInfo,
                 IHttpRequest httpRequest, IApplication application,
                 IProvideApiValue apiValueProvider, object objectValue)
@@ -338,7 +342,7 @@ namespace EastFive.Azure.Persistence.Blobs
                 object objectValue, object memberValue,
                 IHttpRequest httpRequest, IApplication application)
             {
-                var url = this.ContainerName.GenerateBlobFileSasLink(this.Id);
+                var url = this.ContainerName.GenerateBlobFileSasLink(this.Id, lifespan: ValidFor);
                 return writer.WriteValueAsync(url.OriginalString);
             }
         }
