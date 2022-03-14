@@ -14,6 +14,7 @@ namespace EastFive.Azure.Auth.OAuth
         #region Parameter that come back in the token exchange
         public const string tokenParamAccessToken = "access_token";
         public const string tokenParamExpiresIn = "expires_in";
+        public const string tokenIssuedAt = "issued_at";
         public const string tokenParamIdToken = "id_token";
         public const string tokenParamScope = "scope";
         public const string tokenParamTokenType = "token_type";
@@ -29,7 +30,12 @@ namespace EastFive.Azure.Auth.OAuth
         /// <summary>
         /// The remaining lifetime of the access token in seconds.
         /// </summary>
-        public int expires_in;
+        public int? expires_in;
+
+        /// <summary>
+        /// When token was issued.
+        /// </summary>
+        public string issued_at;
 
         /// <summary>
         /// The scopes of access granted by the access_token expressed as a list of space-delimited,
@@ -56,7 +62,10 @@ namespace EastFive.Azure.Auth.OAuth
         public virtual IDictionary<string, string> AppendResponseParameters(IDictionary<string, string> responseParameters)
         {
             responseParameters.TryAdd(TokenResponse.tokenParamAccessToken, this.access_token);
-            responseParameters.TryAdd(TokenResponse.tokenParamExpiresIn, this.expires_in.ToString());
+            if(this.expires_in.HasValue)
+                responseParameters.TryAdd(TokenResponse.tokenParamExpiresIn, this.expires_in.Value.ToString());
+            if (this.issued_at.HasBlackSpace())
+                responseParameters.TryAdd(TokenResponse.tokenIssuedAt, this.issued_at);
             responseParameters.TryAdd(TokenResponse.tokenParamScope, this.scope);
             responseParameters.TryAdd(TokenResponse.tokenParamTokenType, this.token_type);
             responseParameters.TryAdd(TokenResponse.tokenParamIdToken, this.id_token);
