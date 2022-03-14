@@ -284,6 +284,13 @@ namespace EastFive.Azure
             [Config]
             public static class Salesforce
             {
+                [ConfigKey("URL used to identify the application to Salesforce.",
+                    DeploymentOverrides.Suggested,
+                    Location = "https://login.salesforce.com/.well-known/openid-configuration | https://test.salesforce.com/.well-known/openid-configuration",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = false)]
+                public const string DocumentDiscoveryUrl = "EastFive.Salesforce.DocumentDiscoveryUrl";
+
                 [ConfigKey("ID used to identify the application to Salesforce.",
                     DeploymentOverrides.Suggested,
                     Location = "Manage Connected Apps",
