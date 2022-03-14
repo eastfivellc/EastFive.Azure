@@ -64,6 +64,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                     if (expressionType == ExpressionType.Equal)
                         return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
 
+                    if (expressionType == ExpressionType.IsTrue)
+                        return string.Empty;
+
                     throw new ArgumentException();
                 },
                 () =>
