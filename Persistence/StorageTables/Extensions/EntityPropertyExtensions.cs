@@ -504,9 +504,25 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             if (type.IsSubClassOfGeneric(typeof(IRef<>)))
             {
-                var guidValue = value.GuidValue.Value;
-                var instance = IRefInstance(guidValue);
-                return onBound(instance);
+                if (TryGetGuidValue(out Guid guidValue))
+                {
+                    var instance = IRefInstance(guidValue);
+                    return onBound(instance);
+                }
+
+                bool TryGetGuidValue(out Guid guid)
+                {
+                    if (value.PropertyType == EdmType.Guid)
+                    {
+                        guid = value.GuidValue.Value;
+                        return true;
+                    }
+                    if (value.PropertyType == EdmType.String)
+                        return Guid.TryParse(value.StringValue, out guid);
+
+                    guid = default;
+                    return false;
+                }
             }
 
             if (type.IsSubClassOfGeneric(typeof(IRefOptional<>)))
