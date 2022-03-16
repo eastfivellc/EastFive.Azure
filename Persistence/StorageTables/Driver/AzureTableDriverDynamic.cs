@@ -1698,6 +1698,57 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         #endregion
 
+        #region Delete
+
+        public Task<TResult> DeleteLookupBy<TRefEntity, TEntity, TResult>(TEntity entity,
+                    Expression<Func<TEntity, IRefOptional<TRefEntity>>> by,
+                Func<TResult> onSuccess,
+                Func<TResult> onFailure)
+            where TEntity : IReferenceable
+            where TRefEntity : IReferenceable
+        {
+            return DeleteLookupInternal(entity, by, onSuccess, onFailure);
+        }
+
+        public Task<TResult> DeleteLookupBy<TRefEntity, TEntity, TResult>(TEntity entity,
+                    Expression<Func<TEntity, IRef<TRefEntity>>> by,
+                Func<TResult> onSuccess,
+                Func<TResult> onFailure)
+            where TEntity : IReferenceable
+            where TRefEntity : IReferenceable
+        {
+            return DeleteLookupInternal(entity, by, onSuccess, onFailure);
+        }
+
+        private Task<TResult> DeleteLookupInternal<TMatch, TDocument, TResult>(TDocument document,
+                Expression<Func<TDocument, TMatch>> by,
+            Func<TResult> onSuccess,
+            Func<TResult> onFailure)
+                where TDocument : IReferenceable
+        {
+            if (!typeof(TDocument).TryGetAttributeInterface(out IProvideEntity entityProvider))
+                throw new ArgumentException($"`{typeof(TDocument).FullName}` does not contain attribute that implements `{nameof(IProvideEntity)}`");
+
+            return by.MemberInfo(
+                (memberCandidate, expr) =>
+                {
+                    if (!memberCandidate.TryGetAttributeInterface(out IModifyAzureStorageTableSave modifier))
+                        throw new ArgumentException($"{memberCandidate.DeclaringType.FullName}..{memberCandidate.Name} is not a lookup attribute.");
+
+                    var entity = entityProvider.GetEntity(document);
+
+                    return modifier.ExecuteDeleteAsync<TDocument, TResult>(memberCandidate,
+                            rowKeyRef: entity.RowKey, partitionKeyRef: entity.PartitionKey,
+                            document, entity.WriteEntity(null),
+                            this,
+                        onSuccessWithRollback: (rollback) => onSuccess(),
+                        onFailure: () => onFailure());
+                },
+                () => throw new ArgumentException($"{by} is not a member expression."));
+        }
+
+        #endregion
+
         #endregion
 
         #region CREATE

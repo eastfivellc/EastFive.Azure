@@ -1,11 +1,6 @@
-﻿using BlackBarLabs.Persistence.Azure.StorageTables;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Reflection;
-using EastFive.Persistence.Azure.StorageTables.Driver;
-using EastFive.Reflection;
-using Microsoft.Azure.Cosmos.Table;
+﻿// This needs to be depricated. It has been replaced by the StorageTableAttribute or any other
+// class that implements IProvideTable and/or IProvideEntity
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,8 +8,22 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
+using Microsoft.Azure.Cosmos.Table;
+
+using EastFive;
+using EastFive.Collections.Generic;
+using EastFive.Extensions;
+using EastFive.Linq;
+using EastFive.Reflection;
+using EastFive.Persistence.Azure.StorageTables.Driver;
+
 namespace EastFive.Persistence.Azure.StorageTables
 {
+    /// <summary>
+    /// This needs to be depricated. It has been replaced by the StorageTableAttribute or any other
+    /// class that implements IProvideTable and/or IProvideEntity
+    /// </summary>
+    /// <typeparam name="EntityType"></typeparam>
     public class TableEntity<EntityType> : IWrapTableEntity<EntityType>, IAzureStorageTableEntity<EntityType>
     {
         public EntityType Entity { get; private set; }

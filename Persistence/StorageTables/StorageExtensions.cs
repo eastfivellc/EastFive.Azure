@@ -435,6 +435,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #endregion
 
+        #region
+
+
+
+        #endregion
+
         #region QUERY / GET
 
         public static IEnumerableAsync<object> StorageGetAll(this Type type, string tableName = default)
@@ -475,18 +481,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onFound,
                     onDoesNotExists);
         }
-
-        //public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
-        //    Func<TEntity, TResult> onFound,
-        //    Func<TResult> onDoesNotExists = default)
-        //    where TEntity : IReferenceable
-        //{
-        //    if (!entityRefMaybe.HasValue)
-        //        return onDoesNotExists();
-        //    return await entityRefMaybe.Ref.StorageGetAsync(
-        //        onFound,
-        //        onDoesNotExists: onDoesNotExists);
-        //}
 
         public static async Task<TResult> StorageGetAsync<TEntity, TResult>(this IRefOptional<TEntity> entityRefMaybe,
             Func<TEntity, TResult> onFound,
@@ -1434,6 +1428,34 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .DeleteBatch<TEntity, TResult>(documentIds, onSuccess);
+        }
+
+        public static Task<TResult> StorageDeleteLookup<TRefEntity, TEntity, TResult>(this TEntity entity,
+                Expression<Func<TEntity, IRefOptional<TRefEntity>>> idProperty,
+            Func<TResult> onSuccess,
+            Func<TResult> onFailure)
+                where TEntity : IReferenceable
+                where TRefEntity : IReferenceable
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteLookupBy(entity, idProperty,
+                    onSuccess: onSuccess,
+                    onFailure: onFailure);
+        }
+
+        public static Task<TResult> StorageDeleteLookup<TRefEntity, TEntity, TResult>(this TEntity entity,
+                Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
+            Func<TResult> onSuccess,
+            Func<TResult> onFailure)
+                where TEntity : IReferenceable
+                where TRefEntity : IReferenceable
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteLookupBy(entity, idProperty,
+                    onSuccess: onSuccess,
+                    onFailure: onFailure);
         }
 
         #endregion
