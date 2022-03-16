@@ -293,7 +293,7 @@ namespace EastFive.Azure.Auth.Salesforce
                 .AddQueryParameter(requestParamClientId, this.clientId)
                 //.AddQueryParameter(requestParamResponseMode, "form_post")
                 .AddQueryParameter(requestParamResponseType, $"{responseParamCode}")
-                .AddQueryParameter(requestParamScope, "full")
+                .AddQueryParameter(requestParamScope, "full api offline_access refresh_token") // 
                 .AddQueryParameter(requestParamState, state.ToString("N"))
                 .AddQueryParameter(requestParamNonce, Guid.NewGuid().ToString("N"))
                 .AddQueryParameter(requestParamRedirectUri, responseControllerLocation.AbsoluteUri);
@@ -364,13 +364,17 @@ namespace EastFive.Azure.Auth.Salesforce
             Func<IProvideLogin, TResult> onProvideAuthorization,
             Func<string, TResult> onNotAvailable)
         {
+            var discoveryDocumentUrl = AppSettings.Auth.Salesforce.DocumentDiscoveryUrl.ConfigurationUri(
+                ddUrl => ddUrl,
+                onNotSpecified:() => new Uri("https://login.salesforce.com/.well-known/openid-configuration"));
+
             return AppSettings.Auth.Salesforce.ConsumerKey.ConfigurationString(
                 consumerKey =>
                 {
                     return AppSettings.Auth.Salesforce.ConsumerSecret.ConfigurationString(
                         async (consumerSecret) =>
                         {
-                            return await await new Uri(discoveryDocumentUrl).HttpClientGetResourceAsync(
+                            return await await discoveryDocumentUrl.HttpClientGetResourceAsync(
                                 (DiscoveryDocument discDoc) =>
                                 {
                                     return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
@@ -388,8 +392,6 @@ namespace EastFive.Azure.Auth.Salesforce
                 },
                 (why) => onNotAvailable(why).AsTask());
         }
-
-        public const string discoveryDocumentUrl = "https://login.salesforce.com/.well-known/openid-configuration";
 
         public class DiscoveryDocument
         {

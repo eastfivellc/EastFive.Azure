@@ -97,8 +97,10 @@ namespace EastFive.Azure.Auth.Salesforce
             updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamVisualforceDomain, this.visualforce_domain);
             updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamVisualforceSid, this.visualforce_sid);
             updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamCsrfToken, this.csrf_token);
-            updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamInstanceUrl, this.instance_url.OriginalString);
-            updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamId, this.id.OriginalString);
+            if(this.instance_url.IsNotDefaultOrNull())
+                updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamInstanceUrl, this.instance_url.OriginalString);
+            if(this.id.IsNotDefaultOrNull())
+                updatedResponseParameters.TryAdd(SalesforceTokenResponse.tokenParamId, this.id.OriginalString);
             return updatedResponseParameters;
         }
 
