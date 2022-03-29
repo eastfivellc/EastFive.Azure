@@ -575,11 +575,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         }
 
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
-                Expression<Func<TEntity, IRef<TRefEntity>>> by)
+                Expression<Func<TEntity, IRef<TRefEntity>>> by,
+                int readAhead = -1)
             where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
-            return FindByInternal(entityRef, by);
+            return FindByInternal(entityRef, by, readAhead:readAhead);
         }
 
         public IEnumerableAsync<TEntity> FindBy<TProperty, TEntity>(TProperty propertyValue,
@@ -596,11 +597,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         }
 
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
-                Expression<Func<TEntity, IRef<IReferenceable>>> by)
+                Expression<Func<TEntity, IRef<IReferenceable>>> by,
+                int readAhead = -1)
             where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
-            return FindByInternal(entityRef, by);
+            return FindByInternal(entityRef, by, readAhead:readAhead);
         }
 
         public IEnumerableAsync<TEntity> FindBy<TEntity>(Guid entityId,
