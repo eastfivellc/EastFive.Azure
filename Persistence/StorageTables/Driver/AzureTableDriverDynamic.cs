@@ -3460,6 +3460,45 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
+        public async Task<TResult> BlobCreateOrUpdateAsync<TResult>(string blobName, string containerName,
+                Func<Stream, Task> writeStreamAsync,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
+                using (var stream = new MemoryStream())
+                {
+                    await writeStreamAsync(stream);
+                    await stream.FlushAsync();
+                    stream.Position = 0;
+                    var result = await blockClient.UploadAsync(stream,
+                        new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+                        {
+                            Metadata = metadata,
+                            HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                            {
+                                ContentType = contentType,
+                            }
+                        });
+                }
+                return onSuccess();
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseStorageException(
+                    (errorCode, errorMessage) =>
+                        onFailure(errorCode, errorMessage),
+                    () => throw ex);
+            }
+        }
+
         public Task<TResult> BlobCreateAsync<TResult>(byte[] content, Guid blobId, string containerName,
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
@@ -3600,8 +3639,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 {
                     await writeAsync(stream);
                     stream.Position = 0;
-                    await blockClient.UploadAsync(stream,
-                        new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+                    global::Azure.Response<BlobContentInfo> response = await blockClient.UploadAsync(stream,
+                        new BlobUploadOptions
                         {
                             Metadata = metadata,
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()

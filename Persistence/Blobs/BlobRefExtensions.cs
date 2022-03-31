@@ -225,6 +225,70 @@ namespace EastFive.Azure.Persistence.Blobs
                     contentType: contentType);
         }
 
+        public static Task<IBlobRef> CreateBlobStorageRefAsync<TResource>(
+            this string blobName,
+            Expression<Func<TResource, IBlobRef>> asPropertyOf,
+            Func<Stream, Task> writeBlobData,
+            string contentType = default, string fileName = default)
+        {
+            asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(blobName: blobName, containerName: containerName,
+                        writeAsync: writeBlobData,
+                    onSuccess: () =>
+                    {
+                        return (IBlobRef)new BlobRefStorage
+                        {
+                            Id = blobName,
+                            ContainerName = containerName,
+                            //ContentType = contentType,
+                            //FileName = fileName.HasBlackSpace() ? fileName : blobName,
+                            //bytes = ?
+                        };
+                    },
+                    contentType: contentType);
+        }
+
+        public static Task<IBlobRef> CreateOrReplaceBlobStorageRefAsync<TResource>(
+            this string blobName,
+            Expression<Func<TResource, IBlobRef>> asPropertyOf,
+            Func<Stream, Task> writeBlobData,
+            string contentType = default, string fileName = default)
+        {
+            asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateOrUpdateAsync(blobName: blobName, containerName: containerName,
+                        writeStreamAsync: writeBlobData,
+                    onSuccess: () =>
+                    {
+                        return (IBlobRef)new BlobRefStorage
+                        {
+                            Id = blobName,
+                            ContainerName = containerName,
+                        };
+                    },
+                    contentType: contentType);
+        }
+
+        public static IBlobRef AsBlobStorageRef<TResource>(
+            this string blobName,
+            Expression<Func<TResource, IBlobRef>> asPropertyOf)
+        {
+            asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            return new BlobRefStorage()
+            {
+                Id = blobName,
+                ContainerName = containerName,
+            };
+        }
+
         public static IBlobRef AsBlobUploadRef<TResource>(
             this string blobName,
             Expression<Func<TResource, IBlobRef>> asPropertyOf,
