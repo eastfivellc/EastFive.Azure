@@ -106,7 +106,8 @@ namespace EastFive.Azure.Media
         {
             return blobRef.LoadImageSharpAsync(
                 (image, mediaType, disposition, format) => onFound(image, mediaType, disposition),
-                onNotFound);
+                onNotFound:onNotFound,
+                onInvalidImage: onInvalidImage);
         }
 
         public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
