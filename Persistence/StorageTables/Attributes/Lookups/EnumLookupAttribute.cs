@@ -17,17 +17,20 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string NullValue { get; set; } = "null";
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("EnumLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch("EnumLookupAttribute only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
             var propertyValueType = lookupValue.Key.GetMemberType();
 
-            return GetLookup(propertyValueType, rowKeyValue);
+            var lookups = GetLookup(propertyValueType, rowKeyValue);
+            return onLookupValuesMatch(lookups);
 
             IEnumerable<IRefAst> GetLookup(Type lookupType, object lookupValue)
             {

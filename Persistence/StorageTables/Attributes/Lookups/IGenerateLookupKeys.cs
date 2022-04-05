@@ -24,8 +24,10 @@ namespace EastFive.Persistence.Azure.StorageTables
         /// The exception being where the member generating the lookups is a collection
         /// and the resource should be addressable by any single member of the collection.
         /// </remarks>
-        IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues);
+        TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+                IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch);
 
         /// <summary>
         /// Identifies which members are needed to compute the lookup hash.

@@ -18,20 +18,22 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool ShouldHashRowKey { get; set; }
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("IdLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch($"{nameof(IdLookupAttribute)} only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
             var rowKey = GetStringValue(decoratedMember, rowKeyValue, 
                 this.GetType(), this.Components, this.ShouldHashRowKey);
             if (rowKey.IsNullOrWhiteSpace())
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
             var partitionKey = GetPartitionKey(rowKey);
-            return new RefAst(rowKey, partitionKey).AsEnumerable();
+            return onLookupValuesMatch(new RefAst(rowKey, partitionKey).AsEnumerable());
         }
 
         internal static string GetStringValue(MemberInfo memberInfo, object memberValue, 

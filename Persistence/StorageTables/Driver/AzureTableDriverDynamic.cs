@@ -660,26 +660,34 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         .First<IProvideFindBy, IEnumerableAsync<TEntity>>(
                             (attr, next) =>
                             {
-                                return attr.GetKeys(memberCandidate, this, memberAssignments, logger: logger)
-                                    .Select(
-                                        async rowParitionKeyKvp =>
-                                        {
-                                            var rowKey = rowParitionKeyKvp.RowKey;
-                                            var partitionKey = rowParitionKeyKvp.PartitionKey;
-                                            var kvp = await this.FindByIdAsync(rowKey, partitionKey,
-                                                    (TEntity entity, TableResult eTag) => entity.PairWithKey(true),
-                                                    () => default(TEntity).PairWithKey(false),
-                                                    onFailure: (code, msg) => default(TEntity).PairWithKey(false));
-                                            if (kvp.Key)
-                                                logger.Trace($"Lookup {partitionKey}/{rowKey} was found.");
-                                            else
-                                                logger.Trace($"Lookup {partitionKey}/{rowKey} failed.");
+                                return attr.GetKeys(memberCandidate, this, memberAssignments,
+                                    (keys) =>
+                                    {
+                                        return keys.Select(
+                                            async rowParitionKeyKvp =>
+                                            {
+                                                var rowKey = rowParitionKeyKvp.RowKey;
+                                                var partitionKey = rowParitionKeyKvp.PartitionKey;
+                                                var kvp = await this.FindByIdAsync(rowKey, partitionKey,
+                                                        (TEntity entity, TableResult eTag) => entity.PairWithKey(true),
+                                                        () => default(TEntity).PairWithKey(false),
+                                                        onFailure: (code, msg) => default(TEntity).PairWithKey(false));
+                                                if (kvp.Key)
+                                                    logger.Trace($"Lookup {partitionKey}/{rowKey} was found.");
+                                                else
+                                                    logger.Trace($"Lookup {partitionKey}/{rowKey} failed.");
 
-                                            return kvp;
-                                        })
-                                    .Await(readAhead: readAhead)
-                                    .Where(kvp => kvp.Key)
-                                    .SelectValues();
+                                                return kvp;
+                                            })
+                                        .Await(readAhead: readAhead)
+                                        .Where(kvp => kvp.Key)
+                                        .SelectValues();
+                                    },
+                                    () =>
+                                    {
+                                        return next();
+                                    },
+                                    logger: logger);
                             },
                             () =>
                             {
@@ -823,11 +831,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     .ToArray();
 
                                 return attr.GetKeys(memberCandidate, this, memberAssignments,
-                                    logger: logger);
+                                    (value) => value,
+                                    () => next(),
+                                        logger: logger);
                             },
                             () =>
                             {
-                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy.");
+                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy that utilizes the query parameters provided.");
                             });
                 },
                 () => throw new Exception());
@@ -1738,10 +1748,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         throw new ArgumentException($"{memberCandidate.DeclaringType.FullName}..{memberCandidate.Name} is not a lookup attribute.");
 
                     var entity = entityProvider.GetEntity(document);
+                    var entityProperties = entity.WriteEntity(null);
 
                     return modifier.ExecuteDeleteAsync<TDocument, TResult>(memberCandidate,
                             rowKeyRef: entity.RowKey, partitionKeyRef: entity.PartitionKey,
-                            document, entity.WriteEntity(null),
+                            document, entityProperties,
                             this,
                         onSuccessWithRollback: (rollback) => onSuccess(),
                         onFailure: () => onFailure());

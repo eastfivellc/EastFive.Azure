@@ -15,7 +15,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using EastFive.Reflection;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
@@ -41,10 +40,12 @@ namespace EastFive.Persistence.Azure.StorageTables
             return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
         }
 
-        public IEnumerableAsync<IRefAst> GetKeys(
-            MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries,
-            ILogger logger = default)
+        public TResult GetKeys<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<IEnumerableAsync<IRefAst>, TResult> onQueriesMatched,
+            Func<TResult> onQueriesDidNotMatch,
+                ILogger logger = default)
         {
             if (queries.IsDefaultNullOrEmpty())
                 throw new ArgumentException("Exactly one query param is required for StorageLinkAttribute.");
@@ -58,7 +59,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 onMissing: () => new RowKeyAttribute());
             var partitionKey = queryMemberInfo.StorageComputePartitionKey(memberValue, rowKey,
                 onMissing: () => new RowKeyPrefixAttribute());
-            return repository
+            return onQueriesMatched(repository
                 .FindByIdAsync<StorageLookupTable, IEnumerableAsync<IRefAst>>(rowKey, partitionKey,
                     (dictEntity, tableResult) =>
                     {
@@ -70,7 +71,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     },
                     () => EnumerableAsync.Empty<IRefAst>(),
                     tableName: tableName)
-                .FoldTask();
+                .FoldTask());
         }
 
         public Task<TResult> GetLookupInfoAsync<TResult>(

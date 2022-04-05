@@ -12,11 +12,13 @@ namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class IdLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("IdLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch($"{nameof(IdLookupAttribute)} only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
@@ -24,10 +26,10 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             var rowKey = RowKey(this.GetType(), propertyValueType, rowKeyValue);
             if (rowKey.IsDefaultNullOrEmpty())
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
             var partitionKey = GetPartitionKey(rowKey);
             var astRef = new RefAst(rowKey, partitionKey);
-            return astRef.AsEnumerable();
+            return onLookupValuesMatch(astRef.AsEnumerable());
         }
 
         internal static string RowKey(Type thisType, Type propertyValueType, object rowKeyValue)
@@ -153,25 +155,29 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     public abstract class IdsLookupAttribute : StorageLookupAttribute, IGenerateLookupKeys
     {
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("IdLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch("IdLookupAttribute only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
             if (rowKeyValue.IsNull())
-                return new IRefAst[] { };
+                return onLookupValuesMatch(new IRefAst[] { });
             var propertyValueType = rowKeyValue.GetType();
 
-            return RowKeys()
+            var astRefs = RowKeys()
                 .Select(
                     rowKey =>
                     {
                         var partitionKey = GetPartitionKey(rowKey);
                         return new RefAst(rowKey, partitionKey);
-                    });
+                    })
+                .ToArray();
+            return onLookupValuesMatch(astRefs);
 
             string[] RowKeys()
             {

@@ -35,34 +35,41 @@ namespace EastFive.Persistence.Azure.StorageTables
             return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
         }
 
-        public IEnumerableAsync<IRefAst> GetKeys(
-            MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries,
-            ILogger logger = default)
+        public TResult GetKeys<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<IEnumerableAsync<IRefAst>, TResult> onQueriesMatched,
+            Func<TResult> onQueriesDidNotMatch,
+                ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
-            var lookupRefs = lookupGeneratorAttr
-                .GetLookupKeys(memberInfo, queries)
-                .ToArray();
-            return lookupRefs
-                .Select(
-                    lookupRef =>
+            return lookupGeneratorAttr
+                .GetLookupKeys(memberInfo, queries,
+                    lookupKeys =>
                     {
-                        return repository.FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(
-                                lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, tableResult) =>
-                            {
-                                var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
-                                    .NullToEmpty()
-                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value));
-                                return rowAndParitionKeys;
-                            },
-                            () => Enumerable.Empty<IRefAst>(),
-                            tableName: tableName);
-                    })
-                .AsyncEnumerable(true)
-                .SelectMany();
+                        var astRefs = lookupKeys
+                            .ToArray()
+                            .Select(
+                                lookupRef =>
+                                {
+                                    return repository.FindByIdAsync<StorageLookupTable, IEnumerable<IRefAst>>(
+                                            lookupRef.RowKey, lookupRef.PartitionKey,
+                                        (dictEntity, tableResult) =>
+                                        {
+                                            var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
+                                                .NullToEmpty()
+                                                .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value));
+                                            return rowAndParitionKeys;
+                                        },
+                                        () => Enumerable.Empty<IRefAst>(),
+                                        tableName: tableName);
+                                })
+                            .AsyncEnumerable(true)
+                            .SelectMany();
+                        return onQueriesMatched(astRefs);
+                    },
+                    why => onQueriesDidNotMatch());
         }
 
         public Task<TResult> GetLookupInfoAsync<TResult>(
@@ -73,20 +80,24 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var tableName = GetLookupTableName(memberInfo);
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
-            var lookupRef = lookupGeneratorAttr
-                .GetLookupKeys(memberInfo, queries)
-                .First();
-            return repository.FindByIdAsync<StorageLookupTable, TResult>(
-                    lookupRef.RowKey, lookupRef.PartitionKey,
-                (dictEntity, tableResult) =>
-                {
-                    return onEtagLastModifedFound(tableResult.Etag, 
-                        dictEntity.lastModified,
-                        dictEntity.rowAndPartitionKeys
-                            .NullToEmpty().Count());
-                },
-                () => onNoLookupInfo(),
-                tableName: tableName);
+            return lookupGeneratorAttr
+                .GetLookupKeys(memberInfo, queries,
+                    lookupKeys =>
+                    {
+                        var lookupRef = lookupKeys.First();
+                        return repository.FindByIdAsync<StorageLookupTable, TResult>(
+                                lookupRef.RowKey, lookupRef.PartitionKey,
+                            (dictEntity, tableResult) =>
+                            {
+                                return onEtagLastModifedFound(tableResult.Etag,
+                                    dictEntity.lastModified,
+                                    dictEntity.rowAndPartitionKeys
+                                        .NullToEmpty().Count());
+                            },
+                            () => onNoLookupInfo(),
+                            tableName: tableName);
+                    },
+                    why => throw new Exception(why));
         }
 
         public Task<PropertyLookupInformation[]> GetInfoAsync(
@@ -123,7 +134,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .Select(member => member.GetValue(value).PairWithKey(member))
                 .ToArray();
             return lookupGeneratorAttr.GetLookupKeys(decoratedMember,
-                membersAndValuesRequiredForComputingLookup);
+                membersAndValuesRequiredForComputingLookup,
+                values => values,
+                why => throw new Exception(why));
         }
 
         #region Execution Code IMPORTANT: READ NOTE BEFORE MODIFYING!!!!!

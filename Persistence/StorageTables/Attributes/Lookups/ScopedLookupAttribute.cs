@@ -47,8 +47,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .Append(decoratedMember);
         }
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             var lookupRowKey = ScopedPartitionAttribute.ComputeKey(decoratedMember.DeclaringType,
                 memberInfo =>
@@ -64,7 +66,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 out bool ignore);
 
             if (ignore)
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
             var lookupPartitionKey = ScopedPartitionAttribute.ComputeKey(decoratedMember.DeclaringType,
                 memberInfo =>
@@ -80,9 +82,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 out ignore);
 
             if (ignore)
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
-            return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
+            return onLookupValuesMatch(lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable());
         }
 
         #endregion
