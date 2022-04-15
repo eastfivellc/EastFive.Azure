@@ -31,9 +31,24 @@ namespace EastFive.Azure.Persistence.Blobs
 
         string Id { get; }
 
-        Task<TResult> LoadAsync<TResult>(
-                Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
-                Func<TResult> onNotFound,
-                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
+        Task<TResult> LoadBytesAsync<TResult>(
+            Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
+
+        Task<TResult> LoadStreamAsync<TResult>(
+            Func<string, Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
+
+        Task<TResult> LoadStreamToAsync<TResult>(Stream stream,
+            Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default);
+    }
+
+    public static class BlobRefLoadExtensions
+    {
+
     }
 }

@@ -532,7 +532,7 @@ namespace EastFive.Api.Azure.Monitoring
 
         async Task<Body> GetPostmanBodyAsync()
         {
-            return await await this.body.LoadAsync(
+            return await await this.body.LoadBytesAsync(
                 (id, data, mediaType, contentDisposition) =>
                 {
                     return new Body
@@ -565,7 +565,7 @@ namespace EastFive.Api.Azure.Monitoring
                         .Select(
                             fd =>
                             {
-                                return fd.contents.LoadAsync(
+                                return fd.contents.LoadBytesAsync(
                                     (id, data, contentType, disposition) =>
                                     {
                                         var fileName = ContentDispositionHeaderValue.TryParse(fd.contentDisposition,

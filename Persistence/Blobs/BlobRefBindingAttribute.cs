@@ -282,7 +282,7 @@ namespace EastFive.Azure.Persistence.Blobs
                 }
             }
 
-            public async Task<TResult> LoadAsync<TResult>(
+            public async Task<TResult> LoadBytesAsync<TResult>(
                 Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound, 
                 Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes, 
                     string, TResult> onFailure = null)
@@ -304,6 +304,56 @@ namespace EastFive.Azure.Persistence.Blobs
                         mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
                     
                     return onFound(this.Id, bytes, mediaType, contentDisposition);
+                }
+            }
+
+            public Task<TResult> LoadStreamAsync<TResult>(
+                Func<string, System.IO.Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes,
+                    string, TResult> onFailure = null)
+            {
+                using (var stream = content.OpenReadStream())
+                {
+                    ContentDispositionHeaderValue.TryParse(content.ContentDisposition,
+                        out ContentDispositionHeaderValue contentDisposition);
+                    if (contentDisposition.IsDefaultOrNull())
+                    {
+                        contentDisposition = new ContentDispositionHeaderValue("inline")
+                        {
+                            FileName = this.Id,
+                        };
+                    }
+                    if (!MediaTypeHeaderValue.TryParse(content.ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                        mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+
+                    return onFound(this.Id, stream, mediaType, contentDisposition).AsTask();
+                }
+            }
+
+            public async Task<TResult> LoadStreamToAsync<TResult>(System.IO.Stream streamOut,
+                Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound, Func<ExtendedErrorInformationCodes,
+                    string, TResult> onFailure = null)
+            {
+                using (var streamIn = content.OpenReadStream())
+                {
+                    ContentDispositionHeaderValue.TryParse(content.ContentDisposition,
+                        out ContentDispositionHeaderValue contentDisposition);
+                    if (contentDisposition.IsDefaultOrNull())
+                    {
+                        contentDisposition = new ContentDispositionHeaderValue("inline")
+                        {
+                            FileName = this.Id,
+                        };
+                    }
+                    if (!MediaTypeHeaderValue.TryParse(content.ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                        mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+
+                    await streamIn.CopyToAsync(streamOut);
+
+                    return onFound(this.Id, mediaType, contentDisposition);
                 }
             }
 

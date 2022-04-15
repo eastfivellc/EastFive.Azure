@@ -20,7 +20,7 @@ namespace EastFive.Azure.Persistence.Blobs
 
         public string Id { get; set; }
 
-        public Task<TResult> LoadAsync<TResult>(
+        public Task<TResult> LoadBytesAsync<TResult>(
             Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
@@ -45,6 +45,66 @@ namespace EastFive.Azure.Persistence.Blobs
                             mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
 
                         return onFound(blobName, bytes, mediaType, disposition);
+                    },
+                    onNotFound: onNotFound,
+                    onFailure: onFailure);
+        }
+
+        public Task<TResult> LoadStreamAsync<TResult>(
+            Func<string, System.IO.Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+        {
+            var blobName = this.Id;
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobLoadStreamAsync(blobName: blobName, containerName: this.ContainerName,
+                    (stream, properties) =>
+                    {
+                        ContentDispositionHeaderValue.TryParse(properties.ContentDisposition,
+                            out ContentDispositionHeaderValue disposition);
+                        if (disposition.IsDefaultOrNull())
+                        {
+                            disposition = new ContentDispositionHeaderValue("inline")
+                            {
+                                FileName = blobName,
+                            };
+                        }
+                        if (!MediaTypeHeaderValue.TryParse(properties.ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                            mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+
+                        return onFound(blobName, stream, mediaType, disposition);
+                    },
+                    onNotFound: onNotFound,
+                    onFailure: onFailure);
+        }
+
+        public Task<TResult> LoadStreamToAsync<TResult>(System.IO.Stream stream,
+            Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+            Func<TResult> onNotFound,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+        {
+            var blobName = this.Id;
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobLoadToAsync(blobName: blobName, containerName: this.ContainerName, stream,
+                    (properties) =>
+                    {
+                        ContentDispositionHeaderValue.TryParse(properties.ContentDisposition,
+                            out ContentDispositionHeaderValue disposition);
+                        if (disposition.IsDefaultOrNull())
+                        {
+                            disposition = new ContentDispositionHeaderValue("inline")
+                            {
+                                FileName = blobName,
+                            };
+                        }
+                        if (!MediaTypeHeaderValue.TryParse(properties.ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                            mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+
+                        return onFound(blobName, mediaType, disposition);
                     },
                     onNotFound: onNotFound,
                     onFailure: onFailure);

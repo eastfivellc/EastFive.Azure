@@ -145,7 +145,7 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<TResult> onCouldNotAccess = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
         {
-            return await await blobRef.LoadAsync(
+            return await await blobRef.LoadBytesAsync(
                 async (blobName, bytes, contentType, disposition) =>
                 {
                     return await AzureTableDriverDynamic
@@ -346,7 +346,7 @@ namespace EastFive.Azure.Persistence.Blobs
 
             public string FileName { get; set; }
 
-            public Task<TResult> LoadAsync<TResult>(
+            public Task<TResult> LoadBytesAsync<TResult>(
                 Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
@@ -361,6 +361,39 @@ namespace EastFive.Azure.Persistence.Blobs
                         FileName = FileName,
                     }).AsTask();
             }
+
+            public Task<TResult> LoadStreamAsync<TResult>(
+                Func<string, Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+            {
+                if (!MediaTypeHeaderValue.TryParse(ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                    mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+                return onFound(Id, new MemoryStream(bytes),
+                    mediaType,
+                    new ContentDispositionHeaderValue("attachment")
+                    {
+                        FileName = FileName,
+                    }).AsTask();
+            }
+
+            public async Task<TResult> LoadStreamToAsync<TResult>(Stream stream,
+                Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+            {
+                if (!MediaTypeHeaderValue.TryParse(ContentType,
+                            out MediaTypeHeaderValue mediaType))
+                    mediaType = new MediaTypeHeaderValue(IBlobRef.DefaultMediaType);
+                await stream.WriteAsync(bytes, 0, bytes.Length);
+                return onFound(Id,
+                    mediaType,
+                    new ContentDispositionHeaderValue("attachment")
+                    {
+                        FileName = FileName,
+                    });
+            }
         }
 
         private class BlobCastRef : IBlobRef
@@ -371,11 +404,23 @@ namespace EastFive.Azure.Persistence.Blobs
 
             public string Id { get; set; }
 
-            public Task<TResult> LoadAsync<TResult>(
+            public Task<TResult> LoadBytesAsync<TResult>(
                 Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
-                 => from.LoadAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
+                 => from.LoadBytesAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
+
+            public Task<TResult> LoadStreamAsync<TResult>(
+                Func<string, Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+                 => from.LoadStreamAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
+
+            public Task<TResult> LoadStreamToAsync<TResult>(Stream stream,
+                Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
+                 => from.LoadStreamToAsync(stream, onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
         }
 
         private class SerializableBlobRef : IBlobRef, ICastJson
@@ -395,11 +440,23 @@ namespace EastFive.Azure.Persistence.Blobs
                 return isBlobRef;
             }
 
-            public Task<TResult> LoadAsync<TResult>(
+            public Task<TResult> LoadBytesAsync<TResult>(
                 Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
                  => throw new NotImplementedException();
+
+            public Task<TResult> LoadStreamAsync<TResult>(
+                    Func<string, Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                    Func<TResult> onNotFound,
+                    Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default) =>
+                throw new NotImplementedException();
+
+            public Task<TResult> LoadStreamToAsync<TResult>(Stream stream,
+                Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default) =>
+                    throw new NotImplementedException();
 
             public Task WriteAsync(JsonWriter writer, JsonSerializer serializer,
                 MemberInfo member, ParameterInfo paramInfo, IProvideApiValue apiValueProvider,

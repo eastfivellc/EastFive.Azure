@@ -30,6 +30,7 @@ using EastFive.Reflection;
 using EastFive.Serialization;
 
 using BlackBarLabs.Persistence.Azure;
+using EastFive.Api;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -3809,6 +3810,39 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 var properties = await blockClient.GetPropertiesAsync();
                 var returnStream = await returnStreamTask;
                 return onFound(returnStream, properties.Value);
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (ex.IsProblemDoesNotExist())
+                    if (!onNotFound.IsDefaultOrNull())
+                        return onNotFound();
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseExtendedErrorInformation(
+                    (code, msg) => onFailure(code, msg),
+                    () => throw ex);
+            }
+        }
+
+        public async Task<TResult> BlobLoadToAsync<TResult>(string blobName, string containerName,
+                System.IO.Stream stream,
+            Func<BlobProperties, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureStorageDriver.RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var blockClient = await GetBlobClientAsync(
+                    containerName, blobName);
+                var responseGetting = blockClient.DownloadToAsync(stream);
+                var properties = await blockClient.GetPropertiesAsync();
+                var response = await responseGetting;
+                var responseStatus = (HttpStatusCode)response.Status;
+                if (responseStatus.IsSuccess())
+                    return onFound(properties.Value);
+
+                return onNotFound();
             }
             catch (global::Azure.RequestFailedException ex)
             {
