@@ -1654,6 +1654,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, string blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            string contentDisposition = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateOrUpdateAsync(content, blobId, containerName,
+                onSuccess,
+                onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                contentDisposition: contentDisposition,
+                onTimeout: onTimeout);
+        }
+
         public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
             string contentType = default,
             IDictionary<string, string> metadata = default,
@@ -1727,7 +1746,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
         {
@@ -1738,6 +1757,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onAlreadyExists: onAlreadyExists,
                     onFailure: onFailure,
                     contentType: contentType,
+                    fileName: fileName,
                     metadata: metadata,
                     onTimeout: onTimeout);
         }

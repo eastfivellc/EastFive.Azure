@@ -3427,20 +3427,21 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, Guid blobId, string containerName,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateOrUpdateAsync(
                     content, blobId.ToString("N"), containerName,
                 onSuccess,
                 onFailure,
-                contentType,
+                contentType:contentType,
+                contentDisposition:contentDisposition,
                 metadata,
                 onTimeout);
 
         public async Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, string blobName, string containerName,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
@@ -3456,6 +3457,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
+                                ContentDisposition = contentDisposition,
                             }
                         });
                 }
@@ -3476,7 +3478,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<Stream, Task> writeStreamAsync,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
@@ -3495,6 +3497,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
+                                ContentDisposition = contentDisposition,
                             }
                         });
                 }
@@ -3515,14 +3518,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) =>
                 BlobCreateAsync<TResult>(content, blobId.ToString("N"), containerName,
                     onSuccess, 
                     onAlreadyExists: onAlreadyExists, 
                     onFailure: onFailure,
-                        contentType: contentType, metadata: metadata, onTimeout: onTimeout);
+                        contentType: contentType, fileName:fileName,
+                        metadata: metadata, onTimeout: onTimeout);
 
         public async Task<TResult> BlobCreateAsync<TResult>(byte[] content, string blobName, string containerName,
             Func<TResult> onSuccess,
@@ -3584,7 +3588,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobId, containerName,
                     stream => content.CopyToAsync(stream),
@@ -3592,6 +3596,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
                 contentType: contentType,
+                fileName: fileName,
                 metadata: metadata,
                 onTimeout: onTimeout);
 
@@ -3599,7 +3604,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobName, containerName,
                     stream => content.CopyToAsync(stream),
@@ -3607,6 +3612,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
                 contentType: contentType,
+                fileName: fileName,
                 metadata: metadata,
                 onTimeout: onTimeout);
 
@@ -3615,7 +3621,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(
                     blobId.ToString("N"), containerName, writeAsync:writeAsync,
@@ -3623,6 +3629,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onAlreadyExists: onAlreadyExists,
                 onFailure: onFailure,
                 contentType: contentType,
+                fileName: fileName,
                 metadata: metadata,
                 onTimeout: onTimeout);
 
@@ -3631,7 +3638,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             AzureStorageDriver.RetryDelegate onTimeout = default)
         {
@@ -3658,8 +3665,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
+                                ContentDisposition = GetDisposition(),
                             }
                         });
+
+                    string GetDisposition()
+                    {
+                        if (fileName.IsNullOrWhiteSpace())
+                            return default;
+                        var disposition = new System.Net.Mime.ContentDisposition();
+                        disposition.FileName = fileName;
+                        return disposition.ToString();
+                    }
                 }
                 return onSuccess();
             }

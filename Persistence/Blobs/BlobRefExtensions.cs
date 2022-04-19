@@ -22,6 +22,7 @@ using EastFive.Serialization;
 using EastFive.Reflection;
 using EastFive.Api;
 using Newtonsoft.Json;
+using EastFive.IO;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
@@ -161,6 +162,156 @@ namespace EastFive.Azure.Persistence.Blobs
                 onNotFound: onCouldNotAccess.AsAsyncFunc());
         }
 
+        public static IBlobRef CreateUrlBlobRef<TResource>(
+            this Uri blobData,
+            Expression<Func<TResource, IBlobRef>> selectProperty,
+            Guid? blobId = default, string blobName = default)
+        {
+            selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = GetBlobName();
+
+            return new BlobRefUrl(blobData)
+            {
+                ContainerName = containerName,
+                Id = newBlobId,
+            };
+
+            string GetBlobName()
+            {
+                if (blobName.HasBlackSpace())
+                    return blobName;
+
+                if (blobId.HasValue)
+                    return blobId.Value.AsBlobName();
+
+                var paths = blobData.ParsePath();
+                if(paths.Any())
+                    return paths.Last();
+
+                return Guid.NewGuid().AsBlobName();
+            }
+        }
+
+        public static Task<TResult> CreateOrUpdateStorageBlobRefAsync<TResource, TResult>(
+                this Uri blobData,
+                Expression<Func<TResource, IBlobRef>> selectProperty,
+            Func<IBlobRef, TResult> onSaved,
+            Func<TResult> onFailure,
+                Guid? blobId = default, string blobName = default)
+        {
+            var blob = blobData.CreateUrlBlobRef(selectProperty, blobId: blobId, blobName: blobName);
+            return blob.CreateOrUpdateStorageBlobRefAsync(
+                onSaved: onSaved, onFailure: onFailure);
+        }
+
+        public static async Task<TResult> CreateStorageBlobRefAsync<TResource, TResult>(
+            this IBlobRef from,
+            Expression<Func<TResource, IBlobRef>> selectProperty,
+            Func<IBlobRef, TResult> onSaved,
+            Func<TResult> onFailure,
+                Guid? blobId = default, string blobName = default)
+        {
+            return await await from.LoadStreamAsync(
+                async (id, streamSource, mediaType, cd) =>
+                {
+                    var blobRef = await selectProperty.CreateBlobRefFromStreamAsync(
+                        streamWrite => streamSource.CopyToAsync(streamWrite),
+                        contentType: mediaType.MediaType, fileName: cd.FileName,
+                        blobId: blobId, blobName: blobName);
+                    return onSaved(blobRef);
+                },
+                onFailure.AsAsyncFunc());
+        }
+
+        public static async Task<TResult> CreateOrUpdateStorageBlobRefAsync<TResult>(
+            this IBlobRef blobToStore,
+            Func<IBlobRef, TResult> onSaved,
+            Func<TResult> onFailure)
+        {
+            return await await blobToStore.LoadBytesAsync(
+                async (id, streamIn, mediaType, contentDisposition) =>
+                {
+                    var cdStr = contentDisposition.ToString();
+                    return await AzureTableDriverDynamic
+                        .FromSettings()
+                        .BlobCreateOrUpdateAsync(blobToStore.Id, blobToStore.ContainerName,
+                            writeStreamAsync: async (streamOut) =>
+                            {
+                                await streamOut.WriteAsync(streamIn, 0, streamIn.Length);
+                                return;
+                            },
+                            onSuccess: () =>
+                            {
+                                var storageBlob = new BlobRefStorage()
+                                {
+                                    Id = blobToStore.Id,
+                                    ContainerName = blobToStore.ContainerName,
+                                };
+                                return onSaved(storageBlob);
+                            },
+                            contentType: mediaType.MediaType,
+                            contentDisposition: cdStr);
+                },
+                onNotFound: onFailure.AsAsyncFunc());
+
+            // Can't use streams because they get disposed
+
+            //return await await blobToStore.LoadStreamAsync(
+            //    async (id, streamIn, mediaType, contentDisposition) =>
+            //    {
+            //        var cdStr = contentDisposition.ToString();
+            //        return await AzureTableDriverDynamic
+            //            .FromSettings()
+            //            .BlobCreateOrUpdateAsync(blobToStore.Id, blobToStore.ContainerName,
+            //                writeStreamAsync: async (streamOut) =>
+            //                {
+            //                    await streamIn.CopyToAsync(streamOut);
+            //                    return;
+            //                },
+            //                onSuccess:() =>
+            //                {
+            //                    var storageBlob = new BlobRefStorage()
+            //                    {
+            //                        Id = blobToStore.Id,
+            //                        ContainerName = blobToStore.ContainerName,
+            //                    };
+            //                    return onSaved(storageBlob);
+            //                },
+            //                contentType: mediaType.MediaType,
+            //                contentDisposition: cdStr);
+            //    },
+            //    onNotFound: onFailure.AsAsyncFunc());
+        }
+
+        public static async Task<TResult> CreateOrUpdateStorageBlobRefAsync<TResult>(
+            this IBlobRef blobToStore,
+            Func<IBlobRef, byte [], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onSaved,
+            Func<TResult> onFailure)
+        {
+            return await await blobToStore.LoadBytesAsync(
+                async (id, streamIn, mediaType, contentDisposition) =>
+                {
+                    var cdStr = contentDisposition.ToString();
+                    return await AzureTableDriverDynamic
+                        .FromSettings()
+                        .BlobCreateOrUpdateAsync(blobToStore.Id, blobToStore.ContainerName,
+                            writeStreamAsync: (streamOut) => streamOut.WriteAsync(streamIn, 0, streamIn.Length),
+                            onSuccess: () =>
+                            {
+                                var storageBlob = new BlobRefStorage()
+                                {
+                                    Id = blobToStore.Id,
+                                    ContainerName = blobToStore.ContainerName,
+                                };
+                                return onSaved(storageBlob, streamIn, mediaType, contentDisposition);
+                            },
+                            contentType: mediaType.MediaType,
+                            contentDisposition: cdStr);
+                },
+                onNotFound: onFailure.AsAsyncFunc());
+        }
+
         public static async Task<IBlobRef> CreateBlobRefAsync<TResource>(
             this byte[] blobData,
             Expression<Func<TResource, IBlobRef>> selectProperty,
@@ -222,7 +373,8 @@ namespace EastFive.Azure.Persistence.Blobs
                             FileName = fileName.HasBlackSpace() ? fileName : newBlobId,
                         };
                     },
-                    contentType: contentType);
+                    contentType: contentType,
+                    fileName: fileName);
         }
 
         public static Task<IBlobRef> CreateBlobStorageRefAsync<TResource>(
@@ -256,7 +408,7 @@ namespace EastFive.Azure.Persistence.Blobs
             this string blobName,
             Expression<Func<TResource, IBlobRef>> asPropertyOf,
             Func<Stream, Task> writeBlobData,
-            string contentType = default, string fileName = default)
+            string contentType = default, ContentDisposition contentDisposition = default)
         {
             asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
             var containerName = memberInfo.BlobContainerName();
@@ -273,7 +425,8 @@ namespace EastFive.Azure.Persistence.Blobs
                             ContainerName = containerName,
                         };
                     },
-                    contentType: contentType);
+                    contentType: contentType,
+                    contentDisposition: contentDisposition.ToString());
         }
 
         public static IBlobRef AsBlobStorageRef<TResource>(
@@ -332,7 +485,6 @@ namespace EastFive.Azure.Persistence.Blobs
                 ContainerName = containerName,
             };
         }
-
 
         private class BlobRef : IBlobRef
         {
