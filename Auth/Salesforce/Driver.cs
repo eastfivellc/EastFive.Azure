@@ -13,6 +13,27 @@ using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
+	public interface IDefineSalesforceApiPath
+    {
+		Uri ProvideUrl(string instanceUrl);
+    }
+
+	public class SalesforceApiPathAttribute : Attribute, IDefineSalesforceApiPath
+	{
+		public SalesforceApiPathAttribute(string objectName)
+        {
+			this.ObjectName = objectName;
+		}
+
+		public string ObjectName { get; set; }
+
+        public Uri ProvideUrl(string instanceUrl)
+        {
+			Uri.TryCreate($"{instanceUrl}/services/data/v54.0/sobjects/{this.ObjectName}/", UriKind.Absolute, out Uri url);
+			return url;
+		}
+    }
+
 	public class Driver
 	{
 		string authToken;
@@ -58,6 +79,26 @@ namespace EastFive.Azure.Auth.Salesforce
 			
 		}
 
+		public async Task<TResult> CreateAsync<TResource, TResult>(TResource resource,
+				Func<string, TResult> onCreated,
+				Func<HttpStatusCode, string, TResult> onFailure = default)
+		{
+			typeof(TResource).TryGetAttributeInterface(out IDefineSalesforceApiPath attr);
+			var location = attr.ProvideUrl(this.instanceUrl);
+
+			return await location.HttpClientPostResourceAsync(resource,
+					authToken: this.authToken, tokenType: this.tokenType,
+				(Response response) =>
+				{
+					var id = response.id;
+					return onCreated(id);
+				},
+				onFailureWithBody: (statusCode, body) =>
+				{
+					return ProcessFailure(statusCode, body, onCreated, onFailure);
+				},
+					didTokenGetRefreshed: this.DidTokenGetRefreshed);
+		}
 
 		public class Leads
         {
