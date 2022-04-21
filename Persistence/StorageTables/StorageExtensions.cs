@@ -1242,7 +1242,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             var rowKey = entityRef.StorageComputeRowKey();
             return AzureTableDriverDynamic
