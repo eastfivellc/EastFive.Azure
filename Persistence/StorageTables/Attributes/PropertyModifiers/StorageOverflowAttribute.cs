@@ -26,7 +26,8 @@ namespace EastFive.Persistence
         private const string overflowToken = "8d40521b-7d71-47b3-92c5-46e4a804e7de";
         private const string overflowTokenString = "9a9a2e13d0ed44d7aa39c2549aff176a";
 
-        public override KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public override KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
             var valueType = memberInfo.GetPropertyOrFieldType();

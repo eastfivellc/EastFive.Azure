@@ -28,7 +28,6 @@ namespace EastFive.Azure.Auth
                     (accountLink, next) => onMatched(accountLink.externalAccountKey),
                     () => onNotMatched());
         }
-
     }
 
     public struct AccountLink
@@ -39,11 +38,13 @@ namespace EastFive.Azure.Auth
 
     public class AccountLinksAttribute : StorageLookupAttribute, IPersistInAzureStorageTables
     {
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (!typeof(AccountLinks).IsAssignableFrom(decoratedMember.GetPropertyOrFieldType()))
-                throw new ArgumentException(
+                return onNoMatch(
                     $"{nameof(AccountLinksAttribute)} should not be used to decorate any type other than {nameof(AccountLinks)}." +
                     $" Please modify {decoratedMember.DeclaringType.FullName}..{decoratedMember.Name}");
 
@@ -52,14 +53,14 @@ namespace EastFive.Azure.Auth
                 .SelectValues()
                 .Single();
 
-            return accountLinks.accountLinks
+            return onLookupValuesMatch(accountLinks.accountLinks
                 .NullToEmpty()
                 .Select(
                     accountLink =>
                     {
                         return accountLink.externalAccountKey
                             .AsAstRef($"AM{accountLink.method.id.ToString("n")}");
-                    });
+                    }));
         }
 
         #region IPersistInAzureStorageTables
@@ -74,7 +75,8 @@ namespace EastFive.Azure.Auth
             return tablePropertyName;
         }
 
-        public KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var accountLinks = (AccountLinks)value;
             return accountLinks.accountLinks

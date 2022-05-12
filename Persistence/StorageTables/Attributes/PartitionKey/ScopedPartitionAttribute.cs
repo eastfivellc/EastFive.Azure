@@ -11,6 +11,7 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
+using static EastFive.Persistence.Azure.StorageTables.ParititionKeyAttribute;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -57,24 +58,33 @@ namespace EastFive.Persistence.Azure.StorageTables
             out Func<TEntity, bool> postFilter)
         {
             Func<TEntity, bool> cacheFilter = (e) => true;
-            var result = filter.MemberComparison(
-                (memberInAssignmentInfo, expressionType, partitionValue) =>
-                {
-                    // TODO: if(memberInAssignmentInfo != memberInfo)?
-                    if (expressionType == ExpressionType.Equal)
-                        return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
-
-                    if (expressionType == ExpressionType.IsTrue)
-                        return string.Empty;
-
-                    throw new ArgumentException();
-                },
-                () =>
-                {
-                    throw new ArgumentException();
-                });
             postFilter = cacheFilter;
-            return result;
+            if (filter.Body is BinaryExpression)
+            {
+                var filterAssignments = filter.Body.GetFilterAssignments<TEntity>().ToArray();
+                var partitionValue = ComputePartitionKey(typeof(TEntity), filterAssignments);
+                return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
+            }
+            return filter.ResolveFilter<TEntity>(out postFilter);
+
+            //var result = filter.MemberComparison(
+            //    (memberInAssignmentInfo, expressionType, partitionValue) =>
+            //    {
+            //        // TODO: if(memberInAssignmentInfo != memberInfo)?
+            //        if (expressionType == ExpressionType.Equal)
+            //            return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
+
+            //        if (expressionType == ExpressionType.IsTrue)
+            //            return string.Empty;
+
+            //        throw new ArgumentException();
+            //    },
+            //    () =>
+            //    {
+            //        throw new ArgumentException();
+            //    });
+            //postFilter = cacheFilter;
+            //return result;
         }
 
         private string ComputePartitionKey(Type declaringType,

@@ -10,8 +10,14 @@ namespace EastFive.Azure.Monitoring
         static TelemetryExtensions()
         {
             client = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.ConfigurationString(
-                key => new TelemetryClient { InstrumentationKey = key }, 
-                (why) => new TelemetryClient());
+                key =>
+                {
+                    return new TelemetryClient { InstrumentationKey = key };
+                },
+                (why) =>
+                {
+                    return new TelemetryClient();
+                });
         }
 
         public static TelemetryClient LoadTelemetryClient(this string configKeyName)

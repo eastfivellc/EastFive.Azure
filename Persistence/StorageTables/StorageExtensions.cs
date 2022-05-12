@@ -446,7 +446,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<object> StorageGetAll(this Type type, string tableName = default)
         {
             var findAllMethod = typeof(StorageExtensions)
-                .GetMethod("StorageGetAllInternal", BindingFlags.Public | BindingFlags.Static);
+                .GetMethod(nameof(StorageGetAllInternal), BindingFlags.Public | BindingFlags.Static);
             var findAllCast = findAllMethod.MakeGenericMethod(type.AsArray());
             return (IEnumerableAsync<object>)findAllCast.Invoke(null, new object[] { tableName });
         }
@@ -558,13 +558,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
-                Expression<Func<TEntity, IRef<TRefEntity>>> idProperty)
+                Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
+                int readAhead = -1)
             where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy(entityRef, idProperty);
+                .FindBy(entityRef, idProperty, readAhead:readAhead);
         }
 
         //public static IEnumerableAsync<TEntity> StorageGetBy<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
@@ -1241,7 +1242,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             var rowKey = entityRef.StorageComputeRowKey();
             return AzureTableDriverDynamic
@@ -1653,6 +1654,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, string blobId, string containerName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            string contentDisposition = default,
+            IDictionary<string, string> metadata = default,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateOrUpdateAsync(content, blobId, containerName,
+                onSuccess,
+                onFailure,
+                contentType: contentType,
+                metadata: metadata,
+                contentDisposition: contentDisposition,
+                onTimeout: onTimeout);
+        }
+
         public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
             string contentType = default,
             IDictionary<string, string> metadata = default,
@@ -1726,7 +1746,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
+            string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
         {
@@ -1737,6 +1757,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onAlreadyExists: onAlreadyExists,
                     onFailure: onFailure,
                     contentType: contentType,
+                    fileName: fileName,
                     metadata: metadata,
                     onTimeout: onTimeout);
         }

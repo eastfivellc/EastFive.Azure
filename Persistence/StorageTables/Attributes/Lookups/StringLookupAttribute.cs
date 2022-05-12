@@ -16,11 +16,13 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool IgnoreNullWhiteSpace { get; set; }
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+                IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("IdLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch("IdLookupAttribute only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
@@ -31,13 +33,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var rowKey = (string)rowKeyValue;
                 
                 if (IgnoreNull && rowKey.IsDefaultOrNull())
-                    return Enumerable.Empty<IRefAst>();
+                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
                 if(IgnoreNullWhiteSpace && rowKey.IsNullOrWhiteSpace())
-                    return Enumerable.Empty<IRefAst>();
+                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
                 var partitionKey = GetPartitionKey(rowKey);
-                return new RefAst(rowKey, partitionKey).AsEnumerable();
+                return onLookupValuesMatch(new RefAst(rowKey, partitionKey).AsEnumerable());
             }
 
             var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +

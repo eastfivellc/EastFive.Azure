@@ -22,12 +22,13 @@ namespace EastFive.Persistence
     public class StorageDateTimeTicksAttribute : StorageAttribute,
         IPersistInAzureStorageTables
     {
-        public override KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public override KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
 
             var ep = GetEp();
-
+            
             return new KeyValuePair<string, EntityProperty>[]
             {
                 propertyName.PairWithValue(ep)

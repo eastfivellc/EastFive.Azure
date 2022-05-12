@@ -30,51 +30,62 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string Cascade { get; set; }
 
+        internal static string GetMemberTableName(MemberInfo memberInfo)
+        {
+            return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
+        }
+
         protected virtual string GetLookupTableName(MemberInfo memberInfo)
         {
             if (LookupTableName.HasBlackSpace())
                 return this.LookupTableName;
-            return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
+            return GetMemberTableName(memberInfo);
         }
 
-        public IEnumerableAsync<IRefAst> GetKeys(
-            MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
-            KeyValuePair<MemberInfo, object>[] queries,
-            ILogger logger = default)
+        public TResult GetKeys<TResult>(
+                MemberInfo memberInfo, Driver.AzureTableDriverDynamic repository,
+                KeyValuePair<MemberInfo, object>[] queries,
+            Func<IEnumerableAsync<IRefAst>, TResult> onQueriesMatched,
+            Func<TResult> onQueriesDidNotMatch,
+                ILogger logger = default)
         {
             var tableName = GetLookupTableName(memberInfo);
             var scopedLogger = logger.CreateScope("GetKeys");
-            var lookupRefs = this
-                .GetLookupKeys(memberInfo, queries)
-                .ToArray();
-            scopedLogger.Trace($"Found {lookupRefs.Length} lookupRefs [{lookupRefs.Select(lr => $"{lr.PartitionKey}/{lr.RowKey}").Join(",")}]");
-            return lookupRefs
-                .Select(
-                    lookupRef =>
-                    {
-                        scopedLogger.Trace($"Fetching... {lookupRef.PartitionKey}/{lookupRef.RowKey}");
-                        return repository.FindByIdAsync<StorageLookupTable, IRefAst[]>(
-                                lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, tableResult) =>
+            return this.GetLookupKeys(memberInfo, queries,
+                lookupKeys =>
+                {
+                    var lookupRefs = lookupKeys.ToArray();
+                    scopedLogger.Trace($"Found {lookupRefs.Length} lookupRefs [{lookupRefs.Select(lr => $"{lr.PartitionKey}/{lr.RowKey}").Join(",")}]");
+                    var items = lookupRefs
+                        .Select(
+                            lookupRef =>
                             {
-                                scopedLogger.Trace($"Fetched {lookupRef.PartitionKey}/{lookupRef.RowKey}");
-                                var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
-                                    .NullToEmpty()
-                                    .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
-                                    .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
-                                    .ToArray();
-                                scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndParitionKeys.Length} lookups");
-                                return rowAndParitionKeys;
-                            },
-                            () =>
-                            {
-                                scopedLogger.Trace($"Fetch FAILED for {lookupRef.PartitionKey}/{lookupRef.RowKey}");
-                                return new IRefAst[] { };
-                            },
-                            tableName: tableName);
-                    })
-                .AsyncEnumerable(startAllTasks:true)
-                .SelectMany(logger: scopedLogger);
+                                scopedLogger.Trace($"Fetching... {lookupRef.PartitionKey}/{lookupRef.RowKey}");
+                                return repository.FindByIdAsync<StorageLookupTable, IRefAst[]>(
+                                        lookupRef.RowKey, lookupRef.PartitionKey,
+                                    (dictEntity, tableResult) =>
+                                    {
+                                        scopedLogger.Trace($"Fetched {lookupRef.PartitionKey}/{lookupRef.RowKey}");
+                                        var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
+                                            .NullToEmpty()
+                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
+                                            .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
+                                            .ToArray();
+                                        scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndParitionKeys.Length} lookups");
+                                        return rowAndParitionKeys;
+                                    },
+                                    () =>
+                                    {
+                                        scopedLogger.Trace($"Fetch FAILED for {lookupRef.PartitionKey}/{lookupRef.RowKey}");
+                                        return new IRefAst[] { };
+                                    },
+                                    tableName: tableName);
+                            })
+                        .AsyncEnumerable(startAllTasks: true)
+                        .SelectMany(logger: scopedLogger);
+                    return onQueriesMatched(items);
+                },
+                why => onQueriesDidNotMatch());
         }
 
         public Task<TResult> GetLookupInfoAsync<TResult>(
@@ -84,42 +95,44 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onNoLookupInfo)
         {
             var tableName = GetLookupTableName(memberInfo);
-            var lookupGeneratorAttr = this;
-            var lookupRefs = lookupGeneratorAttr
-                .GetLookupKeys(memberInfo, queries)
-                .ToArray();
-            return lookupRefs
-                .Select(
-                    lookupRef =>
-                    {
-                        return repository.FindByIdAsync<StorageLookupTable, (bool, string, DateTime, int)>(
-                                lookupRef.RowKey, lookupRef.PartitionKey,
-                            (dictEntity, tableResult) =>
+            return this.GetLookupKeys(memberInfo, queries,
+                lookupValues =>
+                {
+                    var lookupRefs = lookupValues.ToArray();
+                    return lookupRefs
+                        .Select(
+                            lookupRef =>
                             {
-                                var lastModified = dictEntity.lastModified;
-                                var count = dictEntity
-                                    .rowAndPartitionKeys
-                                    .NullToEmpty()
-                                    .Count();
-                                return (true, tableResult.Etag,
-                                    lastModified,
-                                    count);
-                            },
-                            () =>
-                            {
-                                var etag = default(string);
-                                var count = default(int);
-                                var lastModified = default(DateTime);
-                                return (false, etag, lastModified, count);
-                            },
-                            tableName: tableName);
-                    })
-                .AsyncEnumerable()
-                .Where(tpl => tpl.Item1)
-                .FirstAsync(
-                    tpl => onEtagLastModifedFound(
-                        tpl.Item2, tpl.Item3, tpl.Item4),
-                    () => onNoLookupInfo());
+                                return repository.FindByIdAsync<StorageLookupTable, (bool, string, DateTime, int)>(
+                                        lookupRef.RowKey, lookupRef.PartitionKey,
+                                    (dictEntity, tableResult) =>
+                                    {
+                                        var lastModified = dictEntity.lastModified;
+                                        var count = dictEntity
+                                            .rowAndPartitionKeys
+                                            .NullToEmpty()
+                                            .Count();
+                                        return (true, tableResult.Etag,
+                                            lastModified,
+                                            count);
+                                    },
+                                    () =>
+                                    {
+                                        var etag = default(string);
+                                        var count = default(int);
+                                        var lastModified = default(DateTime);
+                                        return (false, etag, lastModified, count);
+                                    },
+                                    tableName: tableName);
+                            })
+                        .AsyncEnumerable()
+                        .Where(tpl => tpl.Item1)
+                        .FirstAsync(
+                            tpl => onEtagLastModifedFound(
+                                tpl.Item2, tpl.Item3, tpl.Item4),
+                            () => onNoLookupInfo());
+                },
+                (why) => throw new Exception(why));
         }
 
         public async Task<PropertyLookupInformation[]> GetInfoAsync(
@@ -179,7 +192,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             public KeyValuePair<string, string>[] rowAndPartitionKeys;
         }
 
-        protected virtual IEnumerable<IRefAst> GetKeys<TEntity>(MemberInfo decoratedMember, TEntity value)
+        protected virtual TResult GetKeys<TEntity, TResult>(MemberInfo decoratedMember, TEntity value,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             var lookupGeneratorAttr = (IGenerateLookupKeys)this;
             var membersOfInterest = lookupGeneratorAttr.ProvideLookupMembers(decoratedMember);
@@ -187,7 +202,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 .Select(member => member.GetValue(value).PairWithKey(member))
                 .ToArray();
             return lookupGeneratorAttr.GetLookupKeys(decoratedMember, 
-                membersAndValuesRequiredForComputingLookup);
+                membersAndValuesRequiredForComputingLookup,
+                onLookupValuesMatch,
+                onNoMatch:onNoMatch);
         }
 
         #region Execution Code IMPORTANT: READ NOTE BEFORE MODIFYING!!!!!
@@ -197,28 +214,33 @@ namespace EastFive.Persistence.Azure.StorageTables
         // Removal of duplicate entries inside of Execution Chain can
         // result in data loss during concurrent operations.
 
-        public virtual async Task<TResult> ExecuteAsync<TEntity, TResult>(MemberInfo memberInfo,
+        public virtual Task<TResult> ExecuteAsync<TEntity, TResult>(MemberInfo memberInfo,
                 TEntity value,
                 AzureTableDriverDynamic repository, 
                 Func<IEnumerable<IRefAst>, IEnumerable<IRefAst>> mutateCollection,
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure)
         {
-            var rollbacks = await GetKeys(memberInfo, value)
-                .Select(
-                    lookupKey =>
-                    {
-                        return MutateLookupTable(lookupKey.RowKey, lookupKey.PartitionKey,
-                            memberInfo, repository, mutateCollection);
-                    })
-                .WhenAllAsync();
-            Func<Task> allRollbacks =
-                () =>
+            return GetKeys(memberInfo, value,
+                async lookupKeys =>
                 {
-                    var tasks = rollbacks.Select(rb => rb());
-                    return Task.WhenAll(tasks);
-                };
-            return onSuccessWithRollback(allRollbacks);
+                    var rollbacks = await lookupKeys
+                        .Select(
+                            lookupKey =>
+                            {
+                                return MutateLookupTable(lookupKey.RowKey, lookupKey.PartitionKey,
+                                    memberInfo, repository, mutateCollection);
+                            })
+                        .WhenAllAsync();
+                    Func<Task> allRollbacks =
+                        () =>
+                        {
+                            var tasks = rollbacks.Select(rb => rb());
+                            return Task.WhenAll(tasks);
+                        };
+                    return onSuccessWithRollback(allRollbacks);
+                },
+                why => onFailure().AsTask());
         }
 
         public async Task<Func<Task>> MutateLookupTable(string rowKey, string partitionKey,
@@ -376,15 +398,20 @@ namespace EastFive.Persistence.Azure.StorageTables
             TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
         {
             var tableName = GetLookupTableName(memberInfo);
-            return GetKeys(memberInfo, entity)
-                .Select(
-                    lookupKey =>
-                    {
-                        return (IBatchModify)new BatchModifier(tableName, lookupKey,
-                            rowAndPartitionKeys => rowAndPartitionKeys
-                                .Append(rowKey.PairWithValue(partitionKey)));
-                    })
-                .ToArray();
+            return GetKeys(memberInfo, entity,
+                lookupKeys =>
+                {
+                    return lookupKeys
+                        .Select(
+                            lookupKey =>
+                            {
+                                return (IBatchModify)new BatchModifier(tableName, lookupKey,
+                                    rowAndPartitionKeys => rowAndPartitionKeys
+                                        .Append(rowKey.PairWithValue(partitionKey)));
+                            })
+                        .ToArray();
+                },
+                why => throw new Exception(why));
         }
 
         public async Task<TResult> ExecuteInsertOrReplaceAsync<TEntity, TResult>(MemberInfo memberInfo,
@@ -394,80 +421,93 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure)
         {
-            var existingRowKeys = GetKeys(memberInfo, value);
             var tableName = GetLookupTableName(memberInfo);
-            var missingRows = existingRowKeys
-                .Select(
-                    async astKey =>
-                    {
-                        var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
-                            (lookup, tableResult) =>
+            return await GetKeys(memberInfo, value,
+                async existingRowKeys =>
+                {
+                    var missingRows = existingRowKeys
+                        .Select(
+                            async astKey =>
                             {
-                                var rowAndParitionKeys = lookup.rowAndPartitionKeys;
-                                var rowKeyFound = rowAndParitionKeys
-                                    .NullToEmpty()
-                                    .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
-                                    .Where(kvp => kvp.Key == rowKeyRef)
-                                    .Where(kvp => kvp.Value == partitionKeyRef)
-                                    .Any();
-                                if (rowKeyFound)
-                                    return true;
-                                return false;
-                            },
-                            onNotFound: () => false,
-                            tableName: tableName);
-                        return isGood;
-                    })
-                .AsyncEnumerable()
-                .Where(item => !item);
-            if (await missingRows.AnyAsync())
-                return onFailure();
-            return onSuccessWithRollback(() => 1.AsTask());
+                                var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
+                                    (lookup, tableResult) =>
+                                    {
+                                        var rowAndParitionKeys = lookup.rowAndPartitionKeys;
+                                        var rowKeyFound = rowAndParitionKeys
+                                            .NullToEmpty()
+                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
+                                            .Where(kvp => kvp.Key == rowKeyRef)
+                                            .Where(kvp => kvp.Value == partitionKeyRef)
+                                            .Any();
+                                        if (rowKeyFound)
+                                            return true;
+                                        return false;
+                                    },
+                                    onNotFound: () => false,
+                                    tableName: tableName);
+                                return isGood;
+                            })
+                        .AsyncEnumerable()
+                        .Where(item => !item);
+                    if (await missingRows.AnyAsync())
+                        return onFailure();
+                    return onSuccessWithRollback(() => 1.AsTask());
+                },
+                why => throw new Exception(why));
         }
 
-        public async Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
+        public Task<TResult> ExecuteUpdateAsync<TEntity, TResult>(MemberInfo memberInfo,
                 IAzureStorageTableEntity<TEntity> updatedEntity, 
                 IAzureStorageTableEntity<TEntity> existingEntity,
                 AzureTableDriverDynamic repository, 
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
-            var existingRowKeys = GetKeys(memberInfo, existingEntity.Entity);
-            var updatedRowKeys = GetKeys(memberInfo, updatedEntity.Entity);
-            var rowKeysDeleted = existingRowKeys.Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
-            var rowKeysAdded = updatedRowKeys.Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
-            var deletionRollbacks = rowKeysDeleted
-                .Select(
-                    rowKey =>
-                    {
-                        return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-                            repository,
-                            (rowAndParitionKeys) => rowAndParitionKeys
-                                .NullToEmpty()
-                                .Where(kvp =>
-                                    kvp.RowKey != existingEntity.RowKey && 
-                                    kvp.PartitionKey != existingEntity.PartitionKey)
-                                .ToArray());
-                    });
-            var additionRollbacks = rowKeysAdded
-                 .Select(
-                     rowKey =>
-                     {
-                         return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-                             repository,
-                             (rowAndParitionKeys) => rowAndParitionKeys
-                                .NullToEmpty()
-                                .Append(updatedEntity.RowKey.AsAstRef(updatedEntity.PartitionKey))
-                                .ToArray());
-                     });
-            var allRollbacks = await additionRollbacks.Concat(deletionRollbacks).WhenAllAsync();
-            Func<Task> allRollback =
-                () =>
+            return GetKeys(memberInfo, existingEntity.Entity,
+                existingRowKeys =>
                 {
-                    var tasks = allRollbacks.Select(rb => rb());
-                    return Task.WhenAll(tasks);
-                };
-            return onSuccessWithRollback(allRollback);
+                    return GetKeys(memberInfo, updatedEntity.Entity,
+                        async updatedRowKeys =>
+                        {
+                            var rowKeysDeleted = existingRowKeys.Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
+                            var rowKeysAdded = updatedRowKeys.Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}");
+                            var deletionRollbacks = rowKeysDeleted
+                                .Select(
+                                    rowKey =>
+                                    {
+                                        return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+                                            repository,
+                                            (rowAndParitionKeys) => rowAndParitionKeys
+                                                .NullToEmpty()
+                                                .Where(kvp =>
+                                                    kvp.RowKey != existingEntity.RowKey &&
+                                                    kvp.PartitionKey != existingEntity.PartitionKey)
+                                                .ToArray());
+                                    });
+                            var additionRollbacks = rowKeysAdded
+                                 .Select(
+                                     rowKey =>
+                                     {
+                                         return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
+                                             repository,
+                                             (rowAndParitionKeys) => rowAndParitionKeys
+                                                .NullToEmpty()
+                                                .Append(updatedEntity.RowKey.AsAstRef(updatedEntity.PartitionKey))
+                                                .ToArray());
+                                     });
+                            var allRollbacks = await additionRollbacks.Concat(deletionRollbacks).WhenAllAsync();
+                            Func<Task> allRollback =
+                                () =>
+                                {
+                                    var tasks = allRollbacks.Select(rb => rb());
+                                    return Task.WhenAll(tasks);
+                                };
+                            return onSuccessWithRollback(allRollback);
+                        },
+                        why => throw new Exception(why));
+                },
+                why => throw new Exception(why));
+            
         }
 
         public Task<TResult> ExecuteDeleteAsync<TEntity, TResult>(MemberInfo memberInfo, 
@@ -495,21 +535,26 @@ namespace EastFive.Persistence.Azure.StorageTables
             TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
         {
             var tableName = GetLookupTableName(memberInfo);
-            return GetKeys(memberInfo, entity)
-                .Select(
-                    lookupKey =>
-                    {
-                        return (IBatchModify)new BatchModifier(tableName, lookupKey,
-                            rowAndPartitionKeys =>
+            return GetKeys(memberInfo, entity,
+                lookupKeys =>
+                {
+                    return lookupKeys
+                        .Select(
+                            lookupKey =>
                             {
-                                return rowAndPartitionKeys
-                                    .Where(
-                                        kvp =>
-                                            kvp.Key != rowKey ||
-                                            kvp.Value != partitionKey);
-                            });
-                    })
-                .ToArray();
+                                return (IBatchModify)new BatchModifier(tableName, lookupKey,
+                                    rowAndPartitionKeys =>
+                                    {
+                                        return rowAndPartitionKeys
+                                            .Where(
+                                                kvp =>
+                                                    kvp.Key != rowKey ||
+                                                    kvp.Value != partitionKey);
+                                    });
+                            })
+                        .ToArray();
+                },
+                why => throw new Exception(why));
         }
 
         public async Task<TResult> RepairAsync<TEntity, TResult>(MemberInfo memberInfo,
@@ -531,61 +576,23 @@ namespace EastFive.Persistence.Azure.StorageTables
                     })
                 .ToArray();
 
-            //var existingRowKeys = await GetKeys(memberInfo, repository, queryableProperties)
-            //    .ToArrayAsync();
-            //var doesContainLookup = existingRowKeys
-            //    .Contains(rk => rk.RowKey == rowKeyRef && rk.PartitionKey == partitionKeyRef);
-            //if (doesContainLookup)
-            //    return onNoChangesNecessary();
+            return await this.GetLookupKeys(memberInfo, queryableProperties,
+                async lookupKeys =>
+                {
+                    Func<Task>[] rollbacks = await lookupKeys
+                        .Select(
+                            lookupKeys => MutateLookupTable(lookupKeys.RowKey, lookupKeys.PartitionKey, memberInfo,
+                                repository,
+                                (rowAndParitionKeys) => rowAndParitionKeys
+                                    .NullToEmpty()
+                                    .Append(rowKeyRef.AsAstRef(partitionKeyRef))))
+                        .AsyncEnumerable()
+                        .ToArrayAsync();
 
-            Func<Task>[] rollbacks = await this.GetLookupKeys(memberInfo, queryableProperties)
-                .Select(
-                    lookupKeys => MutateLookupTable(lookupKeys.RowKey, lookupKeys.PartitionKey, memberInfo,
-                        repository,
-                        (rowAndParitionKeys) => rowAndParitionKeys
-                            .NullToEmpty()
-                            .Append(rowKeyRef.AsAstRef(partitionKeyRef))))
-                .AsyncEnumerable()
-                .ToArrayAsync();
+                    return onRepaired($"Processed Lookup:{rowKeyRef + " | " + partitionKeyRef}");
 
-            return onRepaired($"Processed Lookup:{rowKeyRef + " | " + partitionKeyRef}");
-
-            //var updatedRowKeys = new RefAst(rowKeyRef, partitionKeyRef).AsArray(); // GetKeys(memberInfo, value);
-            //var rowKeysDeleted = existingRowKeys
-            //    .Except(updatedRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-            //    .ToArray();
-            //var rowKeysAdded = updatedRowKeys
-            //    .Except(existingRowKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-            //    .ToArray();
-            //if (rowKeysDeleted.None() && rowKeysAdded.None())
-            //    return onNoChangesNecessary();
-
-            //var deletionRollbacks = await rowKeysDeleted
-            //    .Select(
-            //        rowKey =>
-            //        {
-            //            return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-            //                repository,
-            //                (rowAndParitionKeys) => rowAndParitionKeys
-            //                    .NullToEmpty()
-            //                    .Where(kvp => kvp.Key != rowKeyRef));
-            //        })
-            //    .AsyncEnumerable()
-            //    .ToArrayAsync();
-            //var additionRollbacks = await rowKeysAdded
-            //     .Select(
-            //         rowKey =>
-            //         {
-            //             return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
-            //                 repository,
-            //                 (rowAndParitionKeys) => rowAndParitionKeys
-            //                    .NullToEmpty()
-            //                    .Append(rowKeyRef.PairWithValue(partitionKeyRef)));
-            //         })
-            //    .AsyncEnumerable()
-            //    .ToArrayAsync();
-
-
+                },
+                why => throw new Exception(why));
         }
 
         #endregion
@@ -686,10 +693,10 @@ namespace EastFive.Persistence.Azure.StorageTables
             return decoratedMember.AsEnumerable();
         }
 
-        public abstract IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember, 
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues);
-
-        
+        public abstract TResult GetLookupKeys<TResult>(MemberInfo decoratedMember, 
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch);
     }
 
 }

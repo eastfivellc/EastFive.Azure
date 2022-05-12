@@ -66,7 +66,7 @@ namespace EastFive.Azure.Media
             Func<TResult> onNotFound,
             Func<byte [], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onInvalidImage = default)
         {
-            return blobRef.LoadAsync(
+            return blobRef.LoadBytesAsync(
                 (blobId, imageBytes, mediaType, disposition) =>
                 {
                     if (imageBytes.TryReadImage(out Image image))
@@ -85,7 +85,7 @@ namespace EastFive.Azure.Media
             Func<TResult> onNotFound,
             Func<byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onInvalidImage = default)
         {
-            return blobRef.LoadAsync(
+            return blobRef.LoadBytesAsync(
                 (blobId, imageBytes, mediaType, disposition) =>
                 {
                     if (imageBytes.TryReadImage(out SixLabors.ImageSharp.Image image, out SixLabors.ImageSharp.Formats.IImageFormat format))
@@ -100,13 +100,32 @@ namespace EastFive.Azure.Media
         }
 
         public static Task<TResult> LoadImageSharpAsync<TResult>(this IBlobRef blobRef,
-            Func<SixLabors.ImageSharp.Image, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<SixLabors.ImageSharp.Image, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                Func<TResult> onNotFound,
+                Func<byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onInvalidImage = default) =>
+            blobRef.LoadImageSharpAsync(
+                (image, mediaType, disposition, format) => onFound(image, mediaType, disposition),
+                onNotFound:onNotFound,
+                onInvalidImage: onInvalidImage);
+
+        public static Task<TResult> LoadImageMagickAsync<TResult>(this IBlobRef blobRef,
+            Func<object, MediaTypeHeaderValue, ContentDispositionHeaderValue, object, TResult> onFound,
             Func<TResult> onNotFound,
             Func<byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onInvalidImage = default)
         {
-            return blobRef.LoadImageSharpAsync(
-                (image, mediaType, disposition, format) => onFound(image, mediaType, disposition),
-                onNotFound);
+            throw new NotImplementedException();
+            //return blobRef.LoadBytesAsync(
+            //    (blobId, imageBytes, mediaType, disposition) =>
+            //    {
+            //        if (imageBytes.TryReadImage(out MagickImage image, out MagickFormat format))
+            //            return onFound(image, mediaType, disposition, format);
+
+            //        if (onInvalidImage.IsDefaultOrNull())
+            //            return onNotFound();
+
+            //        return onInvalidImage(imageBytes, mediaType, disposition);
+            //    },
+            //    onNotFound);
         }
 
         public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
@@ -166,7 +185,7 @@ namespace EastFive.Azure.Media
                                 new ApiKeyServiceClientCredentials(subscriptionKey),
                                 new System.Net.Http.DelegatingHandler[] { }))
                             {
-                                return await await contentRef.LoadAsync(
+                                return await await contentRef.LoadBytesAsync(
                                     async (blobId, imageData, contentType, disposition) =>
                                     {
                                         var widthMultiplier = default(double?);

@@ -106,7 +106,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new Exception($"Unrecognized EdmType {ep.PropertyType}");
         }
 
-        public static object[] FromEdmTypedByteArray(this byte[] binaryValue, Type type)
+        public static object[] FromEdmTypedByteArray(this byte[] binaryValue, Type typeForDefaultFromMissingValues)
         {
             var typeFromByte = typeBytes
                 .Select(kvp => kvp.Key.PairWithKey(kvp.Value))
@@ -117,21 +117,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                     typeWithBytes =>
                     {
                         if (!typeWithBytes.Any())
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         var typeByte = typeWithBytes[0];
                         if(!typeFromByte.ContainsKey(typeByte))
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         var edmType = typeFromByte[typeByte];
                         var valueBytes = typeWithBytes.Skip(1).ToArray();
                         var valueObj = edmType.ToObjectFromEdmTypeByteArray(valueBytes);
                         if(null == valueObj)
                         {
-                            if (type.IsClass)
+                            if (typeForDefaultFromMissingValues.IsClass)
                                 return valueObj;
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         }
-                        if (!type.IsAssignableFrom(valueObj.GetType()))
-                            return type.GetDefault(); // TODO: Data corruption?
+                        if (!typeForDefaultFromMissingValues.IsAssignableFrom(valueObj.GetType()))
+                            return typeForDefaultFromMissingValues.GetDefault(); // TODO: Data corruption?
                         return valueObj;
                     })
                 .ToArray();
@@ -782,8 +782,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                         {
                             return v.CastEntityProperty(arrayType,
                                 ep => ep,
-                                () => throw new NotImplementedException(
-                                    $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
+                                () =>
+                                {
+                                    throw new NotImplementedException(
+                                        $"Serialization of {arrayType.FullName} is currently not supported on arrays.");
+                                });
                         })
                     .ToArray();
                 var bytess = entityProperties.ToByteArrayOfEntityProperties();
@@ -903,6 +906,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             TResult GetDefault()
             {
+                var entityCasters = arrayType
+                    .GetAttributesInterface<ICast<EntityProperty>>(true)
+                    .ToArray();
                 var valueEnumerable = (System.Collections.IEnumerable)value;
                 var valueEnumerator = valueEnumerable.GetEnumerator();
                 var entityProperties = valueEnumerable
@@ -910,15 +916,17 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .Select(
                         (v, index) =>
                         {
-                            return arrayType
-                                .GetAttributesInterface<ICast<EntityProperty>>(true)
+                            return entityCasters
                                 .First(
                                     (epSerializer, next) =>
                                     {
                                         return epSerializer.Cast(v, arrayType, default, default,
                                             ep => ep,
-                                            () => throw new NotImplementedException(
-                                                $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
+                                            () =>
+                                            {
+                                                throw new NotImplementedException(
+                                                    $"Serialization of {arrayType.FullName} is currently not supported on arrays.");
+                                            });
                                     },
                                     () =>
                                     {
@@ -930,15 +938,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                                                     var key = $"{index}";
                                                     return epSerializer.Cast(v, arrayType, key, default,
                                                         epKvp => epKvp[key],
-                                                        () => throw new NotImplementedException(
-                                                            $"Serialization of {arrayType.FullName} is currently not supported on arrays."));
+                                                        () =>
+                                                        {
+                                                            throw new NotImplementedException(
+                                                                $"Serialization of {arrayType.FullName} is currently not supported on arrays.");
+                                                        });
                                                 },
                                                 () =>
                                                 {
                                                     return v.CastEntityProperty(arrayType,
                                                         ep => ep,
-                                                        () => throw new NotImplementedException(
-                                                            $"Serialization of {arrayType.FullName} is currently not supported on arrays."),
+                                                        () =>
+                                                        {
+                                                            throw new NotImplementedException(
+                                                                $"Serialization of {arrayType.FullName} is currently not supported on arrays.");
+                                                        },
                                                         amDesperate: true);
                                                 });
                                     });

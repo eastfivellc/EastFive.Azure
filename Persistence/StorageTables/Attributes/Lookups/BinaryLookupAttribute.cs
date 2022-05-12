@@ -44,11 +44,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             return "BinaryLookupAttribute";
         }
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException("IdLookupAttribute only supports operations on a single member.", "lookupValues");
+                return onNoMatch("IdLookupAttribute only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
 
@@ -63,14 +65,14 @@ namespace EastFive.Persistence.Azure.StorageTables
             var rowKey = (bool)rowKeyValue;
             if (StorageMask == StorageMasks.True)
                 if (!rowKey)
-                    return Enumerable.Empty<IRefAst>();
+                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
             if (StorageMask == StorageMasks.False)
                 if (rowKey)
-                    return Enumerable.Empty<IRefAst>();
+                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
             var partitionKey = base.GetLookupTableName(decoratedMember);
-            return new RefAst(rowKey.ToString(), partitionKey).AsEnumerable();
+            return onLookupValuesMatch(new RefAst(rowKey.ToString(), partitionKey).AsEnumerable());
         }
     }
 

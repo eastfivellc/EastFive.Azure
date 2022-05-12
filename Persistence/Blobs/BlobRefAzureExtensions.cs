@@ -91,11 +91,23 @@ namespace EastFive.Azure.Persistence.Blobs
 
             private Uri sasUrl;
 
-            public Task<TResult> LoadAsync<TResult>(
+            public Task<TResult> LoadBytesAsync<TResult>(
                 Func<string, byte[], MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
                 Func<TResult> onNotFound,
                 Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null) =>
-                    baseBlob.LoadAsync(onFound, onNotFound, onFailure: onFailure);
+                    baseBlob.LoadBytesAsync(onFound, onNotFound, onFailure: onFailure);
+
+            public Task<TResult> LoadStreamAsync<TResult>(
+                    Func<string, Stream, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                    Func<TResult> onNotFound,
+                    Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default) =>
+                baseBlob.LoadStreamAsync(onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
+
+            public Task<TResult> LoadStreamToAsync<TResult>(Stream stream,
+                    Func<string, MediaTypeHeaderValue, ContentDispositionHeaderValue, TResult> onFound,
+                    Func<TResult> onNotFound,
+                    Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default) =>
+                baseBlob.LoadStreamToAsync(stream, onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
 
             public void Write(JsonWriter writer, JsonSerializer serializer,
                 IHttpRequest httpRequest, IAzureApplication application)

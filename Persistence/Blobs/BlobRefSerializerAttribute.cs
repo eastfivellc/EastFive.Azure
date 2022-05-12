@@ -36,37 +36,51 @@ namespace EastFive.Azure.Persistence.Blobs
         {
             var containerName = member.BlobContainerName();
 
-            var id = GetId(pathStart);
-            var blobRef = new BlobRefStorage
-            {
-                Id = id,
-                ContainerName = containerName,
-            };
-            return onBound(blobRef);
-
-            string GetId(string path)
+            return GetId(pathStart,
+                id =>
+                {
+                    var blobRef = new BlobRefStorage
+                    {
+                        Id = id,
+                        ContainerName = containerName,
+                    };
+                    return onBound(blobRef);
+                },
+                () =>
+                {
+                    return onBound(default(IBlobRef));
+                });
+            
+            TResult GetId(string path,
+                Func<string, TResult> onFound,
+                Func<TResult> onNoValue)
             {
                 if (!value.TryGetValue(path, out EntityProperty epValue))
                 {
                     if(!member.TryGetAttributeInterface(out IMigrateBlobIdAttribute migrateBlobId))
-                        return default;
+                        return onNoValue();
 
                     // terminate recursion
                     if (migrateBlobId.IdName.Equals(path, StringComparison.Ordinal))
-                        return default;
+                        return onNoValue();
 
-                    return GetId(migrateBlobId.IdName);
+                    return GetId(migrateBlobId.IdName,
+                        onFound, onNoValue);
                 }
 
                 if (epValue.PropertyType == EdmType.String)
-                    return epValue.StringValue;
+                {
+                    if(epValue.StringValue.HasBlackSpace())
+                        return onFound(epValue.StringValue);
+                    return onNoValue();
+                }
                 if (epValue.PropertyType == EdmType.Guid)
                 {
                     var guidValue = epValue.GuidValue;
                     if(guidValue.HasValue)
-                        return guidValue.Value.ToString("N");
+                        return onFound(guidValue.Value.ToString("N"));
                 }
-                return default;
+                return onNoValue();
             }
             
         }
@@ -77,7 +91,11 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<TResult> onNoCast)
         {
             if (value.IsDefaultOrNull())
-                return onNoCast();
+            {
+                var epNull = new EntityProperty(default(string));
+                var dictEmpty = epNull.PairWithKey(path).AsArray().ToDictionary();
+                return onValue(dictEmpty);
+            }
             if(!(value is IBlobRef))
                 return onNoCast();
             var blobRef = value as IBlobRef;

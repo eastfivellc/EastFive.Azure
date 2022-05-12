@@ -45,8 +45,10 @@ namespace EastFive.Persistence.Azure.StorageTables
                     });
         }
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+                IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             return lookupValues
                 .Select(
@@ -63,7 +65,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var (hasAttr, lookup, integrationIdProvider) = tpl;
                         if(!integrationIdProvider.TryGetIntegrationId(lookup.Key, lookup.Value, 
                                 out string integrationId))
-                            return Enumerable.Empty<IRefAst>();
+                            return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
                         var keyLookupAttrs = lookupValues
                             .Select(
                                 lookup =>
@@ -74,10 +76,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                                 })
                             .Where(tpl => tpl.hasAttr);
                         if (!keyLookupAttrs.Any())
-                            throw new Exception(
-                                $"Property that implements {nameof(IProvideIntegrationKey)} was not provided in query.");
+                            return next();
+                            //throw new Exception(
+                            //    $"Property that implements {nameof(IProvideIntegrationKey)} was not provided in query.");
 
-                        return keyLookupAttrs
+                        var r = keyLookupAttrs
                             .First(
                                 (tpl, next) =>
                                 {
@@ -88,12 +91,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     return next();
                                 },
                                 () => Enumerable.Empty<IRefAst>());
+                        return onLookupValuesMatch(r);
                     },
                     () =>
                     {
-                        throw new Exception(
-                            $"{decoratedMember.DeclaringType.FullName}..{decoratedMember.Name} was not provided in query.");
-                        return Enumerable.Empty<IRefAst>();
+                        return onNoMatch($"{decoratedMember.DeclaringType.FullName}..{decoratedMember.Name} was not provided in query.");
                     });
         }
 

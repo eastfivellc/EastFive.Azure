@@ -36,26 +36,28 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool IgnoreDefault { get; set; } = true;
 
-        public override IEnumerable<IRefAst> GetLookupKeys(MemberInfo decoratedMember,
-            IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues)
+        public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
+                IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
+            Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
+            Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                throw new ArgumentException();
+                return onNoMatch($"{nameof(DateTimeLookupAttribute)} can only process 1 lookup value");
 
             var lookupMemberValueKvp = lookupValues.Single();
             var lookupMemberInfo = lookupMemberValueKvp.Key;
 
             var lookupValueMaybe = GetDateTime();
             if (!lookupValueMaybe.HasValue)
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
             var lookupValue = lookupValueMaybe.Value;
             if(IgnoreDefault && lookupValue.IsDefault())
-                return Enumerable.Empty<IRefAst>();
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
             var lookupRowKey = ComputeLookupKey(lookupValue, this.Row);
             var lookupPartitionKey = ComputeLookupKey(lookupValue, this.Partition);
 
-            return lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable();
+            return onLookupValuesMatch(lookupRowKey.AsAstRef(lookupPartitionKey).AsEnumerable());
 
             DateTime? GetDateTime()
             {
