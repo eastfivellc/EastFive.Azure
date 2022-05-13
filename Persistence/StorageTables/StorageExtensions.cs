@@ -366,15 +366,29 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static object StorageParsePartitionKeyForType(this object entity, string partitionKey, Type type)
         {
-            var partitionKeyMember = type
+            return type
                 .GetPropertyOrFieldMembers()
-                .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>())
                 .Select(member =>
-                    member.GetAttributesInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>()
-                        .First()
-                        .PairWithKey(member))
-                .First();
-            return partitionKeyMember.Value.ParsePartitionKey(entity, partitionKey, partitionKeyMember.Key);
+                {
+                    var success = member.TryGetAttributeInterface(out IModifyAzureStorageTablePartitionKey attr);
+                    return (success, attr, member);
+                })
+                .SelectWhere()
+                .Single(
+                    onSingle: (partitionKeyMemberTpl) =>
+                    {
+                        var (partitionKeyModifier, member) = partitionKeyMemberTpl;
+                        return partitionKeyModifier.ParsePartitionKey(entity, partitionKey, member);
+                    },
+                    onNone: () =>
+                    {
+                        throw new ArgumentException($"{type.FullName} does not contain a field or property that implements {nameof(IModifyAzureStorageTablePartitionKey)}");
+                    },
+                    onMultiple: (memberTpls) =>
+                    {
+                        var fieldsAndProps = memberTpls.Select(tpl => tpl.Item2.Name).Join(',');
+                        throw new ArgumentException($"{type.FullName} contains multiple fields or properties ({fieldsAndProps}) that implement {nameof(IModifyAzureStorageTablePartitionKey)}");
+                    });
         }
 
         public static IEnumerable<string> StorageGetPartitionKeys(this Type type, int skip, int top)
