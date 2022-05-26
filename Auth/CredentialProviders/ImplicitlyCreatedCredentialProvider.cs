@@ -72,12 +72,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             throw new NotImplementedException();
         }
 
-        public Task<TResult> UpdateEmailAsync<TResult>(Guid loginId, string email, Func<TResult> onSuccess, Func<string, TResult> onServiceNotAvailable, Func<TResult> onServiceNotSupported, Func<string, TResult> onFailure)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<TResult> DeleteAuthorizationAsync<TResult>(Guid loginId, Func<TResult> onSuccess, Func<string, TResult> onServiceNotAvailable, Func<TResult> onServiceNotSupported, Func<string, TResult> onFailure)
+        public Task<TResult> DeleteAuthorizationAsync<TResult>(string loginId, Func<TResult> onSuccess, Func<string, TResult> onServiceNotAvailable, Func<TResult> onServiceNotSupported, Func<string, TResult> onFailure)
         {
             throw new NotImplementedException();
         }
