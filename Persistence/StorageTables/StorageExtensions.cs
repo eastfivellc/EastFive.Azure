@@ -4,26 +4,27 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using System.Reflection;
+using System.IO;
+using System.Threading;
 
+using Microsoft.Azure.Cosmos.Table;
+
+using EastFive;
 using EastFive.Async;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 using BlackBarLabs.Persistence.Azure;
 using EastFive.Persistence.Azure;
 using EastFive.Azure.StorageTables.Driver;
-using System.Reflection;
-using System.IO;
+
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Analytics;
-using System.Threading;
 using EastFive.Azure.Persistence.StorageTables;
-using Microsoft.Azure.Cosmos.Table;
-using EastFive.Api;
 using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
@@ -366,15 +367,29 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static object StorageParsePartitionKeyForType(this object entity, string partitionKey, Type type)
         {
-            var partitionKeyMember = type
+            return type
                 .GetPropertyOrFieldMembers()
-                .Where(member => member.ContainsAttributeInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>())
                 .Select(member =>
-                    member.GetAttributesInterface<EastFive.Persistence.IModifyAzureStorageTablePartitionKey>()
-                        .First()
-                        .PairWithKey(member))
-                .First();
-            return partitionKeyMember.Value.ParsePartitionKey(entity, partitionKey, partitionKeyMember.Key);
+                    {
+                        var success = member.TryGetAttributeInterface(out IModifyAzureStorageTablePartitionKey attr);
+                        return (success, attr, member);
+                    })
+                .SelectWhere()
+                .Single(
+                    onSingle:(partitionKeyMemberTpl) =>
+                    {
+                        var (partitionKeyModifier, member) = partitionKeyMemberTpl;
+                        return partitionKeyModifier.ParsePartitionKey(entity, partitionKey, member);
+                    },
+                    onNone:() =>
+                    {
+                        throw new ArgumentException($"{type.FullName} does not contain a field or property that implements {nameof(IModifyAzureStorageTablePartitionKey)}");
+                    },
+                    onMultiple: (memberTpls) =>
+                    {
+                        var fieldsAndProps = memberTpls.Select(tpl => tpl.Item2.Name).Join(',');
+                        throw new ArgumentException($"{type.FullName} contains multiple fields or properties ({fieldsAndProps}) that implement {nameof(IModifyAzureStorageTablePartitionKey)}");
+                    });
         }
 
         public static IEnumerable<string> StorageGetPartitionKeys(this Type type, int skip, int top)
@@ -446,7 +461,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<object> StorageGetAll(this Type type, string tableName = default)
         {
             var findAllMethod = typeof(StorageExtensions)
-                .GetMethod("StorageGetAllInternal", BindingFlags.Public | BindingFlags.Static);
+                .GetMethod(nameof(StorageGetAllInternal), BindingFlags.Public | BindingFlags.Static);
             var findAllCast = findAllMethod.MakeGenericMethod(type.AsArray());
             return (IEnumerableAsync<object>)findAllCast.Invoke(null, new object[] { tableName });
         }
@@ -1242,7 +1257,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
                 default(Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
-            where TEntity : struct, IReferenceable
+            where TEntity : IReferenceable
         {
             var rowKey = entityRef.StorageComputeRowKey();
             return AzureTableDriverDynamic

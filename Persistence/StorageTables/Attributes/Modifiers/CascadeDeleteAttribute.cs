@@ -104,7 +104,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         #region 
 
-        public KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             return new KeyValuePair<string, EntityProperty>[] { };
         }

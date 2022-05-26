@@ -17,6 +17,17 @@ namespace EastFive.Azure.Auth
     public struct AccountLinks
     {
         public AccountLink[] accountLinks;
+
+        public TResult GetLinkForMethod<TResult>(IRef<Method> methodRef,
+            Func<string, TResult> onMatched,
+            Func<TResult> onNotMatched)
+        {
+            return this.accountLinks
+                .Where(al => al.method.id == methodRef.id)
+                .First(
+                    (accountLink, next) => onMatched(accountLink.externalAccountKey),
+                    () => onNotMatched());
+        }
     }
 
     public struct AccountLink
@@ -27,7 +38,6 @@ namespace EastFive.Azure.Auth
 
     public class AccountLinksAttribute : StorageLookupAttribute, IPersistInAzureStorageTables
     {
-
         public override TResult GetLookupKeys<TResult>(MemberInfo decoratedMember,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
             Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
@@ -65,7 +75,8 @@ namespace EastFive.Azure.Auth
             return tablePropertyName;
         }
 
-        public KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var accountLinks = (AccountLinks)value;
             return accountLinks.accountLinks

@@ -197,6 +197,17 @@ namespace EastFive.Api.Azure
         {
             get
             {
+                if(loginProviders.IsDefaultOrNull())
+                {
+                    var countDown = 1000;
+                    while (!this.IsInitialized)
+                    {
+                        if (countDown <= 0)
+                            break;
+                        countDown--;
+                        Thread.Sleep(10);
+                    }
+                }
                 return loginProviders;
                 //return this.GetType()
                 //    .GetAttributesInterface<IProvideLoginProvider>(true, true)

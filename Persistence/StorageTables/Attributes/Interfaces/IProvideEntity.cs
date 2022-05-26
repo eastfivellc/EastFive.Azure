@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
-    interface IProvideEntity
+    public interface IProvideEntity
     {
         IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity);
 
