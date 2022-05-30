@@ -141,12 +141,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             var providerId = ConfigurationManager.AppSettings.Get("BlackBarLabs.Security.CredentialProvider.ImplicitCreation.ProviderId");
 
             var concatination = providerId + username;
-            Guid authId = default;
-            using (var algorithm = MD5.Create())
-            {
-                byte[] md5data = algorithm.ComputeHash(Encoding.UTF8.GetBytes(concatination));
-                authId = new Guid(md5data);
-            }
+            Guid authId = Encoding.UTF8.GetBytes(concatination).MD5HashGuid();
 
             #endregion
 
