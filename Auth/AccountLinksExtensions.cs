@@ -20,15 +20,19 @@ namespace EastFive.Azure.Auth
     public static class AccountLinksExtensions
     {
         public static AccountLinks AppendCredentials(this AccountLinks accountLinks,
-            Method authMethod, string accountKey)
+            Method authMethod, string accountKey) =>
+                accountLinks.AddOrUpdateCredentials(authMethod.authenticationId, accountKey);
+
+        public static AccountLinks AddOrUpdateCredentials(this AccountLinks accountLinks,
+            IRef<Method> authMethodRef, string accountKey)
         {
             accountLinks.accountLinks = accountLinks.accountLinks
                 .NullToEmpty()
-                .Where(al => al.method.id != authMethod.authenticationId.id)
+                .Where(al => al.method.id != authMethodRef.id)
                 .Append(
                     new AccountLink
                     {
-                        method = authMethod.authenticationId,
+                        method = authMethodRef,
                         externalAccountKey = accountKey,
                     })
                 .ToArray();
@@ -67,21 +71,6 @@ namespace EastFive.Azure.Auth
             return alsUpdated;
         }
         
-        public static TResource PopulateResourceFromClaims<TResource>(this IProvideClaims claimProvider,
-            TResource account, IDictionary<string, string> extraParams)
-        {
-            return account.GetType()
-                    .GetPropertyAndFieldsWithAttributesInterface<PopulatedByAuthorizationClaim>()
-                    .Aggregate(account,
-                        (accountToUpdate, tpl) =>
-                        {
-                            var (member, populationAttr) = tpl;
-                            return populationAttr.PopulateValue(accountToUpdate, member,
-                                (string claimType, out string claimValue) =>
-                                    claimProvider.TryGetStandardClaimValue(claimType, extraParams, out claimValue));
-                        });
-        }
-
         public static IEnumerableAsync<Method> DeleteInCredentialProviders(this AccountLinks accountLinks, IAuthApplication application)
         {
             var loginProvidersWithMethods = application.LoginProviders
