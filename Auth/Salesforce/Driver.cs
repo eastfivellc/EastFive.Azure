@@ -17,6 +17,9 @@ using EastFive.Serialization;
 using EastFive.Serialization.Json;
 using EastFive.Web.Configuration;
 using EastFive.Azure.Auth.Salesforce.Resources;
+using Newtonsoft.Json.Linq;
+using System.Threading;
+using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
@@ -25,7 +28,14 @@ namespace EastFive.Azure.Auth.Salesforce
 		Uri ProvideUrl(string instanceUrl);
     }
 
-    public interface IBindSalesforce
+	public interface IDefineSalesforceIdentifier
+    {
+		TResult GetIdentifier<T, TResult>(T resource, MemberInfo propertyOrField,
+			Func<string, TResult> onIdentified,
+			Func<TResult> onNoIdentification);
+    }
+
+	public interface IBindSalesforce
     {
 		/// <summary>
 		/// 
@@ -40,134 +50,27 @@ namespace EastFive.Azure.Auth.Salesforce
 		/// <returns></returns>
 		bool IsMatch(MemberInfo member, Field field, Type primaryResource);
 
-        void PopluateSalesforceResource(JsonTextWriter jsonWriter, MemberInfo member, object resource, Field field);
+		void PopluateSalesforceResource(JsonTextWriter jsonWriter, MemberInfo member, object resource, Field field);
     }
 
-    public class SalesforceApiPathAttribute : Attribute, IDefineSalesforceApiPath
+
+	public interface ICastSalesforce
 	{
-		public SalesforceApiPathAttribute(string objectName)
-        {
-			this.ObjectName = objectName;
-		}
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="member"></param>
+		/// <param name="field"></param>
+		/// <param name="primaryResource">The resource that is being synchronized</param>
+		/// <remarks>
+		/// <paramref name="primaryResource"/> Can be used to differentiate
+		/// if this class is used to differentiate the case where this class is used as an extraObjct,
+		/// or if this class is the primary object being synchronized</remarks>
+		/// <returns></returns>
+		bool IsMatch(MemberInfo member, JProperty jproperty, Type primaryResource);
 
-		public string ObjectName { get; set; }
-
-        public Uri ProvideUrl(string instanceUrl)
-        {
-			Uri.TryCreate($"{instanceUrl}/services/data/v54.0/sobjects/{this.ObjectName}/", UriKind.Absolute, out Uri url);
-			return url;
-		}
-    }
-
-    public class SalesforcePropertyAttribute : Attribute, IBindSalesforce
-    {
-		public string Name { get; set; }
-
-		public Type Type { get; set; }
-
-		public SalesforcePropertyAttribute(string name)
-		{
-			this.Name = name;
-		}
-
-		public virtual bool IsMatch(MemberInfo member, Field field, Type primaryResource)
-        {
-			if (Type.IsNotDefaultOrNull())
-				if (Type != primaryResource)
-					return false;
-
-			return Name.Equals(field.name, StringComparison.Ordinal);
-        }
-
-        public virtual void PopluateSalesforceResource(JsonTextWriter jsonWriter,
-			MemberInfo member, object resource, Field field)
-        {
-			jsonWriter.WritePropertyName(field.name);
-			var value = member.GetPropertyOrFieldValue(resource);
-
-			WriteJson(jsonWriter, value, new JsonSerializer());
-
-			void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-            {
-				Api.Serialization.ExtrudeConvert.WriteJson(jsonWriter, value, serializer,
-					type => false,
-					(wtr, v, serializer) => WriteJson(wtr, v, serializer),
-					serializer => 1.0);
-			}
-        }
-    }
-
-	public class SalesforceProperty2Attribute : SalesforcePropertyAttribute
-    {
-		public SalesforceProperty2Attribute(string name) : base(name)
-        {
-
-        }
+		void PopluateSalesforceResource(object resource, MemberInfo member, JObject jsonObject, JProperty jProperty, bool overrideEmptyValues);
 	}
-
-	public class SalesforcePropertyMappingAttribute : SalesforcePropertyAttribute
-	{
-		public bool IgnoreCase { get; set; } = true;
-		public string Key1 { get; set; }
-		public string Value1 { get; set; }
-		public string Key2 { get; set; }
-		public string Value2 { get; set; }
-		public string Key3 { get; set; }
-		public string Value3 { get; set; }
-		public string Key4 { get; set; }
-		public string Value4 { get; set; }
-		public string Key5 { get; set; }
-		public string Value5 { get; set; }
-		public string Key6 { get; set; }
-		public string Value6 { get; set; }
-		public string Key7 { get; set; }
-		public string Value7 { get; set; }
-		public string Default { get; set; }
-
-		public SalesforcePropertyMappingAttribute(string name) : base(name)
-		{
-
-		}
-
-        public override void PopluateSalesforceResource(JsonTextWriter jsonWriter, MemberInfo member, object resource, Field field)
-        {
-			var value = (string)member.GetPropertyOrFieldValue(resource);
-			var propsAndFields = typeof(SalesforcePropertyMappingAttribute)
-				.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-				.ToArray();
-
-			bool didWrite = propsAndFields
-				.Where(prop => prop.Name.StartsWith("Key"))
-				.First(
-					(keyProp, next) =>
-					{
-						var keyValue = (string)keyProp.GetValue(this);
-						if (!value.Equals(keyValue, StringComparison.OrdinalIgnoreCase))
-							return next();
-
-						var valueProp = propsAndFields
-							.Where(prop => prop.Name.StartsWith("Value"))
-							.Where(valueProp => valueProp.Name.Last() == keyProp.Name.Last())
-							.First();
-						var valueValue = valueProp.GetValue(this);
-
-						jsonWriter.WritePropertyName(this.Name);
-						jsonWriter.WriteValue(valueValue);
-
-						return true;
-					},
-					() =>
-                    {
-						if (Default.IsNullOrWhiteSpace())
-							return false;
-
-						jsonWriter.WritePropertyName(this.Name);
-						jsonWriter.WriteValue(Default);
-
-						return true;
-					});
-        }
-    }
 
 	public class Driver
 	{
@@ -175,6 +78,8 @@ namespace EastFive.Azure.Auth.Salesforce
 		string instanceUrl;
 		string tokenType;
 		string refreshToken;
+		DateTime lastRefreshed;
+		AutoResetEvent tokenLock = new AutoResetEvent(true);
 
 		public Driver(string instanceUrl, string authToken, string tokenType, string refreshToken)
 		{
@@ -182,6 +87,7 @@ namespace EastFive.Azure.Auth.Salesforce
 			this.authToken = authToken;
 			this.tokenType = tokenType;
 			this.refreshToken = refreshToken;
+			this.lastRefreshed = DateTime.UtcNow;
 		}
 
 		public Task<TResult> RefreshToken<TResult>(
@@ -192,23 +98,39 @@ namespace EastFive.Azure.Auth.Salesforce
 				clientId =>
 				{
 					return EastFive.Azure.AppSettings.Auth.Salesforce.ConsumerSecret.ConfigurationString(
-						clientSecret =>
+						async clientSecret =>
 						{
 							Uri.TryCreate($"{this.instanceUrl}/services/oauth2/token", UriKind.Absolute, out Uri refreshUrl);
-							return refreshUrl.HttpPostFormDataContentAsync(
-								new Dictionary<string, string>()
-								{
-									{ "client_id", clientId },
-									{ "client_secret", clientSecret },
-									{ "refresh_token", this.refreshToken },
-									{ "grant_type", "refresh_token" },
-								},
+							var startAttempt = DateTime.Now;
+
+							tokenLock.WaitOne();
+
+							if (startAttempt > this.lastRefreshed)
+							{
+								tokenLock.Set();
+								return onRefreshed(this.authToken);
+							}
+
+							return await refreshUrl.HttpPostFormDataContentAsync(
+									new Dictionary<string, string>()
+									{
+										{ "client_id", clientId },
+										{ "client_secret", clientSecret },
+										{ "refresh_token", this.refreshToken },
+										{ "grant_type", "refresh_token" },
+									},
 								(SalesforceTokenResponse response) =>
 								{
+									this.lastRefreshed = DateTime.UtcNow;
 									this.authToken = response.access_token;
+									tokenLock.Set();
 									return onRefreshed(response.access_token);
 								},
-								onFailure: onFailure);
+								onFailure: why =>
+								{
+									tokenLock.Set();
+									return onFailure(why);
+								});
 						});
 				});
 			
@@ -256,9 +178,99 @@ namespace EastFive.Azure.Auth.Salesforce
 					didTokenGetRefreshed: this.DidTokenGetRefreshed);
 		}
 
-		public async Task<TResult> SynchronizeAsync<TResource, TResult>(TResource resource,
+		public async Task<TResult> GetAsync<TResource, TResult>(
+				TResource resource, object [] extraResources, IDictionary<string, object> extraValues,
+			Func<TResource, object[], IDictionary<string, object>, TResult> onCreated,
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+				bool overrideEmptyValues = false)
+		{
+			var originalType = typeof(TResource);
+			var attr = originalType.GetAttributeInterface<IDefineSalesforceApiPath>();
+			var location = attr.ProvideUrl(this.instanceUrl);
+			var (member, identifierDefinition) = originalType
+				.GetPropertyAndFieldsWithAttributesInterface<IDefineSalesforceIdentifier>( )
+				.Single();
+			return await identifierDefinition.GetIdentifier(resource, member,
+				async identifier =>
+                {
+					var locationWithIdentifier = location.AppendToPath(identifier);
+
+					return await await locationWithIdentifier.HttpClientGetAuthenticatedAsync(
+							authToken: this.authToken, tokenType: this.tokenType,
+						async (responseSuccess) =>
+						{
+							var content = await responseSuccess.Content.ReadAsStringAsync();
+							var jObject = JObject.Parse(content);
+							var resourceUpdated = (TResource)DeserializeObject(resource, jObject);
+							var updatedObjects = extraResources
+								.NullToEmpty()
+								.Select(
+									objectToUpdate =>
+									{
+										return DeserializeObject(objectToUpdate, jObject);
+									})
+								.ToArray();
+							var updatedDictionary = DeserializeDictionary(extraValues, jObject);
+							return onCreated(resourceUpdated, updatedObjects, updatedDictionary);
+						},
+						onFailureWithBody: (statusCode, body) =>
+						{
+							return onFailure(statusCode, body).AsTask();
+						},
+							didTokenGetRefreshed: this.DidTokenGetRefreshed);
+				},
+				() => onFailure(HttpStatusCode.NotFound, "Resource is not linked to Salesforce").AsTask());
+			
+
+			object DeserializeObject(object resourceToDeserialize, JObject jsonObject)
+			{
+				var (matched, discard1, discard2) = resourceToDeserialize
+					.GetType()
+					.GetPropertyAndFieldsWithAttributesInterface<ICastSalesforce>(multiple: true)
+					.Match(jsonObject.Properties(),
+						(memberAttrTpl, jproperty) =>
+						{
+							var (member, attr) = memberAttrTpl;
+							return attr.IsMatch(member, jproperty, originalType);
+						});
+
+				foreach (var ((member, binder), jproperty) in matched)
+				{
+					binder.PopluateSalesforceResource(resourceToDeserialize, member, jsonObject, jproperty,
+						overrideEmptyValues:overrideEmptyValues);
+				}
+				return resourceToDeserialize;
+			}
+
+			IDictionary<string, object> DeserializeDictionary(IDictionary<string, object> dictionaryToDeserialize, JObject jsonObject)
+			{
+				var (matched, discard1, discard2) = dictionaryToDeserialize
+					.NullToEmpty()
+					.Match(jsonObject.Properties(),
+						(kvp, jproperty) =>
+						{
+							return kvp.Key.Equals(jproperty.Name, StringComparison.Ordinal);
+						});
+
+				return matched
+					.Select(
+						match =>
+						{
+							var (kvp, property) = match;
+							if(property.Value is JValue)
+                            {
+								var value = (JValue)property.Value;
+								return kvp.Key.PairWithValue(value.Value);
+							}
+							return kvp.Key.PairWithValue(default(object));
+						})
+					.ToDictionary();
+			}
+		}
+
+		public async Task<TResult> UpdateAsync<TResource, TResult>(TResource resource,
 				object[] extraResources, Dictionary<string, object> extraValues,
-			Func<string, TResult> onCreated,
+			Func<string, TResult> onUpdated,
 			Func<HttpStatusCode, string, TResult> onFailure = default)
 		{
 			return await await this.DescribeAsync<TResource, Task<TResult>>(
@@ -266,10 +278,53 @@ namespace EastFive.Azure.Auth.Salesforce
 				{
 					var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
 					var location = attr.ProvideUrl(this.instanceUrl);
+					var json = Serialize(resource,
+						extraResources: extraResources, extraValues: extraValues, description.fields);
 
-					var json = Serialize();
+					return await await location.HttpClientPatchDynamicAuthenticatedAsync(
+							populateRequest: (request) =>
+							{
+								var content = new StringContent(json,
+									encoding: System.Text.Encoding.UTF8,
+									mediaType: "application/json");
+								request.Content = content;
+								return (request, () => { content.Dispose(); });
+							},
+							authToken: this.authToken, tokenType: this.tokenType,
+						(Response response) =>
+						{
+							var id = response.id;
+							return onUpdated(id).AsTask();
+						},
+						onFailureWithBody: (statusCode, body) =>
+						{
+							return onFailure(statusCode, body).AsTask();
+						},
+							didTokenGetRefreshed: this.DidTokenGetRefreshed);
 
-					return await location.HttpClientPostDynamicRequestAsync(
+				},
+				(code, why) =>
+				{
+					return onFailure(code, why).AsTask();
+				});
+		}
+
+		public async Task<TResult> SynchronizeAsync<TResource, TResult>(TResource resource,
+				object[] extraResources, Dictionary<string, object> extraValues,
+			Func<string, TResult> onSynchronized,
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+				bool forceUpdate = false)
+		{
+			return await await this.DescribeAsync<TResource, Task<TResult>>(
+				async description =>
+				{
+					var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
+					var location = attr.ProvideUrl(this.instanceUrl);
+
+					var json = Serialize(resource,
+						extraResources:extraResources, extraValues:extraValues, description.fields);
+
+					return await await location.HttpClientPostDynamicRequestAsync(
 							populateRequest:(request) =>
                             {
 								var content = new StringContent(json,
@@ -282,59 +337,40 @@ namespace EastFive.Azure.Auth.Salesforce
 						(Response response) =>
 						{
 							var id = response.id;
-							return onCreated(id);
+							return onSynchronized(id).AsTask();
 						},
 						onFailureWithBody: (statusCode, body) =>
 						{
-							return ProcessCreateFailure(statusCode, body, onCreated, onFailure);
+							return ProcessCreateFailure(statusCode, body,
+								async (sfId) =>
+								{
+									if (!forceUpdate)
+										return onSynchronized(sfId);
+
+									var patchLocation = location.AppendToPath(sfId);
+									return await patchLocation.HttpClientPatchDynamicAuthenticatedAsync(
+											populateRequest: (request) =>
+											{
+												var content = new StringContent(json,
+													encoding: System.Text.Encoding.UTF8,
+													mediaType: "application/json");
+												request.Content = content;
+												return (request, () => { content.Dispose(); });
+											},
+											authToken: this.authToken, tokenType: this.tokenType,
+										(Response response) =>
+										{
+											var id = sfId; // response will be null response.id;
+											return onSynchronized(id);
+										},
+										onFailureWithBody: (statusCode, body) =>
+										{
+											return onFailure(statusCode, body);
+										});
+								},
+								onFailure.AsAsyncFunc());
 						},
 							didTokenGetRefreshed: this.DidTokenGetRefreshed);
-
-					string Serialize()
-                    {
-						var stringBuilder = new System.Text.StringBuilder();
-						using (var textWriter = new System.IO.StringWriter(stringBuilder))
-						{
-							using (var jsonWriter = new JsonTextWriter(textWriter))
-							{
-								jsonWriter.WriteStartObject();
-
-								SerializeObject(typeof(TResource), resource, jsonWriter, typeof(TResource));
-								foreach(var extraRes in extraResources.NullToEmpty())
-                                {
-									var type = extraRes.GetType();
-									SerializeObject(type, extraRes, jsonWriter, typeof(TResource));
-								}
-
-								foreach(var extraValue in extraValues.NullToEmpty())
-                                {
-									jsonWriter.WritePropertyName(extraValue.Key);
-									jsonWriter.WriteValue(extraValue.Value);
-								}
-								
-								jsonWriter.WriteEndObject();
-								var json = stringBuilder.ToString();
-								return json;
-							}
-						}
-					}
-
-					void SerializeObject(Type type, object resourceToSerialize, JsonTextWriter jsonWriter, Type originalType)
-                    {
-						var (matched, discard1, discard2) = type
-							.GetPropertyAndFieldsWithAttributesInterface<IBindSalesforce>(multiple:true)
-							.Match(description.fields,
-								(memberAttrTpl, field) =>
-								{
-									var (member, attr) = memberAttrTpl;
-									return attr.IsMatch(member, field, originalType);
-								});
-
-						foreach (var ((member, binder), field) in matched)
-						{
-							binder.PopluateSalesforceResource(jsonWriter, member, resourceToSerialize, field);
-						}
-					}
 				},
 				(code, why) =>
 				{
@@ -342,6 +378,56 @@ namespace EastFive.Azure.Auth.Salesforce
 				});
 		}
 
+		private static string Serialize<TResource>(TResource resource,
+			object[] extraResources,
+			Dictionary<string, object> extraValues, Field[] fields)
+		{
+			var orignalType = typeof(TResource);
+			var stringBuilder = new System.Text.StringBuilder();
+			using (var textWriter = new System.IO.StringWriter(stringBuilder))
+			{
+				using (var jsonWriter = new JsonTextWriter(textWriter))
+				{
+					jsonWriter.WriteStartObject();
+
+					SerializeObject(resource, jsonWriter, orignalType, fields);
+					foreach (var extraRes in extraResources.NullToEmpty())
+					{
+						SerializeObject(extraRes, jsonWriter, orignalType, fields);
+					}
+
+					foreach (var extraValue in extraValues.NullToEmpty())
+					{
+						jsonWriter.WritePropertyName(extraValue.Key);
+						jsonWriter.WriteValue(extraValue.Value);
+					}
+
+					jsonWriter.WriteEndObject();
+					var json = stringBuilder.ToString();
+					return json;
+				}
+			}
+		}
+
+		private static JsonTextWriter SerializeObject(object resourceToSerialize, JsonTextWriter jsonWriter, Type originalType,
+			Field [] fields)
+		{
+			var (matched, discard1, discard2) = resourceToSerialize
+				.GetType()
+				.GetPropertyAndFieldsWithAttributesInterface<IBindSalesforce>(multiple: true)
+				.Match(fields,
+					(memberAttrTpl, field) =>
+					{
+						var (member, attr) = memberAttrTpl;
+						return attr.IsMatch(member, field, originalType);
+					});
+
+			foreach (var ((member, binder), field) in matched)
+			{
+				binder.PopluateSalesforceResource(jsonWriter, member, resourceToSerialize, field);
+			}
+			return jsonWriter;
+		}
 
 		protected static TResult ProcessCreateFailure<TResult>(HttpStatusCode statusCode, string body,
 			Func<string, TResult> onDuplicate,
@@ -469,6 +555,9 @@ namespace EastFive.Azure.Auth.Salesforce
 
 			//{"message":"Job Category: bad value for restricted picklist field: NURSE PRACTITIONER, SUPERVISING(NP,S)","errorCode":"INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST","fields":["Job_Category__c"]}
 			INVALID_OR_NULL_FOR_RESTRICTED_PICKLIST,
+
+			// [{"message":"Required fields are missing: [Name]","errorCode":"REQUIRED_FIELD_MISSING","fields":["Name"]}]
+			REQUIRED_FIELD_MISSING,
 		}
 
 		internal class ErrorResponse
@@ -476,7 +565,7 @@ namespace EastFive.Azure.Auth.Salesforce
 			public string message;
 			public ErrorCodes errorCode;
 			public DuplicateResult duplicateResut;
-			public object[] fields;
+			public string[] fields;
 		}
 
 		// {"id":"0018M000001oWgPQAU","success":true,"errors":[]}
@@ -535,53 +624,6 @@ namespace EastFive.Azure.Auth.Salesforce
 		//	public string RecordTypeId;
 		//}
 
-		//public class Contacts
-		//{
-		//	private Driver driver;
-
-		//	public string Salutation;
-		//	public string FirstName;
-		//	public string LastName;
-		//	// public string Company;
-		//	public string Title;
-		//	public string Email;
-
-		//	[JsonProperty(PropertyName = "AccountId")]
-		//	public string Account;
-
-
-		//	/// <summary>
-		//	/// Must contain <code>Name</code> property
-		//	/// </summary>
-		//	public object RecordType;
-		//	public string RecordTypeId;
-
-		//	public Contacts(Driver driver)
-		//	{
-		//		this.driver = driver;
-		//	}
-
-		//	public async Task<TResult> CreateAsync<TResult>(
-		//		Func<string, TResult> onCreated,
-		//		Func<HttpStatusCode, string, TResult> onFailure = default)
-		//	{
-		//		Uri.TryCreate($"{this.driver.instanceUrl}/services/data/v54.0/sobjects/Contact/", UriKind.Absolute, out Uri leadLocation);
-
-		//		return await leadLocation.HttpClientPostResourceAsync(this,
-		//				authToken: this.driver.authToken, tokenType: this.driver.tokenType,
-		//			(Response response) =>
-		//			{
-		//				var id = response.id;
-		//				return onCreated(id);
-		//			},
-		//			onFailureWithBody: (statusCode, body) =>
-		//			{
-		//				return ProcessFailure(statusCode, body, onCreated, onFailure);
-		//			},
-		//				didTokenGetRefreshed: driver.DidTokenGetRefreshed);
-		//	}
-		//}
-
 		//public class Logins
 		//{
 		//	private Driver driver;
@@ -622,60 +664,6 @@ namespace EastFive.Azure.Auth.Salesforce
 		//	}
 		//}
 
-		//public class Accounts
-		//{
-		//	private Driver driver;
-
-		//	public string Name;
-
-		//	public string Type;
-
-		//	public string AccountSource;
-
-		//	public string Description;
-
-		//	[JsonProperty(PropertyName = "EMR__c")]
-		//	public string EMR;
-
-		//	public string ParentId;
-
-		//	[JsonProperty(PropertyName = "City__c")]
-		//	public string City;
-
-		//	[JsonProperty(PropertyName = "State__c")]
-		//	public string State;
-
-		//	[JsonProperty(PropertyName = "Street_Address__c")]
-		//	public string StreetAddress;
-
-		//	[JsonProperty(PropertyName = "Zip__c")]
-		//	public string Zip;
-
-		//	public Accounts(Driver driver)
-		//	{
-		//		this.driver = driver;
-		//	}
-
-		//	public async Task<TResult> CreateAsync<TResult>(
-		//		Func<string, TResult> onCreated,
-		//		Func<HttpStatusCode, string, TResult> onFailure = default)
-		//	{
-		//		Uri.TryCreate($"{this.driver.instanceUrl}/services/data/v54.0/sobjects/Account/", UriKind.Absolute, out Uri leadLocation);
-
-		//		return await leadLocation.HttpClientPostResourceAsync(this,
-		//				authToken: this.driver.authToken, tokenType: this.driver.tokenType,
-		//			(Response response) =>
-		//			{
-		//				var id = response.id;
-		//				return onCreated(id);
-		//			},
-		//			onFailureWithBody: (statusCode, body) =>
-		//			{
-		//				return ProcessFailure(statusCode, body, onCreated, onFailure);
-		//			},
-		//				didTokenGetRefreshed: driver.DidTokenGetRefreshed);
-		//	}
-		//}
 	}
 }
 

@@ -52,15 +52,19 @@ namespace EastFive.Azure.Auth
     public static class AccountPopulationExtensions
     {
         public static AccountLinks AppendCredentials(this AccountLinks accountLinks,
-            Method authMethod, string accountKey)
+            Method authMethod, string accountKey) =>
+                accountLinks.AddOrUpdateCredentials(authMethod.authenticationId, accountKey);
+
+        public static AccountLinks AddOrUpdateCredentials(this AccountLinks accountLinks,
+            IRef<Method> authMethodRef, string accountKey)
         {
             accountLinks.accountLinks = accountLinks.accountLinks
                 .NullToEmpty()
-                .Where(al => al.method.id != authMethod.authenticationId.id)
+                .Where(al => al.method.id != authMethodRef.id)
                 .Append(
                     new AccountLink
                     {
-                        method = authMethod.authenticationId,
+                        method = authMethodRef,
                         externalAccountKey = accountKey,
                     })
                 .ToArray();
