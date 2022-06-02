@@ -98,7 +98,7 @@ namespace EastFive.Azure.Login
                 authenticationRef = Ref<Authentication>.SecureRef(),
                 authenticated = DateTime.UtcNow,
                 userIdentification = userIdentification,
-                state = SecureGuid.Generate().ToString("N"),
+                token = SecureGuid.Generate().ToString("N"),
             };
             return await await authentication
                 .StorageCreateAsync(
@@ -110,7 +110,7 @@ namespace EastFive.Azure.Login
                         var parameters = new Dictionary<string, string>()
                             {
                                 { "state",  authentication.authenticationRef.id.ToString() },
-                                { "token",  authentication.state },
+                                { "token",  authentication.token },
                                 {  CredentialProvider.referrerKey, "https://example.com/internal" }
                             };
 

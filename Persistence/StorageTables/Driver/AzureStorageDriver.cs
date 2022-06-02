@@ -48,6 +48,7 @@ namespace EastFive.Azure.StorageTables.Driver
         public static RetryDelegateAsync<TResult> GetRetryDelegateContentionAsync<TResult>(
             int maxRetries = 100)
         {
+            #pragma warning disable SCS0005 // Weak random number generator
             var retriesAttempted = 0;
             var lastFail = default(long);
             var rand = new Random();
@@ -68,6 +69,7 @@ namespace EastFive.Azure.StorageTables.Driver
                     await Task.Delay(retryDelay);
                     return retry();
                 };
+            #pragma warning restore SCS0005 // Weak random number generator
         }
 
         protected static RetryDelegateAsync<TResult> GetRetryDelegateCollisionAsync<TResult>(
@@ -75,6 +77,7 @@ namespace EastFive.Azure.StorageTables.Driver
             TimeSpan limit = default(TimeSpan),
             int maxRetries = 10)
         {
+            #pragma warning disable SCS0005 // Weak random number generator
             if (default(TimeSpan) == delay)
                 delay = TimeSpan.FromSeconds(0.5);
 
@@ -99,6 +102,7 @@ namespace EastFive.Azure.StorageTables.Driver
                     await Task.Delay(retryDelay);
                     return retry();
                 };
+            #pragma warning restore SCS0005 // Weak random number generator
         }
 
         #endregion

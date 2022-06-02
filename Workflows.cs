@@ -47,6 +47,7 @@ namespace EastFive.Azure
                 public const string AuthenticationId = "AuthenticationId";
                 public const string Authorization = "AuthorizationId";
                 public const string AuthorizationRedirect = "AuthorizationRedirect";
+                public const string AccountId = "AccountId";
             }
         }
     }
