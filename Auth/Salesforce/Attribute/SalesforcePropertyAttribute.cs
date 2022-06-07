@@ -70,6 +70,15 @@ namespace EastFive.Azure.Auth.Salesforce
 		{
 			var serializer = new JsonSerializer();
 			var reader = jProperty.CreateReader();
+			if (!reader.Read())
+				return;
+
+			if (reader.TokenType != JsonToken.PropertyName)
+				return;
+
+			if (!reader.Read())
+				return;
+
 			var memberType = member.GetPropertyOrFieldType();
 
 			var currentValue = member.GetPropertyOrFieldValue(resource);

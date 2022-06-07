@@ -20,6 +20,7 @@ using EastFive.Azure.Auth.Salesforce.Resources;
 using Newtonsoft.Json.Linq;
 using System.Threading;
 using EastFive.Collections.Generic;
+using Microsoft.Extensions.Logging;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
@@ -138,13 +139,14 @@ namespace EastFive.Azure.Auth.Salesforce
 
 		public async Task<TResult> DescribeAsync<TResource, TResult>(
 			Func<Resources.Describe, TResult> onCreated,
-			Func<HttpStatusCode, string, TResult> onFailure = default)
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+			ILogger logger = default)
 		{
 			var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
 			var location = attr.ProvideUrl(this.instanceUrl);
 			var describeLocation = location.AppendToPath("describe");
 
-			return await describeLocation.HttpClientGetResourceAsync(
+			return await describeLocation.HttpClientGetResourceAuthenticatedAsync(
 					authToken: this.authToken, tokenType: this.tokenType,
 				(Resources.Describe response) =>
 				{
@@ -154,12 +156,13 @@ namespace EastFive.Azure.Auth.Salesforce
 				{
 					return onFailure(statusCode, body);
 				},
-					didTokenGetRefreshed: this.DidTokenGetRefreshed);
+					didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
 		}
 
 		public async Task<TResult> CreateAsync<TResource, TResult>(TResource resource,
 			Func<string, TResult> onCreated,
-			Func<HttpStatusCode, string, TResult> onFailure = default)
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+				ILogger logger = default)
 		{
 			typeof(TResource).TryGetAttributeInterface(out IDefineSalesforceApiPath attr);
 			var location = attr.ProvideUrl(this.instanceUrl);
@@ -175,14 +178,16 @@ namespace EastFive.Azure.Auth.Salesforce
 				{
 					return ProcessCreateFailure(statusCode, body, onCreated, onFailure);
 				},
-					didTokenGetRefreshed: this.DidTokenGetRefreshed);
+					didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
 		}
 
 		public async Task<TResult> GetAsync<TResource, TResult>(
 				TResource resource, object [] extraResources, IDictionary<string, object> extraValues,
-			Func<TResource, object[], IDictionary<string, object>, TResult> onCreated,
+			Func<string, TResource, object[], IDictionary<string, object>, TResult> onCreated,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
-				bool overrideEmptyValues = false)
+			Func<TResult> onCannotBeIdentified = default,
+				bool overrideEmptyValues = false,
+				ILogger logger = default)
 		{
 			var originalType = typeof(TResource);
 			var attr = originalType.GetAttributeInterface<IDefineSalesforceApiPath>();
@@ -195,7 +200,7 @@ namespace EastFive.Azure.Auth.Salesforce
                 {
 					var locationWithIdentifier = location.AppendToPath(identifier);
 
-					return await await locationWithIdentifier.HttpClientGetAuthenticatedAsync(
+					return await await locationWithIdentifier.HttpClientGetResponseAuthenticatedAsync(
 							authToken: this.authToken, tokenType: this.tokenType,
 						async (responseSuccess) =>
 						{
@@ -211,17 +216,16 @@ namespace EastFive.Azure.Auth.Salesforce
 									})
 								.ToArray();
 							var updatedDictionary = DeserializeDictionary(extraValues, jObject);
-							return onCreated(resourceUpdated, updatedObjects, updatedDictionary);
+							return onCreated(identifier, resourceUpdated, updatedObjects, updatedDictionary);
 						},
 						onFailureWithBody: (statusCode, body) =>
 						{
 							return onFailure(statusCode, body).AsTask();
 						},
-							didTokenGetRefreshed: this.DidTokenGetRefreshed);
+							didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
 				},
-				() => onFailure(HttpStatusCode.NotFound, "Resource is not linked to Salesforce").AsTask());
+				() => onCannotBeIdentified().AsTask());
 			
-
 			object DeserializeObject(object resourceToDeserialize, JObject jsonObject)
 			{
 				var (matched, discard1, discard2) = resourceToDeserialize
@@ -271,7 +275,8 @@ namespace EastFive.Azure.Auth.Salesforce
 		public async Task<TResult> UpdateAsync<TResource, TResult>(TResource resource,
 				object[] extraResources, Dictionary<string, object> extraValues,
 			Func<string, TResult> onUpdated,
-			Func<HttpStatusCode, string, TResult> onFailure = default)
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+			Func<TResult> onCannotBeIdentified = default)
 		{
 			return await await this.DescribeAsync<TResource, Task<TResult>>(
 				async description =>
@@ -281,27 +286,34 @@ namespace EastFive.Azure.Auth.Salesforce
 					var json = Serialize(resource,
 						extraResources: extraResources, extraValues: extraValues, description.fields);
 
-					return await await location.HttpClientPatchDynamicAuthenticatedAsync(
-							populateRequest: (request) =>
-							{
-								var content = new StringContent(json,
-									encoding: System.Text.Encoding.UTF8,
-									mediaType: "application/json");
-								request.Content = content;
-								return (request, () => { content.Dispose(); });
-							},
-							authToken: this.authToken, tokenType: this.tokenType,
-						(Response response) =>
+					var (member, identifierDefinition) = typeof(TResource)
+						.GetPropertyAndFieldsWithAttributesInterface<IDefineSalesforceIdentifier>()
+						.Single();
+					return await identifierDefinition.GetIdentifier(resource, member,
+						identifier =>
 						{
-							var id = response.id;
-							return onUpdated(id).AsTask();
+							var locationWithIdentifier = location.AppendToPath(identifier);
+							return locationWithIdentifier.HttpClientPatchDynamicAuthenticatedAsync(
+									populateRequest: (request) =>
+									{
+										var content = new StringContent(json,
+											encoding: System.Text.Encoding.UTF8,
+											mediaType: "application/json");
+										request.Content = content;
+										return (request, () => { content.Dispose(); });
+									},
+									authToken: this.authToken, tokenType: this.tokenType,
+								(Response response) =>
+								{
+									return onUpdated(identifier);
+								},
+								onFailureWithBody: (statusCode, body) =>
+								{
+									return onFailure(statusCode, body);
+								},
+									didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
 						},
-						onFailureWithBody: (statusCode, body) =>
-						{
-							return onFailure(statusCode, body).AsTask();
-						},
-							didTokenGetRefreshed: this.DidTokenGetRefreshed);
-
+						() => onCannotBeIdentified().AsTask());
 				},
 				(code, why) =>
 				{
@@ -313,7 +325,8 @@ namespace EastFive.Azure.Auth.Salesforce
 				object[] extraResources, Dictionary<string, object> extraValues,
 			Func<string, TResult> onSynchronized,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
-				bool forceUpdate = false)
+				bool forceUpdate = false,
+				ILogger logger = default)
 		{
 			return await await this.DescribeAsync<TResource, Task<TResult>>(
 				async description =>
@@ -370,12 +383,13 @@ namespace EastFive.Azure.Auth.Salesforce
 								},
 								onFailure.AsAsyncFunc());
 						},
-							didTokenGetRefreshed: this.DidTokenGetRefreshed);
+							didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
 				},
 				(code, why) =>
 				{
 					return onFailure(code, why).AsTask();
-				});
+				},
+					logger: logger);
 		}
 
 		private static string Serialize<TResource>(TResource resource,
@@ -531,11 +545,20 @@ namespace EastFive.Azure.Auth.Salesforce
 								{
 									return (true, newToken);
 								},
-								onFailure: (why) => (false, string.Empty));
+								onFailure: (why) =>
+								{
+									return (false, string.Empty);
+								});
 						},
-						() => (false, string.Empty).AsTask());
+						() =>
+						{
+							return (false, string.Empty).AsTask();
+						});
 				},
-				(message) => (false, string.Empty).AsTask());
+				(message) =>
+                {
+					return (false, string.Empty).AsTask();
+				});
 		}
 
 		public enum ErrorCodes

@@ -20,12 +20,13 @@ namespace EastFive.Azure.Auth.Salesforce
         public override void PopluateSalesforceResource(JsonTextWriter jsonWriter,
             MemberInfo member, object resource, Field field)
         {
+            var methodId = SalesforceProvider.IntegrationId;
             ValidateIsAccountLinks(member);
 
             var accountLinksObj = member.GetValue(resource);
             var accountLinks = (AccountLinks)accountLinksObj;
             bool written = accountLinks.accountLinks
-                .Where(al => al.method.id == Guid.Parse("2fbb6d4a-50f6-2af8-f801-f71c3efd72c3"))
+                .Where(al => al.method.id == SalesforceProvider.IntegrationId)
                 .First(
                     (accountLink, next) =>
                     {
@@ -55,7 +56,7 @@ namespace EastFive.Azure.Auth.Salesforce
                 return;
 
             var accountLinksUpdated = accountLinks.AddOrUpdateCredentials(
-                Guid.Parse("2fbb6d4a-50f6-2af8-f801-f71c3efd72c3").AsRef<Method>(),
+                SalesforceProvider.IntegrationId.AsRef<Method>(),
                 linkKey);
             member.SetPropertyOrFieldValue(resource, accountLinksUpdated);
         }
@@ -84,7 +85,7 @@ namespace EastFive.Azure.Auth.Salesforce
             var accountLinksObj = propertyOrField.GetValue(resource);
             var accountLinks = (AccountLinks)accountLinksObj;
             return accountLinks.accountLinks
-                .Where(al => al.method.id == Guid.Parse("2fbb6d4a-50f6-2af8-f801-f71c3efd72c3"))
+                .Where(al => al.method.id == SalesforceProvider.IntegrationId)
                 .First(
                     (accountLink, next) =>
                     {
