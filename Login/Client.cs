@@ -18,7 +18,7 @@ namespace EastFive.Azure.Login
     [FunctionViewController(
         Route = "LoginClient",
         ContentType = "x-application/login-client",
-        Namespace = "login",
+        Namespace = "e5/login",
         ContentTypeVersion = "0.1")]
     public struct Client : IReferenceable
     {
