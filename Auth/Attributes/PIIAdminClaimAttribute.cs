@@ -8,10 +8,9 @@ using EastFive.Extensions;
 
 namespace EastFive.Azure.Auth
 {
-    [ApiVoucherQueryDefinition]
+    //[ApiVoucherQueryDefinition]
     public class PIIAdminClaimAttribute : Attribute, IValidateHttpRequest
     {
-        private const string ClaimType = System.Security.Claims.ClaimTypes.Role;
         private const string ClaimValue = ClaimValues.Roles.PIIAdmin;
 
         public Task<IHttpResponse> ValidateRequest(
@@ -21,10 +20,10 @@ namespace EastFive.Azure.Auth
             IHttpRequest request,
             ValidateHttpDelegate boundCallback)
         {
-            if (!request.IsAuthorizedFor(new Uri(ClaimType), ClaimValue))
+            if (!request.IsAuthorizedForRole(ClaimValue))
                 return request
                     .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
-                    .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires claim `{ClaimType}`=`{ClaimValue}`")
+                    .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires roll claim `{ClaimValue}`")
                     .AsTask();
             return boundCallback(parameterSelection, method, httpApp, request);
         }

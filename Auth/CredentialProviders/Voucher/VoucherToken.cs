@@ -61,6 +61,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
 
         public const string AuthIdPropertyName = "auth_id";
         [Storage(Name = AuthIdPropertyName)]
+        [StorageQuery]
         [ApiProperty(PropertyName = AuthIdPropertyName)]
         [JsonProperty(PropertyName = AuthIdPropertyName)]
         public Guid authId { get; set; }
