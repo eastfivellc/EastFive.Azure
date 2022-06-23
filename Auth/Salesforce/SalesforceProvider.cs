@@ -202,7 +202,9 @@ namespace EastFive.Azure.Auth.Salesforce
 
         public string Method => IntegrationName;
 
-        public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
+        public Guid Id => IntegrationId;
+
+        public static Guid IntegrationId => System.Text.Encoding.UTF8.GetBytes(IntegrationName).MD5HashGuid();
 
         public Type CallbackController => typeof(SalesforceRedirect);
 

@@ -19,11 +19,10 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
+            ignore = false;
             var idValue = IdLookupAttribute.RowKey(this.GetType(), key.GetPropertyOrFieldType(), value);
-            ignore = idValue.IsNullOrWhiteSpace()?
-                IgnoreNullOrDefault
-                :
-                false;
+            if (idValue.IsNullOrWhiteSpace())
+                ignore = true;
             return $"{currentKey}{idValue}";
         }
 

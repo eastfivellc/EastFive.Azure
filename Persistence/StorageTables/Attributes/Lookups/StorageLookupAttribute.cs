@@ -30,11 +30,16 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string Cascade { get; set; }
 
+        internal static string GetMemberTableName(MemberInfo memberInfo)
+        {
+            return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
+        }
+
         protected virtual string GetLookupTableName(MemberInfo memberInfo)
         {
             if (LookupTableName.HasBlackSpace())
                 return this.LookupTableName;
-            return $"{memberInfo.DeclaringType.Name}{memberInfo.Name}";
+            return GetMemberTableName(memberInfo);
         }
 
         public TResult GetKeys<TResult>(

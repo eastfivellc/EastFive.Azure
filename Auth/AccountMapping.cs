@@ -143,7 +143,7 @@ namespace EastFive.Azure.Auth
         //        () => onForbidden().AddReason("Account is already mapped to that authentication."));
         //}
 
-        [Api.HttpPost] //(MatchAllBodyParameters = false)]
+        [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
@@ -270,7 +270,6 @@ namespace EastFive.Azure.Auth
                 });
         }
     
-
         public static async Task<TResult> FindByMethodAndKeyAsync<TResult>(IRef<Method> authenticationId, string authorizationKey,
                 Authorization authorization,
             Func<Guid, TResult> onFound,
@@ -296,6 +295,21 @@ namespace EastFive.Azure.Auth
                         },
                         () => onNotFound().AsTask());
                 });
+        }
+
+        public static async Task<TResult> DeleteByMethodAndKeyAsync<TResult>(IRef<Method> authenticationId, string authorizationKey,
+            Func<Guid, TResult> onFound,
+            Func<TResult> onNotFound)
+        {
+            var lookupRef = AccountMappingLookup.GetLookup(authenticationId, authorizationKey);
+            return await await lookupRef.StorageDeleteAsync(
+                lookup =>
+                {
+                    return lookup.accountMappingId.StorageDeleteAsync(
+                        accountMapping => onFound(accountMapping.accountId),
+                        () => onNotFound());
+                },
+                () => onNotFound().AsTask());
         }
     }
 }

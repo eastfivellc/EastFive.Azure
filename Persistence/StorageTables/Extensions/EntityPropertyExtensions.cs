@@ -106,7 +106,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new Exception($"Unrecognized EdmType {ep.PropertyType}");
         }
 
-        public static object[] FromEdmTypedByteArray(this byte[] binaryValue, Type type)
+        public static object[] FromEdmTypedByteArray(this byte[] binaryValue, Type typeForDefaultFromMissingValues)
         {
             var typeFromByte = typeBytes
                 .Select(kvp => kvp.Key.PairWithKey(kvp.Value))
@@ -117,21 +117,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                     typeWithBytes =>
                     {
                         if (!typeWithBytes.Any())
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         var typeByte = typeWithBytes[0];
                         if(!typeFromByte.ContainsKey(typeByte))
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         var edmType = typeFromByte[typeByte];
                         var valueBytes = typeWithBytes.Skip(1).ToArray();
                         var valueObj = edmType.ToObjectFromEdmTypeByteArray(valueBytes);
                         if(null == valueObj)
                         {
-                            if (type.IsClass)
+                            if (typeForDefaultFromMissingValues.IsClass)
                                 return valueObj;
-                            return type.GetDefault();
+                            return typeForDefaultFromMissingValues.GetDefault();
                         }
-                        if (!type.IsAssignableFrom(valueObj.GetType()))
-                            return type.GetDefault(); // TODO: Data corruption?
+                        if (!typeForDefaultFromMissingValues.IsAssignableFrom(valueObj.GetType()))
+                            return typeForDefaultFromMissingValues.GetDefault(); // TODO: Data corruption?
                         return valueObj;
                     })
                 .ToArray();

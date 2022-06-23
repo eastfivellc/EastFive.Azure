@@ -362,5 +362,38 @@ namespace EastFive.Persistence.Azure.StorageTables
             throw new ArgumentException($"{filter.Body.GetType().FullName} is not a supported TableQuery expression type.");
         }
 
+
+        public static IEnumerable<KeyValuePair<MemberInfo, object>> GetFilterAssignments<TEntity>(this Expression filter)
+        {
+            return filter.MemberComparison(
+                (memberInfo, expressionType, value) =>
+                {
+                    if (expressionType == ExpressionType.Equal)
+                        return memberInfo.PairWithValue(value).AsArray();
+
+                    // don't error here since it could be non-partition queries
+                    // (and if they are partition queries the failure will be noted when the matchup occurs)
+                    return new KeyValuePair<MemberInfo, object>[] { };
+                },
+                () =>
+                {
+                    if (filter is BinaryExpression)
+                    {
+                        var binaryExpression = filter as BinaryExpression;
+
+                        // Since the partition key is a hash, we can only AndAlso values
+                        if (binaryExpression.NodeType == ExpressionType.AndAlso)
+                        {
+                            var leftFilter = GetFilterAssignments<TEntity>(binaryExpression.Left);
+                            var rightFilter = GetFilterAssignments<TEntity>(binaryExpression.Right);
+
+                            return leftFilter.Concat(rightFilter);
+                        }
+                    }
+                    // don't error here since it could be non-partition queries
+                    // (and if they are partition queries the failure will be noted when the matchup occurs)
+                    return new KeyValuePair<MemberInfo, object>[] { };
+                });
+        }
     }
 }

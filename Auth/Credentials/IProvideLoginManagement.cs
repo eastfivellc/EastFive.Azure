@@ -59,13 +59,13 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<TResult> onServiceNotSupported,
             Func<string, TResult> onFailure);
 
-        Task<TResult> UpdateEmailAsync<TResult>(Guid loginId, string email,
-            Func<TResult> onSuccess,
-            Func<string, TResult> onServiceNotAvailable,
-            Func<TResult> onServiceNotSupported,
-            Func<string, TResult> onFailure);
+        //Task<TResult> UpdateEmailAsync<TResult>(Guid loginId, string email,
+        //    Func<TResult> onSuccess,
+        //    Func<string, TResult> onServiceNotAvailable,
+        //    Func<TResult> onServiceNotSupported,
+        //    Func<string, TResult> onFailure);
 
-        Task<TResult> DeleteAuthorizationAsync<TResult>(Guid loginId,
+        Task<TResult> DeleteAuthorizationAsync<TResult>(string loginId,
             Func<TResult> onSuccess,
             Func<string, TResult> onServiceNotAvailable,
             Func<TResult> onServiceNotSupported,

@@ -1,10 +1,4 @@
-﻿using BlackBarLabs.Persistence.Azure;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Reflection;
-using EastFive.Serialization;
-using Microsoft.Azure.Cosmos.Table;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections;
@@ -12,7 +6,14 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using BlackBarLabs.Extensions;
+
+using Microsoft.Azure.Cosmos.Table;
+
+using EastFive;
+using EastFive.Collections.Generic;
+using EastFive.Extensions;
+using EastFive.Reflection;
+using EastFive.Serialization;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Linq;
@@ -24,7 +25,8 @@ namespace EastFive.Persistence
     {
         string Name { get; }
 
-        KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo);
+        KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper);
 
         object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values);
 
@@ -102,6 +104,17 @@ namespace EastFive.Persistence
             out Func<TEntity, bool> postFilter);
     }
 
+    public interface IProvideBulkSerialization
+    {
+        string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Expression<Func<TEntity, bool>> filter,
+            out Func<TEntity, bool> postFilter);
+
+        string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Assignment[] assignments,
+            out Func<TEntity, bool> postFilter);
+    }
+
     public class StorageQueryAttribute : Attribute, IProvideTableQuery
     {
         public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
@@ -146,7 +159,8 @@ namespace EastFive.Persistence
         public Type ReferenceType { get; set; }
         public string ReferenceProperty { get; set; }
 
-        public virtual KeyValuePair<string, EntityProperty>[] ConvertValue(object value, MemberInfo memberInfo)
+        public virtual KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
 

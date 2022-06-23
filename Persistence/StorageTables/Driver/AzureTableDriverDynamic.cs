@@ -51,28 +51,14 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public AzureTableDriverDynamic(CloudStorageAccount storageAccount, string connectionString)
         {
             TableClient = storageAccount.CreateCloudTableClient();
-            //lock (tableClientsLock)
-            //{
-            //    (TableClient, tableClients) = tableClients.AddIfMissing(
-            //            storageAccount.TableEndpoint.AbsoluteUri,
-            //            onAddValueSinceMissing: (save) =>
-            //            {
-            //                var newCloudClient = storageAccount.CreateCloudTableClient();
-            //                return save(newCloudClient);
-            //            },
-            //            (tc, updatedDictionary, wasAdded) => (tc, updatedDictionary));
-            //}
             TableClient.DefaultRequestOptions.RetryPolicy =
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
 
             BlobClient = new BlobServiceClient(connectionString,
                 new BlobClientOptions
                 {
-                    // Retry = new global::Azure.Core.RetryOptions()
                 });
-            //BlobClient.DefaultRequestOptions.RetryPolicy =
-            //    new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
-
+            
             StorageSharedKeyCredential = GetCredentialFromConnectionString(connectionString);
         }
 
@@ -272,7 +258,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             string tableName = default,
             int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
             System.Threading.CancellationToken cancellationToken = default)
-        //where TEntity : IReferenceable
         {
             if (table.IsDefaultOrNull())
                 table = tableName.HasBlackSpace() ?
@@ -281,7 +266,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     GetTable<TEntity>();
 
             var tableQuery = TableQueryExtensions.GetTableQuery<TEntity>();
-            //selectColumns:new List<string> { "PartitionKey" });
             var tableEntityTypes = tableQuery.GetType().GetGenericArguments();
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
                 .GetMethod(nameof(AzureTableDriverDynamic.FindAllInternal), BindingFlags.Static | BindingFlags.Public)
@@ -427,7 +411,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             string tableName = default(string),
             AzureStorageDriver.RetryDelegate onTimeout =
                 default(AzureStorageDriver.RetryDelegate),
-            ICacheEntites cache = default)
+            ICacheEntites cache = default,
+            IProvideEntity entityProvider = default)
         {
             return cache.ByRowPartitionKeyEx(rowKey, partitionKey,
                 (TEntity entity) => onFound(entity, default(TableResult)).AsTask(),
@@ -436,20 +421,31 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     var operation = TableOperation.Retrieve(partitionKey, rowKey,
                         (string partitionKeyEntity, string rowKeyEntity, DateTimeOffset timestamp, IDictionary<string, EntityProperty> properties, string etag) =>
                         {
-                            return typeof(TEntity)
-                                .GetAttributesInterface<IProvideEntity>()
-                                .First(
-                                    (entityProvider, next) =>
-                                    {
-                                        var entityPopulated = entityProvider.CreateEntityInstance<TEntity>(
-                                            rowKeyEntity, partitionKeyEntity, properties, etag, timestamp);
-                                        return entityPopulated;
-                                    },
-                                    () =>
-                                    {
-                                        var entityPopulated = TableEntity<TEntity>.CreateEntityInstance(properties);
-                                        return entityPopulated;
-                                    });
+                            return GetEntityProvider(
+                                entityProvider =>
+                                {
+                                    return entityProvider.CreateEntityInstance<TEntity>(rowKeyEntity, partitionKeyEntity,
+                                        properties, etag, timestamp);
+                                },
+                                () =>
+                                {
+                                    var entityPopulated = TableEntity<TEntity>.CreateEntityInstance(properties);
+                                    return entityPopulated;
+                                });
+
+                            TEntity GetEntityProvider(
+                                Func<IProvideEntity, TEntity> onFound,
+                                Func<TEntity> onNone)
+                            {
+                                if (entityProvider.IsNotDefaultOrNull())
+                                    return onFound(entityProvider);
+
+                                return typeof(TEntity)
+                                    .GetAttributesInterface<IProvideEntity>()
+                                    .First(
+                                        (entityProvider, next) => onFound(entityProvider),
+                                        () => onNone());
+                            }
                         });
                     if (table.IsDefaultOrNull())
                         table = tableName.HasBlackSpace() ?
@@ -1448,20 +1444,40 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             };
         }
 
-        public async Task<TResult> ReplaceAsync<TData, TResult>(ITableEntity tableEntity,
+        public Task<TResult> ReplaceAsync<TData, TResult>(ITableEntity tableEntity,
             Func<TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             AzureStorageDriver.RetryDelegate onTimeout = null)
         {
             var table = GetTable<TData>();
+            var e5Table = new E5CloudTable(table);
+            return ReplaceAsync(tableEntity, e5Table,
+                onSuccess: success,
+                onFailure: onFailure,
+                onTimeout: onTimeout);
+        }
+
+        public async Task<TResult> ReplaceAsync<TResult>(ITableEntity tableEntity, E5CloudTable table,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+            AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
             var update = TableOperation.Replace(tableEntity);
             try
             {
-                await new E5CloudTable(table).ExecuteAsync(update);
-                return success();
+                await table.ExecuteAsync(update);
+                return onSuccess();
             }
             catch (StorageException ex)
             {
+                if(ex.IsProblemTableDoesNotExist())
+                {
+                    await table.cloudTable.CreateIfNotExistsAsync();
+                    return await ReplaceAsync(tableEntity: tableEntity, table:table,
+                        onSuccess: onSuccess,
+                        onFailure: onFailure,
+                        onTimeout: onTimeout);
+                }
                 return await ex.ParseStorageException(
                     async (errorCode, errorMessage) =>
                     {
@@ -1475,8 +1491,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
-                                            timeoutResult = await ReplaceAsync<TData, TResult>(tableEntity,
-                                                success, onFailure, onTimeout);
+                                            timeoutResult = await ReplaceAsync<TResult>(tableEntity, table,
+                                                onSuccess, onFailure, onTimeout);
                                         });
                                     return timeoutResult;
                                 }
@@ -1495,19 +1511,37 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        public async Task<TResult> InsertOrReplaceAsync<TData, TResult>(ITableEntity tableEntity,
+        public Task<TResult> InsertOrReplaceAsync<TData, TResult>(ITableEntity tableEntity,
             Func<bool, IAzureStorageTableEntity<TData>, TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+                AzureStorageDriver.RetryDelegate onTimeout = null,
+                string tableName = default)
         {
-            var table = GetTable<TData>();
+            var table = tableName.HasBlackSpace() ?
+                this.TableClient.GetTableReference(tableName)
+                :
+                GetTable<TData>();
+            return InsertOrReplaceAsync<TResult>(tableEntity, new E5CloudTable(table),
+                (created, result) =>
+                {
+                    var entity = result.Result as IAzureStorageTableEntity<TData>;
+                    return success(created, entity);
+                },
+                onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
+        public async Task<TResult> InsertOrReplaceAsync<TResult>(ITableEntity tableEntity, E5CloudTable table,
+            Func<bool, TableResult, TResult> success,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
+                AzureStorageDriver.RetryDelegate onTimeout = null)
+        {
             var update = TableOperation.InsertOrReplace(tableEntity);
             try
             {
-                TableResult result = await new E5CloudTable(table).ExecuteAsync(update);
+                TableResult result = await table.ExecuteAsync(update);
                 var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
-                var entity = result.Result as IAzureStorageTableEntity<TData>;
-                return success(created, entity);
+                return success(created, result);
             }
             catch (StorageException ex)
             {
@@ -1524,7 +1558,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
-                                            timeoutResult = await InsertOrReplaceAsync<TData, TResult>(tableEntity,
+                                            timeoutResult = await InsertOrReplaceAsync(tableEntity, table,
                                                 success, onFailure, onTimeout);
                                         });
                                     return timeoutResult;
@@ -2200,7 +2234,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 table = AzureTableDriverDynamic.TableFromEntity(tableEntityType, this.TableClient);
             }
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
-                .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
+                .GetMethod(nameof(FindAllInternal), BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
                 .Invoke(null, new object[] { query, table, numberOfTimesToRetry, cancellationToken });
             return findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;

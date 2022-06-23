@@ -66,10 +66,15 @@ namespace EastFive.Azure.Login
         [Storage]
         public DateTime? authenticated;
 
-        public const string StatePropertyName = "state";
+        public const string TokenPropertyName = "token";
         [Storage]
         [JsonIgnore]
-        public string state;
+        public string token;
+
+        public const string AuthorizationPropertyName = "state";
+        [Storage]
+        [JsonIgnore]
+        public IRefOptional<Authorization> authorizationMaybe;
 
         public const string ClientPropertyName = "client";
         [ApiProperty(PropertyName = ClientPropertyName)]
@@ -115,15 +120,16 @@ namespace EastFive.Azure.Login
         [WorkflowStep(
             FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
             Step = 2.0,
-            StepName = "Start Authentication Process")]
+            StepName = "Start Authentication Process",
+            FollowRedirects = false)]
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
-                [WorkflowNewId]
-                [WorkflowVariable(
-                    Workflows.PasswordLoginCreateAccount.Variables.State,
-                    StatePropertyName)]
-                [QueryParameter(Name = StatePropertyName)]
-                string state,
+                //[WorkflowNewId]
+                //[WorkflowVariable(
+                //    Workflows.PasswordLoginCreateAccount.Variables.State,
+                //    AuthorizationPropertyName)]
+                [OptionalQueryParameter(Name = AuthorizationPropertyName)]
+                IRefOptional<Authorization> authorizationRefOptional,
 
                 [WorkflowParameter(
                     Value = "d989b604-1e25-4d77-b79e-fe1c7d36f833",
@@ -132,7 +138,7 @@ namespace EastFive.Azure.Login
                 IRef<Client> clientRef,
 
                 [WorkflowNewId(Description = "No idea what this does.")]
-                [QueryParameter(Name = ValidationPropertyName)]
+                [OptionalQueryParameter(Name = ValidationPropertyName)]
                 string validation,
 
                 IAuthApplication application, IProvideUrl urlHelper,
@@ -153,7 +159,7 @@ namespace EastFive.Azure.Login
                     var authentication = new Authentication
                     {
                         authenticationRef = SecureGuid.Generate().AsRef<Authentication>(),
-                        state = state,
+                        authorizationMaybe = authorizationRefOptional,
                         client = clientRef,
                     };
                     return authentication.StorageCreateAsync(
@@ -206,7 +212,7 @@ namespace EastFive.Azure.Login
                 IHttpRequest httpRequest,
             RedirectResponse onUpdated,
 
-            [WorkflowVariable(Workflows.PasswordLoginCreateAccount.Variables.State, StatePropertyName)]
+            [WorkflowVariable(Workflows.PasswordLoginCreateAccount.Variables.State, AuthorizationPropertyName)]
             [WorkflowVariable2(Workflows.PasswordLoginCreateAccount.Variables.Token, "token")]
             ContentTypeResponse<AuthorizationParameters> onJsonPreferred,
 
@@ -223,7 +229,7 @@ namespace EastFive.Azure.Login
                             authentication.userIdentification = userIdentification;
                             authentication.authenticated = DateTime.UtcNow;
                             await saveAsync(authentication);
-                            var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.state}");
+                            var authorizationUrl = new Uri(httpRequest.RequestUri, $"/api/LoginRedirection?state={authentication.authenticationRef.id}&token={authentication.token}");
 
                             if (hold.HasValue && hold.Value)
                             {
@@ -232,7 +238,7 @@ namespace EastFive.Azure.Login
                                     var authorizationParameters = new AuthorizationParameters
                                     {
                                         state = authentication.authenticationRef,
-                                        token = authentication.state,
+                                        token = authentication.token,
                                     };
                                     return onJsonPreferred(authorizationParameters);
                                 }
@@ -254,15 +260,9 @@ namespace EastFive.Azure.Login
             return userIdentification
                 .MD5HashGuid()
                 .AsRef<Account>()
-                .StorageUpdateAsync(
-                    async (account, saveAync) =>
+                .StorageGetAsync(
+                    (account) =>
                     {
-                        if(account.userIdentification.IsNullOrWhiteSpace())
-                        {
-                            account.userIdentification = userIdentification;
-                            await saveAync(account);
-                        }
-
                         if (account.IsPasswordValid(password))
                             return onValid(account);
 

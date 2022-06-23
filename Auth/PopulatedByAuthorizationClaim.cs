@@ -51,22 +51,7 @@ namespace EastFive.Azure.Auth
 
     public static class AccountPopulationExtensions
     {
-        public static AccountLinks AppendCredentials(this AccountLinks accountLinks,
-            Method authMethod, string accountKey)
-        {
-            accountLinks.accountLinks = accountLinks.accountLinks
-                .NullToEmpty()
-                .Where(al => al.method.id != authMethod.authenticationId.id)
-                .Append(
-                    new AccountLink
-                    {
-                        method = authMethod.authenticationId,
-                        externalAccountKey = accountKey,
-                    })
-                .ToArray();
-            return accountLinks;
-
-        }
+        
 
         public static TResource PopulateResourceFromClaims<TResource>(this IProvideClaims claimProvider,
             TResource account, IDictionary<string, string> extraParams)

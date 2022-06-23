@@ -1,6 +1,8 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
@@ -16,6 +18,7 @@ namespace EastFive.Azure.Login
     [FunctionViewController(
         Route = "LoginClient",
         ContentType = "x-application/login-client",
+        Namespace = "e5/login",
         ContentTypeVersion = "0.1")]
     public struct Client : IReferenceable
     {
@@ -49,6 +52,16 @@ namespace EastFive.Azure.Login
                         return onCreated();
                     },
                     () => onAlreadyExists());
+        }
+
+        [Api.HttpGet]
+        public static IHttpResponse ListAsync(
+            MultipartAsyncResponse<Client> onListed)
+        {
+            return typeof(Client)
+                .StorageGetAll()
+                .Select(c => (Client)c)
+                .HttpResponse(onListed);;
         }
     }
 }

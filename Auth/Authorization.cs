@@ -227,16 +227,37 @@ namespace EastFive.Azure.Auth
                 () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }
 
+        [WorkflowStep(
+            FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Step = 4.0,
+            StepName = "Trade Authorization ID for Session")]
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAuthorizedAsync(
-                [QueryParameter(Name = "session")] IRef<Session> sessionRef,
-                [UpdateId(Name = AuthorizationIdPropertyName)] IRef<Authorization> authorizationRef,
-                [Property(Name = MethodPropertyName)] IRef<Method> methodRef,
-                [Property(Name = ParametersPropertyName)] IDictionary<string, string> parameters,
+                [WorkflowNewId]
+                [QueryParameter(Name = "session")]
+                IRef<Session> sessionRef,
+
+                [WorkflowParameterFromVariable(
+                    Value = Workflows.PasswordLoginCreateAccount.Variables.Authorization)]
+                [UpdateId(Name = AuthorizationIdPropertyName)]
+                IRef<Authorization> authorizationRef,
+
+                [WorkflowParameter(Value = "80a7de99-1307-9633-a7b8-ed70578ac6ae")]
+                [Property(Name = MethodPropertyName)]
+                IRef<Method> methodRef,
+
+                [WorkflowObjectParameter(
+                    Key0 = "state", Value0 = "{{InternalAuthState}}",
+                    Key1 = "token", Value1 = "{{InternalAuthToken}}")]
+                [Property(Name = ParametersPropertyName)]
+                IDictionary<string, string> parameters,
+
                 Api.Azure.AzureApplication application,
                 IInvokeApplication endpoints,
                 IHttpRequest request,
+            [WorkflowVariable(Workflows.PasswordLoginCreateAccount.Variables.AccountId, PropertyName =  Session.AccountPropertyName)]
             CreatedBodyResponse<Session> onCreated,
+
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onAuthorizationFailed,
             ServiceUnavailableResponse onServiceUnavailable,
@@ -341,24 +362,15 @@ namespace EastFive.Azure.Auth
                 () => onNotFound());
         }
 
-        [WorkflowStep(
-            FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
-            Step = 4.0,
-            StepName = "Trade Authorization ID for Session")]
+        
         [Api.HttpPatch]
         public async static Task<IHttpResponse> AuthorizeAsync(
-                [WorkflowNewId]
                 [QueryParameter(Name = "session")]
                 IRef<Session> sessionRef,
 
-                [WorkflowParameterFromVariable(
-                    Value = Workflows.PasswordLoginCreateAccount.Variables.Authorization)]
                 [UpdateId(Name = AuthorizationIdPropertyName)]
                 IRef<Authorization> authorizationRef,
 
-                [WorkflowObjectParameter(
-                    Key0 = "state", Value0 = "{{InternalAuthState}}",
-                    Key1 = "token", Value1 = "{{InternalAuthToken}}")]
                 [Property(Name = ParametersPropertyName)]
                 IDictionary<string, string> parameters,
 

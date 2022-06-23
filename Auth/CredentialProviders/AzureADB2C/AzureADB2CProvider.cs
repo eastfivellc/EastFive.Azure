@@ -362,13 +362,13 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 onFailure);
         }
 
-        public async Task<TResult> DeleteAuthorizationAsync<TResult>(Guid loginId,
+        public async Task<TResult> DeleteAuthorizationAsync<TResult>(string loginId,
             Func<TResult> onSuccess,
             Func<string, TResult> onServiceNotAvailable, 
             Func<TResult> onServiceNotSupported,
             Func<string, TResult> onFailure)
         {
-            var result = await client.DeleteUser(loginId.ToString());
+            var result = await client.DeleteUser(loginId);
             return onSuccess();
         }
 

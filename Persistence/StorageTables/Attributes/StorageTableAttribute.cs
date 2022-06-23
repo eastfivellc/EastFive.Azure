@@ -269,7 +269,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             var propInfo = propInfoAttribute.Key;
                             var attr = propInfoAttribute.Value;
                             var value = propInfo.GetValue(this.Entity);
-                            return attr.ConvertValue(value, propInfo);
+                            return attr.ConvertValue(propInfo, value, this);
                         })
                     .ToDictionary();
                 return valuesToStore;
