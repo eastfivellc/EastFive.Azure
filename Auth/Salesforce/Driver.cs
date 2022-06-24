@@ -34,7 +34,10 @@ namespace EastFive.Azure.Auth.Salesforce
 		TResult GetIdentifier<T, TResult>(T resource, MemberInfo propertyOrField,
 			Func<string, TResult> onIdentified,
 			Func<TResult> onNoIdentification);
-    }
+
+		TResource SetIdentifier<TResource>(TResource resource,
+			MemberInfo propertyOrField, string sfId);
+	}
 
 	public interface IBindSalesforce
     {
@@ -94,7 +97,7 @@ namespace EastFive.Azure.Auth.Salesforce
 		public Task<TResult> RefreshToken<TResult>(
 			Func<string, TResult> onRefreshed,
 			Func<string, TResult> onFailure)
-        {
+		{
 			return EastFive.Azure.AppSettings.Auth.Salesforce.ConsumerKey.ConfigurationString(
 				clientId =>
 				{
@@ -134,7 +137,7 @@ namespace EastFive.Azure.Auth.Salesforce
 								});
 						});
 				});
-			
+
 		}
 
 		public async Task<TResult> DescribeAsync<TResource, TResult>(
@@ -156,12 +159,14 @@ namespace EastFive.Azure.Auth.Salesforce
 				{
 					return onFailure(statusCode, body);
 				},
-					didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
+				onFailure:(why) => onFailure(default, why),
+					didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 		}
 
 		public async Task<TResult> CreateAsync<TResource, TResult>(TResource resource,
 			Func<string, TResult> onCreated,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
+			Func<string, TResult> onReferenceToNonExistantResource = default,
 				ILogger logger = default)
 		{
 			typeof(TResource).TryGetAttributeInterface(out IDefineSalesforceApiPath attr);
@@ -176,28 +181,31 @@ namespace EastFive.Azure.Auth.Salesforce
 				},
 				onFailureWithBody: (statusCode, body) =>
 				{
-					return ProcessCreateFailure(statusCode, body, onCreated, onFailure);
+					return ProcessCreateFailure(statusCode, body,
+						onFailure: onFailure,
+						onDuplicate: onCreated,
+						onReferenceToNonExistantResource: onReferenceToNonExistantResource);
 				},
-					didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
+					didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 		}
 
 		public async Task<TResult> GetAsync<TResource, TResult>(
-				TResource resource, object [] extraResources, IDictionary<string, object> extraValues,
+				TResource resource, object[] extraResources, IDictionary<string, object> extraValues,
 			Func<string, TResource, object[], IDictionary<string, object>, TResult> onCreated,
+			Func<TResult> onNotFound = default,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
 			Func<TResult> onCannotBeIdentified = default,
-				bool overrideEmptyValues = false,
-				ILogger logger = default)
+				bool overrideEmptyValues = false)
 		{
 			var originalType = typeof(TResource);
 			var attr = originalType.GetAttributeInterface<IDefineSalesforceApiPath>();
 			var location = attr.ProvideUrl(this.instanceUrl);
 			var (member, identifierDefinition) = originalType
-				.GetPropertyAndFieldsWithAttributesInterface<IDefineSalesforceIdentifier>( )
+				.GetPropertyAndFieldsWithAttributesInterface<IDefineSalesforceIdentifier>()
 				.Single();
 			return await identifierDefinition.GetIdentifier(resource, member,
 				async identifier =>
-                {
+				{
 					var locationWithIdentifier = location.AppendToPath(identifier);
 
 					return await await locationWithIdentifier.HttpClientGetResponseAuthenticatedAsync(
@@ -220,12 +228,29 @@ namespace EastFive.Azure.Auth.Salesforce
 						},
 						onFailureWithBody: (statusCode, body) =>
 						{
-							return onFailure(statusCode, body).AsTask();
+							return body.JsonParse(
+									(ErrorResponse[] errorResponses) =>
+									{
+										return errorResponses.First(
+											(errorResponse, next) =>
+											{
+												if (errorResponse.errorCode == ErrorCodes.NOT_FOUND)
+													return onNotFound();
+
+												return next();
+											},
+											() =>
+											{
+												return onFailure(statusCode, body);
+											});
+									},
+									(message) => onFailure(statusCode, message))
+								.AsTask();
 						},
-							didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
+							didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 				},
 				() => onCannotBeIdentified().AsTask());
-			
+
 			object DeserializeObject(object resourceToDeserialize, JObject jsonObject)
 			{
 				var (matched, discard1, discard2) = resourceToDeserialize
@@ -241,7 +266,7 @@ namespace EastFive.Azure.Auth.Salesforce
 				foreach (var ((member, binder), jproperty) in matched)
 				{
 					binder.PopluateSalesforceResource(resourceToDeserialize, member, jsonObject, jproperty,
-						overrideEmptyValues:overrideEmptyValues);
+						overrideEmptyValues: overrideEmptyValues);
 				}
 				return resourceToDeserialize;
 			}
@@ -261,8 +286,8 @@ namespace EastFive.Azure.Auth.Salesforce
 						match =>
 						{
 							var (kvp, property) = match;
-							if(property.Value is JValue)
-                            {
+							if (property.Value is JValue)
+							{
 								var value = (JValue)property.Value;
 								return kvp.Key.PairWithValue(value.Value);
 							}
@@ -275,6 +300,8 @@ namespace EastFive.Azure.Auth.Salesforce
 		public async Task<TResult> UpdateAsync<TResource, TResult>(TResource resource,
 				object[] extraResources, Dictionary<string, object> extraValues,
 			Func<string, TResult> onUpdated,
+			Func<string, TResult> onDuplicateValue = default,
+			Func<string, TResult> onReferenceToNonExistantResource = default,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
 			Func<TResult> onCannotBeIdentified = default)
 		{
@@ -309,9 +336,18 @@ namespace EastFive.Azure.Auth.Salesforce
 								},
 								onFailureWithBody: (statusCode, body) =>
 								{
-									return onFailure(statusCode, body);
+									if (onDuplicateValue.IsDefaultOrNull())
+										return onFailure(statusCode, body);
+
+									return ProcessCreateFailure(statusCode, body,
+										onFailure: (code, body) => onFailure(code, body),
+										onDuplicate: duplicatValue =>
+										{
+											return onDuplicateValue(duplicatValue);
+										},
+										onReferenceToNonExistantResource: onReferenceToNonExistantResource);
 								},
-									didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
+									didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 						},
 						() => onCannotBeIdentified().AsTask());
 				},
@@ -321,80 +357,185 @@ namespace EastFive.Azure.Auth.Salesforce
 				});
 		}
 
-		public async Task<TResult> SynchronizeAsync<TResource, TResult>(TResource resource,
-				object[] extraResources, Dictionary<string, object> extraValues,
+		public async Task<TResult> CreateOrLinkAsync<TResource, TResult>(TResource resourceToSynchronize,
+				object[] extraResources, IDictionary<string, object> extraValues,
 			Func<string, TResult> onSynchronized,
 			Func<HttpStatusCode, string, TResult> onFailure = default,
-				bool forceUpdate = false,
+			Func<string, TResult> onReferenceToNonExistantResource = default,
 				ILogger logger = default)
 		{
+			var driver = this;
 			return await await this.DescribeAsync<TResource, Task<TResult>>(
-				async description =>
+				description =>
 				{
-					var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
-					var location = attr.ProvideUrl(this.instanceUrl);
-
-					var json = Serialize(resource,
-						extraResources:extraResources, extraValues:extraValues, description.fields);
-
-					return await await location.HttpClientPostDynamicRequestAsync(
-							populateRequest:(request) =>
-                            {
-								var content = new StringContent(json,
-									encoding: System.Text.Encoding.UTF8,
-									mediaType:"application/json");
-								request.Content = content;
-								return (request, () => { content.Dispose(); });
-							},
-							authToken: this.authToken, tokenType: this.tokenType,
-						(Response response) =>
-						{
-							var id = response.id;
-							return onSynchronized(id).AsTask();
-						},
-						onFailureWithBody: (statusCode, body) =>
-						{
-							return ProcessCreateFailure(statusCode, body,
-								async (sfId) =>
-								{
-									if (!forceUpdate)
-										return onSynchronized(sfId);
-
-									var patchLocation = location.AppendToPath(sfId);
-									return await patchLocation.HttpClientPatchDynamicAuthenticatedAsync(
-											populateRequest: (request) =>
-											{
-												var content = new StringContent(json,
-													encoding: System.Text.Encoding.UTF8,
-													mediaType: "application/json");
-												request.Content = content;
-												return (request, () => { content.Dispose(); });
-											},
-											authToken: this.authToken, tokenType: this.tokenType,
-										(Response response) =>
-										{
-											var id = sfId; // response will be null response.id;
-											return onSynchronized(id);
-										},
-										onFailureWithBody: (statusCode, body) =>
-										{
-											return onFailure(statusCode, body);
-										});
-								},
-								onFailure.AsAsyncFunc());
-						},
-							didTokenGetRefreshed:(code, body) => this.DidTokenGetRefreshed(code, body));
+					return GetAndUpdateAsync(description, resourceToSynchronize);
 				},
 				(code, why) =>
 				{
 					return onFailure(code, why).AsTask();
 				},
 					logger: logger);
+
+			async Task<TResult> GetAndUpdateAsync(Describe description, TResource resource)
+			{
+				var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
+				var location = attr.ProvideUrl(this.instanceUrl);
+
+				return await await driver.GetAsync(resource, extraResources, extraValues,
+					(sfId, resGot, extraResGot, extraValuesGot) =>
+					{
+						return onSynchronized(sfId).AsTask(); //, resGot, extraResGot, extraValuesGot).AsTask();
+					},
+					onNotFound: () => CreateNewAsync(description, location, resource),
+					onFailure: onFailure.AsAsyncFunc(),
+					onCannotBeIdentified: () => CreateNewAsync(description, location, resource));
+			}
+
+			async Task<TResult> CreateNewAsync(Describe description, Uri location, TResource resource)
+			{
+				var json = Serialize(resource,
+						extraResources: extraResources, extraValues: extraValues, description.fields);
+
+				return await await location.HttpClientPostDynamicRequestAsync(
+						populateRequest: (request) =>
+						{
+							var content = new StringContent(json,
+								encoding: System.Text.Encoding.UTF8,
+								mediaType: "application/json");
+							request.Content = content;
+							return (request, () => { content.Dispose(); });
+						},
+						authToken: this.authToken, tokenType: this.tokenType,
+					(Response response) =>
+					{
+						var id = response.id;
+						return onSynchronized(id).AsTask();
+					},
+					onFailureWithBody: (statusCode, body) =>
+					{
+						return ProcessCreateFailure(statusCode, body,
+							onFailure: onFailure.AsAsyncFunc(),
+							onDuplicate: (sfId) =>
+							{
+								var resourceWithIdentifier = UpdateSalesforceIdentifier(resource, sfId);
+								return GetAndUpdateAsync(description, resourceWithIdentifier);
+							},
+							onReferenceToNonExistantResource: onReferenceToNonExistantResource.AsAsyncFunc());
+					},
+					didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
+			}
+		}
+
+
+		public async Task<TResult> SynchronizeAsync<TResource, TResult>(TResource resourceToSynchronize,
+				object[] extraResources, IDictionary<string, object> extraValues,
+				Func<TResource, object[], IDictionary<string, object>,
+					(TResource, object[], IDictionary<string, object>)> mergeValues,
+				Func<Func<TResource, TResource>, Task<TResource>> updateResource,
+			Func<string, TResult> onSynchronized,
+			Func<HttpStatusCode, string, TResult> onFailure = default,
+			Func<string, TResult> onReferenceToNonExistantResource = default,
+				ILogger logger = default)
+		{
+			var driver = this;
+			return await await this.DescribeAsync<TResource, Task<TResult>>(
+				description =>
+				{
+					return GetAndUpdateAsync(description, resourceToSynchronize);
+				},
+				(code, why) =>
+				{
+					return onFailure(code, why).AsTask();
+				},
+					logger: logger);
+
+			async Task<TResult> GetAndUpdateAsync(Describe description, TResource resource)
+            {
+				var attr = typeof(TResource).GetAttributeInterface<IDefineSalesforceApiPath>();
+				var location = attr.ProvideUrl(this.instanceUrl);
+
+				return await await driver.GetAsync(resource, extraResources, extraValues,
+					(sfId, resGot, extraResGot, extraValuesGot) =>
+					{
+						var (resNew, extraResNew, extraValuesNew) = mergeValues(
+							resGot, extraResGot, extraValuesGot);
+						var json = Serialize(resNew, extraResNew, extraValuesNew, description.fields);
+						return UpdateAsync(location, sfId, json);
+					},
+					onNotFound: () => CreateNewAsync(description, location, resource),
+					onFailure: onFailure.AsAsyncFunc(),
+					onCannotBeIdentified: () => CreateNewAsync(description, location, resource));
+			}
+
+			async Task<TResult> CreateNewAsync(Describe description, Uri location, TResource resource)
+			{
+				var json = Serialize(resource,
+						extraResources: extraResources, extraValues: extraValues, description.fields);
+
+				return await await location.HttpClientPostDynamicRequestAsync(
+						populateRequest: (request) =>
+						{
+							var content = new StringContent(json,
+								encoding: System.Text.Encoding.UTF8,
+								mediaType: "application/json");
+							request.Content = content;
+							return (request, () => { content.Dispose(); });
+						},
+						authToken: this.authToken, tokenType: this.tokenType,
+					(Response response) =>
+					{
+						var id = response.id;
+						return onSynchronized(id).AsTask();
+					},
+					onFailureWithBody: (statusCode, body) =>
+					{
+						return ProcessCreateFailure(statusCode, body,
+							onFailure: onFailure.AsAsyncFunc(),
+							onDuplicate: async (sfId) =>
+							{
+								var savedResource = await updateResource(
+									(resourceToUpdate) =>
+									{
+										var resourceWithIdentifier = UpdateSalesforceIdentifier(resourceToUpdate, sfId);
+										return resourceWithIdentifier;
+									});
+								
+								return await GetAndUpdateAsync(description, savedResource);
+							},
+							onReferenceToNonExistantResource: onReferenceToNonExistantResource.AsAsyncFunc());
+					},
+					didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
+			}
+
+			async Task<TResult> UpdateAsync(Uri location, string sfId, string json)
+			{
+				var patchLocation = location.AppendToPath(sfId);
+				return await patchLocation.HttpClientPatchDynamicAuthenticatedAsync(
+						populateRequest: (request) =>
+						{
+							var content = new StringContent(json,
+								encoding: System.Text.Encoding.UTF8,
+								mediaType: "application/json");
+							request.Content = content;
+							return (request, () => { content.Dispose(); });
+						},
+					authToken: this.authToken, tokenType: this.tokenType,
+					(Response response) =>
+					{
+						var id = sfId; // response will be null response.id;
+						return onSynchronized(id);
+					},
+					onFailureWithBody: (statusCode, body) =>
+					{
+						return onFailure(statusCode, body);
+					});
+			}
+		
 		}
 
 		private static string Serialize<TResource>(TResource resource,
 			object[] extraResources,
-			Dictionary<string, object> extraValues, Field[] fields)
+			IDictionary<string, object> extraValues, Field[] fields)
 		{
 			var orignalType = typeof(TResource);
 			var stringBuilder = new System.Text.StringBuilder();
@@ -443,9 +584,53 @@ namespace EastFive.Azure.Auth.Salesforce
 			return jsonWriter;
 		}
 
+        #region Error handling
+
+        async Task<(bool, string)> DidTokenGetRefreshed(HttpStatusCode statusCode, string body)
+		{
+			if (statusCode != HttpStatusCode.Unauthorized)
+				return (false, string.Empty);
+
+			return await body.JsonParse(
+				(ErrorResponse[] errorResponses) =>
+				{
+					return errorResponses.First(
+						async (errorResponse, next) =>
+						{
+							// [{"message":"Session expired or invalid","errorCode":"INVALID_SESSION_ID"}]
+
+							if (errorResponse.errorCode != ErrorCodes.INVALID_SESSION_ID)
+								return (false, string.Empty);
+
+							if (!errorResponse.message.Contains("expired", StringComparison.OrdinalIgnoreCase))
+								return (false, string.Empty);
+
+							return await this.RefreshToken(
+								onRefreshed: (newToken) =>
+								{
+									return (true, newToken);
+								},
+								onFailure: (why) =>
+								{
+									return (false, string.Empty);
+								});
+						},
+						() =>
+						{
+							return (false, string.Empty).AsTask();
+						});
+				},
+				(message) =>
+				{
+					return (false, string.Empty).AsTask();
+				});
+		}
+
+
 		protected static TResult ProcessCreateFailure<TResult>(HttpStatusCode statusCode, string body,
-			Func<string, TResult> onDuplicate,
-			Func<HttpStatusCode, string, TResult> onFailure)
+			Func<HttpStatusCode, string, TResult> onFailure,
+			Func<string, TResult> onDuplicate = default,
+			Func<string, TResult> onReferenceToNonExistantResource = default)
         {
 			return body.JsonParse(
 				(ErrorResponse[] errorResponses) =>
@@ -504,10 +689,34 @@ namespace EastFive.Azure.Auth.Salesforce
 												},
 												() => OnFailure());
 										});
-
-									
 								},
-								() => OnFailure());
+								() =>
+                                {
+									return errorResponses.First(
+										(errorResponse, next) =>
+										{
+											if (errorResponse.errorCode != ErrorCodes.INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY)
+												return next();
+
+											// duplicate value found: AffirmId__c duplicates value on record with id: 0018M000003uKqq
+											return errorResponse.message.MatchRegexInvoke(
+												".*cross-reference id:\\s*(?<property>[0-9a-zA-Z_]+).*",
+												(property) => property,
+												matches =>
+												{
+													return matches.First(
+														(match, nextMatch) =>
+														{
+															var sfId = match;
+															return onReferenceToNonExistantResource(sfId);
+														},
+														() => OnFailure());
+												});
+										},
+										() => OnFailure());
+								});
+
+							// 	body	"[{\"message\":\"insufficient access rights on cross-reference id: 0018M000003uKwe\",\"errorCode\":\"INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY\",\"fields\":[]}]"	
 						});
 						
 				},
@@ -521,47 +730,9 @@ namespace EastFive.Azure.Auth.Salesforce
 			}
 		}
 
-		async Task<(bool, string)> DidTokenGetRefreshed(HttpStatusCode statusCode, string body)
-        {
-			if (statusCode != HttpStatusCode.Unauthorized)
-				return (false, string.Empty);
+        #region Error resources
 
-			return await body.JsonParse(
-				(ErrorResponse[] errorResponses) =>
-				{
-					return errorResponses.First(
-						async (errorResponse, next) =>
-						{
-							// [{"message":"Session expired or invalid","errorCode":"INVALID_SESSION_ID"}]
-
-							if (errorResponse.errorCode != ErrorCodes.INVALID_SESSION_ID)
-								return (false, string.Empty);
-
-							if (!errorResponse.message.Contains("expired", StringComparison.OrdinalIgnoreCase))
-								return (false, string.Empty);
-
-							return await this.RefreshToken(
-								onRefreshed: (newToken) =>
-								{
-									return (true, newToken);
-								},
-								onFailure: (why) =>
-								{
-									return (false, string.Empty);
-								});
-						},
-						() =>
-						{
-							return (false, string.Empty).AsTask();
-						});
-				},
-				(message) =>
-                {
-					return (false, string.Empty).AsTask();
-				});
-		}
-
-		public enum ErrorCodes
+        public enum ErrorCodes
         {
 			INVALID_SESSION_ID,
 			DUPLICATES_DETECTED,
@@ -581,6 +752,8 @@ namespace EastFive.Azure.Auth.Salesforce
 
 			// [{"message":"Required fields are missing: [Name]","errorCode":"REQUIRED_FIELD_MISSING","fields":["Name"]}]
 			REQUIRED_FIELD_MISSING,
+
+			NOT_FOUND,
 		}
 
 		internal class ErrorResponse
@@ -628,64 +801,18 @@ namespace EastFive.Azure.Auth.Salesforce
 			public string Id;
         }
 
-		// [{"duplicateResut":{"allowSave":true,"duplicateRule":"Standard_Contact_Duplicate_Rule","duplicateRuleEntityType":"Contact","errorMessage":"You're creating a duplicate record. We recommend you use an existing record instead.","matchResults":[{"entityType":"Contact","errors":[],"matchEngine":"FuzzyMatchEngine","matchRecords":[{"additionalInformation":[],"fieldDiffs":[],"matchConfidence":100.0,"record":{"attributes":{"type":"Contact","url":"/services/data/v54.0/sobjects/Contact/0038M0000016Wv8QAE"},"Id":"0038M0000016Wv8QAE"}}],"rule":"Standard_Contact_Match_Rule_v1_1","size":1,"success":true}]},"errorCode":"DUPLICATES_DETECTED","message":"You're creating a duplicate record. We recommend you use an existing record instead."}]
+        #endregion
 
-		//[SalesforceApiPath("Lead")]
-		//public class Leads
-		//{
-		//	public string Salutation;
-		//	public string FirstName;
-		//	public string LastName;
-		//	public string Company;
-		//	public string Title;
-		//	public string Email;
+        #endregion
 
-		//	/// <summary>
-		//	/// Must contain <code>Name</code> property
-		//	/// </summary>
-		//	public object RecordType;
-		//	public string RecordTypeId;
-		//}
-
-		//public class Logins
-		//{
-		//	private Driver driver;
-
-		//	[JsonProperty(PropertyName = "Login_Date__c")]
-		//	public DateTime When;
-
-		//	[JsonProperty(PropertyName = "Login_User__c")]
-		//	public string User;
-
-		//	[JsonProperty(PropertyName = "LoginDayIndex__c")]
-		//	public string LoginDayIndex => $"{When.Year}|{When.DayOfYear}";
-
-		//	public Logins(Driver driver)
-		//	{
-		//		this.driver = driver;
-		//	}
-
-		//	public async Task<TResult> CreateAsync<TResult>(
-		//		Func<string, TResult> onCreated,
-		//		Func<HttpStatusCode, string, TResult> onFailure = default)
-		//	{
-		//		Uri.TryCreate($"{this.driver.instanceUrl}/services/data/v54.0/sobjects/Logins__c/", UriKind.Absolute, out Uri leadLocation);
-
-		//		return await leadLocation.HttpClientPostResourceAsync(this,
-		//				authToken: this.driver.authToken, tokenType: this.driver.tokenType,
-		//			(Response response) =>
-		//			{
-		//				var id = response.id;
-		//				return onCreated(id);
-		//			},
-		//			onFailureWithBody: (statusCode, body) =>
-		//			{
-		//				return ProcessFailure(statusCode, body, onCreated, onFailure);
-		//			},
-		//				didTokenGetRefreshed: driver.DidTokenGetRefreshed);
-
-		//	}
-		//}
+        internal TResource UpdateSalesforceIdentifier<TResource>(TResource resource, string sfId)
+        {
+			var originalType = typeof(TResource);;
+			var (member, identifierDefinition) = originalType
+				.GetPropertyAndFieldsWithAttributesInterface<IDefineSalesforceIdentifier>()
+				.Single();
+			return identifierDefinition.SetIdentifier(resource, member, sfId);
+		}
 
 	}
 }

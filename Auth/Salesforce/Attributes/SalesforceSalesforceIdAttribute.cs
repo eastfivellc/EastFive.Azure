@@ -10,6 +10,7 @@ using EastFive.Azure.Auth.Salesforce.Resources;
 using EastFive.Reflection;
 using EastFive.Linq;
 using Newtonsoft.Json.Linq;
+using EastFive.Extensions;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
@@ -95,6 +96,15 @@ namespace EastFive.Azure.Auth.Salesforce
                     {
                         return onNoIdentification();
                     });
+        }
+
+        public TResource SetIdentifier<TResource>(TResource resource, MemberInfo propertyOrField, string sfId)
+        {
+            var accountLinksObj = propertyOrField.GetValue(resource);
+            var accountLinks = (AccountLinks)accountLinksObj;
+            var accountLinksUpdated = accountLinks.AddOrUpdateCredentials(
+                SalesforceProvider.IntegrationId.AsRef<Method>(), sfId);
+            return (TResource)propertyOrField.SetPropertyOrFieldValue(resource, accountLinksUpdated);
         }
     }
 }

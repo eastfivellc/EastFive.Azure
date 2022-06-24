@@ -1441,7 +1441,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     var message = generalEx;
                     throw;
                 }
-            };
+            }
         }
 
         public Task<TResult> ReplaceAsync<TData, TResult>(ITableEntity tableEntity,
