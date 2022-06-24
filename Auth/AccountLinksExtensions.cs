@@ -70,7 +70,17 @@ namespace EastFive.Azure.Auth
                     });
             return alsUpdated;
         }
-        
+
+        public static AccountLinks DeleteCredentials(this AccountLinks accountLinks,
+            IRef<Method> authMethodRef)
+        {
+            accountLinks.accountLinks = accountLinks.accountLinks
+                .NullToEmpty()
+                .Where(al => al.method.id != authMethodRef.id)
+                .ToArray();
+            return accountLinks;
+        }
+
         public static IEnumerableAsync<Method> DeleteInCredentialProviders(this AccountLinks accountLinks, IAuthApplication application)
         {
             var loginProvidersWithMethods = application.LoginProviders

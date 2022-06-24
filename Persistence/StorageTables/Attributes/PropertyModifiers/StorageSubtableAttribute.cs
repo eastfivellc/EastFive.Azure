@@ -240,6 +240,9 @@ namespace EastFive.Persistence
                     .ToArray();
 
                 var lengths = propsAndValues.Select(tpl => tpl.Item2.Length).ToArray();
+                if(lengths.None())
+                    return elementType.ConstructEmptyArray();
+
                 var min = lengths.Min();
                 var max = lengths.Max();
                 if (min != max)
