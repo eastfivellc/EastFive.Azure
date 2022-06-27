@@ -1,6 +1,4 @@
-﻿#if !NET6_0_OR_GREATER
-
-using System;
+﻿using System;
 
 using System.Threading.Tasks;
 using EastFive.Extensions;
@@ -57,5 +55,3 @@ namespace EastFive.Azure.Functions
         }
 	}
 }
-
-#endif

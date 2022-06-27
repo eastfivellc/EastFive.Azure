@@ -426,7 +426,6 @@ namespace EastFive.Azure.Auth.Salesforce
 			}
 		}
 
-
 		public async Task<TResult> SynchronizeAsync<TResource, TResult>(TResource resourceToSynchronize,
 				object[] extraResources, IDictionary<string, object> extraValues,
 				Func<TResource, object[], IDictionary<string, object>,
