@@ -66,13 +66,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     (dictEntity, tableResult) =>
                                     {
                                         scopedLogger.Trace($"Fetched {lookupRef.PartitionKey}/{lookupRef.RowKey}");
-                                        var rowAndParitionKeys = dictEntity.rowAndPartitionKeys
+                                        var rowAndPartitionKeys = dictEntity.rowAndPartitionKeys
                                             .NullToEmpty()
-                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
-                                            .Select(rowParitionKeyKvp => rowParitionKeyKvp.Key.AsAstRef(rowParitionKeyKvp.Value))
+                                            .Where(rowPartitionKeyKvp => rowPartitionKeyKvp.Key.HasBlackSpace() && rowPartitionKeyKvp.Value.HasBlackSpace())
+                                            .Distinct(rowPartitionKeyKvp => $"{rowPartitionKeyKvp.Key}{rowPartitionKeyKvp.Value}")
+                                            .Select(rowPartitionKeyKvp => rowPartitionKeyKvp.Key.AsAstRef(rowPartitionKeyKvp.Value))
                                             .ToArray();
-                                        scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndParitionKeys.Length} lookups");
-                                        return rowAndParitionKeys;
+                                        scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndPartitionKeys.Length} lookups");
+                                        return rowAndPartitionKeys;
                                     },
                                     () =>
                                     {
