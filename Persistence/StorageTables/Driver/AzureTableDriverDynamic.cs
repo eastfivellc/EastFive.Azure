@@ -1532,7 +1532,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         }
 
         public async Task<TResult> InsertOrReplaceAsync<TResult>(ITableEntity tableEntity, E5CloudTable table,
-            Func<bool, TableResult, TResult> success,
+            Func<bool, TableResult, TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
                 AzureStorageDriver.RetryDelegate onTimeout = null)
         {
@@ -1541,10 +1541,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             {
                 TableResult result = await table.ExecuteAsync(update);
                 var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
-                return success(created, result);
+                return onSuccess(created, result);
             }
             catch (StorageException ex)
             {
+                if (ex.IsProblemTableDoesNotExist())
+                {
+                    await table.cloudTable.CreateIfNotExistsAsync();
+                    return await InsertOrReplaceAsync(tableEntity: tableEntity, table: table,
+                        onSuccess: onSuccess,
+                        onFailure: onFailure,
+                        onTimeout: onTimeout);
+                }
                 return await ex.ParseStorageException(
                     async (errorCode, errorMessage) =>
                     {
@@ -1559,7 +1567,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                         async () =>
                                         {
                                             timeoutResult = await InsertOrReplaceAsync(tableEntity, table,
-                                                success, onFailure, onTimeout);
+                                                onSuccess, onFailure, onTimeout);
                                         });
                                     return timeoutResult;
                                 }
