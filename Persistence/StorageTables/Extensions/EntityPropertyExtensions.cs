@@ -138,6 +138,56 @@ namespace EastFive.Persistence.Azure.StorageTables
             return arrOfObj;
         }
 
+        public static EntityProperty[] FromEdmTypedByteArrayToEntityProperties(this byte[] binaryValue, Type typeForDefaultFromMissingValues)
+        {
+            var typeFromByte = typeBytes
+                .Select(kvp => kvp.Key.PairWithKey(kvp.Value))
+                .ToDictionary();
+            var arrOfObj = binaryValue
+                .FromByteArray()
+                .Select(
+                    typeWithBytes =>
+                    {
+                        if (!typeWithBytes.Any())
+                            return NullValue();
+                        var typeByte = typeWithBytes[0];
+                        if (!typeFromByte.ContainsKey(typeByte))
+                            return NullValue();
+                        var edmType = typeFromByte[typeByte];
+                        var valueBytes = typeWithBytes.Skip(1).ToArray();
+                        var valueObj = edmType.ToObjectFromEdmTypeByteArray(valueBytes);
+                        if (null == valueObj)
+                        {
+                            return NullValue();
+                        }
+
+                        if (typeof(byte[]).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((byte[])valueObj);
+                        if (typeof(string).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((string)valueObj);
+                        if (typeof(bool).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((bool)valueObj);
+                        if (typeof(DateTime).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((DateTime)valueObj);
+                        if (typeof(DateTimeOffset).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((DateTimeOffset)valueObj);
+                        if (typeof(double).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((double)valueObj);
+                        if (typeof(Guid).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((Guid)valueObj);
+                        if (typeof(int).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((int)valueObj);
+                        if (typeof(long).IsAssignableFrom(valueObj.GetType()))
+                            return new EntityProperty((long)valueObj);
+
+                        return NullValue();
+
+                        EntityProperty NullValue() =>new EntityProperty(new byte[] { });
+                    })
+                .ToArray();
+            return arrOfObj;
+        }
+
         public static TResult CastEntityProperty<TResult>(this object value, Type valueType,
             Func<EntityProperty, TResult> onValue,
             Func<TResult> onNoCast,
