@@ -38,43 +38,7 @@ namespace EastFive.Persistence
                     {
                         var propName = propNameStorageValueKvp.Key;
                         var storageValue = propNameStorageValueKvp.Value;
-                        if(storageValue.PropertyType == EdmType.Binary)
-                        {
-                            if (storageValue.BinaryValue.Length <= 0x10000)
-                                return propNameStorageValueKvp.AsArray();
-
-                            var overflowTokenBytes = new Guid(overflowToken).ToByteArray();
-                            return storageValue.BinaryValue
-                                .Split(x => 0x10000)
-                                .Select(
-                                    (bytes, index) =>
-                                    {
-                                        var bytesArr = bytes.ToArray();
-                                        var storageValueSized = new EntityProperty(bytesArr);
-                                        var propNameIndexed = $"{propName}_overflow_{index}";
-                                        return propNameIndexed.PairWithValue(storageValueSized);
-                                    })
-                                .Append(propName.PairWithValue(new EntityProperty(overflowTokenBytes)));
-                        }
-                        if (storageValue.PropertyType == EdmType.String)
-                        {
-                            if (storageValue.StringValue.Length <= 0x8000)
-                                return propNameStorageValueKvp.AsArray();
-
-                            return storageValue.StringValue
-                                .Split(x => 0x8000)
-                                .Select(
-                                    (chars, index) =>
-                                    {
-                                        var stringValue = new String(chars.ToArray());
-                                        var storageValueSized = new EntityProperty(stringValue);
-                                        var propNameIndexed = $"{propName}_overflow_{index}";
-                                        return propNameIndexed.PairWithValue(storageValueSized);
-                                    })
-                                .Append(propName.PairWithValue(new EntityProperty(overflowTokenString)));
-                        }
-
-                        return propNameStorageValueKvp.AsArray();
+                        return ComputeOverflowValues(propName, storageValue);
                     })
                 .ToArray();
 
@@ -91,39 +55,92 @@ namespace EastFive.Persistence
                         var propName = propNameStorageValueKvp.Key;
                         var storageValue = propNameStorageValueKvp.Value;
 
-                        if (storageValue.PropertyType == EdmType.Binary)
-                        {
-                            var overflowTokenBytes = new Guid(overflowToken).ToByteArray();
-
-                            if (!storageValue.BinaryValue.SequenceEqual(overflowTokenBytes))
-                                return propNameStorageValueKvp;
-
-                            var compactedBytes = values
-                                .Where(value => value.Value.PropertyType == EdmType.Binary)
-                                .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
-                                .OrderBy(value => value.Key)
-                                .Aggregate(new byte[] { },
-                                    (bytes, valueKvp) => bytes.Concat(valueKvp.Value.BinaryValue).ToArray());
-                            return propName.PairWithValue(new EntityProperty(compactedBytes));
-                        }
-                        if (storageValue.PropertyType == EdmType.String)
-                        {
-                            if (storageValue.StringValue != overflowTokenString)
-                                return propNameStorageValueKvp;
-
-                            var stringBuilder = values
-                                .Where(value => value.Value.PropertyType == EdmType.String)
-                                .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
-                                .OrderBy(value => value.Key)
-                                .Aggregate(new StringBuilder(),
-                                    (sb, valueKvp) => sb.Append(valueKvp.Value.StringValue));
-                            return propName.PairWithValue(new EntityProperty(stringBuilder.ToString()));
-                        }
-                        return propNameStorageValueKvp;
+                        return ParseOverflowValues(propName, storageValue, values);
                     })
                 .ToDictionary();
 
             return base.GetMemberValue(memberInfo, compactedValues);
+        }
+
+        public static IEnumerable<KeyValuePair<string, EntityProperty>> ComputeOverflowValues(
+            string propName, EntityProperty storageValue)
+        {
+            if (storageValue.PropertyType == EdmType.Binary)
+            {
+                if (storageValue.BinaryValue.Length <= 0x10000)
+                    return propName.PairWithValue(storageValue).AsArray();
+
+                var overflowTokenBytes = new Guid(overflowToken).ToByteArray();
+                return storageValue.BinaryValue
+                    .Split(x => 0x10000)
+                    .Select(
+                        (bytes, index) =>
+                        {
+                            var bytesArr = bytes.ToArray();
+                            var storageValueSized = new EntityProperty(bytesArr);
+                            var propNameIndexed = $"{propName}_overflow_{index}";
+                            return propNameIndexed.PairWithValue(storageValueSized);
+                        })
+                    .Append(propName.PairWithValue(new EntityProperty(overflowTokenBytes)));
+            }
+
+            if (storageValue.PropertyType == EdmType.String)
+            {
+                if (storageValue.StringValue.Length <= 0x8000)
+                    return propName.PairWithValue(storageValue).AsArray();
+
+                return storageValue.StringValue
+                    .Split(x => 0x8000)
+                    .Select(
+                        (chars, index) =>
+                        {
+                            var stringValue = new String(chars.ToArray());
+                            var storageValueSized = new EntityProperty(stringValue);
+                            var propNameIndexed = $"{propName}_overflow_{index}";
+                            return propNameIndexed.PairWithValue(storageValueSized);
+                        })
+                    .Append(propName.PairWithValue(new EntityProperty(overflowTokenString)));
+            }
+
+            return propName.PairWithValue(storageValue).AsArray();
+        }
+
+        public static KeyValuePair<string, EntityProperty> ParseOverflowValues(
+            string propName, EntityProperty storageValue, IDictionary<string, EntityProperty> values)
+        {
+            if (storageValue.PropertyType == EdmType.Binary)
+            {
+                var overflowTokenBytes = new Guid(overflowToken).ToByteArray();
+
+                if (!storageValue.BinaryValue.SequenceEqual(overflowTokenBytes))
+                    return Empty();
+
+                var compactedBytes = values
+                    .Where(value => value.Value.PropertyType == EdmType.Binary)
+                    .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
+                    .OrderBy(value => value.Key)
+                    .Aggregate(new byte[] { },
+                        (bytes, valueKvp) => bytes.Concat(valueKvp.Value.BinaryValue).ToArray());
+                return propName.PairWithValue(new EntityProperty(compactedBytes));
+            }
+
+            if (storageValue.PropertyType == EdmType.String)
+            {
+                if (storageValue.StringValue != overflowTokenString)
+                    return Empty();
+
+                var stringBuilder = values
+                    .Where(value => value.Value.PropertyType == EdmType.String)
+                    .Where(value => value.Key.StartsWith($"{propName}_overflow_"))
+                    .OrderBy(value => value.Key)
+                    .Aggregate(new StringBuilder(),
+                        (sb, valueKvp) => sb.Append(valueKvp.Value.StringValue));
+                return propName.PairWithValue(new EntityProperty(stringBuilder.ToString()));
+            }
+
+            return Empty();
+
+            KeyValuePair<string, EntityProperty> Empty() => propName.PairWithValue(storageValue);
         }
     }
 

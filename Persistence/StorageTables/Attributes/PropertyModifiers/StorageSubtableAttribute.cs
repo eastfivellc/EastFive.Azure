@@ -25,6 +25,8 @@ namespace EastFive.Persistence
     public class StorageSubtableAttribute : Attribute,
         IPersistInAzureStorageTables, IModifyAzureStorageTableSave, IProvideEntity
     {
+        private const string overflowToken = "8d40521b-7d71-47b3-92c5-46e4a804e7de";
+        private const string overflowTokenString = "9a9a2e13d0ed44d7aa39c2549aff176a";
 
         public string Name { get; set; }
 
@@ -181,7 +183,7 @@ namespace EastFive.Persistence
                             var keys = valuesForMember
                                 .SelectMany(kvps => kvps.SelectKeys().Where(key => key.HasBlackSpace()))
                                 .Distinct()
-                                .Select(
+                                .SelectMany(
                                     key =>
                                     {
                                         var values = valuesForMember
@@ -200,7 +202,10 @@ namespace EastFive.Persistence
                                                 })
                                             .ToArray()
                                             .ToByteArrayOfEntityProperties();
-                                        return key.PairWithValue(new EntityProperty(values));
+                                        var ep = new EntityProperty(values);
+                                        var kvps = StorageOverflowAttribute.ComputeOverflowValues(key, ep);
+                                        return kvps;
+                                        // return key.PairWithValue(ep);
                                     })
                                 .ToArray();
                             return keys;
@@ -233,7 +238,25 @@ namespace EastFive.Persistence
                             if (!properties.TryGetValue(propertyName, out EntityProperty entityProperty))
                                 return (false, member, default(object[]));
 
-                            var values = entityProperty.BinaryValue.FromEdmTypedByteArray(memberType);
+                            // var values = entityProperty.BinaryValue.FromEdmTypedByteArray(memberType);
+                            // return (true, member, values);
+
+                            var epToParse = StorageOverflowAttribute.ParseOverflowValues(
+                                propertyName, entityProperty, properties);
+
+                            var values = epToParse.Value.BinaryValue
+                                .FromEdmTypedByteArrayToEntityProperties(memberType)
+                                .Select(
+                                    ep =>
+                                    {
+                                        return persistor.GetMemberValue(member,
+                                            new Dictionary<string, EntityProperty>()
+                                            {
+                                                {propertyName, ep}
+                                            });
+                                    })
+                                .ToArray();
+
                             return (true, member, values);
                         })
                     .SelectWhere()
@@ -374,5 +397,4 @@ namespace EastFive.Persistence
         }
 
     }
-
 }
