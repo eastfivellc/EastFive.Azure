@@ -1,19 +1,15 @@
 ﻿using System;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using EastFive.Api;
-using EastFive.Api.Auth;
 using EastFive.Api.Azure;
-using EastFive.Azure.Meta;
+using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Persistence;
-using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
 using Microsoft.Azure.Cosmos.Table;
@@ -35,10 +31,7 @@ namespace EastFive.Azure.Auth
         public Guid id => redirectionManagerRef.id;
 
         public const string RedirectionManagerId = "id";
-        [ApiProperty(PropertyName = RedirectionManagerId)]
-        [JsonProperty(PropertyName = RedirectionManagerId)]
-        [RowKey]
-        [StandardParititionKey]
+        [JsonIgnore]
         public IRef<RedirectionManager> redirectionManagerRef;
 
         #endregion
@@ -46,26 +39,16 @@ namespace EastFive.Azure.Auth
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
         [JsonProperty(PropertyName = AuthorizationPropertyName)]
-        [Storage]
-        public IRefOptional<Authorization> authorization { get; set; }
+        public IRef<Authorization> authorizationRef { get; set; }
 
-        public const string Message = "message";
-        [ApiProperty(PropertyName = Message)]
-        [JsonProperty(PropertyName = Message)]
-        [Storage]
-        public string message { get; set; }
+        [JsonProperty]
+        public string info { get; set; }
 
-        public const string When = "when";
-        [ApiProperty(PropertyName = When)]
-        [JsonProperty(PropertyName = When)]
-        [Storage]
+        [JsonProperty]
         public DateTime when { get; set; }
 
-        public const string Redirection = "redirection";
-        [ApiProperty(PropertyName = Redirection)]
-        [JsonProperty(PropertyName = Redirection)]
-        [Storage]
-        public Uri redirection { get; set; }
+        [JsonProperty(PropertyName = "COPY_link")]
+        public Uri link { get; set; }
 
         #endregion
 
@@ -75,28 +58,34 @@ namespace EastFive.Azure.Auth
 
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.HijackLoginFlow.FlowName,
-            StepName = "Find Authorization To Hijack",
-            Step = 2.0)]
+            StepName = Workflows.HijackLoginFlow.Steps.ListLogins,
+            Step = Workflows.HijackLoginFlow.Ordinals.ListLogins)]
         [Api.HttpGet]
         [PIIAdminClaim]
-        public async static Task<IHttpResponse> GetAllSecureAsync(
-
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{AuthenticationMethod}}")]
+        public async static Task<IHttpResponse> QueryAsync(
+                [WorkflowParameterFromVariable(
+                    Value = Workflows.HijackLoginFlow.Variables.Method.Get.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.Method.Get.Description)]
                 [QueryParameter(Name = "method")]
                 IRef<Method> methodRef,
 
-                [OptionalQueryParameter(Name = "successOnly")]bool successOnly,
+                [OptionalQueryParameter(Name = "successOnly")]bool? successOnly,
 
-                [Api.Meta.Flows.WorkflowParameter(Description = "ACP,Dash,TCM,HUDDLE", Value = "")]
+                [WorkflowParameter(
+                    Value = Workflows.HijackLoginFlow.Variables.Search.Set.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.Search.Set.Description)]
                 [OptionalQueryParameter(Name = "search")]
                 string search,
 
-                [OptionalQueryParameter(Name = "months")]int? monthsMaybe,
+                [WorkflowParameter(
+                    Value = Workflows.HijackLoginFlow.Variables.History.Set.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.History.Set.Description)]
+                [OptionalQueryParameter(Name = "days")]int? daysMaybe,
+
                 AzureApplication application,
                 EastFive.Api.Security security,
                 IHttpRequest request,
 
-            [Api.Meta.Flows.WorkflowVariable(AuthorizationPropertyName, "authorization{0}")]
             ContentTypeResponse<RedirectionManager[]> onContent,
             UnauthorizedResponse onUnauthorized,
             ConfigurationFailureResponse onConfigFailure,
@@ -106,10 +95,20 @@ namespace EastFive.Azure.Auth
             var methodMaybe = await Method.ById(methodRef, application, (m) => m, () => default(Method?));
             if (methodMaybe.IsDefault())
                 return onBadRequest().AddReason("Method no longer supported");
-            var method = methodMaybe.Value;
 
-            var months = monthsMaybe.HasValue ? Math.Abs(monthsMaybe.Value) : 1;
-            var since = DateTime.UtcNow.Date.AddMonths(-months);
+            if (!successOnly.HasValue)
+                successOnly = true;
+
+            request.Headers.TryGetValue("api-voucher", out string[] apiVouchers);
+            var apiVoucher = apiVouchers
+                .NullToEmpty()
+                .First(
+                    (x,next) => $"&api-voucher={x}", 
+                    () => string.Empty);
+
+            var method = methodMaybe.Value;
+            var days = daysMaybe.HasValue ? Math.Abs(daysMaybe.Value) : 31;
+            var since = DateTime.UtcNow.Date.AddDays(-days);
             var query = new TableQuery<GenericTableEntity>().Where(
             TableQuery.CombineFilters(
                 TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
@@ -167,13 +166,13 @@ namespace EastFive.Azure.Auth
 
                             RedirectionManager? Failure(string why)
                             {
-                                if (successOnly)
+                                if (successOnly.GetValueOrDefault())
                                     return default(RedirectionManager?);
 
                                 return new RedirectionManager
                                 {
-                                    authorization = id.AsRef<Authorization>().Optional(),
-                                    message = why,
+                                    authorizationRef = id.AsRef<Authorization>(),
+                                    info = why,
                                     when = when,
                                 };
                             }
@@ -184,11 +183,11 @@ namespace EastFive.Azure.Auth
                                     return new RedirectionManager
                                     {
                                         when = when,
-                                        message = $"Ready:{externalId}",
-                                        authorization = id.AsRef<Authorization>().Optional(),
-                                        redirection = new Uri(
+                                        info = $"{externalId}",
+                                        authorizationRef = id.AsRef<Authorization>(),
+                                        link = new Uri(
                                             request.RequestUri,
-                                            $"/api/RedirectionManager?authorization={id}"),
+                                            $"/api/RedirectionManager?authorization={id}{apiVoucher}"),
                                     };
                                 },
                                 (why) => Failure(why));
@@ -245,16 +244,20 @@ namespace EastFive.Azure.Auth
             //return onContent(results.ToArray());
         }
 
-
-        [Api.Meta.Flows.WorkflowStep(
-            FlowName = Workflows.HijackLoginFlow.FlowName,
-            StepName = "Launch UI",
-            Step = 3.0)]
+        // commented this out since Postman doesn't behave like a regular browser
+        //[Api.Meta.Flows.WorkflowStep(
+        //    FlowName = Workflows.HijackLoginFlow.FlowName,
+        //    StepName = Workflows.HijackLoginFlow.Steps.LaunchLogin,
+        //    Step = Workflows.HijackLoginFlow.Ordinals.LaunchLogin)]
         [Api.HttpGet]
         [PIIAdminClaim]
         public static Task<IHttpResponse> GetRedirection(
-                [Api.Meta.Flows.WorkflowParameter(Value = "{{Authorization}}")]
-                [QueryParameter(Name = "authorization")]IRef<Authorization> authRef,
+                [WorkflowParameter(
+                    Value = Workflows.HijackLoginFlow.Variables.Authorization.Set.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.Authorization.Set.Description)]
+                [QueryParameter(Name = AuthorizationPropertyName)]
+                IRef<Authorization> authRef,
+
                 AzureApplication application,
                 IInvokeApplication endpoints,
                 EastFive.Api.Security security,
@@ -320,43 +323,44 @@ namespace EastFive.Azure.Auth
                 () => onNotFound());
         }
 
-        [Api.HttpGet]
-        [PIIAdminClaim]
-        public static async Task<IHttpResponse> GetAllSecureAsync(
-                [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
-                AzureApplication application,
-                IInvokeApplication endpoints,
-                IHttpRequest request,
-            MultipartAsyncResponse<Authorization> onContent,
-            RedirectResponse onSuccess,
-            NotFoundResponse onNotFound,
-            ForbiddenResponse onFailure)
-        {
-            return await await authorizationRef.StorageGetAsync(
-                async authorization =>
-                {
-                    return await await Method.ById(authorization.Method, application,
-                        async method =>
-                        {
-                            return await await method.ParseTokenAsync(authorization.parameters, application,
-                                (externalId, loginProvider) =>
-                                {
-                                    return Auth.Redirection.ProcessAsync(authorization,
-                                            async updatedAuth =>
-                                            {
+        //[Api.HttpGet]
+        //[PIIAdminClaim]
+        //public static async Task<IHttpResponse> GetAllSecureAsync(
+        //        [QueryParameter(Name = "authorization")]IRef<Authorization> authorizationRef,
+        //        AzureApplication application,
+        //        IInvokeApplication endpoints,
+        //        IHttpRequest request,
+        //        EastFive.Api.Security security,
+        //    MultipartAsyncResponse<Authorization> onContent,
+        //    RedirectResponse onSuccess,
+        //    NotFoundResponse onNotFound,
+        //    ForbiddenResponse onFailure)
+        //{
+        //    return await await authorizationRef.StorageGetAsync(
+        //        async authorization =>
+        //        {
+        //            return await await Method.ById(authorization.Method, application,
+        //                async method =>
+        //                {
+        //                    return await await method.ParseTokenAsync(authorization.parameters, application,
+        //                        (externalId, loginProvider) =>
+        //                        {
+        //                            return Auth.Redirection.ProcessAsync(authorization,
+        //                                    async updatedAuth =>
+        //                                    {
 
-                                            }, method, externalId, authorization.parameters,
-                                            application, request, endpoints, loginProvider, request.RequestUri,
-                                        (uri, accountIdMaybe, modifier) => onSuccess(uri),
-                                        (why) => onFailure().AddReason(why),
-                                        application.Telemetry);
-                                },
-                                why => onFailure().AddReason(why).AsTask());
-                        },
-                        () => onFailure().AddReason("Method no longer supported").AsTask());
-                },
-                () => onNotFound().AsTask());
-        }
+        //                                    }, method, externalId, authorization.parameters,
+        //                                    application, request, endpoints, loginProvider, request.RequestUri,
+        //                                (uri, accountIdMaybe, modifier) => onSuccess(uri),
+        //                                (why) => onFailure().AddReason(why),
+        //                                application.Telemetry);
+        //                        },
+        //                        why => onFailure().AddReason(why).AsTask());
+        //                },
+        //                () => onFailure().AddReason("Method no longer supported").AsTask());
+        //        },
+        //        () => onNotFound().AsTask());
+        //}
 
         #endregion
 
