@@ -327,6 +327,24 @@ namespace EastFive.Azure
                 public const string ApiKey = "EastFive.SendGrid.ApiKey";
             }
 
+            [ConfigKey("Connection string for all comms services.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > Communcation Services > Your Service > Settings | Keys",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+            public const string ConnectionString = "EastFive.Azure.Communications.ConnectionString";
+
+            [Config]
+            public static class Email
+            {
+                [ConfigKey("Domain from which email is sent.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > Email Communication Services > %Your Service% > Settings | Provision domains > %Your Domain% > Properties > Properties|From Sender domain",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = false)]
+                public const string SenderDomain = "EastFive.Azure.Communications.Email.SenderDomain";
+            }
+
             public const string MuteEmailToAddress = "EastFive.SendGrid.MuteToAddress";
             public const string BccAllAddresses = "EastFive.SendGrid.BlindCopyAllAddresses";
         }
