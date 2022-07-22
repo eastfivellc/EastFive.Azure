@@ -95,28 +95,73 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
-            Step = 1.0,
-            StepName = "List Methods")]
+            Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
+            StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
         [WorkflowStep2(
             FlowName = Workflows.HijackLoginFlow.FlowName,
-            Step = 1.0,
-            StepName = "List Methods")]
+            Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
+            StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
         public static IHttpResponse QueryAsync(
-            IAuthApplication application,
+                IAuthApplication application,
             [WorkflowVariableResourceResponse]
             MultipartAcceptArrayResponse<Method> onContent)
         {
             var methods = application.LoginProviders
-                    .Select(
-                        (loginProvider) =>
+                .Select(
+                    (loginProvider) =>
+                    {
+                        return new Method
                         {
+                            authenticationId = loginProvider.Value.Id.AsRef<Method>(),
+                            name = loginProvider.Value.Method,
+                        };
+                    });
+            return onContent(methods);
+        }
+
+        [HttpGet]
+        [WorkflowStep(
+            FlowName = Workflows.AuthorizationFlow.FlowName,
+            Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
+            StepName = Workflows.HijackLoginFlow.Steps.ChooseMethod)]
+        [WorkflowStep2(
+            FlowName = Workflows.HijackLoginFlow.FlowName,
+            Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
+            StepName = Workflows.HijackLoginFlow.Steps.ChooseMethod)]
+        public static IHttpResponse GetMatchAsync(
+                [WorkflowParameter(
+                    Value = Workflows.HijackLoginFlow.Variables.Method.Set.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.Method.Set.Description)]
+                [QueryParameter(Name = NamePropertyName)]
+                string name,
+
+                IAuthApplication application,
+
+            [WorkflowVariable(
+                Workflows.HijackLoginFlow.Variables.Method.Get.Value,
+                AuthenticationIdPropertyName)]
+            ContentTypeResponse<Method> onSuccess,
+            NotFoundResponse onNotFound)
+        {
+            var methodMaybe = application.LoginProviders
+                .First(
+                    (loginProvider, next) =>
+                    {
+                        if (loginProvider.Value.Method.Equals(name, StringComparison.OrdinalIgnoreCase))
                             return new Method
                             {
                                 authenticationId = loginProvider.Value.Id.AsRef<Method>(),
                                 name = loginProvider.Value.Method,
                             };
-                        });
-            return onContent(methods);
+
+                        return next();
+                    },
+                    () => default(Method?));
+
+            if (methodMaybe.IsDefault())
+                return onNotFound();
+
+            return onSuccess(methodMaybe.Value);
         }
 
         [HttpGet]
