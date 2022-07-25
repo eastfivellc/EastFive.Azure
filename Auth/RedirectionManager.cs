@@ -45,6 +45,9 @@ namespace EastFive.Azure.Auth
         public string info { get; set; }
 
         [JsonProperty]
+        public int fields { get; set; }
+
+        [JsonProperty]
         public DateTime when { get; set; }
 
         [JsonProperty(PropertyName = "COPY_link")]
@@ -173,6 +176,7 @@ namespace EastFive.Azure.Auth
                                 {
                                     authorizationRef = id.AsRef<Authorization>(),
                                     info = why,
+                                    fields = parameters.Count,
                                     when = when,
                                 };
                             }
@@ -182,9 +186,10 @@ namespace EastFive.Azure.Auth
                                 {
                                     return new RedirectionManager
                                     {
-                                        when = when,
-                                        info = $"{externalId}",
                                         authorizationRef = id.AsRef<Authorization>(),
+                                        info = $"{externalId}",
+                                        fields = parameters.Count,
+                                        when = when,
                                         link = new Uri(
                                             request.RequestUri,
                                             $"/api/RedirectionManager?authorization={id}{apiVoucher}"),

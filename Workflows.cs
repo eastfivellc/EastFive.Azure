@@ -82,7 +82,7 @@ namespace EastFive.Azure
                     public static class Set
                     {
                         // WorkflowParameter.Value
-                        public const string Value = "31";
+                        public const string Value = "7";
                         // WorkflowParameter.Description
                         public const string Description = "Enter number of past days to search";
                     }
