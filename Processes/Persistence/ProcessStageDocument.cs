@@ -420,10 +420,10 @@ namespace EastFive.Azure.Persistence
                 azureStorageRepository =>
                 {
                     return azureStorageRepository.DeleteIfAsync<ProcessStageDocument, TResult>(synchronizationId,
-                        async (syncDoc, deleteSyncDocAsync) =>
+                        (syncDoc, deleteSyncDocAsync) =>
                         {
                             throw new NotImplementedException();
-                            return onDeleted();
+                            //return onDeleted();
                             //if (syncDoc.LocalIdMaybe.HasValue)
                             //{
                             //    bool successLocal = await azureStorageRepository.DeleteIfAsync<ConnectorDocument, bool>(syncDoc.LocalIdMaybe.Value,

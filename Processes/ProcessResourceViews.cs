@@ -62,7 +62,7 @@ namespace EastFive.Azure
                                         async (processStageTypeId, kvpsAggr, next, skip) => await await ProcessStageTypes.FindIdAsync(processStageTypeId,
                                             stageType => next(processStageTypeId.PairWithValue(stageType), kvpsAggr),
                                             () => skip(kvpsAggr.Append(processStageTypeId).ToArray())),
-                                        async (KeyValuePair<Guid, ProcessStageType>[] stageTypes, Guid[] missingValues) =>
+                                        (KeyValuePair<Guid, ProcessStageType>[] stageTypes, Guid[] missingValues) =>
                                         {
                                             var processStageTypeLookup = stageTypes.ToDictionary();
                                             return processSteps
@@ -164,12 +164,12 @@ namespace EastFive.Azure
                                                                 completable = processStageLookup[activeStep.processStageId].completableIds.Contains(actorId),
                                                             };
                                                             return next(view);
-                                                        } catch (Exception ex)
+                                                        } catch (Exception)
                                                         {
                                                             return skip();
                                                         }
                                                     },
-                                                    (IEnumerable<ProcessResourceView> views) => onFound(views.ToArray()));
+                                                    (IEnumerable<ProcessResourceView> views) => onFound(views.ToArray())).AsTask();
                                         });
                             });
                     

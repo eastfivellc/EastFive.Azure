@@ -154,6 +154,10 @@ namespace EastFive.Api.Azure.Resources
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new NotSupportedException("OS not supported");
+
+            #pragma warning disable CA1416
             var response = await EastFive.Api.Azure.Content.FindContentByContentIdAsync(contentId,
                 (contentType, imageData) =>
                 {
@@ -168,6 +172,7 @@ namespace EastFive.Api.Azure.Resources
                 },
                 () => onNotFound(),
                 () => onUnauthorized());
+            #pragma warning restore CA1416
             return response;
         }
 

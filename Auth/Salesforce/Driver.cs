@@ -755,8 +755,9 @@ namespace EastFive.Azure.Auth.Salesforce
 			NOT_FOUND,
 		}
 
+		#pragma warning disable CS0649
 		internal class ErrorResponse
-        {
+		{
 			public string message;
 			public ErrorCodes errorCode;
 			public DuplicateResult duplicateResut;
@@ -799,6 +800,7 @@ namespace EastFive.Azure.Auth.Salesforce
         {
 			public string Id;
         }
+		#pragma warning restore CS0649
 
         #endregion
 

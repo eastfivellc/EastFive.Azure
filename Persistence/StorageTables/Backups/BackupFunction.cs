@@ -267,19 +267,5 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                 },
                 (why) => throw new Exception(why));
         }
-
-        private static string EnsureTableExistsInCode(TableInformation table)
-        {
-            return table.document;
-            var documentType = AppDomain.CurrentDomain.GetAssemblies()
-                .Where(a => a.ManifestModule.Name == table.assembly)
-                .SelectMany(a => a.GetTypes())
-                .Where(t => t.FullName == table.document)
-                .FirstOrDefault();
-            if (documentType == null)
-                throw new Exception($"table name {table.document} not found in code");
-
-            return documentType.Name.ToLower();
-        }
     }
 }

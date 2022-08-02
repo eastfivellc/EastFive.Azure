@@ -10,7 +10,6 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
-using EastFive.Reflection;
 using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;

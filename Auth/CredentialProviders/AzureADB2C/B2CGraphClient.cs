@@ -87,14 +87,14 @@ namespace EastFive.AzureADB2C
                     --attemptsRemaining;
                     return await base.SendAsync(request, cancellationToken);
                 }
-                catch (TaskCanceledException e)
+                catch (TaskCanceledException)
                 {
                     if (attemptsRemaining > 0)
                     {
                         await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
                         return await SendAsync(await CloneAsync(request), cancellationToken, attemptsRemaining, delaySeconds * 2);
                     }
-                    throw e;
+                    throw;
                 }
                 catch (HttpRequestException e)
                 {
@@ -105,7 +105,7 @@ namespace EastFive.AzureADB2C
                         await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
                         return await SendAsync(await CloneAsync(request), cancellationToken, attemptsRemaining, delaySeconds * 2);
                     }
-                    throw e;
+                    throw;
                 }
             }
 

@@ -49,9 +49,9 @@ namespace EastFive.AzureADB2C
                     onFailed.AsAsyncFunc());
             }
 
-            async Task<TResult> GetResourceAsync<TResult>(HttpClient httpClient, string urlStr,
-                Func<Resources.ConfigurationResource, TResult> onGotConfig,
-                Func<string, TResult> onFailedToGetConfig)
+            async Task<SResult> GetResourceAsync<SResult>(HttpClient httpClient, string urlStr,
+                Func<Resources.ConfigurationResource, SResult> onGotConfig,
+                Func<string, SResult> onFailedToGetConfig)
             {
                 try
                 {

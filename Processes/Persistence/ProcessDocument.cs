@@ -95,9 +95,9 @@ namespace EastFive.Azure.Persistence
                 async azureStorageRepository => await await azureStorageRepository.FindLinkedDocumentsAsync(
                         resourceId, resourceType.AssemblyQualifiedName,
                         (Documents.LookupDocument fulfullmentDoc) => fulfullmentDoc.GetLookupDocumentIds(),
-                    async (Documents.LookupDocument fulfillmentDoc, ProcessDocument[] procStageDocs) =>
+                    (Documents.LookupDocument fulfillmentDoc, ProcessDocument[] procStageDocs) =>
                     {
-                        return onFound(procStageDocs.Select(Convert).ToArray());
+                        return onFound(procStageDocs.Select(Convert).ToArray()).AsTask();
                     },
                     onNotFound.AsAsyncFunc()));
         }
