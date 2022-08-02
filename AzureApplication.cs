@@ -301,7 +301,7 @@ namespace EastFive.Api.Azure
                             if (numberInBatch > 0)
                                 continue;
                         }
-                        throw ex;
+                        throw;
                     }
                 } while (messages.Length > 0);
             }

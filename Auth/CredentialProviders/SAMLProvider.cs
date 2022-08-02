@@ -88,7 +88,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                 }
                             },
                             (why) => onUnspecifiedConfiguration(why));
-                    } catch(Exception ex)
+                    } catch(Exception)
                     {
                         return await onInvalidCredentials("SAML Assertion parse and validate failed").AsTask();
                     }

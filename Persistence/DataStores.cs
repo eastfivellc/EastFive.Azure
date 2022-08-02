@@ -20,7 +20,6 @@ namespace BlackBarLabs.Persistence.Azure
         private CloudStorageAccount cloudStorageAccount;
 
         // Contexts
-        private BlobServiceClient blobClient;
         private AzureStorageRepository azureStorageRepository;
 
         public DataStores(string azureKey, string documentDbEndpointUri = null, string documentDbPrimaryKey = null, string documentDbDatabaseName = null)

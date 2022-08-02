@@ -134,7 +134,7 @@ namespace EastFive.Azure.StorageTables.Driver
                         await table.CreateIfNotExistsAsync();
                         return retry();
                     }
-                    catch (StorageException createEx)
+                    catch (StorageException)
                     {
                         // Catch bug with azure storage table client library where
                         // if two resources attempt to create the table at the same

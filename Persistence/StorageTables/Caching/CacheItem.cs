@@ -97,7 +97,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                                     Content = new StringContent(restResponse.Content, System.Text.Encoding.UTF8, "application/json"),
                                 };
                                 return response.AsTask();
-                            } catch (Exception ex)
+                            } catch (Exception)
                             {
                                 Thread.Sleep(sleepTime);
                                 sleepTime = TimeSpan.FromSeconds(sleepTime.TotalSeconds * 2.0);

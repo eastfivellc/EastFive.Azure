@@ -98,79 +98,79 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             //    operation.Set();
             //}
 
-            AutoResetEvent GetOperation()
-            {
-                var operationsSet = AccessOperationsSet();
-                do
-                {
-                    var waitIndex = Mutex.WaitAny(operationsSet, TimeSpan.FromMilliseconds(1));
-                    if (WaitHandle.WaitTimeout != waitIndex)
-                    {
-                        var waitMutex = operationsSet[waitIndex];
-                        return waitMutex;
-                    }
+            //AutoResetEvent GetOperation()
+            //{
+            //    var operationsSet = AccessOperationsSet();
+            //    do
+            //    {
+            //        var waitIndex = Mutex.WaitAny(operationsSet, TimeSpan.FromMilliseconds(1));
+            //        if (WaitHandle.WaitTimeout != waitIndex)
+            //        {
+            //            var waitMutex = operationsSet[waitIndex];
+            //            return waitMutex;
+            //        }
 
-                    try
-                    {
-                        var properties = IPGlobalProperties.GetIPGlobalProperties();
-                        var httpConnections = properties.GetActiveTcpConnections();
-                        var connectionCount = httpConnections.Length;
-                        if (connectionCount < ConnectionCountGrowthStoppingPoint)
-                        {
-                            var waitEventToUse = new AutoResetEvent(true);
-                            if (operationsLock.WaitOne(TimeSpan.FromSeconds(0.1)))
-                            {
-                                try
-                                {
-                                    operations = operations
-                                        .Append(waitEventToUse)
-                                        .ToArray();
-                                    operationsSet = operations.AsCopy();
-                                    return waitEventToUse;
-                                }
-                                finally
-                                {
-                                    operationsLock.Set();
-                                }
-                            }
-                        }
-                    } catch(Exception)
-                    {
+            //        try
+            //        {
+            //            var properties = IPGlobalProperties.GetIPGlobalProperties();
+            //            var httpConnections = properties.GetActiveTcpConnections();
+            //            var connectionCount = httpConnections.Length;
+            //            if (connectionCount < ConnectionCountGrowthStoppingPoint)
+            //            {
+            //                var waitEventToUse = new AutoResetEvent(true);
+            //                if (operationsLock.WaitOne(TimeSpan.FromSeconds(0.1)))
+            //                {
+            //                    try
+            //                    {
+            //                        operations = operations
+            //                            .Append(waitEventToUse)
+            //                            .ToArray();
+            //                        operationsSet = operations.AsCopy();
+            //                        return waitEventToUse;
+            //                    }
+            //                    finally
+            //                    {
+            //                        operationsLock.Set();
+            //                    }
+            //                }
+            //            }
+            //        } catch(Exception)
+            //        {
 
-                    }
-                } while (true);
+            //        }
+            //    } while (true);
 
 
-                AutoResetEvent[] AccessOperationsSet()
-                {
-                    while (true)
-                    {
-                        if (operationsLock.WaitOne(TimeSpan.FromSeconds(1.0)))
-                        {
-                            try
-                            {
-                                var properties = IPGlobalProperties.GetIPGlobalProperties();
-                                var httpConnections = properties.GetActiveTcpConnections();
-                                var connectionCount = httpConnections.Length;
-                                if (connectionCount > ConnectionCountReductionPoint)
-                                {
-                                    if (operations.Length > MinimumParallelConnections)
-                                    {
-                                        operations = operations
-                                            .Take(operations.Length - 1)
-                                            .ToArray();
-                                    }
-                                }
-                                return operations.AsCopy();
-                            }
-                            finally
-                            {
-                                operationsLock.Set();
-                            }
-                        }
-                    }
-                }
-            }
+            //    AutoResetEvent[] AccessOperationsSet()
+            //    {
+            //        while (true)
+            //        {
+            //            if (operationsLock.WaitOne(TimeSpan.FromSeconds(1.0)))
+            //            {
+            //                try
+            //                {
+            //                    var properties = IPGlobalProperties.GetIPGlobalProperties();
+            //                    var httpConnections = properties.GetActiveTcpConnections();
+            //                    var connectionCount = httpConnections.Length;
+            //                    if (connectionCount > ConnectionCountReductionPoint)
+            //                    {
+            //                        if (operations.Length > MinimumParallelConnections)
+            //                        {
+            //                            operations = operations
+            //                                .Take(operations.Length - 1)
+            //                                .ToArray();
+            //                        }
+            //                    }
+            //                    return operations.AsCopy();
+            //                }
+            //                finally
+            //                {
+            //                    operationsLock.Set();
+            //                }
+            //            }
+            //        }
+            //    }
+            //}
         }
     }
 }

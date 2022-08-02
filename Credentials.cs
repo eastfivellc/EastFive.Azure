@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 
 namespace EastFive.Security.SessionServer
 {
+    #pragma warning disable CS0649
     public struct Invite
     {
         public Guid id;
@@ -19,6 +20,7 @@ namespace EastFive.Security.SessionServer
         internal bool isToken;
         internal DateTime? lastSent;
     }
+    #pragma warning restore CS0649
 
     public class Credentials
     {

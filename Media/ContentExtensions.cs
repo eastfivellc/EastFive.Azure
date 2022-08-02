@@ -175,6 +175,9 @@ namespace EastFive.Azure.Media
             Func<TResult> onInvalidFormat = default,
             Func<TResult> onNotFound = default)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new NotSupportedException("OS not supported");
+
             return AppSettings.CognitiveServices.ComputerVisionSubscriptionKey.ConfigurationString(
                 subscriptionKey =>
                 {
@@ -202,6 +205,7 @@ namespace EastFive.Azure.Media
                                             }
                                             using (var newImageStream = new MemoryStream())
                                             {
+                                                #pragma warning disable CA1416
                                                 widthMultiplier = Math.Sqrt(4000000.0 / imageData.Length);
                                                 image
                                                     .ResizeImage(
@@ -210,6 +214,7 @@ namespace EastFive.Azure.Media
                                                     .Save(newImageStream, System.Drawing.Imaging.ImageFormat.Jpeg);
                                                 newImageStream.Position = 0;
                                                 imageData = await newImageStream.ToBytesAsync();
+                                                #pragma warning restore CA1416
                                             }
                                         }
                                         computerVision.Endpoint = endpointUri.OriginalString;
@@ -231,9 +236,9 @@ namespace EastFive.Azure.Media
                                                 return onAnalyzed(analysis, widthMultiplier);
                                             }
                                         }
-                                        catch (ComputerVisionErrorException ex)
+                                        catch (ComputerVisionErrorException)
                                         {
-                                            throw ex;
+                                            throw;
                                         }
                                     },
                                     () =>
@@ -251,6 +256,9 @@ namespace EastFive.Azure.Media
             Func<ImageAnalysis, double?, TResult> onAnalyzed,
             Func<TResult> onNotFound = default)
         {
+            if (!OperatingSystem.IsWindows())
+                throw new NotSupportedException("OS not supported");
+
             return AppSettings.CognitiveServices.ComputerVisionSubscriptionKey.ConfigurationString(
                 subscriptionKey =>
                 {
@@ -267,6 +275,7 @@ namespace EastFive.Azure.Media
                                         var widthMultiplier = default(double?);
                                         if (imageStream.Length > 4000000)
                                         {
+                                            #pragma warning disable CA1416
                                             var image = System.Drawing.Image.FromStream(imageStream);
                                             var newImageStream = new MemoryStream();
                                             widthMultiplier = Math.Sqrt(4000000.0 / imageStream.Length);
@@ -277,6 +286,7 @@ namespace EastFive.Azure.Media
                                                 .Save(newImageStream, System.Drawing.Imaging.ImageFormat.Jpeg);
                                             newImageStream.Position = 0;
                                             imageStream = newImageStream;
+                                            #pragma warning restore CA1416
                                         }
                                         computerVision.Endpoint = endpointUri.OriginalString;
                                         var featuresToSearchFor = VisualFeatureTypes.Categories.AsArray()
@@ -294,9 +304,9 @@ namespace EastFive.Azure.Media
                                                 imageStream, featuresToSearchFor);
                                             return onAnalyzed(analysis, widthMultiplier);
                                         }
-                                        catch(ComputerVisionErrorException ex)
+                                        catch(ComputerVisionErrorException)
                                         {
-                                            throw ex;
+                                            throw;
                                         }
                                     },
                                     () =>

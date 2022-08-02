@@ -583,8 +583,9 @@ namespace EastFive.Azure.Auth.Salesforce
 			REQUIRED_FIELD_MISSING,
 		}
 
+		#pragma warning disable CS0649
 		internal class ErrorResponse
-        {
+		{
 			public string message;
 			public ErrorCodes errorCode;
 			public DuplicateResult duplicateResut;
@@ -627,6 +628,7 @@ namespace EastFive.Azure.Auth.Salesforce
         {
 			public string Id;
         }
+		#pragma warning restore CS0649
 
 		// [{"duplicateResut":{"allowSave":true,"duplicateRule":"Standard_Contact_Duplicate_Rule","duplicateRuleEntityType":"Contact","errorMessage":"You're creating a duplicate record. We recommend you use an existing record instead.","matchResults":[{"entityType":"Contact","errors":[],"matchEngine":"FuzzyMatchEngine","matchRecords":[{"additionalInformation":[],"fieldDiffs":[],"matchConfidence":100.0,"record":{"attributes":{"type":"Contact","url":"/services/data/v54.0/sobjects/Contact/0038M0000016Wv8QAE"},"Id":"0038M0000016Wv8QAE"}}],"rule":"Standard_Contact_Match_Rule_v1_1","size":1,"success":true}]},"errorCode":"DUPLICATES_DETECTED","message":"You're creating a duplicate record. We recommend you use an existing record instead."}]
 

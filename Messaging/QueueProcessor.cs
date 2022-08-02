@@ -159,7 +159,7 @@ namespace EastFive.Messaging
                         {
                             await client.ScheduleMessageAsync(message, DateTimeOffset.UtcNow + TimeSpan.FromSeconds(10));
                             return MessageProcessStatus.ReprocessImmediately;
-                        } catch(Exception ex)
+                        } catch(Exception)
                         {
                             return MessageProcessStatus.Broken;
                         }
