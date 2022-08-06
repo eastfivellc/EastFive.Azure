@@ -69,15 +69,19 @@ namespace EastFive.Azure.Monitoring
                 return response;
 
             string teamsNotifyParam = GetTeamsNotifyParameter();
-            
-            if (!ShouldNotify(out string collectionFolder))
+            var isDone = !ShouldNotify(out string collectionFolder);
+            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(
+                controllerType, resourceInvoker,
+                httpApp, request, collectionFolder, response);
+
+            if (isDone)
                 return response;
 
             try
             {
                 string messageId = await TeamsNotifyAsync(controllerType, resourceInvoker,
                     httpApp, request, response,
-                    teamsNotifyParam, collectionFolder);
+                    teamsNotifyParam, collectionFolder, monitoringRequest);
             } catch(HttpRequestException)
             {
 
@@ -132,11 +136,8 @@ namespace EastFive.Azure.Monitoring
 
         public async Task<string> TeamsNotifyAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request, IHttpResponse response,
-            string teamsNotifyParam, string collectionFolder)
+            string teamsNotifyParam, string collectionFolder, MonitoringRequest monitoringRequest)
         {
-            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(
-                controllerType, resourceInvoker,
-                httpApp, request, collectionFolder);
             var monitoringRequestId = monitoringRequest.id.ToString();
 
             var responseParam = response.Headers

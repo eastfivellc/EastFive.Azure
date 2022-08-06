@@ -155,6 +155,16 @@ namespace EastFive.Api.Azure.Monitoring
             public long length;
         }
 
+        [ApiProperty]
+        [JsonProperty]
+        [Storage]
+        public int status;
+
+        [ApiProperty]
+        [JsonProperty]
+        [Storage]
+        public string reason;
+
         #endregion
 
         #region HttpMethods
@@ -347,7 +357,7 @@ namespace EastFive.Api.Azure.Monitoring
 
         public static async Task<MonitoringRequest> CreateAsync(
             Type controllerType, IInvokeResource resourceInvoker,
-            IApplication httpApp, IHttpRequest request, string folderName)
+            IApplication httpApp, IHttpRequest request, string folderName, IHttpResponse response)
         {
             var doc = new MonitoringRequest();
             doc.title = $"{request.Method.Method} {resourceInvoker.Namespace} {resourceInvoker.Route}";
@@ -409,10 +419,17 @@ namespace EastFive.Api.Azure.Monitoring
             else
             {
                 var bytes = await request.ReadContentAsync();
-                doc.body = await bytes.CreateBlobRefAsync(
-                    (MonitoringRequest mr) => mr.body,
-                    contentType: request.GetMediaType());
+                if (bytes.Length > 0)
+                {
+                    doc.body = await bytes.CreateBlobRefAsync(
+                        (MonitoringRequest mr) => mr.body,
+                        contentType: request.GetMediaType());
+                }
             }
+            doc.status = (int)response.StatusCode;
+
+            if (response.ReasonPhrase.HasBlackSpace())
+                doc.reason = response.ReasonPhrase;
 
             return await doc.StorageCreateAsync((discard) => doc);
         }
