@@ -51,7 +51,8 @@ namespace EastFive.Persistence
             };
         }
 
-        public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
+            Func<object> getDefaultValue = default)
         {
             var memberType = memberInfo.GetPropertyOrFieldType();
             if (!memberType.IsSubClassOfGeneric(typeof(Func<>)))
@@ -253,7 +254,8 @@ namespace EastFive.Persistence
                                             new Dictionary<string, EntityProperty>()
                                             {
                                                 {propertyName, ep}
-                                            });
+                                            },
+                                            () => memberType.GetDefault());
                                     })
                                 .ToArray();
 

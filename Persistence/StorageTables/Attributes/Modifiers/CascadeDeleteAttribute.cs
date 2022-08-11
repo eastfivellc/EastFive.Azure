@@ -110,7 +110,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             return new KeyValuePair<string, EntityProperty>[] { };
         }
 
-        public object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public object GetMemberValue(MemberInfo memberInfo,
+            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
         {
             // TODO: Setup a projection for the StorageCall
             return memberInfo.GetMemberType().GetDefault();

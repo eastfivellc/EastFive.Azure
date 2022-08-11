@@ -91,7 +91,8 @@ namespace EastFive.Azure.Auth
                 .ToArray();
         }
 
-        public object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public object GetMemberValue(MemberInfo memberInfo,
+            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
         {
             var accountLinks = values
                 .TryWhere(

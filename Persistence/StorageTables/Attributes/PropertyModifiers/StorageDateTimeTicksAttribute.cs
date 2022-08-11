@@ -57,7 +57,8 @@ namespace EastFive.Persistence
             }
         }
 
-        public override object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public override object GetMemberValue(MemberInfo memberInfo,
+            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
             var valueType = memberInfo.GetPropertyOrFieldType();
@@ -87,7 +88,7 @@ namespace EastFive.Persistence
                 return defaultValue;
             }
 
-            return base.GetMemberValue(memberInfo, values);
+            return base.GetMemberValue(memberInfo, values, getDefaultValue:getDefaultValue);
         }
     }
 

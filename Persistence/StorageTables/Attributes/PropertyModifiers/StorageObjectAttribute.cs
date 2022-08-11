@@ -64,7 +64,8 @@ namespace EastFive.Persistence
             return new EntityProperty(default(byte[]));
         }
 
-        public override object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public override object GetMemberValue(MemberInfo memberInfo,
+            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
 

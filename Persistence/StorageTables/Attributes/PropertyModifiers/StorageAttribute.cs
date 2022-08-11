@@ -28,7 +28,8 @@ namespace EastFive.Persistence
         KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
             object value, IWrapTableEntity<EntityType> tableEntityWrapper);
 
-        object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values);
+        object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
+            Func<object> getDefaultValue = default);
 
         string GetTablePropertyName(MemberInfo member);
     }
@@ -266,7 +267,8 @@ namespace EastFive.Persistence
             return new EntityProperty(default(byte[]));
         }
 
-        public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values)
+        public virtual object GetMemberValue(MemberInfo memberInfo,
+            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
         {
             var type = memberInfo.GetPropertyOrFieldType();
             var propertyName = this.GetTablePropertyName(memberInfo);
@@ -277,6 +279,9 @@ namespace EastFive.Persistence
                     (convertedValue) => convertedValue,
                     () =>
                     {
+                        if (getDefaultValue.IsNotDefaultOrNull())
+                            return getDefaultValue();
+
                         var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
                             $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
                         throw new Exception(exceptionText);
@@ -287,6 +292,9 @@ namespace EastFive.Persistence
                 (convertedValue) => convertedValue,
                 () =>
                 {
+                    if (getDefaultValue.IsNotDefaultOrNull())
+                        return getDefaultValue();
+
                     var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
                         $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
                     throw new Exception(exceptionText);
