@@ -39,6 +39,7 @@ namespace EastFive.Azure.Auth.Salesforce
 		public override void PopluateSalesforceResource(JsonTextWriter jsonWriter, MemberInfo member, object resource, Field field)
 		{
 			var value = (string)member.GetPropertyOrFieldValue(resource);
+
 			var propsAndFields = typeof(SalesforcePropertyMappingAttribute)
 				.GetProperties(BindingFlags.Public | BindingFlags.Instance)
 				.ToArray();
@@ -49,7 +50,7 @@ namespace EastFive.Azure.Auth.Salesforce
 					(keyProp, next) =>
 					{
 						var keyValue = (string)keyProp.GetValue(this);
-						if (!value.Equals(keyValue, StringComparison.OrdinalIgnoreCase))
+						if (!string.Equals(value, keyValue, StringComparison.OrdinalIgnoreCase))
 							return next();
 
 						var valueProp = propsAndFields
