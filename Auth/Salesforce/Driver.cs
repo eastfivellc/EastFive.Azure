@@ -21,6 +21,7 @@ using Newtonsoft.Json.Linq;
 using System.Threading;
 using EastFive.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Dynamitey;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
@@ -459,7 +460,7 @@ namespace EastFive.Azure.Auth.Salesforce
 						var (resNew, extraResNew, extraValuesNew) = mergeValues(
 							resGot, extraResGot, extraValuesGot);
 						var json = Serialize(resNew, extraResNew, extraValuesNew, description.fields);
-						return UpdateAsync(location, sfId, json);
+						return UpdateAsync(description, location, sfId, json);
 					},
 					onNotFound: () => CreateNewAsync(description, location, resource),
 					onFailure: onFailure.AsAsyncFunc(),
@@ -506,10 +507,10 @@ namespace EastFive.Azure.Auth.Salesforce
 					didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 			}
 
-			async Task<TResult> UpdateAsync(Uri location, string sfId, string json)
+			async Task<TResult> UpdateAsync(Describe description, Uri location, string sfId, string json)
 			{
 				var patchLocation = location.AppendToPath(sfId);
-				return await patchLocation.HttpClientPatchDynamicAuthenticatedAsync(
+				return await await patchLocation.HttpClientPatchDynamicAuthenticatedAsync(
 						populateRequest: (request) =>
 						{
 							var content = new StringContent(json,
@@ -522,12 +523,28 @@ namespace EastFive.Azure.Auth.Salesforce
 					(Response response) =>
 					{
 						var id = sfId; // response will be null response.id;
-						return onSynchronized(id);
+						return onSynchronized(id).AsTask();
 					},
 					onFailureWithBody: (statusCode, body) =>
-					{
-						return onFailure(statusCode, body);
-					});
+                    {
+                        return ProcessCreateFailure(statusCode, body,
+                            onFailure: onFailure.AsAsyncFunc(),
+							onDuplicate: async (sfId) =>
+                            {
+                                var savedResource = await updateResource(
+                                    (resourceToUpdate) =>
+                                    {
+                                        var resourceWithIdentifier = UpdateSalesforceIdentifier(resourceToUpdate, sfId);
+                                        return resourceWithIdentifier;
+                                    });
+
+                                return await GetAndUpdateAsync(description, savedResource);
+                            },
+							onReferenceToNonExistantResource: onReferenceToNonExistantResource.AsAsyncFunc());
+
+						// return onFailure(statusCode, body);
+					},
+                    didTokenGetRefreshed: (code, body) => this.DidTokenGetRefreshed(code, body));
 			}
 		
 		}
@@ -674,8 +691,9 @@ namespace EastFive.Azure.Auth.Salesforce
 									if (errorResponse.errorCode != ErrorCodes.DUPLICATE_VALUE)
 										return next();
 
-									// duplicate value found: AffirmId__c duplicates value on record with id: 0018M000003uKqq
-									return errorResponse.message.MatchRegexInvoke(
+                                    // duplicate value found: AffirmId__c duplicates value on record with id: 0018M000003uKqq
+                                    // duplicate value found: NPI__c duplicates value on record with id: 0035e00000qL5Jz
+                                    return errorResponse.message.MatchRegexInvoke(
 										"duplicate value.*:\\s*(?<property>[0-9a-zA-Z_]+)\\s*duplicates.*:\\s*(?<value>[0-9a-zA-Z]+)",
 										(property, value) => new { property, value },
 										matches =>
@@ -719,7 +737,13 @@ namespace EastFive.Azure.Auth.Salesforce
 						});
 						
 				},
-				(message) => onFailure(statusCode, message));
+				onFailureToParse:(message) => onFailure(statusCode, message),
+				onException:(ex) =>
+                {
+                    if (onFailure.IsDefaultOrNull())
+                        throw ex;
+                    return onFailure(statusCode, $"JSON PARSER threw exception[{ex.Message}] parsing:{body}");
+                });
 
 			TResult OnFailure()
 			{
