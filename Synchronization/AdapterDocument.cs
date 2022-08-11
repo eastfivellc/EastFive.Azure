@@ -439,12 +439,12 @@ namespace EastFive.Azure.Synchronization.Persistence
             Func<Guid, string, string, Func<Task>, Task<TResultInner>> shouldDelete,
             Func<IEnumerable<TResultInner>, TResult> onSuccess)
         {
-
-            return AzureStorageRepository.Connection(
-                async azureStorageRepository =>
+            return AzureStorageRepository.Connection<Task<TResult>>(
+                azureStorageRepository =>
                 {
                     throw new NotImplementedException();
-                    return onSuccess(null);
+                    //return onSuccess(null).AsTask();
+
                     //    var integrationsResults = await await azureStorageRepository
                     //.FindLinkedDocumentsAsync<SynchronizationActorLookupDocument, SynchronizationDocument, Task<TResult>>(
                     //        actorId, systemName,
@@ -499,9 +499,9 @@ namespace EastFive.Azure.Synchronization.Persistence
                 azureStorageRepository =>
                 {
                     return azureStorageRepository.UpdateAsync<ConnectorDocument, TResult>(synchronizationId,
-                        async (doc, update) =>
+                        (doc, update) =>
                         {
-                            return default(TResult);
+                            return default(TResult).AsTask();
                             //return onFound(doc.LocalIdMaybe, doc.RemoteId,
                             //    async (localId, remoteId) =>
                             //    {

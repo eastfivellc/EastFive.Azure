@@ -13,23 +13,23 @@ namespace EastFive.Azure.Functions
         private IAzureApplication azureApplication;
 
         private int executionLimit = 1;
-        private bool createdByThis;
+        //private bool createdByThis;
         private bool disposed;
 
         public InvokeFunction(IAzureApplication application, Uri serverUrl, string apiRouteName, int executionLimit = 1)
             : base(serverUrl, apiRouteName)
         {
-            IAzureApplication GetApplication()
-            {
-                if (application is FunctionApplication)
-                    return application;
+            //IAzureApplication GetApplication()
+            //{
+            //    if (application is FunctionApplication)
+            //        return application;
 
-                var newApp = Activator.CreateInstance(application.GetType()) as IAzureApplication;
-                createdByThis = true;
-                //newApp.ApplicationStart();
+            //    var newApp = Activator.CreateInstance(application.GetType()) as IAzureApplication;
+            //    createdByThis = true;
+            //    //newApp.ApplicationStart();
 
-                return newApp;
-            }
+            //    return newApp;
+            //}
             this.azureApplication = application; //  GetApplication();
             this.executionLimit = executionLimit;
         }
@@ -50,12 +50,12 @@ namespace EastFive.Azure.Functions
             if (disposed)
                 return;
 
-            if (disposing)
-            {
-                if (createdByThis)
-                    if(azureApplication is IDisposable)
-                        (azureApplication as IDisposable).Dispose();
-            }
+            //if (disposing)
+            //{
+            //    if (createdByThis)
+            //        if (azureApplication is IDisposable)
+            //            (azureApplication as IDisposable).Dispose();
+            //}
             disposed = true;
         }
     }

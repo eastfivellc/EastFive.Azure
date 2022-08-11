@@ -479,12 +479,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 });
                             return result;
                         }
-                        throw se;
+                        throw;
                     }
                     catch (Exception ex)
                     {
                         ex.GetType();
-                        throw ex;
+                        throw;
                     }
                 });
         }
@@ -561,14 +561,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         });
                     return result;
                 }
-                throw se;
+                throw;
             }
             catch (Exception ex)
             {
                 ex.GetType();
-                throw ex;
+                throw;
             }
-
         }
 
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
@@ -1745,7 +1744,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             {
                 if (storageException.IsProblemTableDoesNotExist())
                     return new TableResult[] { };
-                throw storageException;
+                throw;
             }
         }
 
@@ -2705,47 +2704,47 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 // .SelectAsyncMany();
                 //.JoinTask(savingModifiers);
 
-            Task<object[]> SaveModifiersAsync(IEnumerable<IAzureStorageTableEntity<TData>> entities) => entities
-                .SelectMany(
-                    resultDocument =>
-                    {
-                        return resultDocument.GetType()
-                            .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
-                                (resultDocument as IAzureStorageTableEntityBatchable)
-                                    .BatchCreateModifiers()
-                            :
-                                new IBatchModify[] { };
-                    })
-                .GroupBy(modifier => modifier.GroupingKey)
-                .Where(grp => grp.Any())
-                .Select(
-                    async grp =>
-                    {
-                        var modifier = grp.First();
-                        if (!modifier.GroupLimit.HasValue)
-                            return await SaveItemsAsync(grp);
+            //Task<object[]> SaveModifiersAsync(IEnumerable<IAzureStorageTableEntity<TData>> entities) => entities
+            //    .SelectMany(
+            //        resultDocument =>
+            //        {
+            //            return resultDocument.GetType()
+            //                .IsSubClassOfGeneric(typeof(IAzureStorageTableEntityBatchable)) ?
+            //                    (resultDocument as IAzureStorageTableEntityBatchable)
+            //                        .BatchCreateModifiers()
+            //                :
+            //                    new IBatchModify[] { };
+            //        })
+            //    .GroupBy(modifier => modifier.GroupingKey)
+            //    .Where(grp => grp.Any())
+            //    .Select(
+            //        async grp =>
+            //        {
+            //            var modifier = grp.First();
+            //            if (!modifier.GroupLimit.HasValue)
+            //                return await SaveItemsAsync(grp);
 
-                        return await grp
-                            .Segment(modifier.GroupLimit.Value)
-                            .Select(items => SaveItemsAsync(items))
-                            .AsyncEnumerable()
-                            .ToArrayAsync();
+            //            return await grp
+            //                .Segment(modifier.GroupLimit.Value)
+            //                .Select(items => SaveItemsAsync(items))
+            //                .AsyncEnumerable()
+            //                .ToArrayAsync();
 
-                        async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
-                            await modifier.CreateOrUpdateAsync(this,
-                                async (resourceToModify, saveAsync) =>
-                                {
-                                    var modifiedResource = items.Aggregate(resourceToModify,
-                                        (resource, modifier) =>
-                                        {
-                                            return modifier.Modify(resource);
-                                        });
-                                    await saveAsync(modifiedResource);
-                                    return modifiedResource;
-                                });
-                    })
-                .AsyncEnumerable()
-                .ToArrayAsync();
+            //            async Task<object> SaveItemsAsync(IEnumerable<IBatchModify> items) =>
+            //                await modifier.CreateOrUpdateAsync(this,
+            //                    async (resourceToModify, saveAsync) =>
+            //                    {
+            //                        var modifiedResource = items.Aggregate(resourceToModify,
+            //                            (resource, modifier) =>
+            //                            {
+            //                                return modifier.Modify(resource);
+            //                            });
+            //                        await saveAsync(modifiedResource);
+            //                        return modifiedResource;
+            //                    });
+            //        })
+            //    .AsyncEnumerable()
+            //    .ToArrayAsync();
         }
 
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,

@@ -927,7 +927,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 {
                     var rowKey = typeof(TEntity)
                         .GetPropertyAndFieldsWithAttributesInterface<IGenerateAzureStorageTableRowKeyIndex>()
-                        .First(
+                        .First<(MemberInfo,IGenerateAzureStorageTableRowKeyIndex),string>(
                             (tpl, next) =>
                             {
                                 var (memberInfo, attr) = tpl;
@@ -936,11 +936,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                             () =>
                             {
                                 throw new Exception("Could not generate row key.");
-                                return "";
                             });
                     var partitionKey = typeof(TEntity)
                         .GetPropertyAndFieldsWithAttributesInterface<IGenerateAzureStorageTablePartitionIndex>()
-                        .First(
+                        .First<(MemberInfo, IGenerateAzureStorageTablePartitionIndex), string>(
                             (tpl, next) =>
                             {
                                 var (memberInfo, attr) = tpl;
@@ -949,7 +948,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                             () =>
                             {
                                 throw new Exception("Could not generate row key.");
-                                return "";
                             });
 
                     return AzureTableDriverDynamic

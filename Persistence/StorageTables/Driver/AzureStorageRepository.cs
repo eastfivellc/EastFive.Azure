@@ -831,7 +831,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         });
                     return result;
                 }
-                throw se;
+                throw;
             }
         }
 

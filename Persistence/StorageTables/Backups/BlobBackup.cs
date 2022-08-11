@@ -25,7 +25,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
         //    public long length;
         //}
 
-        public static async Task ProcessBackupContainersAsync(Containers.ContainerMessage message,
+        public static Task ProcessBackupContainersAsync(Containers.ContainerMessage message,
             CancellationToken functionToken, EastFive.Analytics.ILogger logger)
         {
             throw new NotImplementedException();

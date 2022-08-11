@@ -97,7 +97,7 @@ namespace EastFive.Azure.Search
                 var result = searchClient.IndexDocuments(batch);
                 return result.Value;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Sometimes when your Search service is under load, indexing will fail for some of the documents in
                 // the batch. Depending on your application, you can take compensating actions like delaying and

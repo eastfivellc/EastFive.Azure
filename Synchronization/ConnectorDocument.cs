@@ -576,17 +576,17 @@ namespace EastFive.Azure.Synchronization.Persistence
             Func<Connector[], T> callback)
         {
             throw new NotImplementedException();
-            return AzureStorageRepository.Connection(
-                async azureStorageRepository =>
-                {
-                    var localToRemoteIds = await azureStorageRepository
-                        .FindAllAsync(
-                            (ConnectorDocument[] adaptersAll) =>
-                                adaptersAll
-                                    .Select(Convert)
-                                    .ToArray());
-                    return callback(localToRemoteIds);
-                });
+            //return AzureStorageRepository.Connection(
+            //    async azureStorageRepository =>
+            //    {
+            //        var localToRemoteIds = await azureStorageRepository
+            //            .FindAllAsync(
+            //                (ConnectorDocument[] adaptersAll) =>
+            //                    adaptersAll
+            //                        .Select(Convert)
+            //                        .ToArray());
+            //        return callback(localToRemoteIds);
+            //    });
         }
 
         internal static Connector Convert(ConnectorDocument syncDoc)
