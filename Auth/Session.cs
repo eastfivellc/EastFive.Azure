@@ -420,58 +420,62 @@ namespace EastFive.Azure.Auth
             Func<Guid, IDictionary<string, string>, bool, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {
-            return await authorizationRef.StorageGetAsync(
-                (authorization) =>
+            return await await authorizationRef.StorageGetAsync(
+                async (authorization) =>
                 {
                     if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
 
-                    if (authorization.accountIdMaybe.HasValue)
-                        return onSuccess(authorization.accountIdMaybe.Value, authorization.claims, authorization.authorized);
+                    if (!authorization.accountIdMaybe.HasValue)
+                        return onFailure("Authorization is not connected to an account.", false);
 
-                    return onFailure("Authorization is not connected to an account.", false);
 
-                    //var methodRef = authorization.Method;
-                    //return await await Method.ById(methodRef, application,
-                    //    async method =>
-                    //    {
-                    //        return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
-                    //            async (externalUserKey) =>
-                    //            {
-                    //                if (application is Api.Azure.Credentials.IProvideAccountInformation)
-                    //                {
-                    //                    var accountInformationProvider = application as Api.Azure.Credentials.IProvideAccountInformation;
-                    //                    return await await accountInformationProvider
-                    //                        .FindOrCreateAccountByMethodAndKeyAsync(
-                    //                                method, externalUserKey,
-                    //                                authorization.parameters,
-                    //                            (accountId, claims) => onSuccess(accountId, claims, authorization.authorized).AsTask(),
-                    //                            why => onFailure(why, false).AsTask(),
-                    //                            () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
-                    //                            onNoEffect: () => OnContinue());
-                    //                }
-                    //                return await OnContinue();
-                    //                Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
-                    //                        authorization,
-                    //                    accountId => onSuccess(accountId, authorization.claims, authorization.authorized),
-                    //                    () => onFailure("No mapping to that account.", authorization.authorized));
-                    //            },
-                    //            (why) => onFailure(why, authorization.authorized).AsTask(),
-                    //            () => onFailure("This login method is no longer supported.", false).AsTask());
-                    //    },
-                    //    () => onFailure("Authorization method is no longer valid on this system.", authorization.authorized).AsTask());
-                        //{
-                        //    return CheckSuperAdminBeforeFailure(authorizationRef,
-                        //            "Authorization method is no longer valid on this system.", authorization.authorized,
-                        //        onSuccess, onFailure).AsTask();
-                        //});
+                    // return onSuccess(authorization.accountIdMaybe.Value, authorization.claims, authorization.authorized);
+
+                    var methodRef = authorization.Method;
+                    return await await Method.ById(methodRef, application,
+                        async method =>
+                        {
+                            return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
+                                async (externalUserKey) =>
+                                {
+                                    //if (application is IProvideAccountInformation)
+                                    //{
+                                    //    var accountInformationProvider = application as IProvideAccountInformation;
+                                    //    return await await accountInformationProvider
+                                    //        .FindOrCreateAccountByMethodAndKeyAsync(
+                                    //                method, externalUserKey,
+                                    //                authorization.parameters,
+                                    //                new Dictionary<string, string>() { },
+                                    //                loginProvider:application as IProvideLogin,
+                                    //                default(IHttpRequest),
+                                    //                account => account,
+                                    //            (accountId, claims) => onSuccess(accountId, claims, authorization.authorized).AsTask(),
+                                    //            why => onFailure(why, false).AsTask(),
+                                    //            () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
+                                    //            onNoEffect: () => OnContinue());
+                                    //}
+                                    return await OnContinue();
+                                    Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
+                                            authorization,
+                                        accountId => onSuccess(accountId, authorization.claims, authorization.authorized),
+                                        () => onFailure("No mapping to that account.", authorization.authorized));
+                                },
+                                (why) => onFailure(why, authorization.authorized).AsTask(),
+                                () => onFailure("This login method is no longer supported.", false).AsTask());
+                        },
+                        () => onFailure("Authorization method is no longer valid on this system.", authorization.authorized).AsTask());
+                    //{
+                    //    return CheckSuperAdminBeforeFailure(authorizationRef,
+                    //            "Authorization method is no longer valid on this system.", authorization.authorized,
+                    //        onSuccess, onFailure).AsTask();
+                    //});
                 },
-                () => onFailure("Authorization not found.", false));
+                () => onFailure("Authorization not found.", false).AsTask());
                 //{
                 //    return CheckSuperAdminBeforeFailure(authorizationRef, "Authorization not found.", false,
                 //        onSuccess, onFailure).AsTask();
                 //});
-          
         }
 
         private static TResult CheckSuperAdminBeforeFailure<TResult>( 
