@@ -308,6 +308,12 @@ namespace EastFive.Persistence
                     return onSuccessWithRollback(() => true.AsTask());
             }
 
+            var newValueType = newValue.GetType();
+            if (!newValueType.IsSubClassOfGeneric(typeof(Func<>)))
+            {
+                return onSuccessWithRollback(() => true.AsTask());
+            }
+
             var rowKeyRef = updatedEntity.RowKey;
             var partitionKeyRef = updatedEntity.PartitionKey;
 
