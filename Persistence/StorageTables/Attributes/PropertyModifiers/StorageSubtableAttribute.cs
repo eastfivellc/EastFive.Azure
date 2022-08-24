@@ -134,8 +134,13 @@ namespace EastFive.Persistence
             Func<Func<Task>, TResult> onSuccessWithRollback,
             Func<TResult> onFailure)
         {
-            var memberType = typeof(TEntity);
-            var taskValue = value.ExecuteFunction(out Type taskType);
+            var propertyValue = memberInfo.GetValue(value);
+            var newValueType = propertyValue.GetType();
+            if (!newValueType.IsSubClassOfGeneric(typeof(Func<>)))
+            {
+                return onSuccessWithRollback(() => true.AsTask());
+            }
+            var taskValue = propertyValue.ExecuteFunction(out Type taskType);
             var resultValue = await taskValue.CastAsTaskObjectAsync(out Type typeToSave);
             var rawValues = Serialize(resultValue, typeToSave);
 
