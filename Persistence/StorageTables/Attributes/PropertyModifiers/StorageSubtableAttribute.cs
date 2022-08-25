@@ -135,6 +135,9 @@ namespace EastFive.Persistence
             Func<TResult> onFailure)
         {
             var propertyValue = memberInfo.GetValue(value);
+            if (propertyValue == default)
+                return onSuccessWithRollback(() => true.AsTask());
+
             var newValueType = propertyValue.GetType();
             if (!newValueType.IsSubClassOfGeneric(typeof(Func<>)))
             {
@@ -304,8 +307,10 @@ namespace EastFive.Persistence
             Func<TResult> onFailure)
         {
             var newValue = memberInfo.GetValue(updatedEntity.Entity);
-            var existingValue = memberInfo.GetValue(updatedEntity.Entity);
-            if(newValue.GetType().IsAssignableTo(typeof(System.Delegate)))
+            if (newValue == default)
+                return onSuccessWithRollback(() => true.AsTask());
+
+            if (newValue.GetType().IsAssignableTo(typeof(System.Delegate)))
             {
                 var dele = (Delegate)newValue;
                 var deleType = dele.Target.GetType();
