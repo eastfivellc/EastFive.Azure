@@ -439,27 +439,30 @@ namespace EastFive.Azure.Auth
                             return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
                                 async (externalUserKey) =>
                                 {
-                                    //if (application is IProvideAccountInformation)
-                                    //{
-                                    //    var accountInformationProvider = application as IProvideAccountInformation;
-                                    //    return await await accountInformationProvider
-                                    //        .FindOrCreateAccountByMethodAndKeyAsync(
-                                    //                method, externalUserKey,
-                                    //                authorization.parameters,
-                                    //                new Dictionary<string, string>() { },
-                                    //                loginProvider:application as IProvideLogin,
-                                    //                default(IHttpRequest),
-                                    //                account => account,
-                                    //            (accountId, claims) => onSuccess(accountId, claims, authorization.authorized).AsTask(),
-                                    //            why => onFailure(why, false).AsTask(),
-                                    //            () => onFailure("No mapping to that account.", authorization.authorized).AsTask(),
-                                    //            onNoEffect: () => OnContinue());
-                                    //}
+                                    if (application is IProvideAccountInformation)
+                                    {
+                                        var accountInformationProvider = application as IProvideAccountInformation;
+                                        return await await accountInformationProvider
+                                            .FindAccountByMethodAndKeyAsync(
+                                                    method, externalUserKey,
+                                                    authorization,
+                                                onAccountFound :(accountId) => onSuccess(accountId, authorization.claims, authorization.authorized).AsTask(),
+                                                onReject :() => OnContinue());
+                                    }
                                     return await OnContinue();
-                                    Task<TResult> OnContinue() => Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
-                                            authorization,
-                                        accountId => onSuccess(accountId, authorization.claims, authorization.authorized),
-                                        () => onFailure("No mapping to that account.", authorization.authorized));
+                                    Task<TResult> OnContinue()
+                                    {
+                                        return Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
+                                                authorization,
+                                            accountId =>
+                                            {
+                                                return onSuccess(accountId, authorization.claims, authorization.authorized);
+                                            },
+                                            () =>
+                                            {
+                                                return onFailure("No mapping to that account.", authorization.authorized);
+                                            });
+                                    };
                                 },
                                 (why) => onFailure(why, authorization.authorized).AsTask(),
                                 () => onFailure("This login method is no longer supported.", false).AsTask());

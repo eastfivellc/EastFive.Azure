@@ -94,6 +94,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                     var content = await response.Content.ReadAsStringAsync();
                                     if (response.StatusCode == HttpStatusCode.OK)
                                     {
+                                        if(content.IsNullOrWhiteSpace())
+                                            return onCouldNotConnect($"PING Returned empty response instead of a token");
                                         dynamic stuff = null;
                                         try
                                         {

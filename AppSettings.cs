@@ -229,6 +229,7 @@ namespace EastFive.Azure
         {
             public const string Redirections = "EastFive.Azure.Auth.Redirections";
             public const string PauseRedirections = "EastFive.Azure.Auth.PauseRedirections";
+            public const string DebugLogin = "EastFive.Azure.Auth.DebugLogin";
 
             [Config]
             public static class Apple

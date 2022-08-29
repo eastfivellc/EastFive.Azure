@@ -18,6 +18,7 @@ using EastFive.Azure.Auth;
 using EastFive.Linq;
 using EastFive.Api;
 using EastFive.Api.Azure;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {
@@ -39,7 +40,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         public string agentid { get; set; }
 
         [HttpGet(MatchAllParameters = false)]
-        public static async Task<IHttpResponse> Get(
+        public static Task<IHttpResponse> Get(
                 [OptionalQueryParameter(CheckFileName = true)]string tag,
                 [QueryParameter(Name = TokenIdPropertyName)]string tokenId,
                 [QueryParameter(Name = AgentIdPropertyName)]string agentId,
@@ -65,62 +66,76 @@ namespace EastFive.Azure.Auth.CredentialProviders
             //Then, switch the uncommented/commented lines back and run the server in debug.
             //Send the token via Postman to debug and see any errors that might come back from Ping.
 
+            return EastFive.Azure.AppSettings.Auth.DebugLogin.ConfigurationUri(
+                debugRedirect =>
+                {
+                    var populatedUri = debugRedirect.CopyPathAndQuery(request.RequestUri);
+                    return onRedirectResponse(populatedUri).AsTask();
+                },
+                onFailure: (why) => ContinueAsync(),
+                onNotSpecified: () => ContinueAsync());
+
             //return onRedirectResponse(new Uri("https://www.google.com"));
 
-            if (tag.IsNullOrWhiteSpace())
-                tag = "OpioidTool";
+            async Task<IHttpResponse> ContinueAsync()
+            {
+                if (tag.IsNullOrWhiteSpace())
+                    tag = "OpioidTool";
 
-            var methodName = PingProvider.IntegrationName;
-            var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
+                var methodName = PingProvider.IntegrationName;
+                var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
 
-            var failureHtml = "<html><title>{0}</title><body>{1} Please report:<code>{2}</code> to Affirm Health if the issue persists.</body></html>";
+                var failureHtml = "<html><title>{0}</title><body>{1} Please report:<code>{2}</code> to Affirm Health if the issue persists.</body></html>";
 
-            return await EastFive.Web.Configuration.Settings.GetString($"AffirmHealth.PDMS.PingRedirect.{tag}.PingAuthName",
-                async pingAuthName =>
-                {
-                    return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
-                        async reportSetId =>
-                        {
-                            var requestParams = request.RequestUri
-                                .ParseQuery()
-                                .Append("PingAuthName".PairWithValue(pingAuthName))
-                                .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
-                                .ToDictionary();
+                return await EastFive.Web.Configuration.Settings.GetString($"AffirmHealth.PDMS.PingRedirect.{tag}.PingAuthName",
+                    async pingAuthName =>
+                    {
+                        return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
+                            async reportSetId =>
+                            {
+                                var requestParams = request.RequestUri
+                                    .ParseQuery()
+                                    .Append("PingAuthName".PairWithValue(pingAuthName))
+                                    .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
+                                    .ToDictionary();
 
-                            return await Redirection.ProcessRequestAsync(method, 
-                                    requestParams,
-                                    application, request, endpoints, urlHelper,
-                                (redirect, accountIdMaybe) =>
-                                {
-                                    return onRedirectResponse(redirect);
-                                },
-                                (why) => onBadCredentials().AddReason(why),
-                                (why) =>
-                                {
-                                    var failureText = String.Format(failureHtml,
-                                        "PING/ATHENA credential service offline",
-                                        "Could not connect to PING (the authorization service used by Athena) to verify the provided link. Affirm Health will work with Athena/Ping to resolve this issue.",
-                                        why);
-                                    return onCouldNotConnect(why);
-                                },
-                                (why) =>
-                                {
-                                    var failureText = String.Format(failureHtml,
-                                        "Failed to authenticate",
-                                        "You could not be authenticated.",
-                                        why);
-                                    return onGeneralFailure(why);
-                                });
-                        },
-                        why =>
-                        {
-                            return onGeneralFailure(why).AsTask();
-                        });
-                },
-                why =>
-                {
-                    return onGeneralFailure(why).AsTask();
-                });
+                                return await Redirection.ProcessRequestAsync(method,
+                                        requestParams,
+                                        application, request, endpoints, urlHelper,
+                                    (redirect, accountIdMaybe) =>
+                                    {
+                                        return onRedirectResponse(redirect);
+                                    },
+                                    (why) => onBadCredentials().AddReason(why),
+                                    (why) =>
+                                    {
+                                        var failureText = String.Format(failureHtml,
+                                            "PING/ATHENA credential service offline",
+                                            "Could not connect to PING (the authorization service used by Athena) to verify the provided link. Affirm Health will work with Athena/Ping to resolve this issue.",
+                                            why);
+                                        return onCouldNotConnect(why);
+                                    },
+                                    (why) =>
+                                    {
+                                        var failureText = String.Format(failureHtml,
+                                            "Failed to authenticate",
+                                            "You could not be authenticated.",
+                                            why);
+                                        return onGeneralFailure(why);
+                                    });
+                            },
+                            why =>
+                            {
+                                return onGeneralFailure(why).AsTask();
+                            });
+                    },
+                    why =>
+                    {
+                        return onGeneralFailure(why).AsTask();
+                    });
+            }
+
+            
         }
     }
 }

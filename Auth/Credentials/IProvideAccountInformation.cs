@@ -30,6 +30,12 @@ namespace EastFive.Azure.Auth
             Func<Uri, Guid, IDictionary<string, string>, TResult> onInterceptProcess,
             Func<string, TResult> onReject);
 
+        Task<TResult> FindAccountByMethodAndKeyAsync<TResult>(
+                Method authenticationMethod, string externalAccountKey,
+                Authorization authorization,
+            Func<Guid, TResult> onAccountFound,
+            Func<TResult> onReject);
+
         //Task<TResult> CreateUnpopulatedAccountAsync<TResult>(
         //        Method authenticationMethod, string externalAccountKey,
         //        IAuthApplication application,
