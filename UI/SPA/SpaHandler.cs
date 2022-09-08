@@ -156,18 +156,6 @@ namespace EastFive.Azure.Spa
             {
                 using (var zipArchive = new ZipArchive(blobStream))
                 {
-                    var indexHTML = await zipArchive.Entries
-                       .First(
-                           (item, next) =>
-                           {
-                               if (string.Compare(item.FullName, indexHtmlPath, true) != 0)
-                                   return next();
-                               return item
-                                   .Open()
-                                   .ToBytesAsync();
-                           },
-                           () => new byte[] { }.AsTask());
-
                     var (minimumVersion, aliasPaths, defaultPath) = await zipArchive.Entries
                         .First(
                             async (item, next) =>
@@ -222,14 +210,22 @@ namespace EastFive.Azure.Spa
                                     async entity =>
                                     {
                                         var fileBytes = await entity.Open().ToBytesAsync();
-                                        var finalBytes = // entity.FullName.EndsWith(".js") ?
-                                            //fileBytes
-                                            //    .GetString()
-                                            //    .Replace("8FCC3D6A-9C25-4802-8837-16C51BE9FDBE.example.com", siteLocation)
-                                            //    .GetBytes()
-                                            //:
-                                            fileBytes;
-                                        return entity.FullName.PairWithValue(finalBytes);
+                                        if (!entity.FullName.Equals(indexHtmlPath, StringComparison.OrdinalIgnoreCase))
+                                            return entity.FullName.PairWithValue(fileBytes);
+
+                                        // indexHtmlPath file only
+                                        var aiInstrumentationKey = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.ConfigurationString(
+                                            (value) => value,
+                                            (missingKey) => string.Empty);
+                                        var aiConnectionString = "APPLICATIONINSIGHTS_CONNECTION_STRING".ConfigurationString(
+                                            (value) => value,
+                                            (missingKey) => string.Empty);
+                                        return fileBytes
+                                            .GetString()
+                                            .Replace("2734e0b8-5801-4b33-86a1-e5ae322399d6", aiInstrumentationKey, StringComparison.OrdinalIgnoreCase)
+                                            .Replace("f50751c1-b373-4fa8-8f27-1a7242e1ac79", aiConnectionString, StringComparison.OrdinalIgnoreCase)
+                                            .GetBytes()
+                                            .PairWithKey(entity.FullName);
                                     })
                                 .AsyncEnumerable()
                                 .ToArrayAsync();
