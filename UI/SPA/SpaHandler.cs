@@ -83,34 +83,31 @@ namespace EastFive.Azure.Spa
         {
             try
             {
-                return EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(
-                    indexHtmlPath =>
+                return EastFive.Azure.AppSettings.SPA.BuildConfigPath.ConfigurationString(
+                    buildJsonPath =>
                     {
-                        return EastFive.Azure.AppSettings.SPA.BuildConfigPath.ConfigurationString(
-                            buildJsonPath =>
+                        dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
+                            ds => ds,
+                            onFailure: why => false,
+                            onNotSpecified: () => false);
+
+
+                        loadTask = Task.Run(
+                            async () =>
                             {
-                                dynamicServe = EastFive.Azure.AppSettings.SPA.ServeEnabled.ConfigurationBoolean(
-                                    ds => ds,
-                                    onFailure: why => false,
-                                    onNotSpecified: () => false);
-                        
-                                loadTask = Task.Run(
-                                    async () =>
+                                var indexHtmlPath = EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(path => path, (why) => string.Empty);
+                                return await await LoadSpaFile(
+                                    async spaStream =>
                                     {
-                                        return await await LoadSpaFile(
-                                            async spaStream =>
-                                            {
-                                                bool success;
-                                                (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
-                                                    application, spaStream, indexHtmlPath, buildJsonPath, dynamicServe);
-                                                signal.Set();
-                                                return success;
-                                            },
-                                            () => false.AsTask());
-                                    });
-                                return true;
-                            },
-                            (why) => false);
+                                        bool success;
+                                        (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
+                                            application, spaStream, indexHtmlPath, buildJsonPath, dynamicServe);
+                                        signal.Set();
+                                        return success;
+                                    },
+                                    () => false.AsTask());
+                            });
+                        return true;
                     },
                     (why) => false);
             }
@@ -218,7 +215,6 @@ namespace EastFive.Azure.Spa
                                         if (!indexFiles.Contains(entity.FullName, StringComparison.OrdinalIgnoreCase))
                                             return entity.FullName.PairWithValue(fileBytes);
 
-                                        // indexHtmlPath file only
                                         var aiInstrumentationKey = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.ConfigurationString(
                                             (value) => value,
                                             (missingKey) => string.Empty);
