@@ -156,7 +156,7 @@ namespace EastFive.Azure.Spa
             {
                 using (var zipArchive = new ZipArchive(blobStream))
                 {
-                    var (minimumVersion, aliasPaths, defaultPath) = await zipArchive.Entries
+                    var (minimumVersion, aliasPaths, defaultPath, indexFiles) = await zipArchive.Entries
                         .First(
                             async (item, next) =>
                             {
@@ -179,6 +179,11 @@ namespace EastFive.Azure.Spa
                                         .ToArray()
                                     :
                                     buildJson.routes;
+                                var indexFiles = buildJson.routes
+                                    .NullToEmpty()
+                                    .Select(route => route.indexFile)
+                                    .SelectWhereNotNull()
+                                    .ToArray();
 
                                 SpaHandler.extensionsMimeTypes = buildJson.mimeTypes
                                     .NullToEmpty()
@@ -188,9 +193,9 @@ namespace EastFive.Azure.Spa
                                     .ToDictionary();
 
                                 var buildTime = (int)buildJson.buildTimeInSeconds;
-                                return (buildTime, routes, defaultRoute);
+                                return (buildTime, routes, defaultRoute, indexFiles);
                             },
-                            () => (default(int?), default(Route[]), default(Route?)).AsTask());
+                            () => (default(int?), default(Route[]), default(Route?), default(string[])).AsTask());
 
                     var lookup = await EastFive.Azure.AppSettings.SPA.SiteLocation.ConfigurationString(
                         async (siteLocation) =>
@@ -210,7 +215,7 @@ namespace EastFive.Azure.Spa
                                     async entity =>
                                     {
                                         var fileBytes = await entity.Open().ToBytesAsync();
-                                        if (!entity.FullName.Equals(indexHtmlPath, StringComparison.OrdinalIgnoreCase))
+                                        if (!indexFiles.Contains(entity.FullName, StringComparison.OrdinalIgnoreCase))
                                             return entity.FullName.PairWithValue(fileBytes);
 
                                         // indexHtmlPath file only
