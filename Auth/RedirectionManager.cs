@@ -102,11 +102,13 @@ namespace EastFive.Azure.Auth
             if (!successOnly.HasValue)
                 successOnly = true;
 
-            request.Headers.TryGetValue("api-voucher", out string[] apiVouchers);
+            request.Headers.TryGetValue(
+                EastFive.Azure.Auth.ApiKeyAccessAttribute.ParameterName,
+                out string[] apiVouchers);
             var apiVoucher = apiVouchers
                 .NullToEmpty()
                 .First(
-                    (x,next) => $"&api-voucher={x}", 
+                    (x,next) => $"&{EastFive.Azure.Auth.ApiKeyAccessAttribute.ParameterName}={x}", 
                     () => string.Empty);
 
             var method = methodMaybe.Value;

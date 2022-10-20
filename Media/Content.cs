@@ -32,7 +32,7 @@ namespace EastFive.Api.Azure
         }
 
         public static Task<TResult> FindContentByContentIdAsync<TResult>(Guid contentId,
-                EastFive.Api.Security security,
+                Security security,
             Func<string, byte[], TResult> onFound,
             Func<TResult> onNotFound,
             Func<TResult> onNotAuthorized)

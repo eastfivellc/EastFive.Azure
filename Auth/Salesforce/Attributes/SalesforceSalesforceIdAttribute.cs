@@ -83,28 +83,58 @@ namespace EastFive.Azure.Auth.Salesforce
             Func<string, TResult> onIdentified,
             Func<TResult> onNoIdentification)
         {
-            var accountLinksObj = propertyOrField.GetValue(resource);
-            var accountLinks = (AccountLinks)accountLinksObj;
-            return accountLinks.accountLinks
-                .Where(al => al.method.id == SalesforceProvider.IntegrationId)
-                .First(
-                    (accountLink, next) =>
-                    {
-                        return onIdentified(accountLink.externalAccountKey);
-                    },
-                    () =>
-                    {
-                        return onNoIdentification();
-                    });
+            var propertyOrFieldType = propertyOrField.GetPropertyOrFieldType();
+            if (typeof(AccountLinks).IsAssignableFrom(propertyOrFieldType))
+            {
+                var accountLinksObj = propertyOrField.GetValue(resource);
+                var accountLinks = (AccountLinks)accountLinksObj;
+                return accountLinks.accountLinks
+                    .Where(al => al.method.id == SalesforceProvider.IntegrationId)
+                    .First(
+                        (accountLink, next) =>
+                        {
+                            return onIdentified(accountLink.externalAccountKey);
+                        },
+                        () =>
+                        {
+                            return onNoIdentification();
+                        });
+            }
+            if (typeof(string).IsAssignableFrom(propertyOrFieldType))
+            {
+                var sfIdObj = propertyOrField.GetValue(resource);
+                var sfId = (string)sfIdObj;
+                if(sfId.HasBlackSpace())
+                    return onIdentified(sfId);
+
+                return onNoIdentification();
+            }
+
+            throw new ArgumentException($"{propertyOrField.DeclaringType.FullName}..{propertyOrField.Name} " +
+                $"is decorated with {nameof(SalesforceIdentifier)} but is of type `{propertyOrFieldType.FullName}` " +
+                $"which is not supported.");
         }
 
         public TResource SetIdentifier<TResource>(TResource resource, MemberInfo propertyOrField, string sfId)
         {
-            var accountLinksObj = propertyOrField.GetValue(resource);
-            var accountLinks = (AccountLinks)accountLinksObj;
-            var accountLinksUpdated = accountLinks.AddOrUpdateCredentials(
-                SalesforceProvider.IntegrationId.AsRef<Method>(), sfId);
-            return (TResource)propertyOrField.SetPropertyOrFieldValue(resource, accountLinksUpdated);
+            var propertyOrFieldType = propertyOrField.GetPropertyOrFieldType();
+            var propertyOrFieldObjValue = propertyOrField.GetValue(resource);
+            if (typeof(AccountLinks).IsAssignableFrom(propertyOrFieldType))
+            {
+                var accountLinks = (AccountLinks)propertyOrFieldObjValue;
+                var accountLinksUpdated = accountLinks.AddOrUpdateCredentials(
+                    SalesforceProvider.IntegrationId.AsRef<Method>(), sfId);
+                return (TResource)propertyOrField.SetPropertyOrFieldValue(resource, accountLinksUpdated);
+            }
+
+            if (typeof(string).IsAssignableFrom(propertyOrFieldType))
+            {
+                return (TResource)propertyOrField.SetPropertyOrFieldValue(resource, sfId);
+            }
+
+            throw new ArgumentException($"{propertyOrField.DeclaringType.FullName}..{propertyOrField.Name} " +
+                $"is decorated with {nameof(SalesforceIdentifier)} but is of type `{propertyOrFieldType.FullName}` " +
+                $"which is not supported.");
         }
     }
 }

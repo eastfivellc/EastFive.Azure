@@ -41,7 +41,7 @@ namespace EastFive.Azure.Auth
                                     scope =>
                                     {
                                         var tokenExpiration = TimeSpan.FromMinutes(1.0);
-                                        request.RequestUri = request.RequestUri.RemoveQueryParameter("api-voucher");
+                                        request.RequestUri = request.RequestUri.RemoveQueryParameter(ParameterName);
                                         var sessionId = apiVoucher.MD5HashGuid();
                                         var claims = voucherToken.claims;
                                         return JwtTools.CreateToken(sessionId,

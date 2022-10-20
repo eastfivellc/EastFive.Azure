@@ -167,7 +167,7 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAsync(
             [QueryParameter(Name = "integration")] IRef<XIntegration> integrationRef,
-            IAuthApplication application, EastFive.Api.SessionToken security,
+            IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized,
             ReferencedDocumentNotFoundResponse<XIntegration> onIntegrationNotFound)
@@ -210,7 +210,7 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAccountAsync(
             [QueryParameter(Name = "integration_account")] Guid accountId,
-            IAuthApplication application, EastFive.Api.SessionToken security,
+            IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized)
         {
@@ -319,13 +319,12 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onFailure)
         {
             var methodName = this.name;
-            var matchingLoginProviders = application.LoginProviders
-                .SelectValues()
-                .Where(loginProvider => loginProvider.Method == methodName)
-                .ToArray();
-            if (!matchingLoginProviders.Any())
+            if (!application.LoginProviders
+                    .NullToEmpty()
+                    .SelectValues()
+                    .Where(loginProvider => loginProvider.Method == methodName)
+                    .TryGetAny(out IProvideLogin matchingLoginProvider))
                 return onFailure("Method does not match any existing authentication.").AsTask();
-            var matchingLoginProvider = matchingLoginProviders.First();
 
             return matchingLoginProvider.ParseCredentailParameters(parameters,
                 (externalId, authorizationIdMaybeDiscard, lookupDiscard) =>

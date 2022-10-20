@@ -137,7 +137,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
-                EastFive.Api.SessionTokenMaybe security,
+                EastFive.Azure.Auth.SessionTokenMaybe security,
                 IAuthApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,

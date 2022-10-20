@@ -148,7 +148,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
                 [Resource]AccountMapping accountMapping,
-                IAuthApplication application, Api.SessionToken security,
+                IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
             CreatedResponse onCreated,
             ForbiddenResponse onForbidden,
             UnauthorizedResponse onUnauthorized,

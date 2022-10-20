@@ -11,6 +11,7 @@ namespace EastFive.Azure
         public class AuthorizationFlow
         {
             public const string FlowName = "Authorization Flow";
+
             public class Variables
             {
                 public const string TokenName = "TOKEN";

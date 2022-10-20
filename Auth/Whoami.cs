@@ -54,7 +54,7 @@ namespace EastFive.Azure.Auth
             Step = 4.0)]
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
         public static async Task<IHttpResponse> GetAsync(
-                EastFive.Api.SessionToken security,
+                EastFive.Azure.Auth.SessionToken security,
                 IHttpRequest request,
                 IAuthApplication application,
 

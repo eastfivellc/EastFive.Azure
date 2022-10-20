@@ -48,7 +48,7 @@ namespace EastFive.Azure.Monitoring
                 () => new Claim[] { },
                 (why) => new Claim[] { });
             var sessionIdClaimType = Api.Auth.ClaimEnableSessionAttribute.Type;
-            var sessionIdMaybe = SessionToken.GetClaimIdMaybe(claims, sessionIdClaimType);
+            var sessionIdMaybe = EastFive.Azure.Auth.SessionToken.GetClaimIdMaybe(claims, sessionIdClaimType);
             if (sessionIdMaybe.HasValue)
                 telemetry.Context.Session.Id = sessionIdMaybe.Value.ToString().ToUpper();
             
@@ -57,7 +57,7 @@ namespace EastFive.Azure.Monitoring
                 (why) => default);
             if (accountIdClaimType.HasBlackSpace())
             {
-                var accountIdMaybe = SessionToken.GetClaimIdMaybe(claims, accountIdClaimType);
+                var accountIdMaybe = EastFive.Azure.Auth.SessionToken.GetClaimIdMaybe(claims, accountIdClaimType);
                 if (accountIdMaybe.HasValue)
                 {
                     var accountIdStr = accountIdMaybe.Value.ToString().ToUpper();

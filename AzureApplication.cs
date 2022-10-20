@@ -45,7 +45,7 @@ namespace EastFive.Azure
             Func<TResult> onInvalidAccount,
             Func<string, TResult> onFailure);
 
-        Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security);
+        Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, EastFive.Azure.Auth.SessionToken security);
 
         //Task<TResult> OnUnmappedUserAsync<TResult>(
         //        string subject, IDictionary<string, string> extraParameters,
@@ -122,7 +122,7 @@ namespace EastFive.Api.Azure
                 });
         }
 
-        public virtual async Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, Api.SessionToken security)
+        public virtual async Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, EastFive.Azure.Auth.SessionToken security)
         {
             if (security.accountIdMaybe.HasValue)
             {
