@@ -105,7 +105,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                         {
                                             return onCouldNotConnect($"PING Returned non-json response:{content}");
                                         }
-                                        string subject = (string)stuff[Subject];
+                                        string subject = (string)stuff[Subject];                                        
                                         var loginId = Guid.NewGuid();
                                         var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
                                         foreach (var item in stuff)
@@ -127,6 +127,12 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                         ShimKey(PracticeId);
                                         ShimKey(DepartmentId);
                                         ShimKey(PatientId);
+
+                                        // TODO: should do a data migration for all ping account lookups
+                                        if (subject == "bduchene" && stuff[PracticeId] == "380")
+                                        {
+                                            subject = $"{stuff[PracticeId]}_{subject}";
+                                        }
 
                                         return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
                                     }
