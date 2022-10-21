@@ -225,12 +225,20 @@ namespace EastFive.Azure.Auth.Salesforce
 										{ "refresh_token", this.refreshToken },
 										{ "grant_type", "refresh_token" },
 									},
-								(SalesforceTokenResponse response) =>
+								async (SalesforceTokenResponse response) =>
 								{
 									this.lastRefreshed = DateTime.UtcNow;
 									this.authToken = response.access_token;
-									tokenLock.Set();
-									return this.authorization.StorageUpdateAsync(
+									if (response.refresh_token.IsNullOrWhiteSpace())
+									{
+										tokenLock.Set();
+										return onRefreshed(response.access_token);
+                                    }
+
+                                    this.refreshToken = response.refresh_token;
+                                    tokenLock.Set();
+
+                                    return await this.authorization.StorageUpdateAsync(
 										async (auth, saveAsync) =>
 										{
 											var newRefreshToken = response.refresh_token;
