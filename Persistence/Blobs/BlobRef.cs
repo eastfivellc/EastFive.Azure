@@ -17,12 +17,13 @@ using EastFive.Collections.Generic;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization;
 using EastFive.Reflection;
-
+using EastFive.Api.Meta.Flows;
 
 namespace EastFive.Azure.Persistence.Blobs
 {
     [BlobRefSerializer]
     [BlobRefBinding]
+    [BlobRefMeta]
     public interface IBlobRef
     {
         const string DefaultMediaType = "application/octet-stream";
@@ -50,5 +51,16 @@ namespace EastFive.Azure.Persistence.Blobs
     public static class BlobRefLoadExtensions
     {
 
+    }
+
+    public class BlobRefMetaAttribute : Attribute, IDefineWorkflowParameterAttributes
+    {
+        public bool IsFileType(ParameterInfo parameter)
+        {
+            if (!parameter.ParameterType.IsAssignableTo(typeof(IBlobRef)))
+                throw new ArgumentException($"{parameter.ParameterType.DisplayFullName} cannot be decorated with {nameof(BlobRefMetaAttribute)}");
+
+            return true;
+        }
     }
 }
