@@ -11,7 +11,7 @@ using Microsoft.Azure.Cosmos.Table;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.InteropServices;
 
-namespace BlackBarLabs.Persistence.Azure
+namespace EastFive.Azure.Persistence.StorageTables
 {
     public static class KeyExtensions
     {
@@ -21,7 +21,9 @@ namespace BlackBarLabs.Persistence.Azure
         #region PartitionKeyGeneration
         public static string GeneratePartitionKey(this string id)
         {
-            return BuildPartitionKey(id);
+            var hashCode = GetHashCode(id);
+
+            return (hashCode % PartitionKeyRemainder).ToString(CultureInfo.InvariantCulture);
         }
 
         private static int GetHashCode(string str)
@@ -48,54 +50,47 @@ namespace BlackBarLabs.Persistence.Azure
             }
             return hash1 + (hash2 * 1566083941);
         }
-
-        internal static string BuildPartitionKey(string rowKey)
-        {
-            var hashCode = GetHashCode(rowKey);
-
-            return (hashCode % PartitionKeyRemainder).ToString(CultureInfo.InvariantCulture);
-        }
         #endregion
 
-        public static List<string> ToListOfKeys(this string delimitedList)
-        {
-            if (string.IsNullOrWhiteSpace(delimitedList)) return new List<string>();
-            var listOfGuids = delimitedList.Split(new[] { "|" }, StringSplitOptions.RemoveEmptyEntries).ToList();
-            return listOfGuids;
-        }
+        //public static List<string> ToListOfKeys(this string delimitedList)
+        //{
+        //    if (string.IsNullOrWhiteSpace(delimitedList)) return new List<string>();
+        //    var listOfGuids = delimitedList.Split(new[] { "|" }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        //    return listOfGuids;
+        //}
 
-        public static void SetId(this ITableEntity document, Guid id)
-        {
-            SetId(document, id.AsRowKey());
-        }
+        //public static void SetId(this ITableEntity document, Guid id)
+        //{
+        //    SetId(document, id.AsRowKey());
+        //}
 
-        public static void SetId(this ITableEntity document, string id)
-        {
-            document.RowKey = id;
-            document.PartitionKey = document.RowKey.GeneratePartitionKey();
-        }
+        //public static void SetId(this ITableEntity document, string id)
+        //{
+        //    document.RowKey = id;
+        //    document.PartitionKey = document.RowKey.GeneratePartitionKey();
+        //}
 
-        [Obsolete("Use EastFive.Serialization")]
-        public static string ToStringOfKeys(this List<string> keys)
-        {
-            if (keys == null) return string.Empty;
-            return string.Join("|", keys);
-        }
+        //[Obsolete("Use EastFive.Serialization")]
+        //public static string ToStringOfKeys(this List<string> keys)
+        //{
+        //    if (keys == null) return string.Empty;
+        //    return string.Join("|", keys);
+        //}
 
-        [Obsolete("Use EastFive.Serialization")]
-        public static string ToStringFromListOfGuids(this List<Guid> guids)
-        {
-            if (guids == null) return string.Empty;
-            return string.Join("|", guids);
-        }
+        //[Obsolete("Use EastFive.Serialization")]
+        //public static string ToStringFromListOfGuids(this List<Guid> guids)
+        //{
+        //    if (guids == null) return string.Empty;
+        //    return string.Join("|", guids);
+        //}
 
-        [Obsolete("Use EastFive.Serialization")]
-        public static List<Guid> ToListOfGuidsFromString(this string delimitedList)
-        {
-            if (string.IsNullOrWhiteSpace(delimitedList)) return new List<Guid>();
-            var listOfGuids = delimitedList.Split(new[] { "|" }, StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ToList();
-            return listOfGuids;
-        }
+        //[Obsolete("Use EastFive.Serialization")]
+        //public static List<Guid> ToListOfGuidsFromString(this string delimitedList)
+        //{
+        //    if (string.IsNullOrWhiteSpace(delimitedList)) return new List<Guid>();
+        //    var listOfGuids = delimitedList.Split(new[] { "|" }, StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).ToList();
+        //    return listOfGuids;
+        //}
 
         #region ByteArray
         

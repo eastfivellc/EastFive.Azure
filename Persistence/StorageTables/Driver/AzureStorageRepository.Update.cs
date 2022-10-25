@@ -7,6 +7,7 @@ using BlackBarLabs.Extensions;
 using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace BlackBarLabs.Persistence.Azure.StorageTables
 {

@@ -105,13 +105,31 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                         {
                                             return onCouldNotConnect($"PING Returned non-json response:{content}");
                                         }
-                                        string subject = (string)stuff[Subject];                                        
-                                        var loginId = Guid.NewGuid();
+
                                         var extraParamsWithTokenValues = new Dictionary<string, string>(extraParams);
                                         foreach (var item in stuff)
                                         {
                                             extraParamsWithTokenValues.Add(item.Key.ToString(), item.Value.ToString());
                                         }
+
+                                        // shim differences in casing of keys among connection setups
+                                        ShimKey(PracticeId);
+                                        ShimKey(DepartmentId);
+                                        ShimKey(PatientId);
+                                        ShimKey(Subject);
+
+                                        if(!extraParamsWithTokenValues.TryGetValue(Subject, out string subject))
+                                            return onInvalidCredentials($"PING did not return a `{Subject}`");
+                                        if (!extraParamsWithTokenValues.TryGetValue(PracticeId, out string practiceId))
+                                            return onInvalidCredentials($"PING did not return a `{PracticeId}`");
+
+                                        // TODO: should do a data migration for all ping account lookups
+                                        if (subject == "bduchene" && practiceId == "380")
+                                        {
+                                            subject = $"{stuff[PracticeId]}_{subject}";
+                                        }
+
+                                        return onSuccess(subject, default(Guid?), default(Guid?), extraParamsWithTokenValues);
 
                                         void ShimKey(string expectedName)
                                         {
@@ -122,19 +140,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                                 extraParamsWithTokenValues.Remove(alternateName);
                                             }
                                         }
-
-                                        // shim differences in casing of keys among connection setups
-                                        ShimKey(PracticeId);
-                                        ShimKey(DepartmentId);
-                                        ShimKey(PatientId);
-
-                                        // TODO: should do a data migration for all ping account lookups
-                                        if (subject == "bduchene" && stuff[PracticeId] == "380")
-                                        {
-                                            subject = $"{stuff[PracticeId]}_{subject}";
-                                        }
-
-                                        return onSuccess(subject, default(Guid?), loginId, extraParamsWithTokenValues);
                                     }
                                     else
                                     {

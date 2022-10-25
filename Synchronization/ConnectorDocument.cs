@@ -17,6 +17,7 @@ using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Synchronization.Persistence
 {
@@ -604,12 +605,15 @@ namespace EastFive.Azure.Synchronization.Persistence
 
         internal static ConnectorDocument Convert(Connector connector)
         {
+            var rowKey = connector.connectorId.AsRowKey();
             var connectorDoc = new ConnectorDocument
             {
+                RowKey = rowKey,
+                PartitionKey = rowKey.GeneratePartitionKey(),
                 LocalAdapter = connector.adapterInternalId,
                 RemoteAdapter = connector.adapterExternalId,
             };
-            connectorDoc.SetId(connector.connectorId);
+            // connectorDoc.SetId(connector.connectorId);
             connectorDoc.SetMethod(connector.synchronizationMethod);
             return connectorDoc;
         }

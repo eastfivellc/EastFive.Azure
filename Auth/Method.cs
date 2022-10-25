@@ -354,10 +354,10 @@ namespace EastFive.Azure.Auth
             return await matchingLoginProvider.RedeemTokenAsync(parameters,
                 (userKey, authorizationIdMaybe, deprecatedId, updatedParameters) =>
                 {
+                    var parametersNotUpdated = parameters
+                        .Where(param => !updatedParameters.ContainsKey(param.Key));
                     var allParameters = updatedParameters
-                        .Concat(
-                            parameters
-                                .Where(param => !updatedParameters.ContainsKey(param.Key)))
+                        .Concat(parametersNotUpdated)
                         .ToDictionary();
                     var authorizationRef = authorizationIdMaybe.HasValue ?
                         new RefOptional<Authorization>(authorizationIdMaybe.Value)

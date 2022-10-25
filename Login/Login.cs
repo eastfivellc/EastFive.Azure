@@ -108,12 +108,11 @@ namespace EastFive.Azure.Login
                             CredentialProvider.IntegrationName, application);
 
                         var parameters = new Dictionary<string, string>()
-                            {
-                                { "state",  authentication.authenticationRef.id.ToString() },
-                                { "token",  authentication.token },
-                                {  CredentialProvider.referrerKey, "https://example.com/internal" }
-                            };
-
+                        {
+                            { "state",  authentication.authenticationRef.id.ToString() },
+                            { "token",  authentication.token },
+                            {  CredentialProvider.referrerKey, "https://example.com/internal" }
+                        };
 
                         return await await method.RedeemTokenAsync(parameters, application,
                             async (externalAccountKey, authorizationRefMaybe, loginProvider, extraParams) =>

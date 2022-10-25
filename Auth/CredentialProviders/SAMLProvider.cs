@@ -24,18 +24,11 @@ namespace EastFive.Azure.Auth.CredentialProviders
         public const string IntegrationName = "SAML";
         public string Method => IntegrationName;
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
-
-        private DataContext dataContext;
         
         internal const string SamlpResponseKey = "samlp:Response";
         internal const string SamlAssertionKey = "saml:Assertion";
         internal const string SamlSubjectKey = "saml:Subject";
         internal const string SamlNameIDKey = "saml:NameID";
-
-        public SAMLProvider()
-        {
-            this.dataContext = new DataContext(EastFive.Azure.AppSettings.ASTConnectionStringKey);
-        }
 
         [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(

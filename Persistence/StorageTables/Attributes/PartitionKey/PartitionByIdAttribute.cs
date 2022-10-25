@@ -19,7 +19,6 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public EntityType ParsePartitionKey<EntityType>(EntityType entity, string value, MemberInfo memberInfo)
         {
-            // discard since generated from id
             if (Guid.TryParse(value, out Guid valueGuid))
             {
                 memberInfo.SetValue(ref entity, valueGuid);

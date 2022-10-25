@@ -74,170 +74,170 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
 
         #region Blob methods
 
-        public async Task<TResult> SaveBlobIfNotExistsAsync<TResult>(string containerReference,
-                Guid id, byte[] data, Dictionary<string, string> metadata, string contentType,
-            Func<TResult> success,
-            Func<TResult> blobAlreadyExists,
-            Func<string, TResult> failure)
-        {
-            try
-            {
-                var blockId = id.AsRowKey();
-                var container = BlobClient.GetBlobContainerClient(containerReference);
-                if (!await container.ExistsAsync())
-                    return await SaveBlobAsync(containerReference, id, data,
-                        metadata,
-                        contentType, success, failure);
+        //public async Task<TResult> SaveBlobIfNotExistsAsync<TResult>(string containerReference,
+        //        Guid id, byte[] data, Dictionary<string, string> metadata, string contentType,
+        //    Func<TResult> success,
+        //    Func<TResult> blobAlreadyExists,
+        //    Func<string, TResult> failure)
+        //{
+        //    try
+        //    {
+        //        var blockId = id.AsRowKey();
+        //        var container = BlobClient.GetBlobContainerClient(containerReference);
+        //        if (!await container.ExistsAsync())
+        //            return await SaveBlobAsync(containerReference, id, data,
+        //                metadata,
+        //                contentType, success, failure);
 
-                var blockBlob = container.GetBlobClient(blockId);
-                if (await blockBlob.ExistsAsync())
-                    return blobAlreadyExists();
+        //        var blockBlob = container.GetBlobClient(blockId);
+        //        if (await blockBlob.ExistsAsync())
+        //            return blobAlreadyExists();
                 
-                return await SaveBlobAsync(containerReference, id, data,
-                    metadata,
-                    contentType, success, failure);
-            }
-            catch (Exception ex)
-            {
-                return failure(ex.Message);
-            }
-        }
+        //        return await SaveBlobAsync(containerReference, id, data,
+        //            metadata,
+        //            contentType, success, failure);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return failure(ex.Message);
+        //    }
+        //}
 
-        async Task<BlobClient> GetBlobClientAsync(string containerReference, string blockId)
-        {
-            var container = BlobClient.GetBlobContainerClient(containerReference);
-            var createResponse = await container.CreateIfNotExistsAsync();
-            //global::Azure.ETag created = createResponse.Value.ETag;
-            return container.GetBlobClient(blockId);
-        }
+        //async Task<BlobClient> GetBlobClientAsync(string containerReference, string blockId)
+        //{
+        //    var container = BlobClient.GetBlobContainerClient(containerReference);
+        //    var createResponse = await container.CreateIfNotExistsAsync();
+        //    //global::Azure.ETag created = createResponse.Value.ETag;
+        //    return container.GetBlobClient(blockId);
+        //}
 
-        public async Task<TResult> SaveBlobAsync<TResult>(string containerReference, Guid id, byte[] data,
-                Dictionary<string, string> metadata, string contentType,
-            Func<TResult> success,
-            Func<string, TResult> failure)
-        {
-            try
-            {
-                var blockId = id.AsRowKey();
-                var blockClient = await GetBlobClientAsync(containerReference, blockId);
+        //public async Task<TResult> SaveBlobAsync<TResult>(string containerReference, Guid id, byte[] data,
+        //        Dictionary<string, string> metadata, string contentType,
+        //    Func<TResult> success,
+        //    Func<string, TResult> failure)
+        //{
+        //    try
+        //    {
+        //        var blockId = id.AsRowKey();
+        //        var blockClient = await GetBlobClientAsync(containerReference, blockId);
 
-                using (var stream = new MemoryStream(data))
-                {
-                    await blockClient.UploadAsync(stream, 
-                        new global::Azure.Storage.Blobs.Models.BlobUploadOptions
-                        {
-                            Metadata = metadata,
-                            HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
-                            {
-                                ContentType = contentType,
-                            }
-                        });
-                }
+        //        using (var stream = new MemoryStream(data))
+        //        {
+        //            await blockClient.UploadAsync(stream, 
+        //                new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+        //                {
+        //                    Metadata = metadata,
+        //                    HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+        //                    {
+        //                        ContentType = contentType,
+        //                    }
+        //                });
+        //        }
 
-                return success();
-            }
-            catch (Exception ex)
-            {
-                return failure(ex.Message);
-            }
-        }
+        //        return success();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return failure(ex.Message);
+        //    }
+        //}
 
-        public async Task<TResult> ReadBlobAsync<TResult>(string containerReference, Guid id,
-            Func<Stream, BlobProperties, IDictionary<string, string>, TResult> success,
-            Func<TResult> onNotFound,
-            Func<string, TResult> failure)
-        {
-            try
-            {
-                var blockId = id.AsRowKey();
-                var blockClient = await GetBlobClientAsync(containerReference, blockId);
-                var returnStream = await blockClient.OpenReadAsync(
-                    new BlobOpenReadOptions(true)
-                    {
-                        Conditions = new BlobRequestConditions()
-                        {
-                        }
-                    });
-                var properties = await blockClient.GetPropertiesAsync();
-                return success(returnStream, properties.Value, properties.Value.Metadata);
-            }
-            catch (StorageException storageEx)
-            {
-                return storageEx.ParseExtendedErrorInformation(
-                    (errorCodes, reason) =>
-                    {
-                        return failure(reason);
-                    },
-                    () =>
-                    {
-                        var isNotFound = storageEx.Message
-                            .ToLower()
-                            .Contains("not found");
-                        if (isNotFound)
-                            return onNotFound();
+        //public async Task<TResult> ReadBlobAsync<TResult>(string containerReference, Guid id,
+        //    Func<Stream, BlobProperties, IDictionary<string, string>, TResult> success,
+        //    Func<TResult> onNotFound,
+        //    Func<string, TResult> failure)
+        //{
+        //    try
+        //    {
+        //        var blockId = id.AsRowKey();
+        //        var blockClient = await GetBlobClientAsync(containerReference, blockId);
+        //        var returnStream = await blockClient.OpenReadAsync(
+        //            new BlobOpenReadOptions(true)
+        //            {
+        //                Conditions = new BlobRequestConditions()
+        //                {
+        //                }
+        //            });
+        //        var properties = await blockClient.GetPropertiesAsync();
+        //        return success(returnStream, properties.Value, properties.Value.Metadata);
+        //    }
+        //    catch (StorageException storageEx)
+        //    {
+        //        return storageEx.ParseExtendedErrorInformation(
+        //            (errorCodes, reason) =>
+        //            {
+        //                return failure(reason);
+        //            },
+        //            () =>
+        //            {
+        //                var isNotFound = storageEx.Message
+        //                    .ToLower()
+        //                    .Contains("not found");
+        //                if (isNotFound)
+        //                    return onNotFound();
 
-                        return failure(storageEx.Message);
-                    });
-            }
-            catch (Exception ex)
-            {
-                return failure(ex.Message);
-            }
-        }
+        //                return failure(storageEx.Message);
+        //            });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return failure(ex.Message);
+        //    }
+        //}
 
-        public async Task<TResult> ReadBlobMetadataAsync<TResult>(string containerReference, Guid id,
-            Func<BlobProperties, IDictionary<string, string>, TResult> success,
-            Func<TResult> onNotFound,
-            Func<string, TResult> failure)
-        {
-            try
-            {
-                var blockId = id.AsRowKey();
-                var blockClient = await GetBlobClientAsync(containerReference, blockId);
-                var properties = await blockClient.GetPropertiesAsync();
-                return success(properties.Value, properties.Value.Metadata);
-            }
-            catch (StorageException storageEx)
-            {
-                return storageEx.ParseExtendedErrorInformation(
-                    (errorCodes, reason) =>
-                    {
-                        return failure(reason);
-                    },
-                    () =>
-                    {
-                        var isNotFound = storageEx.Message
-                            .ToLower()
-                            .Contains("not found");
-                        if (isNotFound)
-                            return onNotFound();
+        //public async Task<TResult> ReadBlobMetadataAsync<TResult>(string containerReference, Guid id,
+        //    Func<BlobProperties, IDictionary<string, string>, TResult> success,
+        //    Func<TResult> onNotFound,
+        //    Func<string, TResult> failure)
+        //{
+        //    try
+        //    {
+        //        var blockId = id.AsRowKey();
+        //        var blockClient = await GetBlobClientAsync(containerReference, blockId);
+        //        var properties = await blockClient.GetPropertiesAsync();
+        //        return success(properties.Value, properties.Value.Metadata);
+        //    }
+        //    catch (StorageException storageEx)
+        //    {
+        //        return storageEx.ParseExtendedErrorInformation(
+        //            (errorCodes, reason) =>
+        //            {
+        //                return failure(reason);
+        //            },
+        //            () =>
+        //            {
+        //                var isNotFound = storageEx.Message
+        //                    .ToLower()
+        //                    .Contains("not found");
+        //                if (isNotFound)
+        //                    return onNotFound();
 
-                        return failure(storageEx.Message);
-                    });
-            }
-            catch (Exception ex)
-            {
-                return failure(ex.Message);
-            }
-        }
+        //                return failure(storageEx.Message);
+        //            });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return failure(ex.Message);
+        //    }
+        //}
 
-        public async Task<TResult> DeleteBlobIfExistsAsync<TResult>(string containerReference, Guid id,
-            Func<TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            try
-            {
-                var blockId = id.AsRowKey();
-                var blockClient = await GetBlobClientAsync(containerReference, blockId);
-                var result = await blockClient.DeleteIfExistsAsync();
+        //public async Task<TResult> DeleteBlobIfExistsAsync<TResult>(string containerReference, Guid id,
+        //    Func<TResult> onSuccess,
+        //    Func<string, TResult> onFailure)
+        //{
+        //    try
+        //    {
+        //        var blockId = id.AsRowKey();
+        //        var blockClient = await GetBlobClientAsync(containerReference, blockId);
+        //        var result = await blockClient.DeleteIfExistsAsync();
 
-                return onSuccess();
-            }
-            catch (Exception ex)
-            {
-                return onFailure(ex.Message);
-            }
-        }
+        //        return onSuccess();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return onFailure(ex.Message);
+        //    }
+        //}
 
         #endregion
 
@@ -267,81 +267,81 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
 
         #region Direct methods
         
-        public TResult FindByIdBatch<TDocument, TResult>(IEnumerableAsync<Guid> entityIds,
-            Func<Guid, string> getPartitionKey,
-            Func<IEnumerableAsync<TDocument>, IEnumerableAsync<Guid>, TResult> onComplete,
-            EastFive.Analytics.ILogger diagnosticsTag = default(EastFive.Analytics.ILogger))
-            where TDocument : ITableEntity
-        {
-            var table = GetTable<TDocument>();
-            var diagnosticsBatch = diagnosticsTag.CreateScope("Batch");
-            var diagnosticsSelect = diagnosticsTag.CreateScope("Select");
-            var results = entityIds
-                .Batch(diagnosticsBatch)
-                .Select(
-                    entityIdSet =>
-                    {
-                        try
-                        {
-                            if (!entityIdSet.Any())
-                                return EnumerableAsync.Empty<KeyValuePair<Guid, TableResult>>();
+        //public TResult FindByIdBatch<TDocument, TResult>(IEnumerableAsync<Guid> entityIds,
+        //    Func<Guid, string> getPartitionKey,
+        //    Func<IEnumerableAsync<TDocument>, IEnumerableAsync<Guid>, TResult> onComplete,
+        //    EastFive.Analytics.ILogger diagnosticsTag = default(EastFive.Analytics.ILogger))
+        //    where TDocument : ITableEntity
+        //{
+        //    var table = GetTable<TDocument>();
+        //    var diagnosticsBatch = diagnosticsTag.CreateScope("Batch");
+        //    var diagnosticsSelect = diagnosticsTag.CreateScope("Select");
+        //    var results = entityIds
+        //        .Batch(diagnosticsBatch)
+        //        .Select(
+        //            entityIdSet =>
+        //            {
+        //                try
+        //                {
+        //                    if (!entityIdSet.Any())
+        //                        return EnumerableAsync.Empty<KeyValuePair<Guid, TableResult>>();
 
-                            var batch = entityIdSet
-                                .Select(
-                                    async entityId =>
-                                    {
-                                        var rowKey = entityId.AsRowKey();
-                                        var partitionKey = getPartitionKey(entityId);
-                                        var operation = TableOperation.Retrieve<TDocument>(partitionKey, rowKey);
-                                        try
-                                        {
-                                            var result = await new E5CloudTable(table).ExecuteAsync(operation);
-                                            return result.PairWithKey(entityId);
-                                        }
-                                        catch (StorageException)
-                                        {
-                                            return default(TableResult).PairWithKey(entityId);
-                                        }
-                                    })
-                                .AsyncEnumerable();
-                            return batch;
-                        }
-                        catch(Exception)
-                        {
-                            throw;
-                        }
-                    })
-                .SelectAsyncMany();
+        //                    var batch = entityIdSet
+        //                        .Select(
+        //                            async entityId =>
+        //                            {
+        //                                var rowKey = entityId.AsRowKey();
+        //                                var partitionKey = getPartitionKey(entityId);
+        //                                var operation = TableOperation.Retrieve<TDocument>(partitionKey, rowKey);
+        //                                try
+        //                                {
+        //                                    var result = await new E5CloudTable(table).ExecuteAsync(operation);
+        //                                    return result.PairWithKey(entityId);
+        //                                }
+        //                                catch (StorageException)
+        //                                {
+        //                                    return default(TableResult).PairWithKey(entityId);
+        //                                }
+        //                            })
+        //                        .AsyncEnumerable();
+        //                    return batch;
+        //                }
+        //                catch(Exception)
+        //                {
+        //                    throw;
+        //                }
+        //            })
+        //        .SelectAsyncMany();
 
-            bool IsSuccess(KeyValuePair<Guid, TableResult> resultKvp)
-            {
-                if (resultKvp.Value.IsDefaultOrNull())
-                    return false;
+        //    bool IsSuccess(KeyValuePair<Guid, TableResult> resultKvp)
+        //    {
+        //        if (resultKvp.Value.IsDefaultOrNull())
+        //            return false;
 
-                if (resultKvp.Value.HttpStatusCode >= 400)
-                    return false;
+        //        if (resultKvp.Value.HttpStatusCode >= 400)
+        //            return false;
 
-                return true;
-            }
+        //        return true;
+        //    }
 
-            var resultsSuccess = results
-                .Where(IsSuccess)
-                .Select(
-                    result =>
-                    {
-                        return (TDocument)result.Value.Result;
-                    });
+        //    var resultsSuccess = results
+        //        .Where(IsSuccess)
+        //        .Select(
+        //            result =>
+        //            {
+        //                return (TDocument)result.Value.Result;
+        //            });
 
-            var resultsFailure = results
-                .Where(result => !IsSuccess(result))
-                .Select(
-                    result =>
-                    {
-                        return result.Key;
-                    });
+        //    var resultsFailure = results
+        //        .Where(result => !IsSuccess(result))
+        //        .Select(
+        //            result =>
+        //            {
+        //                return result.Key;
+        //            });
 
-            return onComplete(resultsSuccess, resultsFailure);
-        }
+        //    return onComplete(resultsSuccess, resultsFailure);
+        //}
         
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
                 Func<TDocument, Guid> getRowKey,
@@ -378,94 +378,94 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                     logger:logger);
         }
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatchWithPartitionKey<TDocument, TElement, TResult>(IEnumerableAsync<TElement> entities,
-               Func<TElement, TDocument> getDocument, 
-               Func<TElement, TDocument, Guid> getRowKey,
-               Func<TElement, TDocument, string> getPartitionKey,
-               Func<TDocument, TResult> onSuccess,
-               Func<TDocument, TResult> onFailure,
-               RetryDelegate onTimeout = default(RetryDelegate),
-               ILogger logger = default)
-           where TDocument : class, ITableEntity
-        {
-            return entities
-                .Batch()
-                .Select(
-                    elements =>
-                    {
-                        return CreateOrReplaceBatch(elements, getDocument,
-                            (element, doc) => getRowKey(element, doc).AsRowKey(),
-                                (element, doc) => getPartitionKey(element, doc),
-                                onSuccess, onFailure, onTimeout,
-                                logger: logger);
-                    })
-                .SelectAsyncMany();
-        }
+        //public IEnumerableAsync<TResult> CreateOrReplaceBatchWithPartitionKey<TDocument, TElement, TResult>(IEnumerableAsync<TElement> entities,
+        //       Func<TElement, TDocument> getDocument, 
+        //       Func<TElement, TDocument, Guid> getRowKey,
+        //       Func<TElement, TDocument, string> getPartitionKey,
+        //       Func<TDocument, TResult> onSuccess,
+        //       Func<TDocument, TResult> onFailure,
+        //       RetryDelegate onTimeout = default(RetryDelegate),
+        //       ILogger logger = default)
+        //   where TDocument : class, ITableEntity
+        //{
+        //    return entities
+        //        .Batch()
+        //        .Select(
+        //            elements =>
+        //            {
+        //                return CreateOrReplaceBatch(elements, getDocument,
+        //                    (element, doc) => getRowKey(element, doc).AsRowKey(),
+        //                        (element, doc) => getPartitionKey(element, doc),
+        //                        onSuccess, onFailure, onTimeout,
+        //                        logger: logger);
+        //            })
+        //        .SelectAsyncMany();
+        //}
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatchWithPartitionKey<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
-               Func<TDocument, Guid> getRowKey,
-               Func<TDocument, string> getPartitionKey,
-               Func<TDocument, TResult> onSuccess,
-               Func<TDocument, TResult> onFailure,
-               RetryDelegate onTimeout = default(RetryDelegate),
-               ILogger logger = default)
-           where TDocument : class, ITableEntity
-        {
-            return entities
-                .Batch()
-                .Select(
-                    rows =>
-                    {
-                        return CreateOrReplaceBatch(rows,
-                            (doc) => getRowKey(doc).AsRowKey(),
-                            (doc) => getPartitionKey(doc),
-                            onSuccess, onFailure, onTimeout,
-                            logger: logger);
-                    })
-                .SelectAsyncMany();
-        }
+        //public IEnumerableAsync<TResult> CreateOrReplaceBatchWithPartitionKey<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
+        //       Func<TDocument, Guid> getRowKey,
+        //       Func<TDocument, string> getPartitionKey,
+        //       Func<TDocument, TResult> onSuccess,
+        //       Func<TDocument, TResult> onFailure,
+        //       RetryDelegate onTimeout = default(RetryDelegate),
+        //       ILogger logger = default)
+        //   where TDocument : class, ITableEntity
+        //{
+        //    return entities
+        //        .Batch()
+        //        .Select(
+        //            rows =>
+        //            {
+        //                return CreateOrReplaceBatch(rows,
+        //                    (doc) => getRowKey(doc).AsRowKey(),
+        //                    (doc) => getPartitionKey(doc),
+        //                    onSuccess, onFailure, onTimeout,
+        //                    logger: logger);
+        //            })
+        //        .SelectAsyncMany();
+        //}
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
-                Func<TDocument, string> getRowKey,
-                Func<TDocument, TResult> onSuccess,
-                Func<TDocument, TResult> onFailure,
-                RetryDelegate onTimeout = default(RetryDelegate),
-                ILogger logger = default)
-            where TDocument : class, ITableEntity
-        {
-            return entities
-                .Batch()
-                .Select(
-                    rows =>
-                    {
-                        return CreateOrReplaceBatch(rows,
-                            getRowKey, 
-                            (doc) => doc.RowKey.GeneratePartitionKey(),
-                            onSuccess, onFailure, onTimeout,
-                            logger: logger);
-                    })
-                .SelectAsyncMany();
-        }
+        //public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
+        //        Func<TDocument, string> getRowKey,
+        //        Func<TDocument, TResult> onSuccess,
+        //        Func<TDocument, TResult> onFailure,
+        //        RetryDelegate onTimeout = default(RetryDelegate),
+        //        ILogger logger = default)
+        //    where TDocument : class, ITableEntity
+        //{
+        //    return entities
+        //        .Batch()
+        //        .Select(
+        //            rows =>
+        //            {
+        //                return CreateOrReplaceBatch(rows,
+        //                    getRowKey, 
+        //                    (doc) => doc.RowKey.GeneratePartitionKey(),
+        //                    onSuccess, onFailure, onTimeout,
+        //                    logger: logger);
+        //            })
+        //        .SelectAsyncMany();
+        //}
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
-                Func<TDocument, string> getRowKey,
-                Func<TDocument, string> getPartitionKey,
-                Func<TDocument, TResult> onSuccess,
-                Func<TDocument, TResult> onFailure,
-                RetryDelegate onTimeout = default,
-                ILogger logger = default)
-            where TDocument : class, ITableEntity
-        {
-            return entities
-                .Batch()
-                .Select(
-                    rows =>
-                    {
-                        return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, onSuccess, onFailure, onTimeout,
-                            logger: logger);
-                    })
-                .SelectAsyncMany();
-        }
+        //public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerableAsync<TDocument> entities,
+        //        Func<TDocument, string> getRowKey,
+        //        Func<TDocument, string> getPartitionKey,
+        //        Func<TDocument, TResult> onSuccess,
+        //        Func<TDocument, TResult> onFailure,
+        //        RetryDelegate onTimeout = default,
+        //        ILogger logger = default)
+        //    where TDocument : class, ITableEntity
+        //{
+        //    return entities
+        //        .Batch()
+        //        .Select(
+        //            rows =>
+        //            {
+        //                return CreateOrReplaceBatch(rows, getRowKey, getPartitionKey, onSuccess, onFailure, onTimeout,
+        //                    logger: logger);
+        //            })
+        //        .SelectAsyncMany();
+        //}
 
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerable<TDocument> entities,
                 Func<TDocument, string> getRowKey,
@@ -513,59 +513,59 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                     });
         }
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TElement, TResult>(IEnumerable<TElement> entities,
-                Func<TElement, TDocument> getDocument,
-                Func<TElement, TDocument, string> getRowKey,
-                Func<TElement, TDocument, string> getPartitionKey,
-                Func<TDocument, TResult> onSuccess,
-                Func<TDocument, TResult> onFailure,
-                RetryDelegate onTimeout = default(RetryDelegate),
-                EastFive.Analytics.ILogger logger = default)
-            where TDocument : class, ITableEntity
-        {
-            var scopeLogger = logger.CreateScope("CreateOrReplaceBatch");
+        //public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TElement, TResult>(IEnumerable<TElement> entities,
+        //        Func<TElement, TDocument> getDocument,
+        //        Func<TElement, TDocument, string> getRowKey,
+        //        Func<TElement, TDocument, string> getPartitionKey,
+        //        Func<TDocument, TResult> onSuccess,
+        //        Func<TDocument, TResult> onFailure,
+        //        RetryDelegate onTimeout = default(RetryDelegate),
+        //        EastFive.Analytics.ILogger logger = default)
+        //    where TDocument : class, ITableEntity
+        //{
+        //    var scopeLogger = logger.CreateScope("CreateOrReplaceBatch");
 
-            return entities
-                .Select(
-                    entity =>
-                    {
-                        var row = getDocument(entity);
-                        row.RowKey = getRowKey(entity, row);
-                        row.PartitionKey = getPartitionKey(entity, row);
-                        return row;
-                    })
-                .GroupBy(row => row.PartitionKey)
-                .SelectMany(
-                    grp =>
-                    {
-                        return grp
-                            .Split(index => 100)
-                            .Select(set => set.ToArray().PairWithKey(grp.Key));
-                    })
-                .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, diagnostics: scopeLogger))
-                .AsyncEnumerable()
-                .OnComplete(
-                    (resultss) =>
-                    {
-                        if (!resultss.Any())
-                            scopeLogger.Trace($"Saved 0 {typeof(TDocument).Name} documents across 0 partitions.");
+        //    return entities
+        //        .Select(
+        //            entity =>
+        //            {
+        //                var row = getDocument(entity);
+        //                row.RowKey = getRowKey(entity, row);
+        //                row.PartitionKey = getPartitionKey(entity, row);
+        //                return row;
+        //            })
+        //        .GroupBy(row => row.PartitionKey)
+        //        .SelectMany(
+        //            grp =>
+        //            {
+        //                return grp
+        //                    .Split(index => 100)
+        //                    .Select(set => set.ToArray().PairWithKey(grp.Key));
+        //            })
+        //        .Select(grp => CreateOrReplaceBatchAsync(grp.Key, grp.Value, diagnostics: scopeLogger))
+        //        .AsyncEnumerable()
+        //        .OnComplete(
+        //            (resultss) =>
+        //            {
+        //                if (!resultss.Any())
+        //                    scopeLogger.Trace($"Saved 0 {typeof(TDocument).Name} documents across 0 partitions.");
 
-                        scopeLogger.Trace($"Saved {resultss.Sum(results => results.Length)} {typeof(TDocument).Name} documents across {resultss.Length} partitions.");
-                    })
-                .SelectMany(
-                    trs =>
-                    {
-                        return trs
-                            .Select(
-                                tableResult =>
-                                {
-                                    var resultDocument = (tableResult.Result as TDocument);
-                                    if (tableResult.HttpStatusCode < 400)
-                                        return onSuccess(resultDocument);
-                                    return onFailure(resultDocument);
-                                });
-                    });
-        }
+        //                scopeLogger.Trace($"Saved {resultss.Sum(results => results.Length)} {typeof(TDocument).Name} documents across {resultss.Length} partitions.");
+        //            })
+        //        .SelectMany(
+        //            trs =>
+        //            {
+        //                return trs
+        //                    .Select(
+        //                        tableResult =>
+        //                        {
+        //                            var resultDocument = (tableResult.Result as TDocument);
+        //                            if (tableResult.HttpStatusCode < 400)
+        //                                return onSuccess(resultDocument);
+        //                            return onFailure(resultDocument);
+        //                        });
+        //            });
+        //}
 
         public async Task<TableResult[]> CreateOrReplaceBatchAsync<TDocument>(string partitionKey, TDocument[] entities,
                 RetryDelegate onTimeout = default(RetryDelegate),

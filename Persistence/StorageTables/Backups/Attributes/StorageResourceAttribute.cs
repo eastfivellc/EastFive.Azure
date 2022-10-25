@@ -53,7 +53,7 @@ namespace EastFive.Azure.Persistence.Attributes
 
     public class StandardPartitionKeyGenerator : RemainderKeyGenerator
     {
-        public StandardPartitionKeyGenerator() : base(KeyExtensions.PartitionKeyRemainder - 1) { }
+        public StandardPartitionKeyGenerator() : base(StorageTables.KeyExtensions.PartitionKeyRemainder - 1) { }
     }
 
     public class RemainderKeyGenerator : StringKeyGenerator

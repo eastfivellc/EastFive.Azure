@@ -16,64 +16,64 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
     public partial class AzureStorageRepository
     {
         
-        [Obsolete("Use FindByIdAsync")]
-        public Task<TEntity> FindById<TEntity>(Guid rowId)
-            where TEntity : class,ITableEntity
-        {
-            return FindById<TEntity>(rowId.AsRowKey());
-        }
+        //[Obsolete("Use FindByIdAsync")]
+        //public Task<TEntity> FindById<TEntity>(Guid rowId)
+        //    where TEntity : class,ITableEntity
+        //{
+        //    return FindById<TEntity>(rowId.AsRowKey());
+        //}
 
-        [Obsolete("Use FindByIdAsync")]
-        public async Task<TEntity> FindById<TEntity>(string rowKey)
-                   where TEntity : class, ITableEntity
-        {
-            TEntity entity = null;
-            if(!await TryFindByIdAsync<TEntity>(rowKey, (retries, data) =>
-            {
-                entity = data;
-                if (retries > 0)
-                    Console.WriteLine($"{retries} retries where made to query {typeof (TEntity).Name} table.");
-            }))
-                throw new Exception("Unable to query Azure.");
-            return entity;
-        }
+        //[Obsolete("Use FindByIdAsync")]
+        //public async Task<TEntity> FindById<TEntity>(string rowKey)
+        //           where TEntity : class, ITableEntity
+        //{
+        //    TEntity entity = null;
+        //    if(!await TryFindByIdAsync<TEntity>(rowKey, (retries, data) =>
+        //    {
+        //        entity = data;
+        //        if (retries > 0)
+        //            Console.WriteLine($"{retries} retries where made to query {typeof (TEntity).Name} table.");
+        //    }))
+        //        throw new Exception("Unable to query Azure.");
+        //    return entity;
+        //}
         
-        private delegate void QueryDelegate<in TData>(int retries, TData data);
-        [Obsolete("Use FindByIdAsync")]
-        private async Task<bool> TryFindByIdAsync<TData>(string rowKey, QueryDelegate<TData> callback) where TData : class, ITableEntity
-        {
-            var retriesAttempted = 0;
-            bool shouldRetry;
-            StorageException ex;
-            var table = GetTable<TData>();
-            var operation = TableOperation.Retrieve<TData>(rowKey.GeneratePartitionKey(), rowKey);
-            do
-            {
-                try
-                {
-                    var result = await table.ExecuteAsync(operation);
-                    callback(retriesAttempted, (TData)result.Result);
-                    return true;
-                }
-                catch (StorageException se)
-                {
-                    if (retriesAttempted == 0)
-                    {
-                        if (!await table.ExistsAsync())
-                        {
-                            callback(0, default(TData));
-                            return true;
-                        }
-                    }
-                    TimeSpan retryDelay;
-                    shouldRetry = retryPolicy.ShouldRetry(retriesAttempted++, se.RequestInformation.HttpStatusCode, se, out retryDelay, null);
-                    ex = se;
-                    if (shouldRetry) await Task.Delay(retryDelay);
-                }
-            } while (shouldRetry);
-            Console.WriteLine($"{ex.Message} {typeof(TData).Name} could not be queried after {retriesAttempted - 1} retries.");
-            return false;
-        }
+        //private delegate void QueryDelegate<in TData>(int retries, TData data);
+        //[Obsolete("Use FindByIdAsync")]
+        //private async Task<bool> TryFindByIdAsync<TData>(string rowKey, QueryDelegate<TData> callback) where TData : class, ITableEntity
+        //{
+        //    var retriesAttempted = 0;
+        //    bool shouldRetry;
+        //    StorageException ex;
+        //    var table = GetTable<TData>();
+        //    var operation = TableOperation.Retrieve<TData>(rowKey.GeneratePartitionKey(), rowKey);
+        //    do
+        //    {
+        //        try
+        //        {
+        //            var result = await table.ExecuteAsync(operation);
+        //            callback(retriesAttempted, (TData)result.Result);
+        //            return true;
+        //        }
+        //        catch (StorageException se)
+        //        {
+        //            if (retriesAttempted == 0)
+        //            {
+        //                if (!await table.ExistsAsync())
+        //                {
+        //                    callback(0, default(TData));
+        //                    return true;
+        //                }
+        //            }
+        //            TimeSpan retryDelay;
+        //            shouldRetry = retryPolicy.ShouldRetry(retriesAttempted++, se.RequestInformation.HttpStatusCode, se, out retryDelay, null);
+        //            ex = se;
+        //            if (shouldRetry) await Task.Delay(retryDelay);
+        //        }
+        //    } while (shouldRetry);
+        //    Console.WriteLine($"{ex.Message} {typeof(TData).Name} could not be queried after {retriesAttempted - 1} retries.");
+        //    return false;
+        //}
 
         [Obsolete("Use FindAllAsync")]
         public async Task<IEnumerable<TData>> FindByQueryAsync<TData>(TableQuery<TData> query, int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
