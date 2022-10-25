@@ -95,6 +95,7 @@ namespace EastFive.Azure.Monitoring
             {
                 return request.Headers
                     .Where(kvp => kvp.Key.Equals("X-Teams-Notify", StringComparison.OrdinalIgnoreCase))
+                    .Where(kvp => kvp.Value.Any(v => !"Allscripts".Equals(v)))
                     .First(
                         (teamsNotifyParams, next) =>
                         {
