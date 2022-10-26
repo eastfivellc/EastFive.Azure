@@ -156,7 +156,7 @@ namespace EastFive.Azure.Auth
                             EastFive.Security.AppSettings.TokenScope,
                         scope =>
                         {
-                            return Web.Configuration.Settings.GetDouble(Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes,
+                            return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                                 (tokenExpirationInMinutes) =>
                                 {
                                     return GetClaimsAsync(application, session.authorization,
@@ -244,7 +244,7 @@ namespace EastFive.Azure.Auth
             return await Security.AppSettings.TokenScope.ConfigurationUri(
                 scope =>
                 {
-                    return Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes.ConfigurationDouble(
+                    return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                         async (tokenExpirationInMinutes) =>
                         {
                             return await await GetClaimsAsync(application, authorizationRefMaybe,
@@ -303,7 +303,7 @@ namespace EastFive.Azure.Auth
                     return Security.AppSettings.TokenScope.ConfigurationUri(
                         scope =>
                         {
-                            return Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes.ConfigurationDouble(
+                            return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                                 async (tokenExpirationInMinutes) =>
                                 {
                                     return await await GetClaimsAsync(application, authorizationRefMaybe,
@@ -366,7 +366,7 @@ namespace EastFive.Azure.Auth
             return await Security.AppSettings.TokenScope.ConfigurationUri(
                 scope =>
                 {
-                    return Security.SessionServer.Configuration.AppSettings.TokenExpirationInMinutes.ConfigurationDouble(
+                    return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                         async (tokenExpirationInMinutes) =>
                         {
                             return await await GetClaimsAsync(application, authorizationRefMaybe,

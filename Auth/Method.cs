@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Linq;
@@ -19,10 +20,8 @@ using EastFive.Persistence;
 using EastFive.Collections.Generic;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using BlackBarLabs.Api;
 using EastFive.Security.SessionServer;
 using EastFive.Api.Meta.Flows;
-using System.Linq.Expressions;
 
 namespace EastFive.Azure.Auth
 {
@@ -327,7 +326,7 @@ namespace EastFive.Azure.Auth
                 return onFailure("Method does not match any existing authentication.").AsTask();
 
             return matchingLoginProvider.ParseCredentailParameters(parameters,
-                (externalId, authorizationIdMaybeDiscard, lookupDiscard) =>
+                (externalId, authorizationIdMaybeDiscard) =>
                 {
                     return onParsed(externalId, matchingLoginProvider);
                 },
@@ -352,19 +351,20 @@ namespace EastFive.Azure.Auth
             var matchingLoginProvider = matchingLoginProviders.First();
 
             return await matchingLoginProvider.RedeemTokenAsync(parameters,
-                (userKey, authorizationIdMaybe, deprecatedId, updatedParameters) =>
+                (updatedParameters) =>
                 {
-                    var parametersNotUpdated = parameters
-                        .Where(param => !updatedParameters.ContainsKey(param.Key));
-                    var allParameters = updatedParameters
-                        .Concat(parametersNotUpdated)
-                        .ToDictionary();
-                    var authorizationRef = authorizationIdMaybe.HasValue ?
-                        new RefOptional<Authorization>(authorizationIdMaybe.Value)
-                        :
-                        new RefOptional<Authorization>();
-                    return onSuccess(userKey, authorizationRef,
-                        matchingLoginProvider, allParameters);
+                    return matchingLoginProvider.ParseCredentailParameters(updatedParameters,
+                        (userKey, authorizationRefMaybe) =>
+                        {
+                            var parametersNotUpdated = parameters
+                                .Where(param => !updatedParameters.ContainsKey(param.Key));
+                            var allParameters = updatedParameters
+                                .Concat(parametersNotUpdated)
+                                .ToDictionary();
+                            return onSuccess(userKey, authorizationRefMaybe,
+                                matchingLoginProvider, allParameters);
+                        },
+                        why => onFailure(why));
                 },
                 (authorizationId, extraParams) => onLogout(authorizationId, extraParams),
                 (why) => onFailure(why),
@@ -411,7 +411,7 @@ namespace EastFive.Azure.Auth
         {
             return GetLoginProviderAsync(application,
                 (name, loginProvider) => loginProvider.ParseCredentailParameters(parameters,
-                    (externalUserKey, authenticationIdMaybe, scopeMaybeDiscard) => onAuthorizeKey(externalUserKey),
+                    (externalUserKey, authorizationRefMaybe) => onAuthorizeKey(externalUserKey),
                     why => onFailure(why)),
                 () => loginMethodNoLongerSupported());
         }

@@ -51,14 +51,30 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
             public Task<TResult> RedeemTokenAsync<TResult>(
                 IDictionary<string, string> responseParams, 
-                Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+                Func<IDictionary<string, string>, TResult> onSuccess,
                 Func<Guid?, IDictionary<string, string>, TResult> onNotAuthenticated,
                 Func<string, TResult> onInvalidToken,
                 Func<string, TResult> onCouldNotConnect, 
                 Func<string, TResult> onUnspecifiedConfiguration,
                 Func<string, TResult> onFailure)
             {
-                return onSuccess(responseParams["content_id"], default(Guid?), default(Guid?), responseParams).ToTask();
+                return onSuccess(responseParams).AsTask();
+            }
+
+            public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+                Func<string, IRefOptional<Authorization>, TResult> onSuccess,
+                Func<string, TResult> onFailure)
+            {
+                return onSuccess(responseParams["content_id"], GetState());
+
+                IRefOptional<Authorization> GetState()
+                {
+                    if (!responseParams.TryGetValue("responseParamState", out string stateValue))
+                        return RefOptional<Authorization>.Empty();
+
+                    RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                    return stateId;
+                }
             }
 
             public Task<TResult> UserParametersAsync<TResult>(Guid actorId, System.Security.Claims.Claim[] claims, 
@@ -78,10 +94,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 return onProvideAuthorization(provider).ToTask();
             }
 
-            public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, Func<string, Guid?, Guid?, TResult> onSuccess, Func<string, TResult> onFailure)
-            {
-                throw new NotImplementedException();
-            }
+            
         }
 
         //internal static async Task<TResult> GetAsync<TResult>(Guid authenticationRequestId, Func<Type, Uri> callbackUrlFunc,

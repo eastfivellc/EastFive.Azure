@@ -209,7 +209,7 @@ namespace EastFive.Azure.Auth.Salesforce
         public Type CallbackController => typeof(SalesforceRedirect);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -237,28 +237,22 @@ namespace EastFive.Azure.Auth.Salesforce
                     }
                     return Parse(tokenResponse.id_token, extraParamsWithTokenValues,
                         (subject, authorizationId, extraParamsWithClaimValues) =>
-                            onSuccess(subject, authorizationId, default(Guid?), extraParamsWithClaimValues),
+                            onSuccess(extraParamsWithClaimValues),
                         (why) => onFailure(why));
                 },
                 onFailure);
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, TResult> onSuccess,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
             return GetSubject(
                 subject =>
                 {
-                    var state = responseParams.ContainsKey(responseParamState) ?
-                           Guid.TryParse(responseParams[responseParamState], out Guid stateParsedGuid) ?
-                               stateParsedGuid
-                               :
-                               default(Guid?)
-                           :
-                           default(Guid?);
+                    var state = GetState();
 
-                    return onSuccess(subject, state, default(Guid?));
+                    return onSuccess(subject, state);
                 });
 
             TResult GetSubject(Func<string, TResult> callback)
@@ -279,6 +273,15 @@ namespace EastFive.Azure.Auth.Salesforce
                 }
 
                 return onFailure($"Could not locate {claimParamSub} in params or claims.");
+            }
+
+            IRefOptional<Authorization> GetState()
+            {
+                if (!responseParams.TryGetValue(responseParamState, out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
             }
         }
 

@@ -222,6 +222,10 @@ namespace EastFive.Azure
                 Location = "AD UI -> App Registrations -> [APP] -> All Settings -> Keys -> [New Key]",
                 MoreInfo = "This can only be accessed when the Key is created")]
             public const string ClientSecret = "EastFive.Azure.AzureADB2C.ClientSecret";
+
+            [ConfigKey("The claim identifier used to determine the login subject key.",
+                DeploymentOverrides.Optional)]
+            public const string LoginIdClaimType = "EastFive.Security.SessionServer.LoginProvider.LoginIdClaimType";
         }
 
         [Config]
@@ -279,7 +283,6 @@ namespace EastFive.Azure
             {
                 public const string PingIdentityAthenaRestApiKey = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestApiKey";
                 public const string PingIdentityAthenaRestAuthUsername = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestAuthUsername";
-
             }
 
             [Config]
@@ -307,6 +310,19 @@ namespace EastFive.Azure
                 public const string ConsumerSecret = "EastFive.Salesforce.ConsumerSecret";
             }
 
+            public static class TokenCredential
+            {
+                /// <summary>
+                /// The email address and name from which a token credential is sent.
+                /// </summary>
+                public const string FromEmail = "EastFive.Security.SessionServer.TokenCredential.FromEmail";
+                public const string FromName = "EastFive.Security.SessionServer.TokenCredential.FromName";
+                /// <summary>
+                /// Subject for token credntial email.
+                /// </summary>
+                public const string Subject = "EastFive.Security.SessionServer.TokenCredential.Subject";
+            }
+
             [ConfigKey("Link that is sent (emailed) to the user to login to the application",
                 DeploymentOverrides.Desireable,
                 DeploymentSecurityConcern = false,
@@ -314,6 +330,8 @@ namespace EastFive.Azure
             public const string LandingPage = "EastFive.Security.SessionServer.RouteDefinitions.LandingPage";
 
             public const string OpenApiCollectionName = "EastFive.Azure.Auth";
+
+            public const string TokenExpirationInMinutes = "EastFive.Security.SessionServer.tokenExpirationInMinutes";
         }
 
         [Config]
@@ -348,32 +366,6 @@ namespace EastFive.Azure
 
             public const string MuteEmailToAddress = "EastFive.SendGrid.MuteToAddress";
             public const string BccAllAddresses = "EastFive.SendGrid.BlindCopyAllAddresses";
-        }
-    }
-}
-
-namespace EastFive.Security.SessionServer.Configuration
-{
-    [Config]
-    public static class AppSettings
-    {
-        //public const string Storage = "EastFive.Security.SessionServer.Storage";
-        public const string TokenExpirationInMinutes = "EastFive.Security.SessionServer.tokenExpirationInMinutes";
-        public const string LoginIdClaimType = "EastFive.Security.SessionServer.LoginProvider.LoginIdClaimType";
-
-        
-
-        public static class TokenCredential
-        {
-            /// <summary>
-            /// The email address and name from which a token credential is sent.
-            /// </summary>
-            public const string FromEmail = "EastFive.Security.SessionServer.TokenCredential.FromEmail";
-            public const string FromName = "EastFive.Security.SessionServer.TokenCredential.FromName";
-            /// <summary>
-            /// Subject for token credntial email.
-            /// </summary>
-            public const string Subject = "EastFive.Security.SessionServer.TokenCredential.Subject";
         }
     }
 }

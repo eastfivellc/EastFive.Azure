@@ -41,7 +41,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
         
         public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -59,8 +59,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     }
                     try
                     {
-                        var nameId = tokens[SAMLProvider.SamlNameIDKey];
-
                         return EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.SAML.SAMLLoginIdAttributeName,
                             (attributeName) =>
                             {
@@ -73,12 +71,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                 //if (!Guid.TryParse(attributes[0].AttributeValue.First(), out authId))
                                 //    return invalidCredentials("User's auth identifier is not a guid.");
 
-                                using (var algorithm = SHA512.Create())
-                                {
-                                    var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
-                                    var loginId = new Guid(hash.Take(16).ToArray());
-                                    return onSuccess(nameId, default(Guid?), loginId, tokens);
-                                }
+                                return onSuccess(tokens);
                             },
                             (why) => onUnspecifiedConfiguration(why));
                     } catch(Exception)
@@ -89,16 +82,21 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 (why) => onUnspecifiedConfiguration(why).AsTask());
         }
 
-        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> tokens,
-            Func<string, Guid?, Guid?, TResult> onSuccess,
+        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-            var nameId = tokens[SAMLProvider.SamlNameIDKey];
-            using (var algorithm = SHA512.Create())
+            var nameId = responseParams[SAMLProvider.SamlNameIDKey];
+
+            return onSuccess(nameId, GetState());
+
+            IRefOptional<Authorization> GetState()
             {
-                var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(nameId));
-                var loginId = new Guid(hash.Take(16).ToArray());
-                return onSuccess(nameId, default(Guid?), loginId);
+                if (!responseParams.TryGetValue("responseParamState", out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
             }
         }
 

@@ -35,11 +35,20 @@ namespace EastFive.Azure.Auth.CredentialProviders
         public Type CallbackController => typeof(ImplicitlyCreatedCredentialProvider); // typeof(Controllers.TokenController);
 
         public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onUnspecifiedConfiguration,
+            Func<string, TResult> onFailure)
+        {
+            throw new NotImplementedException();
+        }
+
+
+
+        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
             throw new NotImplementedException();
@@ -168,11 +177,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
 
         public Task<TResult> UserParametersAsync<TResult>(Guid actorId, System.Security.Claims.Claim[] claims, IDictionary<string, string> extraParams, Func<IDictionary<string, string>, IDictionary<string, Type>, IDictionary<string, string>, TResult> onSuccess)
-        {
-            throw new NotImplementedException();
-        }
-
-        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, Func<string, Guid?, Guid?, TResult> onSuccess, Func<string, TResult> onFailure)
         {
             throw new NotImplementedException();
         }

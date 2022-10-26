@@ -596,7 +596,7 @@ namespace EastFive.Azure.Auth
 
                     var loginProvider = loginProviders[method.name];
                     return loginProvider.ParseCredentailParameters(parameters,
-                        (string userKey, Guid? authorizationIdDiscard, Guid? deprecatedId) =>
+                        (userKey, authorizationIdDiscard) =>
                         {
                             return onSuccess(userKey, loginProvider);
                         },

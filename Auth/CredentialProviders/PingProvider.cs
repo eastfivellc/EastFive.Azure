@@ -15,6 +15,7 @@ using Newtonsoft.Json;
 using EastFive.Serialization;
 using EastFive.Azure.Auth;
 using EastFive.Extensions;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {
@@ -60,7 +61,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         public Type CallbackController => typeof(PingResponse);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -75,7 +76,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             var agentId = extraParams[PingProvider.AgentId];
             var restAuthUsername = extraParams[PingProvider.RestApiKey];
 
-            return await Web.Configuration.Settings.GetString<Task<TResult>>(EastFive.Azure.AppSettings.Auth.Ping.PingIdentityAthenaRestApiKey,
+            return await EastFive.Azure.AppSettings.Auth.Ping.PingIdentityAthenaRestApiKey.ConfigurationString(
                 async (restApiKey) =>
                 {
                     using (var httpClient = new HttpClient())
@@ -118,18 +119,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                         ShimKey(PatientId);
                                         ShimKey(Subject);
 
-                                        if(!extraParamsWithTokenValues.TryGetValue(Subject, out string subject))
-                                            return onInvalidCredentials($"PING did not return a `{Subject}`");
-                                        if (!extraParamsWithTokenValues.TryGetValue(PracticeId, out string practiceId))
-                                            return onInvalidCredentials($"PING did not return a `{PracticeId}`");
-
-                                        // TODO: should do a data migration for all ping account lookups
-                                        if (subject == "bduchene" && practiceId == "380")
-                                        {
-                                            subject = $"{stuff[PracticeId]}_{subject}";
-                                        }
-
-                                        return onSuccess(subject, default(Guid?), default(Guid?), extraParamsWithTokenValues);
+                                        return onSuccess(extraParamsWithTokenValues);
 
                                         void ShimKey(string expectedName)
                                         {
@@ -162,20 +152,21 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
         
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, 
-            Func<string, Guid?, Guid?, TResult> onSuccess, 
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess, 
             Func<string, TResult> onFailure)
         {
-            if (!responseParams.ContainsKey(Subject))
-                return onFailure("Missing pingone.subject");
+            if (!responseParams.TryGetValue(Subject, out string subject))
+                return onFailure($"Missing `{Subject}`");
+            if (!responseParams.TryGetValue(PracticeId, out string practiceId))
+                return onFailure($"Missing `{PracticeId}`");
 
-            string subject = responseParams[Subject];
-            using (var algorithm = SHA512.Create())
-            {
-                var hash = algorithm.ComputeHash(System.Text.Encoding.UTF8.GetBytes(subject));
-                var loginId = new Guid(hash.Take(16).ToArray());
+            var accountKey = $"{practiceId}_{subject}";
+            return onSuccess(accountKey, RefOptional<Authorization>.Empty());
 
-                return onSuccess(subject, default(Guid?), loginId);
-            }
+            // TODO: should do a data migration for all ping account lookups
+            //if (subject == "bduchene" && practiceId == "380")
+            //{
+            //}
         }
 
         #region IProvideLogin

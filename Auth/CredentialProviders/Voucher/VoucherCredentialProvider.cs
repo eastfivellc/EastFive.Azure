@@ -10,6 +10,9 @@ namespace EastFive.Azure.Auth.CredentialProviders
     [IntegrationName(IntegrationName)]
     public class VoucherCredentialProvider : IProvideAuthorization
     {
+        public const string AccountKeyParameterName = "account_key";
+        public const string StateParameterName = "state";
+
         public const string IntegrationName = "Voucher";
         public string Method => IntegrationName;
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
@@ -25,8 +28,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
         
         public Type CallbackController => typeof(VoucherCredentialProvider);
 
-        public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+        public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -38,11 +41,16 @@ namespace EastFive.Azure.Auth.CredentialProviders
             //if (String.Compare(providerId.AbsoluteUri.TrimEnd(trimChars), trustedProvider.AbsoluteUri.TrimEnd(trimChars)) != 0)
             //    return invalidCredentials("ProviderId given does not match trustred ProviderId");
 
-            var token = extraParams["token"]; // TODO: Figure out real value (token is placeholder)
+            var token = responseParams["token"]; // TODO: Figure out real value (token is placeholder)
             return EastFive.Azure.Auth.Voucher.Utilities.ValidateToken(token,
-                (stateId) =>
+                (accountId) =>
                 {
-                    return onSuccess(stateId.ToString("N"), stateId, default(Guid?), null);
+                    var accountKey = accountId.ToString("N");
+                    var updatedParams = new Dictionary<string, string>()
+                    {
+                        { AccountKeyParameterName, accountKey }
+                    };
+                    return onSuccess(updatedParams);
                 },
                 (errorMessage) => onInvalidCredentials(errorMessage),
                 (errorMessage) => onInvalidCredentials(errorMessage),
@@ -50,14 +58,23 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 onUnspecifiedConfiguration).AsTask();
         }
 
-        public Task<TResult> UserParametersAsync<TResult>(Guid actorId, System.Security.Claims.Claim[] claims, IDictionary<string, string> extraParams, Func<IDictionary<string, string>, IDictionary<string, Type>, IDictionary<string, string>, TResult> onSuccess)
+        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
+            Func<string, TResult> onFailure)
         {
-            throw new NotImplementedException();
-        }
+            if (!responseParams.TryGetValue(AccountKeyParameterName, out string accountKey))
+                return onFailure($"{AccountKeyParameterName} is missing");
+            var state = GetState();
+            return onSuccess(accountKey, state);
 
-        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams, Func<string, Guid?, Guid?, TResult> onSuccess, Func<string, TResult> onFailure)
-        {
-            throw new NotImplementedException();
+            IRefOptional<Authorization> GetState()
+            {
+                if (!responseParams.TryGetValue(StateParameterName, out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
+            }
         }
     }
 }

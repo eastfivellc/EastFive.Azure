@@ -123,35 +123,64 @@ namespace EastFive.Azure.Auth.CredentialProviders
         #endregion
 
         #region IProvideAuthorization
-        
+
+        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            var stateId = GetState();
+            return Web.Configuration.Settings.GetString(
+                    AppSettings.AzureADB2C.LoginIdClaimType,
+                (claimType) =>
+                {
+                    var authClaims = responseParams
+                        .Where(claim => claim.Key.CompareTo(claimType) == 0)
+                        .ToArray();
+
+                    if (authClaims.Length == 0)
+                        return onFailure($"Token does not contain claim for [{claimType}] which is necessary to operate with this system");
+
+                    string subject = authClaims[0].Value;
+                    //var authId = default(Guid?);
+                    //if (Guid.TryParse(subject, out Guid authIdGuid))
+                    //    authId = authIdGuid;
+
+                    return onSuccess(subject, stateId);
+                },
+                onFailure);
+
+            IRefOptional<Authorization> GetState()
+            {
+                if (!responseParams.TryGetValue(AzureADB2CProvider.StateKey, out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
+            }
+        }
+
         public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> extraParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            if (!extraParams.ContainsKey(AzureADB2CProvider.StateKey))
-                return onFailure($"{AzureADB2CProvider.StateKey} not in auth response");
-            var stateParam = extraParams[AzureADB2CProvider.StateKey];
-            if (!Guid.TryParse(stateParam, out Guid stateId))
-                return onFailure($"Invalid state parameter [{stateParam}] is not a GUID");
-
             if (!extraParams.ContainsKey(AzureADB2CProvider.IdTokenKey))
-                return onUnauthenticated(stateId, extraParams);
+                return onUnauthenticated(default, extraParams);
             var token = extraParams[AzureADB2CProvider.IdTokenKey];
 
             return await this.ValidateToken(token,
                 (claims) =>
                 {
                     return Web.Configuration.Settings.GetString(
-                            EastFive.Security.SessionServer.Configuration.AppSettings.LoginIdClaimType,
+                            AppSettings.AzureADB2C.LoginIdClaimType,
                         (claimType) =>
                         {
                             var authClaims = claims.Claims
-                                        .Where(claim => claim.Type.CompareTo(claimType) == 0)
-                                        .ToArray();
+                                .Where(claim => claim.Type.CompareTo(claimType) == 0)
+                                .ToArray();
                             if (authClaims.Length == 0)
                                 return onFailure($"Token does not contain claim for [{claimType}] which is necessary to operate with this system");
 
@@ -161,7 +190,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                 authId = authIdGuid;
 
                             // TODO: Populate extraParams from claims
-                            return onSuccess(subject, stateId, authId, 
+                            return onSuccess(// subject, stateId, //authId, 
                                 extraParams
                                     .Concat(
                                         claims.Claims.Select(claim => claim.Type.PairWithValue(claim.Value)))
@@ -189,38 +218,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
             {
                 return onFailed(ex.Message);
             }
-        }
-
-
-        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, TResult> onSuccess, 
-            Func<string, TResult> onFailure)
-        {
-            if (!responseParams.ContainsKey(AzureADB2CProvider.StateKey))
-                return onFailure($"{AzureADB2CProvider.StateKey} not in auth response");
-            var stateParam = responseParams[AzureADB2CProvider.StateKey];
-            if (!Guid.TryParse(stateParam, out Guid stateId))
-                return onFailure($"Invalid state parameter [{stateParam}] is not a GUID");
-
-            return Web.Configuration.Settings.GetString(
-                    EastFive.Security.SessionServer.Configuration.AppSettings.LoginIdClaimType,
-                (claimType) =>
-                {
-                    var authClaims = responseParams
-                        .Where(claim => claim.Key.CompareTo(claimType) == 0)
-                        .ToArray();
-
-                    if (authClaims.Length == 0)
-                        return onFailure($"Token does not contain claim for [{claimType}] which is necessary to operate with this system");
-
-                    string subject = authClaims[0].Value;
-                    var authId = default(Guid?);
-                    if (Guid.TryParse(subject, out Guid authIdGuid))
-                        authId = authIdGuid;
-
-                    return onSuccess(subject, stateId, authId);
-                },
-                onFailure);
         }
 
         #endregion

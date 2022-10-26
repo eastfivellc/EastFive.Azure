@@ -46,43 +46,36 @@ namespace EastFive.Azure.Auth.CredentialProviders
             return default(Uri);
         }
 
-        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            if (!responseParams.ContainsKey(AdminLoginRedirection.idKey))
-                return onFailure("ID not found");
-            var userKey = responseParams[AdminLoginRedirection.idKey];
-            
-            var stateId = responseParams.ContainsKey(AdminLoginRedirection.stateKey)?
-                Guid.Parse(responseParams[AdminLoginRedirection.stateKey])
-                :
-                default(Guid?);
-
-            return onSuccess(userKey, stateId, default(Guid?));
-        }
-
         public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess, 
+            Func<IDictionary<string, string>, TResult> onSuccess, 
             Func<Guid?, IDictionary<string, string>, TResult> onNotAuthenticated, 
             Func<string, TResult> onInvalidToken, 
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onUnspecifiedConfiguration, 
             Func<string, TResult> onFailure)
         {
-            if (!responseParams.ContainsKey(AdminLoginRedirection.idKey))
-                return onFailure("ID not found");
-            if (!responseParams.ContainsKey(AdminLoginRedirection.tokenKey))
+            if (!responseParams.TryGetValue(AdminLoginRedirection.tokenKey, out string token))
                 return onFailure("Token not found");
-            var userKey = responseParams[AdminLoginRedirection.idKey];
-            var token = responseParams[AdminLoginRedirection.tokenKey];
 
-            var stateId = responseParams.ContainsKey(AdminLoginRedirection.stateKey) ?
-                Guid.Parse(responseParams[AdminLoginRedirection.stateKey])
+            // TODO: Validate token
+            throw new NotImplementedException();
+
+            return await onSuccess(responseParams).AsTask();
+        }
+
+        public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            if (!responseParams.TryGetValue(AdminLoginRedirection.idKey, out string userKey))
+                return onFailure("ID not found");
+
+            var stateId = responseParams.TryGetValue(AdminLoginRedirection.stateKey, out string stateKey) ?
+                Guid.Parse(stateKey).AsRefOptional<Authorization>()
                 :
-                default(Guid?);
+                RefOptional<Authorization>.Empty();
 
-            return await onSuccess(userKey, stateId, default(Guid?), responseParams).AsTask();
+            return onSuccess(userKey, stateId);
         }
 
         public Task<TResult> UserParametersAsync<TResult>(Guid actorId, 

@@ -45,7 +45,7 @@ namespace EastFive.Azure.Auth
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
 
         private const string appleAuthServerUrl = "https://appleid.apple.com/auth/authorize";
-        private const string appleSubjectClaimKey = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+        private const string appleSubjectClaimKey = System.Security.Claims.ClaimTypes.NameIdentifier; // "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
 
         #region Request pararmeters
         private const string requestParamClientId = "client_id";
@@ -86,7 +86,7 @@ namespace EastFive.Azure.Auth
         public Type CallbackController => typeof(AppleRedirect);
 
         public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -102,14 +102,6 @@ namespace EastFive.Azure.Auth
                     idTokenJwt, issuer, validAudiences,
                 (subject, jwtToken, principal) =>
                 {
-                    var state = responseParams.TryGetValue(responseParamState, out string stateStr) ?
-                        Guid.TryParse(stateStr, out Guid stateParsedGuid) ?
-                            stateParsedGuid
-                            :
-                            default(Guid?)
-                        :
-                        default(Guid?);
-
                     var extraParamsWithClaimValues = principal
                         .Claims
                         .Select(claim => claim.Type.PairWithValue(claim.Value))
@@ -117,27 +109,20 @@ namespace EastFive.Azure.Auth
                         .Distinct(kvp => kvp.Key)
                         .ToDictionary();
 
-                    return onSuccess(subject, state, default(Guid?), extraParamsWithClaimValues);
+                    return onSuccess(extraParamsWithClaimValues);
                 },
                 onFailure).AsTask();
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,
-            Func<string, Guid?, Guid?, TResult> onSuccess,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
             return GetSubject(
                 subject =>
                 {
-                    var state = responseParams.ContainsKey(responseParamState) ?
-                           Guid.TryParse(responseParams[responseParamState], out Guid stateParsedGuid) ?
-                               stateParsedGuid
-                               :
-                               default(Guid?)
-                           :
-                           default(Guid?);
-
-                    return onSuccess(subject, state, default(Guid?));
+                    var state = GetState();
+                    return onSuccess(subject, state);
                 });
 
             TResult GetSubject(Func<string, TResult> callback)
@@ -161,6 +146,15 @@ namespace EastFive.Azure.Auth
                 }
 
                 return onFailure($"Could not locate {appleSubjectClaimKey} in params or claims.");
+            }
+
+            IRefOptional<Authorization> GetState()
+            {
+                if (!responseParams.TryGetValue(responseParamState, out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
             }
         }
 
