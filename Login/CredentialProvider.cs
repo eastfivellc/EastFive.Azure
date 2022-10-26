@@ -60,7 +60,7 @@ namespace EastFive.Azure.Login
         #region IProvideAuthorization
 
         public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokenParameters,
-            Func<string, Guid?, Guid?, IDictionary<string, string>, TResult> onSuccess,
+            Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
             Func<string, TResult> onCouldNotConnect,
@@ -75,24 +75,9 @@ namespace EastFive.Azure.Login
                 return onInvalidCredentials($"Parameter with name [{CredentialProvider.stateKey}] was not provided");
             var stateLookup = tokenParameters[CredentialProvider.stateKey];
 
-            //if (!tokenParameters.ContainsKey(CredentialProvider.referrerKey))
-            //    return onInvalidCredentials($"Parameter with name [{CredentialProvider.referrerKey}] was not provided");
-            //var referrerString = tokenParameters[CredentialProvider.referrerKey];
-
-            //if (!Uri.TryCreate(referrerString, UriKind.Absolute, out Uri referrer))
-            //    return onInvalidCredentials($"Referrer:`{referrerString}` is not a valid absolute url.");
-
             try
             {
-                //using (var client = new HttpClient())
-                //{
-                    //var validationUrl = new Uri(referrer, $"/api/Authentication/{stateLookup}");
-                    //client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                    //var result = await client.GetAsync(validationUrl);
-                    //var authenticationContent = await result.Content.ReadAsStringAsync();
-                    //var authentication = Newtonsoft.Json.JsonConvert.DeserializeObject<Authentication>(authenticationContent);
-
-                    return await Guid.Parse(stateLookup).AsRef<Authentication>().StorageGetAsync(
+                return await Guid.Parse(stateLookup).AsRef<Authentication>().StorageGetAsync(
                         authentication =>
                         {
                             var subject = authentication.userIdentification;
@@ -108,13 +93,12 @@ namespace EastFive.Azure.Login
                             if (!authentication.authenticated.HasValue)
                                 return onUnauthenticated(default(Guid?), extraParams);
 
-                            return onSuccess(subject, state, default(Guid?), extraParams);
+                            return onSuccess(extraParams);
                         },
                         () =>
                         {
                             return onInvalidCredentials($"`stateLookup` is not a valid {typeof(Authentication).FullName}");
                         });
-                //}
             }
             catch (Exception ex)
             {
@@ -123,19 +107,24 @@ namespace EastFive.Azure.Login
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> tokenParameters,
-            Func<string, Guid?, Guid?, TResult> onSuccess,
+            Func<string, IRefOptional<Authorization>, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-            if (!tokenParameters.ContainsKey(CredentialProvider.accountIdKey))
+            if (!tokenParameters.TryGetValue(CredentialProvider.accountIdKey, out string subject))
                 return onFailure($"Parameter with name [{CredentialProvider.accountIdKey}] was not provided");
-            var subject = tokenParameters[CredentialProvider.accountIdKey];
 
-            var state = default(Guid?);
-            if (tokenParameters.ContainsKey(CredentialProvider.stateKey))
-                if (Guid.TryParse(tokenParameters[CredentialProvider.stateKey], out Guid parsedState))
-                    state = parsedState;
+            var state = GetState();
 
-            return onSuccess(subject, state, default(Guid?));
+            return onSuccess(subject, state);
+
+            IRefOptional<Authorization> GetState()
+            {
+                if (!tokenParameters.TryGetValue(CredentialProvider.stateKey, out string stateValue))
+                    return RefOptional<Authorization>.Empty();
+
+                RefOptional<Authorization>.TryParse(stateValue, out IRefOptional<Authorization> stateId);
+                return stateId;
+            }
         }
 
         #endregion
