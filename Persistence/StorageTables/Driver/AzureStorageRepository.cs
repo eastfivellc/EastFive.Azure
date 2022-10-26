@@ -1245,44 +1245,44 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             };
         }
 
-        public IEnumerableAsync<TData> FindAllByPartition<TData>(string partitionKeyValue)
-            where TData : class, ITableEntity, new()
-        {
-            string filter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKeyValue);
+        //public IEnumerableAsync<TData> FindAllByPartition<TData>(string partitionKeyValue)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    string filter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKeyValue);
 
-            var tableQuery = new TableQuery<TData>().Where(filter);
-            return FindAllAsync(tableQuery);
-        }
+        //    var tableQuery = new TableQuery<TData>().Where(filter);
+        //    return FindAllAsync(tableQuery);
+        //}
 
-        public async Task<IEnumerable<TData>> FindAllByPartitionAsync<TData>(string partitionKeyValue)
-            where TData : class, ITableEntity, new()
-        {
-            string filter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKeyValue);
+        //public async Task<IEnumerable<TData>> FindAllByPartitionAsync<TData>(string partitionKeyValue)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    string filter = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKeyValue);
 
-            var tableQuery =
-                   new TableQuery<TData>().Where(filter);
+        //    var tableQuery =
+        //           new TableQuery<TData>().Where(filter);
 
-            //Execute the query
-            var table = GetTable<TData>();
-            try
-            {
-                IEnumerable<List<TData>> lists = new List<TData>[] { };
-                TableContinuationToken token = null;
-                do
-                {
-                    var segment = await table.ExecuteQuerySegmentedAsync(tableQuery, token);
-                    token = segment.ContinuationToken;
-                    lists = lists.Append(segment.Results);
-                } while (token != null);
-                return lists.SelectMany();
-            }
-            catch (StorageException se)
-            {
-                if (se.IsProblemDoesNotExist() || se.IsProblemTableDoesNotExist())
-                    return new TData[] { };
-                throw;
-            };
-        }
+        //    //Execute the query
+        //    var table = GetTable<TData>();
+        //    try
+        //    {
+        //        IEnumerable<List<TData>> lists = new List<TData>[] { };
+        //        TableContinuationToken token = null;
+        //        do
+        //        {
+        //            var segment = await table.ExecuteQuerySegmentedAsync(tableQuery, token);
+        //            token = segment.ContinuationToken;
+        //            lists = lists.Append(segment.Results);
+        //        } while (token != null);
+        //        return lists.SelectMany();
+        //    }
+        //    catch (StorageException se)
+        //    {
+        //        if (se.IsProblemDoesNotExist() || se.IsProblemTableDoesNotExist())
+        //            return new TData[] { };
+        //        throw;
+        //    };
+        //}
 
         #endregion
 

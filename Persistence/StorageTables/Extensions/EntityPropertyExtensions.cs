@@ -426,6 +426,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             #region Basic values
 
+            #region Core types
+
             if (typeof(Guid) == type)
             {
                 if (value.PropertyType == EdmType.Guid)
@@ -544,19 +546,16 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return onBound(boolValue);
             }
 
+            #endregion
+
             #region refs
 
-            object IRefInstance(Guid guidValue)
-            {
-                var resourceType = type.GenericTypeArguments.First();
-                return EntityPropertyExtensions.IRefInstance(guidValue, resourceType);
-            }
 
             if (type.IsSubClassOfGeneric(typeof(IRef<>)))
             {
                 if (TryGetGuidValue(out Guid guidValue))
                 {
-                    var instance = IRefInstance(guidValue);
+                    var instance = guidValue.BindToRef(type.GenericTypeArguments.First());
                     return onBound(instance);
                 }
 
@@ -601,7 +600,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return onBound(refOpt);
                 }
                 var guidValue = guidValueMaybe.Value;
-                var refValue = IRefInstance(guidValue);
+                var refValue = guidValue.BindToRef(type.GenericTypeArguments.First());
                 var instance = Activator.CreateInstance(instantiatableType, new object[] { refValue });
                 return onBound(instance);
             }
@@ -1344,13 +1343,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                     
                 });
 
-        }
-
-        private static object IRefInstance(Guid guidValue, Type type)
-        {
-            var instantiatableType = typeof(EastFive.Ref<>).MakeGenericType(type);
-            var instance = Activator.CreateInstance(instantiatableType, new object[] { guidValue });
-            return instance;
         }
 
     }

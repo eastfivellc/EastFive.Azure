@@ -31,6 +31,7 @@ using EastFive.Serialization;
 
 using BlackBarLabs.Persistence.Azure;
 using EastFive.Api;
+using System.Collections;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -1001,6 +1002,49 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     }
                 },
                 cancellationToken: cancellationToken);
+        }
+
+        public static async Task<(object, string)> FindQuerySegmentAsync<TEntity>(
+            TableQuery<TEntity> query,
+            CloudTable table,
+            string lastTokenString)
+            where TEntity : ITableEntity, new()
+        {
+            var lastToken = lastTokenString.HasBlackSpace()?
+                JsonConvert.DeserializeObject<TableContinuationToken>(lastTokenString)
+                :
+                default(TableContinuationToken);
+            try
+            {
+                var segment = await table.ExecuteQuerySegmentedAsync(query, lastToken);
+                if (segment.IsDefaultOrNull())
+                    return default;
+
+                var token = segment.ContinuationToken;
+                var tokenString = GetToken();
+
+                var results = segment.Results
+                    .ToArray();
+                return (results, tokenString);
+
+                string GetToken()
+                {
+                    if (token.IsDefaultOrNull())
+                        return default;
+                    return JsonConvert.SerializeObject(token);
+                }
+            }
+            catch (AggregateException)
+            {
+                throw;
+            }
+            catch (StorageException)
+            {
+                if (!await table.ExistsAsync())
+                    return (new TEntity[] { }, default(string));
+                
+                throw;
+            }
         }
 
         #endregion
@@ -2270,7 +2314,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             //    cancellationToken: cancellationToken);
 
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
-                .GetMethod("FindAllSegmented", BindingFlags.Static | BindingFlags.Public)
+                .GetMethod(nameof(FindAllSegmented), BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
                 .Invoke(null, new object[] { query, token, table, numberOfTimesToRetry, cancellationToken });
             var findAllCasted = findAllIntermediate as IEnumerableAsync<(ITableEntity, string)>;
@@ -2307,12 +2351,48 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             var tableQuery = TableQueryExtensions.GetTableQuery<TEntity>(filter);
             var tableEntityTypes = tableQuery.GetType().GetGenericArguments();
             var findAllIntermediate = typeof(AzureTableDriverDynamic)
-                .GetMethod("FindAllInternal", BindingFlags.Static | BindingFlags.Public)
+                .GetMethod(nameof(FindAllInternal), BindingFlags.Static | BindingFlags.Public)
                 .MakeGenericMethod(tableEntityTypes)
                 .Invoke(null, new object[] { tableQuery, table, numberOfTimesToRetry, cancellationToken });
             var findAllCasted = findAllIntermediate as IEnumerableAsync<IWrapTableEntity<TEntity>>;
             return findAllCasted
                 .Select(segResult => segResult.Entity);
+        }
+
+        public async Task<(TEntity[], string)> FindSegmentAsync<TEntity>(string filter, string lastTokenString,
+            string tableName = default,
+            int numberOfTimesToRetry = DefaultNumberOfTimesToRetry,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            var table = tableName.HasBlackSpace() ?
+                this.TableClient.GetTableReference(tableName)
+                :
+                GetTable<TEntity>();
+            var tableQuery = TableQueryExtensions.GetTableQuery<TEntity>(filter);
+            var tableEntityTypes = tableQuery.GetType().GetGenericArguments();
+            var findAllIntermediateTaskObjObj = typeof(AzureTableDriverDynamic)
+                .GetMethod(nameof(FindQuerySegmentAsync), BindingFlags.Static | BindingFlags.Public)
+                .MakeGenericMethod(tableEntityTypes)
+                .Invoke(null, new object[] { tableQuery, table, lastTokenString });
+            var findAllIntermediateTaskObj = findAllIntermediateTaskObjObj.CastAsTaskObjectAsync(out Type resultType);
+            var findAllIntermediateObj = await findAllIntermediateTaskObj;
+            // var findAllIntermediateTask = findAllIntermediateTaskObj.CastTask<(IWrapTableEntity<TEntity>[], string)>();
+            var (findAllCastedObj, nextToken) = ((object, string))findAllIntermediateObj;
+            var findAllCastedIEnumerable = (IEnumerable)findAllCastedObj;
+            var findAllCasted = GetCasted();
+            var entities = findAllCasted
+                .Select(segResult => segResult.Entity)
+                .ToArray();
+            return (entities, nextToken);
+
+            IEnumerable<IWrapTableEntity<TEntity>> GetCasted()
+            {
+                foreach (var i in findAllCastedIEnumerable)
+                {
+                    var cast = (IWrapTableEntity<TEntity>)i;
+                    yield return cast;
+                }
+            }
         }
 
         #endregion

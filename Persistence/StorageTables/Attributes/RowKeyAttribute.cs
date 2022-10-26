@@ -14,6 +14,11 @@ namespace EastFive.Persistence.Azure.StorageTables
     public class RowKeyAttribute : Attribute,
         IModifyAzureStorageTableRowKey, IComputeAzureStorageTableRowKey, IGenerateAzureStorageTableRowKeyIndex
     {
+        public bool StoresFullValue
+        {
+            get; set;
+        } = true;
+
         public virtual string ComputeRowKey(object memberValue, MemberInfo memberInfo)
         {
             if (memberValue.IsDefaultOrNull())
@@ -39,7 +44,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(string).IsAssignableFrom(propertyValueType))
             {
                 var stringValue = (string)memberValue;
-                return stringValue;
+                var rowKeyValidatedString = stringValue.AsAzureStorageTablesSafeKey();
+                return rowKeyValidatedString;
             }
             var message = $"`{this.GetType().FullName}` Cannot determine row key from type `{propertyValueType.FullName}` on `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}`";
             throw new NotImplementedException(message);
@@ -78,6 +84,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         EntityType IModifyAzureStorageTableRowKey.ParseRowKey<EntityType>(EntityType entity, string value, MemberInfo memberInfo)
         {
+            if (!StoresFullValue)
+                return entity;
+
             var memberType = memberInfo.GetMemberType();
             if (typeof(Guid).IsAssignableFrom(memberType))
             {

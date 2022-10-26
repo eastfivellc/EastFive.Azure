@@ -90,6 +90,41 @@ namespace EastFive.Persistence.Azure.StorageTables
                 });
         }
 
+        internal static object ParseKey(Type thisType, Type propertyValueType, string keyValue)
+        {
+            if (typeof(Guid).IsAssignableFrom(propertyValueType))
+            {
+                var guidValue = Guid.Parse(keyValue);
+                return guidValue;
+            }
+
+            if (propertyValueType.IsSubClassOfGeneric(typeof(IRef<>)))
+            {
+                var guidValue = Guid.Parse(keyValue);
+                return guidValue.BindToRefType(propertyValueType);
+            }
+
+            if (propertyValueType.IsSubClassOfGeneric(typeof(IRefOptional<>)))
+            {
+                if(Guid.TryParse(keyValue, out Guid guidValue))
+                    return guidValue.AsOptional().BindToRefOptionalType(propertyValueType);
+
+                return default(Guid?).BindToRefOptionalType(propertyValueType);
+            }
+
+            return propertyValueType.IsNullable(
+                nullableBase =>
+                {
+                    return ParseKey(thisType, nullableBase, keyValue);
+                },
+                () =>
+                {
+                    var exMsg = $"{thisType.Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                        $"Please override GetRowKeys on `{thisType.FullName}`.";
+                    throw new NotImplementedException(exMsg);
+                });
+        }
+
         public abstract string GetPartitionKey(string rowKey);
     }
 

@@ -24,12 +24,17 @@ using EastFive.Persistence;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
     public static class StorageExtensions
     {
+        #region Built-in properties
+
         #region Row / Partition keys
+
+        #region Row
 
         public static string StorageComputeRowKey<TRowKey, TEntity>(this TRowKey rowKey,
                 Func<EastFive.Persistence.IComputeAzureStorageTableRowKey> onMissing = default)
@@ -203,6 +208,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .First();
             return rowKeyMember.Value.ParseRowKey(entity, rowKey, rowKeyMember.Key);
         }
+
+        #endregion
+
+        #region Partition
 
         public static string StorageComputePartitionKey<TEntity>(this IRef<TEntity> entityRef,
                 Func<EastFive.Persistence.IComputeAzureStorageTablePartitionKey> onMissing = default)
@@ -406,6 +415,10 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return partitionKeyMember.GeneratePartitionKeys(type, skip: skip, top: top);
         }
 
+        #endregion
+
+        #endregion
+
         #region ETAG
 
         public static string StorageGetETag<TEntity>(this TEntity entity)
@@ -458,11 +471,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region
 
-
-
         #endregion
 
         #region QUERY / GET
+
+        public static IQueryable<TEntity> CreateQuery<TProperty, TEntity>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> memberExpression)
+            where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var filteredQuery = query.StorageQueryByProperty(propertyValue, memberExpression: memberExpression);
+            return filteredQuery;
+        }
 
         public static IEnumerableAsync<object> StorageGetAll(this Type type, string tableName = default)
         {
@@ -1191,6 +1212,36 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
             var rowKey = queryFull.StorageComputeRowKey();
             var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+            return await storageDriver
+                .UpdateAsync<TEntity, TResult>(rowKey, partitionKey,
+                    onUpdate:
+                        (entity, callback) =>
+                        {
+                            return onUpdate(entity,
+                                async (entityToSave) =>
+                                {
+                                    var tr = await callback(entityToSave);
+                                    return new StorageUpdateTableResult(tr);
+                                });
+                        },
+                    onNotFound: onDoesNotExists,
+                    onModificationFailures: onModificationFailures,
+                    onFailure: onFailure);
+        }
+
+        public static async Task<TResult> StorageUpdateAsync<TRowKey, TPartitionKey, TEntity, TResult>(this TRowKey rowKeyValue,
+                TPartitionKey partitionKeyValue,
+            Func<TEntity, Func<TEntity, Task<IUpdateTableResult>>, Task<TResult>> onUpdate,
+            Func<TResult> onDoesNotExists = default,
+            Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+            where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+
+            var rowKey = rowKeyValue.StorageComputeRowKey<TRowKey, TEntity>();
+            var partitionKey = partitionKeyValue.StorageComputePartitionKey<TPartitionKey, TEntity>(rowKey);
             return await storageDriver
                 .UpdateAsync<TEntity, TResult>(rowKey, partitionKey,
                     onUpdate:
