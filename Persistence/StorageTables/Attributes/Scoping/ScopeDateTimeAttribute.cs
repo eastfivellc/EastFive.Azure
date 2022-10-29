@@ -10,15 +10,15 @@ using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
-    public enum TimeSpanUnits
-    {
-        minutes,
-        hours,
-        days,
-        weeks,
-        months,
-        years,
-    }
+    //public enum TimeSpanUnits
+    //{
+    //    minutes,
+    //    hours,
+    //    days,
+    //    weeks,
+    //    months,
+    //    years,
+    //}
 
     public class ScopeDateTimeAttribute : Attribute, IScopeKeys
     {
