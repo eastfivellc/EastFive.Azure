@@ -547,23 +547,15 @@ namespace EastFive.Api.Azure.Monitoring
             }
         }
 
-        async Task<Body> GetPostmanBodyAsync()
+        Task<Body> GetPostmanBodyAsync()
         {
-            return await await this.body.LoadBytesAsync(
-                (id, data, mediaType, contentDisposition) =>
-                {
-                    return new Body
-                    {
-                        mode = "raw",
-                        raw = data.GetString(System.Text.Encoding.UTF8),
-                    }.AsTask();
-                },
+            return GetRawBody(
                 onNotFound: async () =>
                 {
-                     var formDataBody = new Body()
-                     {
-                         mode = "formdata",
-                     };
+                    var formDataBody = new Body()
+                    {
+                        mode = "formdata",
+                    };
 
                     var postFormData = this.formData
                         .Where(fd => fd.contents.IsSingle())
@@ -609,6 +601,26 @@ namespace EastFive.Api.Azure.Monitoring
 
                     return formDataBody;
                 });
+
+            async Task<Body> GetRawBody(
+                Func<Task<Body>> onNotFound)
+            {
+                if (this.body.IsDefaultOrNull())
+                    return await onNotFound();
+                return await await this.body.LoadBytesAsync(
+                    (id, data, mediaType, contentDisposition) =>
+                    {
+                        return new Body
+                        {
+                            mode = "raw",
+                            raw = data.GetString(System.Text.Encoding.UTF8),
+                        }.AsTask();
+                    },
+                    onNotFound: () =>
+                    {
+                        return onNotFound();
+                    });
+            }
         }
     }
 }
