@@ -339,8 +339,9 @@ namespace EastFive.Azure.Auth
         public async static Task<IHttpResponse> UpdateAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = LocationLogoutReturnPropertyName)]Uri locationLogoutReturn,
-                EastFive.Azure.Auth.SessionToken? securityMaybe,
+                EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
             NoContentResponse onUpdated,
+            GeneralConflictResponse onInvalidAuthorization,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
         {
@@ -349,10 +350,15 @@ namespace EastFive.Azure.Auth
                 {
                     if (authorization.deleted.HasValue)
                         return onNotFound();
+
                     if (authorization.authorized)
                     {
                         authorization.LocationAuthentication = default(Uri);
-                        if (!securityMaybe.HasValue)
+                        if (!securityMaybe.sessionId.HasValue)
+                            return onUnauthorized();
+                        if (!authorization.accountIdMaybe.HasValue)
+                            return onInvalidAuthorization("Authorization is not tied to an account.");
+                        if (securityMaybe.accountIdMaybe.Value != authorization.accountIdMaybe.Value)
                             return onUnauthorized();
                     }
                     authorization.LocationLogoutReturn = locationLogoutReturn;
