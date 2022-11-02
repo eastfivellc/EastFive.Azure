@@ -26,8 +26,6 @@ using EastFive.Serialization;
 using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
 using EastFive.Net;
-using EastFive.Security.CredentialProvider;
-using EastFive.Security.SessionServer;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Services;

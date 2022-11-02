@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 
 using EastFive.Api;
 using EastFive.Azure.Auth;
-using EastFive.Security.SessionServer;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {

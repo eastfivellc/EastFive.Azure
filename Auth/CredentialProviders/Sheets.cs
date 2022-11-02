@@ -14,7 +14,6 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using System.IO;
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
 
 namespace EastFive.Azure.Auth.CredentialProviders

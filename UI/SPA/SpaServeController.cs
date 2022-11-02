@@ -3,11 +3,12 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using System.Net.Http;
 using System.Net;
-using HtmlAgilityPack;
 using System.IO;
 using System.Collections.Generic;
-using EastFive.Security.SessionServer.Exceptions;
 using System.Linq;
+
+using HtmlAgilityPack;
+
 using EastFive.Extensions;
 using EastFive.Api.Azure.Modules;
 using EastFive.Api;

@@ -8,9 +8,7 @@ using System.Threading.Tasks;
 
 using Newtonsoft.Json;
 
-using EastFive.Security.SessionServer.Persistence;
 using EastFive.Api.Services;
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
 using EastFive.Azure.Auth;

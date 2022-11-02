@@ -12,7 +12,6 @@ using EastFive.Api;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq;
-using EastFive.Security.SessionServer;
 using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth.Instigations

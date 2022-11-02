@@ -89,8 +89,6 @@ namespace EastFive.Api.Azure
 
             Telemetry = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
 
-            //this.AddInstigator(typeof(EastFive.Security.SessionServer.Context),
-            //    (httpApp, request, parameterInfo, onCreatedSessionContext) => onCreatedSessionContext(this.AzureContext));
             this.AddInstigator(typeof(EastFive.Azure.Functions.InvokeFunction),
                 (httpApp, request, parameterInfo, onCreated) =>
                 {

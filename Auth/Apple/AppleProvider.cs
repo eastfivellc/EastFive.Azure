@@ -20,7 +20,6 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 
 using EastFive;
-using EastFive.Security.CredentialProvider;
 using EastFive.Api.Services;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;

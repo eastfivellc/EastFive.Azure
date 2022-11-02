@@ -122,8 +122,6 @@ namespace EastFive.Azure
             public const string AdminApiKey = "EastFive.Azure.Search.SearchServiceAdminApiKey";
         }
 
-        //public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
-
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
         public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
 

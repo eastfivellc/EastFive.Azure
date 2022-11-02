@@ -10,7 +10,6 @@ using Newtonsoft.Json;
 using EastFive;
 using EastFive.Extensions;
 using EastFive.Reflection;
-using EastFive.Security.SessionServer.Exceptions;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables;
@@ -424,19 +423,19 @@ namespace EastFive.Azure.Auth
                 (paramName, why) =>
                 {
                     var message = $"Invalid parameter while completing login: {paramName} - {why}";
-                    telemetry.TrackException(new ResponseException(message));
+                    telemetry.TrackException(new Exception(message));
                     return onBadResponse(message);
                 },
                 () =>
                 {
                     var message = $"Invalid account while completing login";
-                    telemetry.TrackException(new ResponseException(message));
+                    telemetry.TrackException(new Exception(message));
                     return onBadResponse(message);
                 },
                 (why) =>
                 {
                     var message = $"General failure while completing login: {why}";
-                    telemetry.TrackException(new ResponseException(message));
+                    telemetry.TrackException(new Exception(message));
                     return onBadResponse(message);
                 });
         }
@@ -466,55 +465,55 @@ namespace EastFive.Azure.Auth
         //        });
         //}
 
-        public static async Task<TResult> MapAccountAsync<TResult>(Authorization authorization,
-            Guid internalAccountId, string externalAccountKey,
-            IInvokeApplication endpoints,
-            Uri baseUri,
-            AzureApplication application, IHttpRequest request,
-            Func<Uri, TResult> onRedirect,
-            Func<string, TResult> onFailure,
-            TelemetryClient telemetry)
-        {
-            // applies when intercept process is used
-            if (authorization.accountIdMaybe.IsDefault())
-            {
-                authorization = await authorization.authorizationRef.StorageUpdateAsync(
-                    async (a, saveAsync) =>
-                    {
-                        a.accountIdMaybe = internalAccountId;
-                        await saveAsync(a);
-                        return a;
-                    });
-            }
+        //public static async Task<TResult> MapAccountAsync<TResult>(Authorization authorization,
+        //    Guid internalAccountId, string externalAccountKey,
+        //    IInvokeApplication endpoints,
+        //    Uri baseUri,
+        //    AzureApplication application, IHttpRequest request,
+        //    Func<Uri, TResult> onRedirect,
+        //    Func<string, TResult> onFailure,
+        //    TelemetryClient telemetry)
+        //{
+        //    // applies when intercept process is used
+        //    if (authorization.accountIdMaybe.IsDefault())
+        //    {
+        //        authorization = await authorization.authorizationRef.StorageUpdateAsync(
+        //            async (a, saveAsync) =>
+        //            {
+        //                a.accountIdMaybe = internalAccountId;
+        //                await saveAsync(a);
+        //                return a;
+        //            });
+        //    }
 
-            return await await AccountMapping.CreateByMethodAndKeyAsync(authorization, externalAccountKey,
-                internalAccountId,
-                ProcessAsync,
-                ProcessAsync);
+        //    return await await AccountMapping.CreateByMethodAndKeyAsync(authorization, externalAccountKey,
+        //        internalAccountId,
+        //        ProcessAsync,
+        //        ProcessAsync);
 
-            async Task<TResult> ProcessAsync()
-            {
-                return await await Method.ById(authorization.Method, application,
-                        async method =>
-                        {
-                            return await await method.GetLoginProviderAsync(application,
-                                (loginProviderMethodName, loginProvider) =>
-                                {
-                                    return CreateLoginResponseAsync(
-                                           internalAccountId, authorization.parameters,
-                                           method, authorization,
-                                           application, request, endpoints, baseUri, loginProvider,
-                                       (url, modifier) => onRedirect(url),
-                                       onFailure,
-                                        telemetry);
-                                },
-                                () =>
-                                {
-                                    return onFailure("Login provider is no longer supported by the system").AsTask();
-                                });
-                        },
-                        () => onFailure("Method no longer suppored.").AsTask());
-            }
-        }
+        //    async Task<TResult> ProcessAsync()
+        //    {
+        //        return await await Method.ById(authorization.Method, application,
+        //                async method =>
+        //                {
+        //                    return await await method.GetLoginProviderAsync(application,
+        //                        (loginProviderMethodName, loginProvider) =>
+        //                        {
+        //                            return CreateLoginResponseAsync(
+        //                                   internalAccountId, authorization.parameters,
+        //                                   method, authorization,
+        //                                   application, request, endpoints, baseUri, loginProvider,
+        //                               (url, modifier) => onRedirect(url),
+        //                               onFailure,
+        //                                telemetry);
+        //                        },
+        //                        () =>
+        //                        {
+        //                            return onFailure("Login provider is no longer supported by the system").AsTask();
+        //                        });
+        //                },
+        //                () => onFailure("Method no longer suppored.").AsTask());
+        //    }
+        //}
     }
 }

@@ -18,8 +18,6 @@ using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
-using EastFive.Security.SessionServer;
-using EastFive.Security.SessionServer.Exceptions;
 using Microsoft.ApplicationInsights;
 using Newtonsoft.Json;
 
