@@ -106,6 +106,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                     memberInfo.SetValue(ref entity, refValue);
                     return entity;
                 }
+
+                // don't want to throw an exception for bad data, just don't use the bad data.
+                return entity;
             }
             if (memberType.IsAssignableFrom(typeof(string)))
             {
