@@ -83,10 +83,10 @@ namespace EastFive.Api.Azure.Resources
                 //Resource = httpApplication.GetResourceLink(process.resourceType, process.resourceId, urlHelper),
                 CreatedOn = process.createdOn,
 
-                ConfirmedBy = process.confirmedBy.HasValue ?
-                    EastFive.Security.SessionServer.Library.configurationManager.GetActorLink(process.confirmedBy.Value, urlHelper)
-                    :
-                    default(WebId),
+                //ConfirmedBy = process.confirmedBy.HasValue ?
+                //    EastFive.Security.SessionServer.Library.configurationManager.GetActorLink(process.confirmedBy.Value, urlHelper)
+                //    :
+                //    default(WebId),
                 ConfirmedWhen = process.confirmedWhen,
                 Previous = urlHelper.GetWebId<ProcessStep>(process.previousStep),
                 //Resources = process.resources

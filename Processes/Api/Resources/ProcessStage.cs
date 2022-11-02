@@ -126,28 +126,28 @@ namespace EastFive.Api.Azure.Resources
             return new Resources.ProcessStage
             {
                 Id = url.GetWebId<ProcessStage>(processStage.processStageId),
-                Owner = Library.configurationManager.GetActorLink(processStage.ownerId, url),
+                //Owner = Library.configurationManager.GetActorLink(processStage.ownerId, url),
                 Title = processStage.title,
                 Type = url.GetWebId<ProcessStageType>(processStage.processStageTypeId),
-                Confirmable = processStage.confirmableIds
-                    .Select(
-                        confirmableKvp => new Resources.ProcessStage.ConfirmableResource
-                        {
-                            Positions = confirmableKvp.Key
-                                .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
-                                .ToArray(),
-                            ProcessStageNext = url.GetWebId<ProcessStage>(confirmableKvp.Value),
-                        })
-                    .ToArray(),
-                Editable = processStage.editableIds
-                    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
-                    .ToArray(),
-                Completable = processStage.completableIds
-                    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
-                    .ToArray(),
-                Viewable = processStage.viewableIds
-                    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
-                    .ToArray(),
+                //Confirmable = processStage.confirmableIds
+                //    .Select(
+                //        confirmableKvp => new Resources.ProcessStage.ConfirmableResource
+                //        {
+                //            Positions = confirmableKvp.Key
+                //                .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
+                //                .ToArray(),
+                //            ProcessStageNext = url.GetWebId<ProcessStage>(confirmableKvp.Value),
+                //        })
+                //    .ToArray(),
+                //Editable = processStage.editableIds
+                //    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
+                //    .ToArray(),
+                //Completable = processStage.completableIds
+                //    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
+                //    .ToArray(),
+                //Viewable = processStage.viewableIds
+                //    .Select(actorId => Library.configurationManager.GetActorLink(actorId, url))
+                //    .ToArray(),
             };
         }
 

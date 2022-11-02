@@ -14,6 +14,10 @@ using Microsoft.ApplicationInsights;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Mvc.Razor;
+
+using Azure.Storage.Queues;
+using Azure.Storage.Queues.Models;
 
 using EastFive.Linq;
 using EastFive.Security.SessionServer;
@@ -25,9 +29,6 @@ using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
 using EastFive.Api;
 using EastFive.Azure.Auth.CredentialProviders;
-using Microsoft.AspNetCore.Mvc.Razor;
-using Azure.Storage.Queues.Models;
-using Azure.Storage.Queues;
 
 namespace EastFive.Azure
 {
@@ -46,15 +47,6 @@ namespace EastFive.Azure
             Func<string, TResult> onFailure);
 
         Task<bool> CanAdministerCredentialAsync(Guid actorInQuestion, EastFive.Azure.Auth.SessionToken security);
-
-        //Task<TResult> OnUnmappedUserAsync<TResult>(
-        //        string subject, IDictionary<string, string> extraParameters,
-        //        EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
-        //        IProvideAuthorization authorizationProvider, Uri baseUri,
-        //    Func<Guid, TResult> onCreatedMapping,
-        //    Func<TResult> onAllowSelfServeAccounts,
-        //    Func<Uri, TResult> onInterceptProcess,
-        //    Func<TResult> onNoChange);
 
         Task<bool> ShouldAuthorizeIntegrationAsync(XIntegration integration, EastFive.Azure.Auth.Authorization authorization);
 
@@ -209,23 +201,6 @@ namespace EastFive.Api.Azure
                     }
                 }
                 return loginProviders;
-                //return this.GetType()
-                //    .GetAttributesInterface<IProvideLoginProvider>(true, true)
-                //    .Select(
-                //        loginProviderProvider => loginProviderProvider.ProvideLoginProvider(
-                //            loginProvider => loginProvider,
-                //            (why) => default))
-                //    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
-                //    .ToDictionary(ktem => ktem.Method);
-
-                //return this.InstantiateAll<IProvideLogin>()
-                //    .Where(loginProvider => !loginProvider.IsDefaultOrNull())
-                //    .Select(
-                //        loginProvider =>
-                //        {
-                //            return loginProvider.PairWithKey(loginProvider.Method);
-                //        })
-                //    .ToDictionary();
             }
         }
 
@@ -415,45 +390,22 @@ namespace EastFive.Api.Azure
             return onCredentialSystemNotAvailable();
         }
         
-        //public virtual async Task<TResult> OnUnmappedUserAsync<TResult>(
-        //        string subject, IDictionary<string, string> extraParameters,
-        //        EastFive.Azure.Auth.Method authentication, EastFive.Azure.Auth.Authorization authorization,
-        //        IProvideAuthorization authorizationProvider, Uri baseUri,
-        //    Func<Guid, TResult> onCreatedMapping,
-        //    Func<TResult> onAllowSelfServeAccounts,
-        //    Func<Uri, TResult> onInterceptProcess,
-        //    Func<TResult> onNoChange)
-        //{
-        //    if (authorizationProvider is Credentials.IProvideAccountInformation)
-        //    {
-        //        var accountInfoProvider = authorizationProvider as Credentials.IProvideAccountInformation;
-        //        return await accountInfoProvider
-        //            .CreateAccount(subject, extraParameters,
-        //                    authentication, authorization, baseUri,
-        //                    this,
-        //                onCreatedMapping,
-        //                onAllowSelfServeAccounts,
-        //                onInterceptProcess,
-        //                onNoChange);
-        //    }
-        //    return onNoChange();
-        //}
-
         public virtual Web.Services.ISendMessageService SendMessageService
         { get => Web.Services.ServiceConfiguration.SendMessageService(); }
         
         public virtual Web.Services.ITimeService TimeService { get => Web.Services.ServiceConfiguration.TimeService(); }
         
-        internal virtual Uri GetActorLink(Guid actorId, IProvideUrl url)
-        {
-            return Library.configurationManager.GetActorLink(actorId, url).Source;
-        }
+        //internal virtual Uri GetActorLink(Guid actorId, IProvideUrl url)
+        //{
+        //    return Library.configurationManager.GetActorLink(actorId, url).Source;
+        //}
 
         public virtual Task<TResult> GetActorNameDetailsAsync<TResult>(Guid actorId,
             Func<string, string, string, TResult> onActorFound,
             Func<TResult> onActorNotFound)
         {
-            return EastFive.Security.SessionServer.Library.configurationManager.GetActorNameDetailsAsync(actorId, onActorFound, onActorNotFound);
+            throw new NotImplementedException();
+            // return EastFive.Security.SessionServer.Library.configurationManager.GetActorNameDetailsAsync(actorId, onActorFound, onActorNotFound);
         }
 
         public virtual async Task<TResult> GetRedirectUriAsync<TResult>(
