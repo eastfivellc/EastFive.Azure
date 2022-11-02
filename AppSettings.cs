@@ -122,7 +122,7 @@ namespace EastFive.Azure
             public const string AdminApiKey = "EastFive.Azure.Search.SearchServiceAdminApiKey";
         }
 
-        public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
+        //public const string ApiSecurityKey = "EastFive.Security.SessionServer.ApiSecurityKey";
 
         public const string AdminLoginRsaKey = "EastFive.Azure.Auth.AdminLoginRsaKey";
         public const string ClientMinimumVersion = "EastFive.Azure.Modules.ClientMinimumVersion";
@@ -225,7 +225,7 @@ namespace EastFive.Azure
 
             [ConfigKey("The claim identifier used to determine the login subject key.",
                 DeploymentOverrides.Optional)]
-            public const string LoginIdClaimType = "EastFive.Security.SessionServer.LoginProvider.LoginIdClaimType";
+            public const string LoginIdClaimType = "EastFive.Azure.Auth.AzureADB2C.LoginIdClaimType";
         }
 
         [Config]
@@ -310,17 +310,18 @@ namespace EastFive.Azure
                 public const string ConsumerSecret = "EastFive.Salesforce.ConsumerSecret";
             }
 
+            [Config]
             public static class TokenCredential
             {
                 /// <summary>
                 /// The email address and name from which a token credential is sent.
                 /// </summary>
-                public const string FromEmail = "EastFive.Security.SessionServer.TokenCredential.FromEmail";
-                public const string FromName = "EastFive.Security.SessionServer.TokenCredential.FromName";
+                public const string FromEmail = "EastFive.Azure.Auth.TokenCredential.Email.FromEmail";
+                public const string FromName = "EastFive.Azure.Auth.TokenCredential.Email.FromName";
                 /// <summary>
                 /// Subject for token credntial email.
                 /// </summary>
-                public const string Subject = "EastFive.Security.SessionServer.TokenCredential.Subject";
+                public const string Subject = "EastFive.Azure.Auth.TokenCredential.Email.Subject";
             }
 
             [ConfigKey("Link that is sent (emailed) to the user to login to the application",

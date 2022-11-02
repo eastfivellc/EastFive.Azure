@@ -6,7 +6,6 @@ using System.Configuration;
 using System.Collections.Generic;
 using System.Security.Claims;
 
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
 using EastFive.Security.CredentialProvider.ImplicitCreation;
 using EastFive.Azure.Auth;

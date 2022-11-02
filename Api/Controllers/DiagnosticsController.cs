@@ -7,7 +7,7 @@ using System.Web.Http;
 using EastFive.Api;
 using EastFive.Extensions;
 
-namespace EastFive.Security.SessionServer.Api.Controllers
+namespace EastFive.Azure.Diagnostics
 {
     public class AppSetting
     {

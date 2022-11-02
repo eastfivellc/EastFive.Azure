@@ -11,7 +11,6 @@ using System.Web;
 using System.Web.Http;
 
 using EastFive.Linq;
-using EastFive.Security.SessionServer;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Collections.Generic;

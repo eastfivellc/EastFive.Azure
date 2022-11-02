@@ -20,6 +20,7 @@ namespace EastFive.Api.Azure.Resources
         Route = "Content",
         ContentType = "x-application/content",
         ContentTypeVersion = "0.1")]
+    [Obsolete("Use IBlobRef instead")]
     public class Content : IReferenceable
     {
         [JsonIgnore]

@@ -1,6 +1,4 @@
-﻿using EastFive.Security.CredentialProvider;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
@@ -10,14 +8,20 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
-using EastFive.Security.SessionServer.Persistence;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
-using EastFive.Api.Services;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using EastFive.Security.SessionServer;
 using System.Collections;
+
+using Microsoft.IdentityModel.Tokens;
+
+using Newtonsoft.Json;
+
+using EastFive;
+using EastFive.Security.CredentialProvider;
+using EastFive.Api.Services;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
 using EastFive.Extensions;
@@ -25,10 +29,7 @@ using EastFive.Api.Controllers;
 using EastFive.Linq;
 using EastFive.Collections.Generic;
 using EastFive.Azure.Auth;
-using EastFive;
 using EastFive.Api;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using EastFive.Api.Azure;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Auth.CredentialProviders;

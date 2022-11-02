@@ -1,7 +1,6 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Controllers;
 using EastFive.Extensions;
-using EastFive.Security.SessionServer;
 using EastFive.Serialization;
 using System;
 using System.Collections.Generic;
