@@ -85,7 +85,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
                             try
                             {
                                 var client = new RestClient(source);
-                                var restRequest = new RestRequest(Method.POST);
+                                var restRequest = new RestRequest();
+                                restRequest.Method = Method.Post;
                                 var mutatedRequest = mutateRestRequest(restRequest);
                                 var restResponse = client.Execute(mutatedRequest);
                                 var response = new HttpResponseMessage(restResponse.StatusCode)
