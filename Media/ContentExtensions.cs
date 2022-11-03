@@ -227,7 +227,8 @@ namespace EastFive.Azure.Media
                                             }
                                         }
                                         computerVision.Endpoint = endpointUri.OriginalString;
-                                        var featuresToSearchFor = VisualFeatureTypes.Categories.AsArray()
+                                        var featuresToSearchFor = ((VisualFeatureTypes?)VisualFeatureTypes.Categories)
+                                                .AsArray()
                                                 .Append(VisualFeatureTypes.Description)
                                                 .Append(VisualFeatureTypes.ImageType)
                                                 .Append(VisualFeatureTypes.Objects)
@@ -245,7 +246,7 @@ namespace EastFive.Azure.Media
                                                 return onAnalyzed(analysis, widthMultiplier);
                                             }
                                         }
-                                        catch (ComputerVisionErrorException)
+                                        catch (Exception)
                                         {
                                             throw;
                                         }
@@ -298,7 +299,8 @@ namespace EastFive.Azure.Media
                                             #pragma warning restore CA1416
                                         }
                                         computerVision.Endpoint = endpointUri.OriginalString;
-                                        var featuresToSearchFor = VisualFeatureTypes.Categories.AsArray()
+                                        var featuresToSearchFor = ((VisualFeatureTypes?)VisualFeatureTypes.Categories)
+                                                .AsArray()
                                                 .Append(VisualFeatureTypes.Description)
                                                 .Append(VisualFeatureTypes.ImageType)
                                                 .Append(VisualFeatureTypes.Objects)
@@ -313,7 +315,7 @@ namespace EastFive.Azure.Media
                                                 imageStream, featuresToSearchFor);
                                             return onAnalyzed(analysis, widthMultiplier);
                                         }
-                                        catch(ComputerVisionErrorException)
+                                        catch(Exception)
                                         {
                                             throw;
                                         }

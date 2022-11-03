@@ -4,9 +4,15 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Azure.ApplicationInsights.Models;
+using Microsoft.Azure.Documents;
+
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using EastFive;
 using EastFive.Extensions;
@@ -17,17 +23,10 @@ using EastFive.Serialization;
 using EastFive.Serialization.Json;
 using EastFive.Web.Configuration;
 using EastFive.Azure.Auth.Salesforce.Resources;
-using Newtonsoft.Json.Linq;
-using System.Threading;
 using EastFive.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using Dynamitey;
-using Grpc.Core;
-using Microsoft.Azure.Documents;
-using static EastFive.Azure.Auth.Salesforce.Driver;
-using Microsoft.Azure.ApplicationInsights.Models;
 using EastFive.Api;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using static EastFive.Azure.Auth.Salesforce.Driver;
 
 namespace EastFive.Azure.Auth.Salesforce
 {
