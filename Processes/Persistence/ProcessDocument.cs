@@ -17,6 +17,8 @@ using EastFive;
 using EastFive.Linq;
 using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
+using EastFive.Persistence;
+using EastFive.Persistence.Azure;
 
 namespace EastFive.Azure.Persistence
 {

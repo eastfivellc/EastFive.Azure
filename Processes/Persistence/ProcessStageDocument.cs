@@ -2,22 +2,20 @@
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
+using System.Net.Http;
 
 using Microsoft.Azure.Cosmos.Table;
 
-using BlackBarLabs;
-using EastFive.Collections.Generic;
-
-using BlackBarLabs.Persistence;
-using BlackBarLabs.Extensions;
-using EastFive.Serialization;
-using BlackBarLabs.Persistence.Azure;
-using EastFive.Extensions;
 using EastFive;
 using EastFive.Linq;
+using EastFive.Collections.Generic;
+using EastFive.Serialization;
+using EastFive.Extensions;
+using EastFive.Persistence;
 using BlackBarLabs.Persistence.Azure.StorageTables;
-using System.Runtime.Serialization;
-using System.Net.Http;
+using BlackBarLabs.Persistence;
+using EastFive.Persistence.Azure;
 
 namespace EastFive.Azure.Persistence
 {

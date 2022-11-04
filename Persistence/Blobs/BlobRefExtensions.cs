@@ -344,6 +344,50 @@ namespace EastFive.Azure.Persistence.Blobs
                     contentType: contentType);
         }
 
+        public static async Task<TResult> CreateBlobRefAsync<TResult, TResource>(
+            this byte[] blobData,
+            Expression<Func<TResource, IBlobRef>> selectProperty,
+            Func<IBlobRef, TResult> onCreated,
+            Func<IBlobRef, TResult> onAlreadyExists = default,
+            string contentType = default, string fileName = default,
+            Guid? blobId = default, string blobName = default)
+        {
+            selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = blobName.HasBlackSpace() ?
+                blobName
+                :
+                blobId.HasValue ?
+                    blobId.Value.AsBlobName()
+                    :
+                    Guid.NewGuid().AsBlobName();
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(blobData, newBlobId, containerName,
+                    () =>
+                    {
+                        var blobRefNew = new BlobRef
+                        {
+                            bytes = blobData,
+                            Id = newBlobId,
+                            ContainerName = containerName,
+                            ContentType = contentType,
+                            FileName = fileName.HasBlackSpace() ? fileName : newBlobId,
+                        };
+                        return onCreated(blobRefNew);
+                    },
+                    onAlreadyExists:() =>
+                    {
+                        var blobRef = new BlobRefStorage()
+                        {
+                            Id = newBlobId,
+                            ContainerName = containerName,
+                        };
+                        return onAlreadyExists(blobRef);
+                    },
+                    contentType: contentType);
+        }
+
         public static async Task<IBlobRef> CreateBlobRefFromStreamAsync<TResource>(
             this Expression<Func<TResource, IBlobRef>> selectProperty,
             Func<Stream, Task> writeBlobData,

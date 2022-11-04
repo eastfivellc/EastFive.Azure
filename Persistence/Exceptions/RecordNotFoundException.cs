@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BlackBarLabs.Persistence.Azure
+namespace EastFive.Persistence.Azure
 {
     public class RecordNotFoundException : Exception
     {

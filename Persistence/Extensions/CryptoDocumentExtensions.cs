@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using EastFive.Azure.Persistence.Blobs;
 using Microsoft.Azure.Cosmos.Table;
 
-namespace BlackBarLabs.Identity.AzureStorageTables
+namespace EastFive.Azure.Persistence.AzureStorageTables
 {
     public static class CryptoDocumentExtensions
     {
@@ -22,7 +22,7 @@ namespace BlackBarLabs.Identity.AzureStorageTables
             }
         }
 
-        //public static void DecryptBytes(this Blob document)
+        //public static void DecryptBytes(this IBlobRef document)
         //{
         //    var cryptoProperties = document.GetType().GetProperties()
         //        .Where(prop => prop.GetCustomAttributes(true).Length > 0); //typeof(CryptoAttribute), true));

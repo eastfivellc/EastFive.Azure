@@ -18,6 +18,8 @@ using System.Runtime.Serialization;
 using EastFive.Linq.Async;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Persistence;
+using EastFive.Persistence.Azure;
 
 namespace EastFive.Azure.Synchronization.Persistence
 {
