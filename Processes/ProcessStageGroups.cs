@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api.Controllers;
+﻿using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using System;

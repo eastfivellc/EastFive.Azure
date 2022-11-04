@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api.Controllers;
+﻿using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -174,7 +173,7 @@ namespace EastFive.Azure
                             });
                     
                 },
-                () => onFound(new ProcessResourceView[] { }).ToTask());
+                () => onFound(new ProcessResourceView[] { }).AsTask());
         }
 
         public static Task<TResult> DeleteByIdAsync<TResult>(Guid processStageId, EastFive.Api.Security security,

@@ -8,7 +8,6 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Api.Controllers;
-using BlackBarLabs.Extensions;
 using System.Linq;
 using EastFive.Extensions;
 using System.Collections.Generic;

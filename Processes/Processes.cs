@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api.Controllers;
+﻿using EastFive.Api.Controllers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using EastFive.Linq;
 using EastFive.Collections.Generic;
+using EastFive.Extensions;
 
 namespace EastFive.Azure
 {
@@ -63,7 +63,7 @@ namespace EastFive.Azure
                                         if (!unusedResourceKvps.ContainsKey(kvp.Key))
                                         {
                                             if (confirmedWhen.HasValue)
-                                                return await tail(onFailure($"Missing resource for `{kvp.Key}`").ToTask());
+                                                return await tail(onFailure($"Missing resource for `{kvp.Key}`").AsTask());
                                             return await skip(unusedResourceKvps);
                                         }
                                         return await next(
@@ -106,7 +106,7 @@ namespace EastFive.Azure
                                                         onCreated,
                                                         onAlreadyExists);
                                                 },
-                                                () => onFailure("Previous step does not exist").ToTask());
+                                                () => onFailure("Previous step does not exist").AsTask());
 
                                         // TODO: If confirmed is set, ensure that the security actor posesses a position that is authorized to move the process forward
                                         return await Persistence.ProcessDocument.CreateAsync(processId,
@@ -182,7 +182,7 @@ namespace EastFive.Azure
                                                         })
                                                     :
                                                     next(),
-                                                () => tail(onFailure($"Resource key ${resourceKvp.Key} is not valid for this stage.").ToTask())),
+                                                () => tail(onFailure($"Resource key ${resourceKvp.Key} is not valid for this stage.").AsTask())),
                                         async (IEnumerable<Process.ProcessStageResource> psrs) =>
                                         {
                                             var procStageResources = psrs.ToArray();
@@ -194,8 +194,8 @@ namespace EastFive.Azure
                                             return onUpdated();
                                         });
                             },
-                            () => onFailure($"Process stage is no longer valid `{process.processStageId}` => `{processStage.processStageTypeId}`").ToTask()),
-                        () => onFailure($"Process is no longer valid `{processId}` => `{process.processStageId}`").ToTask());
+                            () => onFailure($"Process stage is no longer valid `{process.processStageId}` => `{processStage.processStageTypeId}`").AsTask()),
+                        () => onFailure($"Process is no longer valid `{processId}` => `{process.processStageId}`").AsTask());
                 },
                 onNotFound);
             

@@ -8,17 +8,15 @@ using Microsoft.Azure.Cosmos.Table;
 using BlackBarLabs;
 using EastFive.Collections.Generic;
 
-using BlackBarLabs.Persistence;
-using BlackBarLabs.Extensions;
 using EastFive.Serialization;
-using BlackBarLabs.Persistence.Azure;
 using EastFive.Extensions;
 using EastFive;
 using EastFive.Linq;
-using BlackBarLabs.Persistence.Azure.StorageTables;
 using System.Runtime.Serialization;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure;
+using BlackBarLabs.Persistence.Azure.StorageTables;
+using BlackBarLabs.Persistence;
 
 namespace EastFive.Azure.Persistence
 {

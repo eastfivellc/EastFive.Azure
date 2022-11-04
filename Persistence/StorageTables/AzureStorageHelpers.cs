@@ -1,13 +1,20 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+
 using Microsoft.Azure.Cosmos.Table;
 
-namespace BlackBarLabs.Persistence.Azure.StorageTables
+namespace EastFive.Azure.Persistence.StorageTables
 {
     // ReSharper disable once InconsistentNaming
     public static class AzureStorageHelpers
     {
+        public enum StorageState
+        {
+            LiveData,
+            RetiredData
+        }
+
         public static readonly DateTime MinDate = new DateTimeOffset(1601, 01, 01, 0, 0, 0, new TimeSpan()).UtcDateTime;
         public static readonly DateTime MaxDate = new DateTimeOffset(9999, 12, 31, 0, 0, 0, new TimeSpan()).UtcDateTime;
 

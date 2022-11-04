@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 
 using EastFive;
 using EastFive.Extensions;
-using BlackBarLabs.Extensions;
 using EastFive.Serialization;
 using EastFive.Linq;
 
@@ -108,7 +107,7 @@ namespace EastFive.Net.Http
                             .Concat(doc.Data30.NullToEmpty())
                             .Concat(doc.Data31.NullToEmpty())
                             .Concat(doc.Data32.NullToEmpty())
-                            .ToArray()).ToTask();
+                            .ToArray()).AsTask();
                 },
                 async () =>
                 {

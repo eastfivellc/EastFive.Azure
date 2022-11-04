@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Extensions;
+﻿using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
@@ -415,8 +414,8 @@ namespace EastFive.AzureADB2C
                     var resultUser = JsonConvert.DeserializeObject<Resources.User>(resultJson);
                     Guid objectId;
                     if (Guid.TryParse(resultUser.ObjectId, out objectId))
-                        return onSuccess(objectId).ToTask();
-                    return onFail("Could not parse ID in response").ToTask();
+                        return onSuccess(objectId).AsTask();
+                    return onFail("Could not parse ID in response").AsTask();
                 },
                 async (code, reason, issue) =>
                 {

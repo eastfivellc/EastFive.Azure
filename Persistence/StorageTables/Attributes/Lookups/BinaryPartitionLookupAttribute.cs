@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
 
-using BlackBarLabs.Extensions;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;

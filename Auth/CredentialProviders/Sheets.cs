@@ -6,7 +6,6 @@ using System.Configuration;
 using System.Threading.Tasks;
 
 using EastFive;
-using BlackBarLabs.Extensions;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Net;
@@ -80,7 +79,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 IDictionary<string, string> extraParams,
                 Func<IDictionary<string, string>, IDictionary<string, Type>, IDictionary<string, string>, TResult> onSuccess)
             {
-                return onSuccess(new Dictionary<string, string>(), new Dictionary<string, Type>(), new Dictionary<string, string>()).ToTask();
+                return onSuccess(new Dictionary<string, string>(), new Dictionary<string, Type>(), new Dictionary<string, string>()).AsTask();
             }
 
             [IntegrationName(IntegrationName)]
@@ -90,7 +89,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 Func<string, TResult> onFailure)
             {
                 var provider = new Provider();
-                return onProvideAuthorization(provider).ToTask();
+                return onProvideAuthorization(provider).AsTask();
             }
 
             

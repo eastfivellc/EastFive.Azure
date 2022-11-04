@@ -9,7 +9,7 @@ using EastFive.Api.Controllers;
 using System.Net.Http;
 using Microsoft.AspNetCore.Mvc.Routing;
 using EastFive.Linq;
-using BlackBarLabs.Extensions;
+using EastFive.Extensions;
 
 namespace EastFive.Api.Azure.Resources
 {
@@ -70,7 +70,7 @@ namespace EastFive.Api.Azure.Resources
                         return onFound(stage);
                     return await next();
                 },
-                () => onNotFound().ToTask());
+                () => onNotFound().AsTask());
 
             //return Connectors.FindByIdAsync(id,
             //        security.performingAsActorId, security.claims,

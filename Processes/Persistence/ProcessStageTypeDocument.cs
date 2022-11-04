@@ -5,11 +5,9 @@ using System.Collections.Generic;
 
 using Microsoft.Azure.Cosmos.Table;
 
-using BlackBarLabs;
 using EastFive.Collections.Generic;
 
 using BlackBarLabs.Persistence;
-using BlackBarLabs.Extensions;
 using EastFive.Serialization;
 using BlackBarLabs.Persistence.Azure;
 using EastFive.Extensions;

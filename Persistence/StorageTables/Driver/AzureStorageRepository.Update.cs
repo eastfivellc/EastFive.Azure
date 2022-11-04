@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 
 using Microsoft.Azure.Cosmos.Table;
 
-using BlackBarLabs.Extensions;
 using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
@@ -92,7 +91,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
                         async (documentToSave) =>
                         {
                             useResultGlobal = await await UpdateIfNotModifiedAsync(documentToSave,
-                                () => false.ToTask(),
+                                () => false.AsTask(),
                                 async () =>
                                 {
                                     if (onTimeoutAsync.IsDefaultOrNull())

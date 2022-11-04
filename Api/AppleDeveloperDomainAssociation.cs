@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Api;
-using EastFive.Api;
+﻿using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;

@@ -9,7 +9,6 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc.Routing;
 using System.Threading.Tasks;
 using EastFive.Linq;
-using BlackBarLabs.Extensions;
 using EastFive.Extensions;
 
 namespace EastFive.Api.Azure.Resources

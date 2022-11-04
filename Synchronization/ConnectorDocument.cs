@@ -10,7 +10,6 @@ using EastFive.Extensions;
 using EastFive.Linq;
 using BlackBarLabs;
 using BlackBarLabs.Persistence;
-using BlackBarLabs.Extensions;
 using EastFive.Serialization;
 using BlackBarLabs.Persistence.Azure;
 using BlackBarLabs.Persistence.Azure.StorageTables;
@@ -434,7 +433,7 @@ namespace EastFive.Azure.Synchronization.Persistence
                                         adapter => next(Convert(connectorDoc).PairWithValue(adapter)),
                                         () => skip()),
                                     (IEnumerable<KeyValuePair<Connector, Adapter>> connectedAdapters) =>
-                                        onFound(AdapterDocument.Convert(adapterDoc), connectedAdapters.ToArray()).ToTask()),
+                                        onFound(AdapterDocument.Convert(adapterDoc), connectedAdapters.ToArray()).AsTask()),
                     onAdapterNotFound.AsAsyncFunc()));
         }
 
@@ -571,7 +570,7 @@ namespace EastFive.Azure.Synchronization.Persistence
                                             }),
                                         () => skip());
                                 },
-                                () => skip().ToTask()));
+                                () => skip().AsTask()));
                 });
         }
 

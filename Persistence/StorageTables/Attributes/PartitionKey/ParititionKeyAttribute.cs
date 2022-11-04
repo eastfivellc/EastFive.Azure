@@ -1,6 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using BlackBarLabs.Persistence.Azure;
-using EastFive.Extensions;
+﻿using EastFive.Extensions;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using System;

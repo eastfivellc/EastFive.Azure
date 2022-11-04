@@ -1,5 +1,4 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api.Controllers;
+﻿using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -89,7 +88,7 @@ namespace EastFive.Azure
                             
                         });
                 },
-                () => onTypeDoesNotExist().ToTask());
+                () => onTypeDoesNotExist().AsTask());
         }
 
         public static Task<TResult> FindByIdAsync<TResult>(Guid processStageId, EastFive.Api.Security security,
@@ -136,7 +135,7 @@ namespace EastFive.Azure
                                     :
                                     skip(),
                                 () => skip()),
-                            (IEnumerable<Guid> processStageTypeIds) => processStageTypeIds.ToLookup(v => v).ToTask());
+                            (IEnumerable<Guid> processStageTypeIds) => processStageTypeIds.ToLookup(v => v).AsTask());
                     var listedAsNext = processStages.SelectMany(procStage => procStage.confirmableIds.SelectValues()).ToLookup(v => v);
                     return onFound(
                         processStages

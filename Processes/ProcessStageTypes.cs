@@ -1,6 +1,6 @@
-﻿using BlackBarLabs.Extensions;
-using EastFive.Api.Controllers;
+﻿using EastFive.Api.Controllers;
 using EastFive.Collections.Generic;
+using EastFive.Extensions;
 using EastFive.Linq;
 using System;
 using System.Collections.Generic;
@@ -44,7 +44,7 @@ namespace EastFive.Azure
                         onCreated,
                         onAlreadyExists);
                 },
-                () => onTypeDoesNotExist().ToTask());
+                () => onTypeDoesNotExist().AsTask());
         }
         
         public static Task<TResult> FindAllAsync<TResult>(EastFive.Api.Security security,

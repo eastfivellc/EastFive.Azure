@@ -1,7 +1,4 @@
-﻿using BlackBarLabs;
-using BlackBarLabs.Extensions;
-using BlackBarLabs.Persistence.Azure.StorageTables;
-using EastFive.Collections.Generic;
+﻿using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
