@@ -54,7 +54,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<string, TResult> onFailure)
         {
             if (!responseParams.TryGetValue(AdminLoginRedirection.tokenKey, out string token))
-                return onFailure("Token not found");
+                return await onFailure("Token not found").AsTask();
 
             // TODO: Validate token
             throw new NotImplementedException();
