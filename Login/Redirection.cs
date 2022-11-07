@@ -1,15 +1,17 @@
-﻿using BlackBarLabs.Api;
-using EastFive.Api;
-using EastFive.Api.Azure;
-using EastFive.Api.Controllers;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+
 using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
+
+using EastFive.Api;
+using EastFive.Api.Azure;
+using EastFive.Api.Controllers;
 
 namespace EastFive.Azure.Login
 {

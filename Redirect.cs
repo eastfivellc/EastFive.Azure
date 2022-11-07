@@ -1,5 +1,20 @@
-﻿using BlackBarLabs.Api;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using System.ComponentModel;
+
+using Newtonsoft.Json;
+
+using Microsoft.AspNetCore.Mvc.Routing;
+
 using EastFive;
+using EastFive.Api.Azure;
+using EastFive.Web.Configuration;
 using EastFive.Collections.Generic;
 using EastFive.Api;
 using EastFive.Api.Controllers;
@@ -11,19 +26,6 @@ using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.Routing;
-using System.ComponentModel;
-using EastFive.Api.Azure;
-using EastFive.Web.Configuration;
 
 namespace EastFive.Azure
 {

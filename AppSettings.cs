@@ -78,6 +78,12 @@ namespace EastFive.Azure
             [ConfigKey("Identifies the application insights endpoint to which data is posted.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false,
+                Location = "Home > Application Insights > {Resource Name} > Dashboard / Connection String")]
+            public const string ConnectionString = "EastFive.Azure.ApplicationInsights.ConnectionString";
+
+            [ConfigKey("Identifies the application insights endpoint to which data is posted.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false,
                 Location = "Home > Application Insights > {Resource Name} > Dashboard / Instrumentation Key")]
             public const string InstrumentationKey = "EastFive.Azure.ApplicationInsights.InstrumentationKey";
 

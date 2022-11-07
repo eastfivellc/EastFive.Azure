@@ -536,10 +536,10 @@ namespace EastFive.Azure.Auth.Salesforce
                         {
                             return onSynchronized(sfId).AsTask(); //, resGot, extraResGot, extraValuesGot).AsTask();
                         },
-                        handleDuplicateResourceAsync: async (resource, resSfId) =>
+                        handleDuplicateResourceAsync: (resource, resSfId) =>
                         {
                             var resourceWithIdentifier = UpdateSalesforceIdentifier(resource, resSfId);
-                            return resourceWithIdentifier;
+                            return resourceWithIdentifier.AsTask();
                         },
 				onSynchronized: onSynchronized,
 				onFailure: onFailure,

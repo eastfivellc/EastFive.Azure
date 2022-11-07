@@ -51,7 +51,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 {
                     using (var certificate = new X509Certificate2(certBuffer))
                     {
-                        var m = ((RSACryptoServiceProvider)certificate.PrivateKey);
+                        var m = certificate.GetRSAPrivateKey();
                         AsymmetricAlgorithm trustedSigner = m; // AsymmetricAlgorithm.Create(certificate.GetKeyAlgorithm()
                         var trustedSigners = default(AsymmetricAlgorithm) == trustedSigner ? null : trustedSigner.AsEnumerable();
                     }

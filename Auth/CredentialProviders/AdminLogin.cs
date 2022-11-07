@@ -59,7 +59,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             // TODO: Validate token
             throw new NotImplementedException();
 
-            return await onSuccess(responseParams).AsTask();
+            // return await onSuccess(responseParams).AsTask();
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,

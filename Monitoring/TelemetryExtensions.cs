@@ -1,5 +1,6 @@
 ﻿using EastFive.Web.Configuration;
 using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 
 namespace EastFive.Azure.Monitoring
 {
@@ -9,14 +10,20 @@ namespace EastFive.Azure.Monitoring
 
         static TelemetryExtensions()
         {
-            client = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.ConfigurationString(
+            
+            client = EastFive.Azure.AppSettings.ApplicationInsights.ConnectionString.ConfigurationString(
                 key =>
                 {
-                    return new TelemetryClient { InstrumentationKey = key };
+                    var config = new TelemetryConfiguration()
+                    {
+                        ConnectionString = key,
+                    };
+                    return new TelemetryClient(config);
                 },
                 (why) =>
                 {
-                    return new TelemetryClient();
+                    var configuration = TelemetryConfiguration.Active;
+                    return new TelemetryClient(configuration);
                 });
         }
 

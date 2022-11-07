@@ -128,7 +128,7 @@ namespace EastFive.AzureADB2C
                     Content = await CloneAsync(request.Content),
                     Version = request.Version
                 };
-                request.Properties.ToList().ForEach(x => clone.Properties.Add(x));
+                request.Options.ToList().ForEach(x => clone.Options.Append(x));
                 request.Headers.ToList().ForEach(x => clone.Headers.TryAddWithoutValidation(x.Key, x.Value));
                 return request;
             }

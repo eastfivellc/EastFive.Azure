@@ -1,4 +1,5 @@
 ﻿using BlackBarLabs.Web;
+using EastFive.Net;
 using EastFive.Web;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -13,8 +14,6 @@ namespace EastFive.AzureADB2C
 {
     public static class Libary
     {
-
-
         public static async Task<TResult> InitializeAsync<TResult>(
                 string tenant, string signupFlow, string signinFlow,
                 string audience,
@@ -70,8 +69,10 @@ namespace EastFive.AzureADB2C
             Func<TokenValidationParameters, TResult> onSuccess,
             Func<string, TResult> onFailed)
         {
-            var requestKeys = WebRequest.CreateHttp(config.JwksUri);
-            var result = await requestKeys.GetResponseJsonAsync(
+            if (!Uri.TryCreate(config.JwksUri, UriKind.Absolute, out Uri jwksUri))
+                return onFailed($"`{config.JwksUri}` is not a valid url.");
+
+            return await jwksUri.HttpClientGetResourceAsync(
                 (Resources.KeyResource keys) =>
                 {
                     var validationParameters = new TokenValidationParameters();
@@ -80,15 +81,14 @@ namespace EastFive.AzureADB2C
                     validationParameters.ValidIssuer = config.Issuer;
                     return onSuccess(validationParameters);
                 },
-                (code, why) =>
+                onFailureWithBody:(code, why) =>
                 {
                     return onFailed(why);
                 },
-                (why) =>
+                onFailure:(why) =>
                 {
                     return onFailed(why);
                 });
-            return result;
         }
     }
 }

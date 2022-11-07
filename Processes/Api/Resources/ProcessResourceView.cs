@@ -1,15 +1,17 @@
-﻿using BlackBarLabs.Api;
-using BlackBarLabs.Api.Resources;
-using System;
+﻿using System;
+using System.Linq;
 using System.Runtime.Serialization;
-using Newtonsoft.Json;
-using EastFive.Api;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
-using EastFive.Api.Controllers;
-using System.Linq;
+
 using Microsoft.AspNetCore.Mvc.Routing;
+
+using Newtonsoft.Json;
+
+using EastFive.Api.Resources;
+using EastFive.Api;
+using EastFive.Api.Controllers;
 using EastFive.Api.Azure;
 
 namespace EastFive.Api.Azure.Resources
