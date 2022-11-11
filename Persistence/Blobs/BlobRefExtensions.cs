@@ -341,7 +341,8 @@ namespace EastFive.Azure.Persistence.Blobs
                             FileName = fileName.HasBlackSpace()? fileName : newBlobId,
                         };
                     },
-                    contentType: contentType);
+                    contentType: contentType,
+                    fileName: fileName);
         }
 
         public static async Task<TResult> CreateBlobRefAsync<TResult, TResource>(
@@ -385,7 +386,8 @@ namespace EastFive.Azure.Persistence.Blobs
                         };
                         return onAlreadyExists(blobRef);
                     },
-                    contentType: contentType);
+                    contentType: contentType,
+                    fileName:fileName);
         }
 
         public static async Task<IBlobRef> CreateBlobRefFromStreamAsync<TResource>(
