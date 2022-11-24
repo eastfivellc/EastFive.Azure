@@ -10,7 +10,7 @@ namespace EastFive.Azure
     {
         public class AuthorizationFlow
         {
-            public const string FlowName = "Authorization Flow";
+            public const string FlowName = "AuthorizationFlow";
 
             public class Variables
             {
@@ -24,7 +24,7 @@ namespace EastFive.Azure
         public class HijackLoginFlow
         {
             // WorkflowStep.FlowName
-            public const string FlowName = "Hijack Login";
+            public const string FlowName = "HijackLogin";
 
             public static class Steps
             {
@@ -33,7 +33,7 @@ namespace EastFive.Azure
                 public const string ChooseMethod = "Choose Method";
                 public const string ListLogins = "List Logins";
                 public const string ChooseLogin = "Choose Login";
-                public const string LaunchLogin = "Launch Login";
+                //public const string LaunchLogin = "Launch Login";
             }
 
             public static class Ordinals
@@ -43,7 +43,7 @@ namespace EastFive.Azure
                 public const double ChooseMethod = 1.1;
                 public const double ListLogins = 2.0;
                 public const double ChooseLogin = 2.1;
-                public const double LaunchLogin = 3.0;
+                //public const double LaunchLogin = 3.0;
             }
 
             public static class Variables
@@ -91,6 +91,14 @@ namespace EastFive.Azure
 
                 public static class Authorization
                 {
+                    public static class Get
+                    {
+                        // WorkflowParameter.Value or WorkflowVariable.VariableName
+                        public const string Value = "AuthorizationId";
+                        // WorkflowParameter.Description
+                        public const string Description = "Run Choose Login first to select a value";
+                    }
+
                     public static class Set
                     {
                         // WorkflowParameter.Value
@@ -114,7 +122,7 @@ namespace EastFive.Azure
 
         public class PasswordLoginCreateAccount
         {
-            public const string FlowName = "Create Account";
+            public const string FlowName = "CreateAccount";
             public class Variables
             {
                 public const string UserId = "UserId";
