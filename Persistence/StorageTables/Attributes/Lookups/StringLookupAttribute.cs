@@ -95,6 +95,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
     public class StringLookupHashXX32Attribute : StringLookupAttribute
     {
+        public bool TrimWhitespace { get; set; }
+
         /// <summary>
         /// Limit 4
         /// </summary>
@@ -115,7 +117,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public override string GetPartitionKey(string rowKey)
         {
-            var hash = rowKey.GetBytes().HashXX32();
+            var rowKeyToHash = TrimWhitespace ?
+                rowKey.Trim() : rowKey;
+            var hash = rowKeyToHash.GetBytes().HashXX32();
             var hashStr = hash.ToString("X");
             return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
         }
