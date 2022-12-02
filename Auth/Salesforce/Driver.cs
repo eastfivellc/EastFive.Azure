@@ -863,6 +863,7 @@ namespace EastFive.Azure.Auth.Salesforce
                 (ErrorResponse[] errorResponses) =>
                 {
                     return errorResponses.FirstOneOf(
+
 						#region DUPLICATES_DETECTED
                         errorResponse =>
 							(errorResponse.errorCode == ErrorCodes.DUPLICATES_DETECTED) &&
@@ -892,7 +893,7 @@ namespace EastFive.Azure.Auth.Salesforce
 									},
 									() => OnFailure());
 						},
-                    #endregion
+						#endregion
 
 						#region DUPLICATE_VALUE
                         errorResponse => errorResponse.errorCode == ErrorCodes.DUPLICATE_VALUE &&
@@ -916,7 +917,7 @@ namespace EastFive.Azure.Auth.Salesforce
 										() => OnFailure());
 								});
 						},
-                    #endregion
+						#endregion
 
 						#region INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY
                         errorResponse => errorResponse.errorCode == ErrorCodes.INSUFFICIENT_ACCESS_ON_CROSS_REFERENCE_ENTITY &&
@@ -938,7 +939,7 @@ namespace EastFive.Azure.Auth.Salesforce
 										() => OnFailure());
 								});
 						},
-                    #endregion
+						#endregion
 
 						#region ENTITY_IS_DELETED
                         errorResponse => errorResponse.errorCode == ErrorCodes.ENTITY_IS_DELETED &&
@@ -959,8 +960,20 @@ namespace EastFive.Azure.Auth.Salesforce
 						},
 						#endregion
 
-						#region INVALID_SESSION_ID
-						errorResponse => errorResponse.errorCode == ErrorCodes.INVALID_SESSION_ID &&
+                        // [{"message":"View Date: invalid date: Sat Jan 01 00:00:00 GMT 1","errorCode":"FIELD_INTEGRITY_EXCEPTION","fields":["View_Date__c"]}]
+						#region FIELD_INTEGRITY_EXCEPTION
+                        errorResponse => errorResponse.errorCode == ErrorCodes.FIELD_INTEGRITY_EXCEPTION &&
+                            onInvalidFieldForInsertOrUpdate.IsNotDefaultOrNull() &&
+							errorResponse.fields.Any(),
+						(errorResponse) =>
+						{
+							return onInvalidFieldForInsertOrUpdate(errorResponse.fields.First());
+						},
+						#endregion
+
+
+                    #region INVALID_SESSION_ID
+                        errorResponse => errorResponse.errorCode == ErrorCodes.INVALID_SESSION_ID &&
                             onInvalidToken.IsNotDefaultOrNull(),
 						(errorResponse) =>
 						{
@@ -977,7 +990,10 @@ namespace EastFive.Azure.Auth.Salesforce
 						},
 						#endregion
 
-                        onNone: () => OnFailure());
+                        onNone: () =>
+						{
+							return OnFailure();
+						});
                 },
                 onFailureToParse: (message) =>
 				{
@@ -1030,6 +1046,9 @@ namespace EastFive.Azure.Auth.Salesforce
 
             // [{"message":"TotalRequests Limit exceeded.","errorCode":"REQUEST_LIMIT_EXCEEDED"}]
             REQUEST_LIMIT_EXCEEDED,
+
+            // [{"message":"View Date: invalid date: Sat Jan 01 00:00:00 GMT 1","errorCode":"FIELD_INTEGRITY_EXCEPTION","fields":["View_Date__c"]}]
+            FIELD_INTEGRITY_EXCEPTION,
 
             NOT_FOUND,
 		}
