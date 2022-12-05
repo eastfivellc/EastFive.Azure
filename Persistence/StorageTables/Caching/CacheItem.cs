@@ -224,7 +224,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
         private BlobServiceClient GetBlobClient()
         {
             var blobClient = Web.Configuration.Settings.GetString(
-                    EastFive.Azure.AppSettings.ASTConnectionStringKey,
+                    EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString,
                 (storageSetting) =>
                 {
                     var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);

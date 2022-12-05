@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using SendGrid.Helpers.Mail;
 
-using BlackBarLabs.Web;
 using EastFive.Web.Services;
 using EastFive.Collections.Generic;
 using EastFive.Linq;

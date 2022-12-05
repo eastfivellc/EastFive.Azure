@@ -7,6 +7,7 @@ using Microsoft.Azure.Cosmos.Table;
 
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Extensions;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.StorageTables.Driver
 {
@@ -118,7 +119,7 @@ namespace EastFive.Azure.StorageTables.Driver
             Func<TResult> retry,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             Func<TResult> onAlreadyExists = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = default)
         {
             return exception.ParseStorageException(
                 onEntityAlreadyExists: (msg) =>
@@ -147,7 +148,7 @@ namespace EastFive.Azure.StorageTables.Driver
                 onTimeout: async (msg) => // IsProblemTimeout
                 {
                     if (onTimeout.IsDefaultOrNull())
-                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                        onTimeout = AzureTableDriverDynamic.GetRetryDelegate();
                     bool shouldRetry = false;
                     await onTimeout(exception.RequestInformation.HttpStatusCode, exception,
                         () =>

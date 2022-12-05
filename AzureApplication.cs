@@ -283,47 +283,47 @@ namespace EastFive.Api.Azure
             }
         }
 
-        public virtual async Task<SendReceipt> SendQueueMessageAsync(string queueName, byte[] byteContent)
-        {
-            var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
-                async (connString) =>
-                {
-                    var queueClient = new QueueClient(connString, queueName);
-                    await queueClient.CreateIfNotExistsAsync();
-                    return queueClient;
-                },
-                (why) => throw new Exception(why));
+        //public virtual async Task<SendReceipt> SendQueueMessageAsync(string queueName, byte[] byteContent)
+        //{
+        //    var appQueue = await EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
+        //        async (connString) =>
+        //        {
+        //            var queueClient = new QueueClient(connString, queueName);
+        //            await queueClient.CreateIfNotExistsAsync();
+        //            return queueClient;
+        //        },
+        //        (why) => throw new Exception(why));
 
-            var receipt = await appQueue.SendMessageAsync(byteContent.ToBase64String());
-            return receipt.Value;
-        }
+        //    var receipt = await appQueue.SendMessageAsync(byteContent.ToBase64String());
+        //    return receipt.Value;
+        //}
 
-        public virtual async Task<TResult> GetNextQueueMessageAsync<TResult>(string queueName,
-            Func<byte[],    // content
-                Func<Task>, // dequeueAsync
-                Task<TResult>> onNextMessage,
-            Func<TResult> onEmpty)
-        {
-            var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
-                async (connString) =>
-                {
-                    var queueClient = new QueueClient(connString, queueName);
-                    await queueClient.CreateIfNotExistsAsync();
-                    return queueClient;
-                },
-                (why) => throw new Exception(why));
+        //public virtual async Task<TResult> GetNextQueueMessageAsync<TResult>(string queueName,
+        //    Func<byte[],    // content
+        //        Func<Task>, // dequeueAsync
+        //        Task<TResult>> onNextMessage,
+        //    Func<TResult> onEmpty)
+        //{
+        //    var appQueue = await EastFive.Azure.AppSettings.ASTConnectionStringKey.ConfigurationString(
+        //        async (connString) =>
+        //        {
+        //            var queueClient = new QueueClient(connString, queueName);
+        //            await queueClient.CreateIfNotExistsAsync();
+        //            return queueClient;
+        //        },
+        //        (why) => throw new Exception(why));
 
-            var response = await appQueue.ReceiveMessageAsync();
-            if (null == response)
-                return onEmpty();
-            if (response.Value.IsDefaultOrNull())
-                return onEmpty();
+        //    var response = await appQueue.ReceiveMessageAsync();
+        //    if (null == response)
+        //        return onEmpty();
+        //    if (response.Value.IsDefaultOrNull())
+        //        return onEmpty();
 
-            var message = response.Value;
-            return await onNextMessage(
-                message.Body.ToArray(),
-                () => appQueue.DeleteMessageAsync(message.MessageId, message.PopReceipt));
-        }
+        //    var message = response.Value;
+        //    return await onNextMessage(
+        //        message.Body.ToArray(),
+        //        () => appQueue.DeleteMessageAsync(message.MessageId, message.PopReceipt));
+        //}
 
         protected override async Task<Initialized> InitializeAsync()
         {

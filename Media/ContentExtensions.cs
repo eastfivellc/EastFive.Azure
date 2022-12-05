@@ -18,6 +18,7 @@ using EastFive.Web.Configuration;
 using System.Drawing;
 using EastFive.Azure.Persistence.Blobs;
 using System.Net.Http.Headers;
+using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.Media
 {
@@ -139,7 +140,7 @@ namespace EastFive.Azure.Media
 
         public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
             string contentType = default,
-            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
         {
             return content.BlobCreateAsync("content",
                 (contentId) => contentId.AsRef<Content>(),
@@ -153,7 +154,7 @@ namespace EastFive.Azure.Media
             Func<TResult> onAlreadyExists = default,
             Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
-            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
         {
             return content.BlobCreateAsync(contentRef.id, "content",
                 onSuccess,
@@ -169,7 +170,7 @@ namespace EastFive.Azure.Media
             Func<TResult> onAlreadyExists = default,
             Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
-            Azure.StorageTables.Driver.AzureStorageDriver.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
         {
             return content.BlobCreateAsync(contentRef.id, "content",
                 onSuccess,

@@ -1,21 +1,21 @@
-﻿using EastFive.Collections.Generic;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Web;
-using EastFive.Serialization;
-using EastFive.Extensions;
-using BlackBarLabs.Web;
 using System.Net.Http;
 using System.Threading;
+using System.Net.Http.Headers;
+using System.Runtime.Serialization;
+
+using EastFive.Collections.Generic;
+using EastFive.Serialization;
+using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
-using EastFive.Azure;
-using System.Net.Http.Headers;
 using EastFive.Api;
-using System.Runtime.Serialization;
+using EastFive.Azure;
 
 namespace EastFive.Azure.Auth
 {

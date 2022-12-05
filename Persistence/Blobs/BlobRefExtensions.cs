@@ -87,7 +87,7 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<byte[], string, TResult> onSuccess,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
         {
             var blobName = blobRef.Id;
             return AzureTableDriverDynamic
@@ -107,7 +107,7 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<Stream, string, TResult> onSuccess,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
         {
             var blobName = blobRef.Id;
             return AzureTableDriverDynamic

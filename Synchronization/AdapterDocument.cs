@@ -352,29 +352,6 @@ namespace EastFive.Azure.Synchronization.Persistence
                 });
         }
 
-        internal static Task<TResult> ShimUpdateAsync<TResult>(Guid sourceAdapterId,
-            Func<Adapter, Func<Guid[], Guid, string, KeyValuePair<string, string>[], Task>, Task<TResult>> onFound,
-            Func<TResult> onNotFound)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    return azureStorageRepository.UpdateAsync<AdapterDocument, TResult>(sourceAdapterId,
-                        (adapterDoc, saveAsync) =>
-                        {
-                            var adapter = Convert(adapterDoc);
-                            return onFound(adapter,
-                                (connectorIds, integrationId, name, identifiers) =>
-                                {
-                                    adapterDoc.SetConnectorIds(connectorIds);
-                                    adapterDoc.IntegrationId = integrationId;
-                                    adapterDoc.Name = name;
-                                    adapterDoc.SetIdentifiers(identifiers);
-                                    return saveAsync(adapterDoc);
-                                });
-                        });
-                });
-        }
 
         internal static Task<TResult> DeleteByIdAsync<TResult>(Guid adapterId,
             Func<TResult> onDeleted,
@@ -425,93 +402,6 @@ namespace EastFive.Azure.Synchronization.Persistence
                 });
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <typeparam name="TResult"></typeparam>
-        /// <typeparam name="TResultInner"></typeparam>
-        /// <param name="actorId"></param>
-        /// <param name="systemName"></param>
-        /// <param name="shouldDelete">LocalId, RemoteId, ResourceType</param>
-        /// <param name="onSuccess"></param>
-        /// <returns></returns>
-        public Task<TResult> DeleteByActorAndSystemAsync<TResult, TResultInner>(Guid actorId, Guid integrationId,
-            Func<Guid, string, string, Func<Task>, Task<TResultInner>> shouldDelete,
-            Func<IEnumerable<TResultInner>, TResult> onSuccess)
-        {
-            return AzureStorageRepository.Connection<Task<TResult>>(
-                azureStorageRepository =>
-                {
-                    throw new NotImplementedException();
-                    //return onSuccess(null).AsTask();
 
-                    //    var integrationsResults = await await azureStorageRepository
-                    //.FindLinkedDocumentsAsync<SynchronizationActorLookupDocument, SynchronizationDocument, Task<TResult>>(
-                    //        actorId, systemName,
-                    //        (actorLookupDoc) => actorLookupDoc.GetSynchronizationDocumentIds(),
-                    //    async (actorLookupDoc, syncDocs) =>
-                    //    {
-                    //        var resultsInner = await syncDocs
-                    //            .Select(
-                    //                async syncDoc =>
-                    //                {
-                    //                    bool keepIt = true;
-                    //                    var localId = syncDoc.LocalIdMaybe.HasValue ? syncDoc.LocalIdMaybe.Value : syncDoc.LocalId;
-                    //                    var result = await shouldDelete(localId, syncDoc.RemoteId, syncDoc.ResourceType,
-                    //                        async () =>
-                    //                        {
-                    //                            keepIt = await azureStorageRepository.DeleteAsync(syncDoc,
-                    //                                () => false,
-                    //                                () => false);
-                    //                            var deletedRef = await azureStorageRepository.UpdateAsync<SynchronizationLookupDocument, bool>(localId,
-                    //                                async (doc, updateAsync) =>
-                    //                                {
-                    //                                    if (doc.RemoveSynchronizationDocumentId(syncDoc.Id))
-                    //                                        await updateAsync(doc);
-                    //                                    return true;
-                    //                                },
-                    //                                () => false);
-                    //                            deletedRef.GetType();
-                    //                        });
-                    //                    var response = syncDoc.PairWithValue(result);
-                    //                    return response.PairWithValue(keepIt);
-                    //                })
-                    //            .WhenAllAsync(1);
-                    //        actorLookupDoc.SynchronizationDocumentIds = resultsInner
-                    //            .Where(ri => ri.Value)
-                    //            .Select(ri => ri.Key.Key.Id)
-                    //            .ToByteArrayOfGuids();
-                    //        return await this.azureStorageRepository.UpdateIfNotModifiedAsync(actorLookupDoc,
-                    //            () => onSuccess(resultsInner.SelectKeys().SelectValues().ToArray()),
-                    //            () => onSuccess(resultsInner.SelectKeys().SelectValues().ToArray()));
-                    //    },
-                    //    () => onSuccess(new TResultInner[] { }).ToTask());
-
-                    //    return integrationsResults;
-                });
-        }
-
-        internal Task<TResult> UpdateAsync<TResult>(Guid synchronizationId,
-            Func<Guid?, string, Func<Guid?, string, Task>, Task<TResult>> onFound,
-            Func<TResult> onNotFound)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    return azureStorageRepository.UpdateAsync<ConnectorDocument, TResult>(synchronizationId,
-                        (doc, update) =>
-                        {
-                            return default(TResult).AsTask();
-                            //return onFound(doc.LocalIdMaybe, doc.RemoteId,
-                            //    async (localId, remoteId) =>
-                            //    {
-                            //        doc.LocalIdMaybe = localId;
-                            //        doc.RemoteId = remoteId;
-                            //        await update(doc);
-                            //    });
-                        },
-                        onNotFound);
-                });
-        }
     }
 }

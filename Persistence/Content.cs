@@ -25,7 +25,7 @@ namespace EastFive.Api.Azure.Persistence
 
         private static BlobServiceClient BlobStore()
         {
-            return Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.ASTConnectionStringKey,
+            return Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString,
                 (connectionString) =>
                 {
                     return new BlobServiceClient(connectionString,

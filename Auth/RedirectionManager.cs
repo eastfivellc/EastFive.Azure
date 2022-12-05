@@ -121,7 +121,7 @@ namespace EastFive.Azure.Auth
                     )
                 )
             );
-            var table = EastFive.Azure.Persistence.AppSettings.Storage.ConfigurationString(
+            var table = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
                 (conn) =>
                 {
                     var account = CloudStorageAccount.Parse(conn);

@@ -26,7 +26,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
 
         public static TResult Connection<TResult>(Func<AzureStorageRepository, TResult> onConnected)
         {
-            var repo = AzureStorageRepository.CreateRepository(EastFive.Azure.AppSettings.ASTConnectionStringKey);
+            var repo = AzureStorageRepository.CreateRepository(EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString);
 
             return onConnected(repo);
         }

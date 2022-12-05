@@ -124,7 +124,7 @@ namespace EastFive.Azure.StorageTables.Driver
             Func<TResult> retry,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             Func<TResult> onAlreadyExists = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            EastFive.Persistence.Azure.StorageTables.Driver.AzureTableDriverDynamic.RetryDelegate onTimeout = default)
         {
             return exception.ParseStorageException(
                 onEntityAlreadyExists: (msg) =>
@@ -153,7 +153,7 @@ namespace EastFive.Azure.StorageTables.Driver
                 onTimeout: async (msg) => // IsProblemTimeout
                 {
                     if (onTimeout.IsDefaultOrNull())
-                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                        onTimeout = EastFive.Persistence.Azure.StorageTables.Driver.AzureTableDriverDynamic.GetRetryDelegate();
                     bool shouldRetry = false;
                     await onTimeout((int)exception.GetHttpStatusCode(), exception,
                         () =>

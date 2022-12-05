@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,6 +18,7 @@ using Azure.Storage.Blobs.Models;
 using Newtonsoft.Json;
 
 using EastFive;
+using EastFive.Api;
 using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -29,9 +31,6 @@ using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
 
-using BlackBarLabs.Persistence.Azure;
-using EastFive.Api;
-using System.Collections;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -46,6 +45,92 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public readonly CloudTableClient TableClient;
         public readonly BlobServiceClient BlobClient;
         public readonly global::Azure.Storage.StorageSharedKeyCredential StorageSharedKeyCredential;
+
+        public delegate Task RetryDelegate(int statusCode, Exception ex, Func<Task> retry);
+        public delegate Task<TResult> RetryDelegateAsync<TResult>(
+            Func<TResult> retry,
+            Func<int, TResult> timeout);
+
+        #region Utility methods
+
+        internal static RetryDelegate GetRetryDelegate()
+        {
+            var retriesAttempted = 0;
+            var retryDelay = TimeSpan.FromSeconds(1.0);
+            return async (statusCode, ex, retry) =>
+            {
+                TimeSpan retryDelayInner = retryDelay;
+                retryDelay = TimeSpan.FromSeconds(retryDelay.TotalSeconds * retryDelay.TotalSeconds);
+                bool shouldRetry = retriesAttempted < 4;
+                retriesAttempted++;
+                if (!shouldRetry)
+                    throw new Exception("After " + retriesAttempted + "attempts finding the resource timed out");
+                await Task.Delay(retryDelay);
+                await retry();
+            };
+        }
+
+        public static RetryDelegateAsync<TResult> GetRetryDelegateContentionAsync<TResult>(
+            int maxRetries = 100)
+        {
+#pragma warning disable SCS0005 // Weak random number generator
+            var retriesAttempted = 0;
+            var lastFail = default(long);
+            var rand = new Random();
+            return
+                async (retry, timeout) =>
+                {
+                    bool shouldRetry = retriesAttempted <= maxRetries;
+                    if (!shouldRetry)
+                        return timeout(retriesAttempted);
+                    var failspan = (retriesAttempted > 0) ?
+                        DateTime.UtcNow.Ticks - lastFail :
+                        0;
+                    lastFail = DateTime.UtcNow.Ticks;
+
+                    retriesAttempted++;
+                    var bobble = rand.NextDouble() * 2.0;
+                    var retryDelay = TimeSpan.FromTicks((long)(failspan * bobble));
+                    await Task.Delay(retryDelay);
+                    return retry();
+                };
+#pragma warning restore SCS0005 // Weak random number generator
+        }
+
+        protected static RetryDelegateAsync<TResult> GetRetryDelegateCollisionAsync<TResult>(
+            TimeSpan delay = default(TimeSpan),
+            TimeSpan limit = default(TimeSpan),
+            int maxRetries = 10)
+        {
+#pragma warning disable SCS0005 // Weak random number generator
+            if (default(TimeSpan) == delay)
+                delay = TimeSpan.FromSeconds(0.5);
+
+            if (default(TimeSpan) == delay)
+                limit = TimeSpan.FromSeconds(60.0);
+
+            var retriesAttempted = 0;
+            var rand = new Random();
+            long delayFactor = 1;
+            return
+                async (retry, timeout) =>
+                {
+                    bool shouldRetry = retriesAttempted <= maxRetries;
+                    if (!shouldRetry)
+                        return timeout(retriesAttempted);
+                    retriesAttempted++;
+                    var bobble = rand.NextDouble() * 2.0;
+                    var delayMultiplier = ((double)(delayFactor >> 1)) + ((double)delayFactor * bobble);
+                    var retryDelay = TimeSpan.FromTicks((long)(delay.Ticks * delayMultiplier));
+                    delayFactor = delayFactor << 1;
+                    delay = TimeSpan.FromSeconds(delay.TotalSeconds + (retriesAttempted * delay.TotalSeconds));
+                    await Task.Delay(retryDelay);
+                    return retry();
+                };
+#pragma warning restore SCS0005 // Weak random number generator
+        }
+
+        #endregion
 
         #region Init / Setup / Utility
 
@@ -65,41 +150,32 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         static global::Azure.Storage.StorageSharedKeyCredential GetCredentialFromConnectionString(string connectionString)
         {
+            // This code was adapted from a Microsoft Tutorial so some of the syle does not match ours
+
             const string accountNameLabel = "AccountName";
             const string accountKeyLabel = "AccountKey";
-            const string devStoreLabel = "UseDevelopmentStorage";
-
-            const string devStoreAccountName = "devstoreaccount1";
-            const string devStoreAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
             const string errorMessage = "The connection string must have an AccountName and AccountKey or UseDevelopmentStorage=true";
 
             try
             {
-                var connectionStringValues = connectionString.Split(';')
-                    .Select(s => s.Split(new char[] { '=' }, 2))
+                var connectionStringValues = connectionString
+                    .Split(';')
+                    .Select(s => s.Split('='.AsArray(), 2))
                     .ToDictionary(s => s[0], s => s[1]);
 
                 string accountName;
                 string accountKey;
-                if (connectionStringValues.TryGetValue(devStoreLabel, out var devStoreValue) && devStoreValue == "true")
-                {
-                    accountName = devStoreAccountName;
-                    accountKey = devStoreAccountKey;
-                }
-                else
-                {
-                    if (connectionStringValues.TryGetValue(accountNameLabel, out var accountNameValue)
+                if (connectionStringValues.TryGetValue(accountNameLabel, out var accountNameValue)
                         && accountNameValue.HasBlackSpace()
                         && connectionStringValues.TryGetValue(accountKeyLabel, out var accountKeyValue)
                         && accountKeyValue.HasBlackSpace())
-                    {
-                        accountName = accountNameValue;
-                        accountKey = accountKeyValue;
-                    }
-                    else
-                    {
-                        throw new ArgumentException(errorMessage);
-                    }
+                {
+                    accountName = accountNameValue;
+                    accountKey = accountKeyValue;
+                }
+                else
+                {
+                    throw new ArgumentException(errorMessage);
                 }
 
                 return new global::Azure.Storage.StorageSharedKeyCredential(accountName, accountKey);
@@ -110,7 +186,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.ASTConnectionStringKey)
+        public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return EastFive.Web.Configuration.Settings.GetString(settingKey,
                 (connectionString) => FromStorageString(connectionString),
@@ -410,8 +486,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
             CloudTable table = default(CloudTable),
             string tableName = default(string),
-            AzureStorageDriver.RetryDelegate onTimeout =
-                default(AzureStorageDriver.RetryDelegate),
+            RetryDelegate onTimeout =
+                default(RetryDelegate),
             ICacheEntites cache = default,
             IProvideEntity entityProvider = default)
         {
@@ -469,8 +545,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         if (se.IsProblemTimeout())
                         {
                             TResult result = default(TResult);
-                            if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                onTimeout = AzureStorageDriver.GetRetryDelegate();
+                            if (default(RetryDelegate) == onTimeout)
+                                onTimeout = GetRetryDelegate();
                             await onTimeout(se.RequestInformation.HttpStatusCode, se,
                                 async () =>
                                 {
@@ -498,7 +574,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             CloudTable table = default,
             string tableName = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var operation = TableOperation.Retrieve(partitionKey, rowKey,
                 (string partitionKeyEntity, string rowKeyEntity,
@@ -551,8 +627,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 if (se.IsProblemTimeout())
                 {
                     TResult result = default(TResult);
-                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                    if (default(RetryDelegate) == onTimeout)
+                        onTimeout = GetRetryDelegate();
                     await onTimeout(se.RequestInformation.HttpStatusCode, se,
                         async () =>
                         {
@@ -1056,7 +1132,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
-           AzureStorageDriver.RetryDelegate onTimeout = default,
+           RetryDelegate onTimeout = default,
            E5CloudTable table = default)
         {
             var tableEntity = GetEntity(entity);
@@ -1147,7 +1223,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
-            AzureStorageDriver.RetryDelegate onTimeout = null,
+            RetryDelegate onTimeout = null,
             CloudTable table = default(CloudTable))
         {
             if (table.IsDefaultOrNull())
@@ -1178,8 +1254,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     case ExtendedErrorInformationCodes.Timeout:
                                         {
                                             var timeoutResult = default(TResult);
-                                            if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                                onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                            if (default(RetryDelegate) == onTimeout)
+                                                onTimeout = GetRetryDelegate();
                                             await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                                 async () =>
                                                 {
@@ -1234,7 +1310,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> success,
             Func<TResult> documentModified,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null,
+            RetryDelegate onTimeout = null,
             CloudTable table = default(CloudTable))
         {
             if (table.IsDefaultOrNull())
@@ -1256,8 +1332,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
@@ -1292,7 +1368,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public Task<TResult> ReplaceAsync<TData, TResult>(TData data,
             Func<TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null) where TData : IReferenceable
+            RetryDelegate onTimeout = null) where TData : IReferenceable
         {
             var tableData = GetEntity(data);
             return ReplaceAsync(tableData,
@@ -1304,7 +1380,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> ReplaceAsync<TData, TResult>(IAzureStorageTableEntity<TData> tableData,
             Func<TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            RetryDelegate onTimeout = null)
         {
             var table = GetTable<TData>();
             if (tableData.ETag.IsNullOrWhiteSpace())
@@ -1332,8 +1408,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
@@ -1362,7 +1438,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<bool, TResult> onSuccess,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            RetryDelegate onTimeout = null)
         {
             var tableEntity = GetEntity(tableData);
             var table = GetTable<TData>();
@@ -1405,8 +1481,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         //            case ExtendedErrorInformationCodes.Timeout:
                         //                {
                         //                    var timeoutResult = default(TResult);
-                        //                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                        //                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                        //                    if (default(RetryDelegate) == onTimeout)
+                        //                        onTimeout = GetRetryDelegate();
                         //                    await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                         //                        async () =>
                         //                        {
@@ -1456,7 +1532,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, TableResult, TResult> onSuccess,
             Func<TResult> onAlreadyExists,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-           AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             while (true)
             {
@@ -1490,7 +1566,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public Task<TResult> ReplaceAsync<TData, TResult>(ITableEntity tableEntity,
             Func<TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            RetryDelegate onTimeout = null)
         {
             var table = GetTable<TData>();
             var e5Table = new E5CloudTable(table);
@@ -1503,7 +1579,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> ReplaceAsync<TResult>(ITableEntity tableEntity, E5CloudTable table,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-            AzureStorageDriver.RetryDelegate onTimeout = null)
+            RetryDelegate onTimeout = null)
         {
             var update = TableOperation.Replace(tableEntity);
             try
@@ -1529,8 +1605,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
@@ -1557,7 +1633,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public Task<TResult> InsertOrReplaceAsync<TData, TResult>(ITableEntity tableEntity,
             Func<bool, IAzureStorageTableEntity<TData>, TResult> success,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-                AzureStorageDriver.RetryDelegate onTimeout = null,
+                RetryDelegate onTimeout = null,
                 string tableName = default)
         {
             var table = tableName.HasBlackSpace() ?
@@ -1577,7 +1653,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> InsertOrReplaceAsync<TResult>(ITableEntity tableEntity, E5CloudTable table,
             Func<bool, TableResult, TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
-                AzureStorageDriver.RetryDelegate onTimeout = null)
+                RetryDelegate onTimeout = null)
         {
             var update = TableOperation.InsertOrReplace(tableEntity);
             try
@@ -1604,8 +1680,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(ex.RequestInformation.HttpStatusCode, ex,
                                         async () =>
                                         {
@@ -1634,7 +1710,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound,
             Func<TResult> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var delete = TableOperation.Delete(entity);
             try
@@ -1654,8 +1730,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(se.RequestInformation.HttpStatusCode, se,
                                         async () =>
                                         {
@@ -1696,7 +1772,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public async Task<TableResult[]> CreateOrReplaceBatchAsync<TDocument>(string partitionKey, TDocument[] entities,
             CloudTable table = default(CloudTable),
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : ITableEntity
         {
@@ -1871,7 +1947,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, TResult> onSuccess,
             Func<TResult> onAlreadyExists,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var table = this.TableClient.GetTableReference(tableName);
             return this.CreateAsync(tableEntity, new E5CloudTable(table),
@@ -1897,7 +1973,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, TResult> onSuccess,
             Func<TResult> onAlreadyExists,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var table = GetTable<TEntity>();
             return this.CreateAsync(tableEntity, new E5CloudTable(table),
@@ -1923,7 +1999,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, TResult> onSuccess,
             Func<TResult> onAlreadyExists,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var table = TableFromEntity(entityType, this.TableClient);
             return this.CreateAsync(tableEntity, new E5CloudTable(table),
@@ -1938,7 +2014,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public async Task<TResult> InsertOrReplaceAsync<TData, TResult>(TData data,
             Func<bool, TResult> onUpdate,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync = default,
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync = default,
             string tableName = default)
         {
             var table = default(CloudTable);
@@ -1973,7 +2049,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<bool, TData, Func<TData, Task<TableResult>>, Task<TResult>> onUpdate,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync = default,
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync = default,
             string tableName = default(string))
         {
             var table = default(CloudTable);
@@ -2049,8 +2125,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             CloudTable table = default(CloudTable),
-            AzureStorageDriver.RetryDelegate onTimeout =
-                default(AzureStorageDriver.RetryDelegate))
+            RetryDelegate onTimeout =
+                default(RetryDelegate))
             where TEntity : IReferenceable
         {
             var entityRef = rowId.AsRef<TEntity>();
@@ -2067,8 +2143,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindByIdsAsync<TEntity>(
                 IRefAst[] rowKeys,
             CloudTable table = default(CloudTable),
-            AzureStorageDriver.RetryDelegate onTimeout =
-                default(AzureStorageDriver.RetryDelegate),
+            RetryDelegate onTimeout =
+                default(RetryDelegate),
             int? readAhead = default)
             where TEntity : IReferenceable
         {
@@ -2405,8 +2481,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             CloudTable table = default(CloudTable),
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
-                default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
+                default(RetryDelegateAsync<Task<TResult>>))
         {
             return UpdateAsyncAsync(rowKey, partitionKey,
                 onUpdate,
@@ -2422,8 +2498,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound = default(Func<TResult>),
             string tableName = default,
             CloudTable table = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
-                default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
+                default(RetryDelegateAsync<Task<TResult>>))
         {
             return UpdateAsyncAsync(rowKey, partitionKey,
                     typeData,
@@ -2438,8 +2514,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TData, Func<TData, Task<TableResult>>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default(Func<Task<TResult>>),
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
-                default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
+                default(RetryDelegateAsync<Task<TResult>>))
             where TData : IReferenceable
         {
             var entityRef = documentId.AsRef<TData>();
@@ -2486,8 +2562,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<ExtendedErrorInformationCodes, string, Task<TResult>> onFailure = default,
             CloudTable table = default(CloudTable),
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
-                default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
+                default(RetryDelegateAsync<Task<TResult>>))
         {
             return await await FindByIdAsync(rowKey, partitionKey,
                 async (TData currentStorage, TableResult tableResult) =>
@@ -2582,7 +2658,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     return (true, tableResult);
                                 },
                                 onModificationFailures: modificationFailure.AsArray(),
-                                onTimeout: AzureStorageDriver.GetRetryDelegate(),
+                                onTimeout: GetRetryDelegate(),
                                 table: table);
                             useResultGlobal = useResultGlobalTableResult.Item1;
                             return useResultGlobalTableResult.Item2;
@@ -2593,7 +2669,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onNotFound,
                 onFailure: default(Func<ExtendedErrorInformationCodes, string, Task<TResult>>),
                 table: table,
-                onTimeout: AzureStorageDriver.GetRetryDelegate());
+                onTimeout: GetRetryDelegate());
         }
 
         public async Task<TResult> UpdateAsyncAsync<TResult>(string rowKey, string partitionKey,
@@ -2602,8 +2678,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<Task<TResult>> onNotFound = default(Func<Task<TResult>>),
             string tableName = default,
             CloudTable table = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
-                default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>))
+            RetryDelegateAsync<Task<TResult>> onTimeoutAsync =
+                default(RetryDelegateAsync<Task<TResult>>))
         {
             table = GetTable();
             CloudTable GetTable()
@@ -2639,7 +2715,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             Func<Task<bool>> documentModified = async () =>
                             {
                                 if (onTimeoutAsync.IsDefaultOrNull())
-                                    onTimeoutAsync = AzureStorageDriver.GetRetryDelegateContentionAsync<Task<TResult>>();
+                                    onTimeoutAsync = GetRetryDelegateContentionAsync<Task<TResult>>();
 
                                 resultGlobal = await await onTimeoutAsync(
                                     async () => await UpdateAsyncAsync(rowKey, partitionKey,
@@ -2656,13 +2732,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             //    success,
                             //    documentModified,
                             //    onFailure: null,
-                            //    onTimeout: AzureStorageDriver.GetRetryDelegate(),
+                            //    onTimeout: GetRetryDelegate(),
                             //    table: table);
                             useResultGlobal = await await (Task<Task<bool>>)typeof(AzureTableDriverDynamic)
                                 .GetMethod("UpdateIfNotModifiedAsync", BindingFlags.NonPublic | BindingFlags.Instance)
                                 .MakeGenericMethod(new Type[] { typeData, typeof(Task<bool>) })
                                 .Invoke(this, new object[] { documentToSave, entity, success, documentModified, null,
-                                    AzureStorageDriver.GetRetryDelegate(), table });
+                                    GetRetryDelegate(), table });
 
 
                         });
@@ -2671,7 +2747,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onNotFound,
                 default,
                 table: table,
-                onTimeout: AzureStorageDriver.GetRetryDelegate());
+                onTimeout: GetRetryDelegate());
         }
 
         #endregion
@@ -2681,7 +2757,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,
                 Func<ITableEntity, TableResult, TResult> perItemCallback,
                 string tableName = default(string),
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
         {
             var table = tableName.HasBlackSpace() ?
@@ -2701,7 +2777,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TResult> CreateOrUpdateBatch<TResult>(IEnumerableAsync<ITableEntity> entities,
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
-            AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+            RetryDelegate onTimeout = default(RetryDelegate),
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
         {
             return CreateOrReplaceBatch<ITableEntity, TResult>(entities,
@@ -2718,7 +2794,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<TDocument, string> getPartitionKey,
                 Func<ITableEntity, TableResult, TResult> perItemCallback,
                 string tableName = default(string),
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
             where TDocument : class, ITableEntity
         {
@@ -2743,7 +2819,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerableAsync<TData> datas,
                 Func<ITableEntity, TableResult, TResult> perItemCallback,
                 string tableName = default(string),
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
                 int? readAhead = default)
             where TData : IReferenceable
@@ -2830,7 +2906,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TResult> CreateOrReplaceBatch<TData, TResult>(IEnumerable<TData> datas,
                 Func<ITableEntity, TableResult, TResult> perItemCallback,
                 string tableName = default(string),
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
                 int? readAhead = default)
             where TData : IReferenceable
@@ -2866,7 +2942,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, TableResult, TResult> perItemCallback,
             string tableName = default(string),
             CloudTable table = default(CloudTable),
-            AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+            RetryDelegate onTimeout = default(RetryDelegate),
             EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger))
         {
             if(table.IsDefaultOrNull())
@@ -2890,7 +2966,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Func<TDocument, TableResult, TResult> perItemCallback,
                 CloudTable table,
                 out Task<object[]> modifiersTask,
-                AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+                RetryDelegate onTimeout = default(RetryDelegate),
                 EastFive.Analytics.ILogger diagnostics = default(EastFive.Analytics.ILogger),
                 int? readAhead = default)
             where TDocument : ITableEntity
@@ -2981,7 +3057,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TData, Func<Task>, Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
                 default(Func<ExtendedErrorInformationCodes, string, TResult>),
-            AzureStorageDriver.RetryDelegate onTimeout = default(AzureStorageDriver.RetryDelegate),
+            RetryDelegate onTimeout = default(RetryDelegate),
             string tableName = default(string))
         {
             var table = tableName.HasBlackSpace() ?
@@ -3026,7 +3102,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TEntity, Func<Task<IAzureStorageTableEntity<TEntity>>>, Task<TResult>> onFound,
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default,
+            RetryDelegate onTimeout = default,
             string tableName = default)
         {
             return await await FindByIdAsync(rowKey, partitionKey,
@@ -3056,7 +3132,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound,
             Func<TResult> onModified,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default,
+            RetryDelegate onTimeout = default,
             string tableName = default)
         {
             var table = tableName.HasBlackSpace() ?
@@ -3079,7 +3155,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ITableEntity, object, TResult> onFound,
             Func<TResult> onNotFound,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default,
+            RetryDelegate onTimeout = default,
             string tableName = default)
         {
             return await await FindByIdAsync(rowKey, partitionKey, typeData,
@@ -3112,7 +3188,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onNotFound,
             Func<Task<TResult>> onModified = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default,
+            RetryDelegate onTimeout = default,
             string tableName = default)
         {
             var table = tableName.HasBlackSpace() ?
@@ -3145,8 +3221,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             case ExtendedErrorInformationCodes.Timeout:
                                 {
                                     var timeoutResult = default(TResult);
-                                    if (default(AzureStorageDriver.RetryDelegate) == onTimeout)
-                                        onTimeout = AzureStorageDriver.GetRetryDelegate();
+                                    if (default(RetryDelegate) == onTimeout)
+                                        onTimeout = GetRetryDelegate();
                                     await onTimeout(se.RequestInformation.HttpStatusCode, se,
                                         async () =>
                                         {
@@ -3193,7 +3269,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public IEnumerableAsync<TResult> DeleteBatch<TData, TResult>(IEnumerableAsync<Guid> documentIds,
             Func<TableResult, TResult> result,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
             where TData : IReferenceable
         {
             return documentIds
@@ -3220,7 +3296,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public IEnumerableAsync<TResult> DeleteBatch<TData, TResult>(IEnumerableAsync<TData> documents,
             Func<TableResult, TResult> result,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
             where TData : IReferenceable
         {
             return documents
@@ -3295,7 +3371,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public IEnumerableAsync<TResult> DeleteBatch<TData, TResult>(IEnumerable<Guid> documentIds,
             Func<TableResult, TResult> result,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
             where TData : IReferenceable
         {
             return documentIds
@@ -3336,7 +3412,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         default(ContinueAquiringLockDelegateAsync<TDocument, TResult>),
                     ConditionForLockingDelegateAsync<TDocument, TResult> shouldLock =
                         default(ConditionForLockingDelegateAsync<TDocument, TResult>),
-                AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeout = default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>),
+                RetryDelegateAsync<Task<TResult>> onTimeout = default(RetryDelegateAsync<Task<TResult>>),
                 Func<TDocument, TDocument> mutateUponLock = default(Func<TDocument, TDocument>))
             where TDocument : IReferenceable => LockedUpdateAsync(rowKey, partitionKey,
                     lockedPropertyExpression, 0, DateTime.UtcNow,
@@ -3357,7 +3433,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         default(ContinueAquiringLockDelegateAsync<TDocument, TResult>),
                     ConditionForLockingDelegateAsync<TDocument, TResult> shouldLock =
                         default(ConditionForLockingDelegateAsync<TDocument, TResult>),
-                AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeout = default(AzureStorageDriver.RetryDelegateAsync<Task<TResult>>),
+                RetryDelegateAsync<Task<TResult>> onTimeout = default(RetryDelegateAsync<Task<TResult>>),
                 Func<TDocument, TDocument> mutateUponLock = default(Func<TDocument, TDocument>))
             where TDocument : IReferenceable => LockedUpdateAsync(
                     rowKey, partitionKey,
@@ -3379,12 +3455,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onLockRejected = default,
             ContinueAquiringLockDelegateAsync<TDocument, TResult> onAlreadyLocked = default,
             ConditionForLockingDelegateAsync<TDocument, TResult> shouldLock = default,
-            AzureStorageDriver.RetryDelegateAsync<Task<TResult>> onTimeout = default,
+            RetryDelegateAsync<Task<TResult>> onTimeout = default,
             Func<TDocument, TDocument> mutateUponLock = default)
             where TDocument : IReferenceable
         {
             if (onTimeout.IsDefaultOrNull())
-                onTimeout = AzureStorageDriver.GetRetryDelegateContentionAsync<Task<TResult>>();
+                onTimeout = GetRetryDelegateContentionAsync<Task<TResult>>();
 
             if (onAlreadyLocked.IsDefaultOrNull())
                 onAlreadyLocked = (retryCountDiscard, initialPassDiscard, doc, continueAquiring, force) => continueAquiring();
@@ -3550,7 +3626,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateOrUpdateAsync(
+            RetryDelegate onTimeout = default) => BlobCreateOrUpdateAsync(
                     content, blobId.ToString("N"), containerName,
                 onSuccess,
                 onFailure,
@@ -3564,7 +3640,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3601,7 +3677,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string contentDisposition = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3641,7 +3717,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) =>
+            RetryDelegate onTimeout = default) =>
                 BlobCreateAsync<TResult>(content, blobId.ToString("N"), containerName,
                     onSuccess, 
                     onAlreadyExists: onAlreadyExists, 
@@ -3656,7 +3732,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             string contentType = default,
             string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3711,7 +3787,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobId, containerName,
+            RetryDelegate onTimeout = default) => BlobCreateAsync(blobId, containerName,
                     stream => content.CopyToAsync(stream),
                 onSuccess: onSuccess,
                 onAlreadyExists: onAlreadyExists,
@@ -3727,7 +3803,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(blobName, containerName,
+            RetryDelegate onTimeout = default) => BlobCreateAsync(blobName, containerName,
                     stream => content.CopyToAsync(stream),
                 onSuccess: onSuccess,
                 onAlreadyExists: onAlreadyExists,
@@ -3744,7 +3820,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobCreateAsync(
+            RetryDelegate onTimeout = default) => BlobCreateAsync(
                     blobId.ToString("N"), containerName, writeAsync:writeAsync,
                 onSuccess: onSuccess,
                 onAlreadyExists: onAlreadyExists,
@@ -3761,7 +3837,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             var container = this.BlobClient.GetBlobContainerClient(containerName);
             var createResponse = await container.CreateIfNotExistsAsync();
@@ -3816,7 +3892,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobInformationAsync(
+            RetryDelegate onTimeout = default) => BlobInformationAsync(
                     blobId.ToString("N"), containerName,
                 onFound,
                 onNotFound,
@@ -3827,7 +3903,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3852,7 +3928,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<byte[], string, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadBytesAsync(
+            RetryDelegate onTimeout = default) => BlobLoadBytesAsync(
                     blobId.ToString("N"), containerName,
                 (bytes, properties) => onFound(bytes, properties.ContentType),
                 onNotFound,
@@ -3863,7 +3939,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<byte[], BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3912,7 +3988,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<System.IO.Stream, string, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
+            RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
                 (stream, properties) => onFound(stream, properties.ContentType),
                 onNotFound,
                 onFailure,
@@ -3922,7 +3998,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<System.IO.Stream, string, IDictionary<string, string>, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
+            RetryDelegate onTimeout = default) => BlobLoadStreamAsync(blobId.ToString("N"), containerName,
                 (stream, properties) => onFound(stream, properties.ContentType, properties.Metadata),
                 onNotFound,
                 onFailure,
@@ -3932,7 +4008,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<System.IO.Stream, BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {
@@ -3967,7 +4043,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<BlobProperties, TResult> onFound,
             Func<TResult> onNotFound = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureStorageDriver.RetryDelegate onTimeout = default)
+            RetryDelegate onTimeout = default)
         {
             try
             {

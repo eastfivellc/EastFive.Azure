@@ -5,12 +5,7 @@ namespace EastFive.Azure
     [Config]
     public static class AppSettings
     {
-        [ConfigKey("Connection string used by default for AzureStorageTables.",
-           DeploymentOverrides.Suggested,
-           DeploymentSecurityConcern = false,
-           Location = "Azure Portal | Storage | Connection Strings",
-           PrivateRepositoryOnly = true)]
-        public const string ASTConnectionStringKey = "EastFive.Azure.StorageTables.ConnectionString";
+        
         public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
 
         [Config]
@@ -36,7 +31,38 @@ namespace EastFive.Azure
                     Location = "Resolved by performance testing.",
                     DeploymentSecurityConcern = false)]
                 public const string MinimumParallelConnections = "EastFive.Azure.Persistence.StorageTables.MinimumParallelConnections";
+
+                [ConfigKey("Connection string used by default for AzureStorageTables.",
+                    DeploymentOverrides.Suggested,
+                    DeploymentSecurityConcern = false,
+                    Location = "Azure Portal | Storage | Connection Strings",
+                    PrivateRepositoryOnly = true)]
+                public const string ConnectionString = "EastFive.Azure.StorageTables.ConnectionString";
             }
+
+            [Config]
+            public static class DataLake
+            {
+                [ConfigKey("Connection string used by default for AzureStorageTables.",
+                    DeploymentOverrides.Suggested,
+                    DeploymentSecurityConcern = false,
+                    Location = "Azure Portal | Storage | Connection Strings",
+                    PrivateRepositoryOnly = true)]
+                public const string ConnectionString = "EastFive.Azure.DataLake.ConnectionString";
+
+                [ConfigKey("When the total of HTTP connections reaches this point the connection pool will stop growing.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Total connections allowed on a given machine.",
+                    DeploymentSecurityConcern = false)]
+                public const string ConnectionCountGrowthStoppingPoint = "EastFive.Azure.Persistence.StorageTables.ConnectionCountGrowthStoppingPoint";
+
+                [ConfigKey("Size of the connection pool will not go below this point.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Resolved by performance testing.",
+                    DeploymentSecurityConcern = false)]
+                public const string MinimumParallelConnections = "EastFive.Azure.Persistence.StorageTables.MinimumParallelConnections";
+            }
+            
         }
 
         [ConfigKey("Connection string that is used for the service bus.",

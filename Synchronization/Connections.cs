@@ -810,67 +810,6 @@ namespace EastFive.Azure.Synchronization
                 onLocalAdapterNotFound.AsAsyncFunc());
         }
 
-        public static Task<TResult> ShimUpdateConnectorIdsAsync<TResult>(Adapter localAdapter, Guid remoteIntegrationId,
-            Func<Connection, TResult> onFound,
-            Func<TResult> onNotFound)
-        {
-            return Persistence.ConnectorDocument.ShimFindByLocalAdapterAsync(localAdapter.adapterId,
-                async (pairs) =>
-                {
-                    return await await pairs.FirstAsync(
-                        async (pair) =>
-                        {
-                            var connector = pair.Key;
-                            var remoteAdapter = pair.Value;
-                            if (!remoteAdapter.connectorIds.Contains(connector.connectorId) || 
-                                !localAdapter.connectorIds.Contains(connector.connectorId) ||
-                                remoteAdapter.integrationId == default(Guid))
-                            {
-                                await Persistence.AdapterDocument.ShimUpdateAsync(remoteAdapter.adapterId,
-                                    async (remote, saveRemoteAsync) =>
-                                    {
-                                        remote.connectorIds = remote.connectorIds
-                                            .Append(connector.connectorId)
-                                            .Distinct()
-                                            .ToArray();
-                                        remote.integrationId = remoteIntegrationId;
-                                        await saveRemoteAsync(
-                                            remote.connectorIds,
-                                            remoteIntegrationId,
-                                            remote.name,
-                                            remote.identifiers);
-                                        return await Persistence.AdapterDocument.UpdateAsync(localAdapter.adapterId,
-                                            async (local, saveLocalAsync) =>
-                                            {
-                                                local.connectorIds = local.connectorIds
-                                                    .Append(connector.connectorId)
-                                                    .Distinct()
-                                                    .ToArray();
-                                                await saveLocalAsync(
-                                                    local.connectorIds,
-                                                    local.name,
-                                                    local.identifiers);
-                                                return onFound(new Connection
-                                                {
-                                                    adapterInternal = local,
-                                                    adapterExternal = remote,
-                                                    connector = connector
-                                                });
-                                            },
-                                            () => onNotFound());
-                                    },
-                                    () => onNotFound());
-                            }
-                            return onFound(new Connection
-                            {
-                                adapterInternal = localAdapter,
-                                adapterExternal = remoteAdapter,
-                                connector = connector
-                            });
-                        },
-                        onNotFound.AsAsyncFunc());
-                });
-        }
 
         public static Task<TResult> FindAdapterConnectorsByKeyAsync<TResult>(string localResourceKey, Guid localIntegrationId, string localResourceType,
             Func<IEnumerableAsync<KeyValuePair<Connector, Adapter>>, TResult> onFound,
