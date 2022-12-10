@@ -36,7 +36,7 @@ namespace EastFive.Api.Azure.Modules
         {
             if (!request.Headers.ContainsKey(HeaderKey))
                 return continueExecution(controllerType, httpApp, request);
-            return EastFive.Azure.AppSettings.TableInformationToken.ConfigurationString(
+            return EastFive.Azure.AppSettings.Persistence.StorageTables.TableInformationToken.ConfigurationString(
                 async headerToken =>
                 {
                     if (request.Headers[HeaderKey].First() != headerToken)
