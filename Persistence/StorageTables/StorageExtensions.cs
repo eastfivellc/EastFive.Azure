@@ -25,6 +25,7 @@ using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Azure.Storage.Blobs.Models;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -243,7 +244,21 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         }
                         return onMissing().PairWithKey(default(MemberInfo));
                     });
-            return partitionKeyMember.Value.ComputePartitionKey(entityRef, partitionKeyMember.Key, rowKey);
+            return typeof(TEntity)
+                .GetPropertyAndFieldsWithAttributesInterface<EastFive.Persistence.IComputeAzureStorageTableRowKey>()
+                .First<(MemberInfo, IComputeAzureStorageTableRowKey), string>(
+                    (rowKeyAttr, next) =>
+                    {
+                        if(rowKeyAttr.Item1 != partitionKeyMember.Key)
+                            throw new ArgumentException($"Unable to resolve single value lookup on `{typeof(TEntity).FullName}` as RowKey uses `{rowKeyAttr.Item1.Name}` {rowKeyAttr.Item1.MemberType} and PartitionKey uses `{partitionKeyMember.Key.Name}` {partitionKeyMember.Key.MemberType}.");
+
+                        return partitionKeyMember.Value.ComputePartitionKey(entityRef, partitionKeyMember.Key, rowKey);
+                    },
+                    () =>
+                    {
+                        throw new ArgumentException($"{typeof(TEntity).FullName} does not contain a field or property with an attribute that implements {nameof(EastFive.Persistence.IComputeAzureStorageTableRowKey)} (aka a row key property).");
+                    });
+            
         }
 
         public static string StorageComputePartitionKey<TEntity>(this IRef<TEntity> entityRef, string rowKey,
@@ -1762,10 +1777,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey: connectionStringConfigKey)
                 .BlobCreateOrUpdateAsync(content, blobId, containerName,
                 onSuccess,
                 onFailure,
@@ -1774,23 +1790,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onTimeout: onTimeout);
         }
 
-        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, string blobId, string containerName,
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, string blobName, string containerName,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             string contentDisposition = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
-                .BlobCreateOrUpdateAsync(content, blobId, containerName,
-                onSuccess,
-                onFailure,
-                contentType: contentType,
-                metadata: metadata,
-                contentDisposition: contentDisposition,
-                onTimeout: onTimeout);
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobCreateOrUpdateAsync(content,
+                        blobName:blobName, containerName:containerName,
+                    onSuccess,
+                    onFailure,
+                    contentType: contentType,
+                    metadata: metadata,
+                    contentDisposition: contentDisposition,
+                    onTimeout: onTimeout);
         }
 
         public static Task<Guid> BlobCreateAsync(this byte[] content, string containerName,
@@ -1812,7 +1830,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             var blobId = Guid.NewGuid();
             return content.BlobCreateAsync(blobId, containerName,
@@ -1821,7 +1840,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onFailure: onFailure,
                 contentType: contentType,
                 metadata: metadata,
-                onTimeout: onTimeout);
+                onTimeout: onTimeout,
+                connectionStringConfigKey: connectionStringConfigKey);
         }
 
         public static Task<TResult> BlobCreateAsync<TResult>(this byte[] content, Guid blobId, string containerName,
@@ -1830,10 +1850,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey: connectionStringConfigKey)
                 .BlobCreateAsync(content, blobId, containerName,
                     onSuccess,
                     onAlreadyExists: onAlreadyExists,
@@ -1849,10 +1870,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey: connectionStringConfigKey)
                 .BlobCreateAsync(content, blobId, containerName,
                     onSuccess,
                     onAlreadyExists: onAlreadyExists,
@@ -1868,10 +1890,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey: connectionStringConfigKey)
                 .BlobCreateAsync(content, blobName, containerName,
                     onSuccess,
                     onAlreadyExists: onAlreadyExists,
@@ -1889,10 +1912,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
             IDictionary<string, string> metadata = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey: connectionStringConfigKey)
                 .BlobCreateAsync(blobId, containerName,
                         writeAsync,
                     onSuccess: onSuccess,
@@ -1907,7 +1931,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<byte[], string, TResult> onSuccess,
             Func<TResult> onNotFound,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             if (!blobId.HasValue)
                 return onNotFound();
@@ -1915,18 +1940,36 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onSuccess,
                 onNotFound: onNotFound,
                 onFailure: onFailure,
-                onTimeout: onTimeout);
+                onTimeout: onTimeout,
+                connectionStringConfigKey:connectionStringConfigKey);
         }
 
         public static Task<TResult> BlobLoadBytesAsync<TResult>(this Guid blobId, string containerName,
             Func<byte [], string, TResult> onSuccess,
             Func<TResult> onNotFound = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
             return AzureTableDriverDynamic
-                .FromSettings()
+                .FromSettings(settingKey:connectionStringConfigKey)
                 .BlobLoadBytesAsync(blobId, containerName,
+                    onSuccess,
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> BlobLoadBytesAsync<TResult>(this string blobName, string containerName,
+            Func<byte[], BlobProperties, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobLoadBytesAsync(blobName, containerName,
                     onSuccess,
                     onNotFound,
                     onFailure: onFailure,
@@ -1957,6 +2000,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .BlobLoadStreamAsync(blobId, containerName,
+                    onSuccess,
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
+        public static Task<TResult> BlobListFilesAsync<TResult>(this string containerName,
+            Func<BlobItem[], TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobListFilesAsync(containerName,
                     onSuccess,
                     onNotFound,
                     onFailure: onFailure,
