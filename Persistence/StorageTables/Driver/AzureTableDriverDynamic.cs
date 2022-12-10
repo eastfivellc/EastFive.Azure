@@ -2842,7 +2842,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .Select(
                     async rows =>
                     {
-                        System.Diagnostics.Debug.WriteLine($"Processing batch of size {rows.Length}");
                         var x = CreateOrReplaceBatch(rows,
                                 row => row.RowKey,
                                 row => row.PartitionKey,
@@ -4091,6 +4090,32 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
             catch (global::Azure.RequestFailedException ex)
             {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseExtendedErrorInformation(
+                    (code, msg) => onFailure(code, msg),
+                    () => throw ex);
+            }
+        }
+
+        public async Task<TResult> BlobListFilesAsync<TResult>(string containerName,
+            Func<BlobItem[], TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var containerClient = BlobClient.GetBlobContainerClient(containerName);
+                var blobItemsPager = containerClient.GetBlobsAsync();
+                var blobItems = await blobItemsPager.ToArrayAsync();
+                return onFound(blobItems);
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (ex.IsProblemDoesNotExist())
+                    if (!onNotFound.IsDefaultOrNull())
+                        return onNotFound();
                 if (onFailure.IsDefaultOrNull())
                     throw;
                 return ex.ParseExtendedErrorInformation(
