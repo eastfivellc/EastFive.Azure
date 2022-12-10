@@ -3,56 +3,57 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Drawing;
 using System.Threading.Tasks;
+using System.Net.Http.Headers;
 
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
 using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
 
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Linq;
 using EastFive.Api;
 using EastFive.Api.Azure.Resources;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Extensions;
-using EastFive.Linq;
 using EastFive.Images;
 using EastFive.Web.Configuration;
-using System.Drawing;
 using EastFive.Azure.Persistence.Blobs;
-using System.Net.Http.Headers;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.Media
 {
     public static class ContentExtensions
     {
-        public static Task<TResult> LoadBytesAsync<TResult>(this IRef<Content> contentRef,
-            Func<byte [], string, TResult> onFound,
-            Func<TResult> onNotFound)
-        {
-            return contentRef.id.BlobLoadBytesAsync("content",
-                onFound,
-                onNotFound);
-        }
+        //public static Task<TResult> LoadBytesAsync<TResult>(this IRef<Content> contentRef,
+        //    Func<byte [], string, TResult> onFound,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return contentRef.id.BlobLoadBytesAsync("content",
+        //        onFound,
+        //        onNotFound);
+        //}
 
-        public static Task<TResult> LoadStreamAsync<TResult>(this IRef<Content> contentRef,
-            Func<Stream, string, TResult> onFound,
-            Func<TResult> onNotFound)
-        {
-            return contentRef.id.BlobLoadStreamAsync("content",
-                onFound,
-                onNotFound);
-        }
+        //public static Task<TResult> LoadStreamAsync<TResult>(this IRef<Content> contentRef,
+        //    Func<Stream, string, TResult> onFound,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return contentRef.id.BlobLoadStreamAsync("content",
+        //        onFound,
+        //        onNotFound);
+        //}
 
-        public static Task<TResult> LoadImageAsync<TResult>(this IRef<Content> contentRef,
-            Func<System.Drawing.Image, string, TResult> onFound,
+        public static Task<TResult> LoadImageAsync<TResult>(this IBlobRef contentRef,
+            Func<System.Drawing.Image, MediaTypeHeaderValue, TResult> onFound,
             Func<TResult> onNotFound,
-            Func<Stream, string, TResult> onInvalidImage = default)
+            Func<Stream, MediaTypeHeaderValue, TResult> onInvalidImage = default)
         {
             if (!OperatingSystem.IsWindows())
                 throw new NotSupportedException("OS not supported");
 
             #pragma warning disable CA1416
-            return contentRef.id.BlobLoadStreamAsync("content",
-                (imageStream, contentType) =>
+            return contentRef.LoadStreamAsync(
+                (blobName, imageStream, contentType, contentDisposition) =>
                 {
                     if(imageStream.TryReadImage(out Image image))
                         return onFound(image, contentType);
@@ -138,47 +139,47 @@ namespace EastFive.Azure.Media
             //    onNotFound);
         }
 
-        public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
-            string contentType = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
-        {
-            return content.BlobCreateAsync("content",
-                (contentId) => contentId.AsRef<Content>(),
-                contentType: contentType,
-                onTimeout: onTimeout);
-        }
+        //public static Task<IRef<Content>> ContentCreateAsync(this byte[] content,
+        //    string contentType = default,
+        //    AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+        //{
+        //    return content.BlobCreateAsync("content",
+        //        (contentId) => contentId.AsRef<Content>(),
+        //        contentType: contentType,
+        //        onTimeout: onTimeout);
+        //}
 
-        public static Task<TResult> SaveBytesAsync<TResult>(this IRef<Content> contentRef, 
-                byte[] content,
-            Func<TResult> onSuccess,
-            Func<TResult> onAlreadyExists = default,
-            Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
-        {
-            return content.BlobCreateAsync(contentRef.id, "content",
-                onSuccess,
-                onAlreadyExists: onAlreadyExists,
-                onFailure: onFailure,
-                contentType: contentType,
-                onTimeout: onTimeout);
-        }
+        //public static Task<TResult> SaveBytesAsync<TResult>(this IRef<Content> contentRef, 
+        //        byte[] content,
+        //    Func<TResult> onSuccess,
+        //    Func<TResult> onAlreadyExists = default,
+        //    Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+        //    string contentType = default,
+        //    AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+        //{
+        //    return content.BlobCreateAsync(contentRef.id, "content",
+        //        onSuccess,
+        //        onAlreadyExists: onAlreadyExists,
+        //        onFailure: onFailure,
+        //        contentType: contentType,
+        //        onTimeout: onTimeout);
+        //}
 
-        public static Task<TResult> SaveStreamAsync<TResult>(this IRef<Content> contentRef,
-                Stream content,
-            Func<TResult> onSuccess,
-            Func<TResult> onAlreadyExists = default,
-            Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
-        {
-            return content.BlobCreateAsync(contentRef.id, "content",
-                onSuccess,
-                onAlreadyExists: onAlreadyExists,
-                onFailure: onFailure,
-                contentType: contentType,
-                onTimeout: onTimeout);
-        }
+        //public static Task<TResult> SaveStreamAsync<TResult>(this IRef<Content> contentRef,
+        //        Stream content,
+        //    Func<TResult> onSuccess,
+        //    Func<TResult> onAlreadyExists = default,
+        //    Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+        //    string contentType = default,
+        //    AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+        //{
+        //    return content.BlobCreateAsync(contentRef.id, "content",
+        //        onSuccess,
+        //        onAlreadyExists: onAlreadyExists,
+        //        onFailure: onFailure,
+        //        contentType: contentType,
+        //        onTimeout: onTimeout);
+        //}
 
         public static Task<TResult> AnalyzeAsync<TResult>(this IBlobRef contentRef,
             Func<ImageAnalysis, double?, TResult> onAnalyzed,
@@ -263,7 +264,7 @@ namespace EastFive.Azure.Media
                 });
         }
 
-        public static Task<TResult> AnalyzeAsync<TResult>(this IRef<Content> contentRef,
+        public static Task<TResult> AnalyzeAsync<TResult>(this IBlobRef contentRef,
             Func<ImageAnalysis, double?, TResult> onAnalyzed,
             Func<TResult> onNotFound = default)
         {
@@ -281,7 +282,7 @@ namespace EastFive.Azure.Media
                                 new System.Net.Http.DelegatingHandler[] { }))
                             {
                                 return await await contentRef.LoadStreamAsync(
-                                    async (imageStream, contentType) =>
+                                    async (blobName, imageStream, contentType, contentDisposition) =>
                                     {
                                         var widthMultiplier = default(double?);
                                         if (imageStream.Length > 4000000)
