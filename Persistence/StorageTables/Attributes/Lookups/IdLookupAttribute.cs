@@ -18,6 +18,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
+                // This cannot be an exception since other querys on the same property could work
                 return onNoMatch($"{nameof(IdLookupAttribute)} only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();

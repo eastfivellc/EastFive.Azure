@@ -804,10 +804,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                     return RunQuery<TEntity>(whereFilter, table);
                                 }
 
-                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy.");
+                                var assignmentsNames = memberAssignments.Select(kvp => kvp.Key.Identification()).Join(",");
+                                var line2 = $" or {assignmentsNames} did not match any {nameof(IProvideFindBy)} queries.";
+                                throw new ArgumentException($"{memberCandidate.Identification()} does not contain an attribute that implements {nameof(IProvideFindBy)}, {nameof(IProvideTableQuery)}, or {nameof(IComputeAzureStorageTablePartitionKey)}{line2}");
                             });
                 },
-                () => throw new Exception());
+                () => throw new ArgumentException($"Expression {by} is not a parsable member expression"));
         }
 
         private Task<TResult> FindByInternalAsync<TRefEntity, TMatch, TEntity, TResult>(IRef<TRefEntity> entityRef,
@@ -875,7 +877,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 });
                     }
                 },
-                () => throw new Exception());
+                () => throw new ArgumentException($"Expression {by} is not a parsable member expression"));
         }
 
         public IEnumerableAsync<IRefAst> FindIdsBy<TMatch, TEntity>(object findByValue,
@@ -910,10 +912,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             },
                             () =>
                             {
-                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy that utilizes the query parameters provided.");
+                                throw new ArgumentException($"{memberCandidate.Identification()} does not contain an attribute that implements {nameof(IProvideFindBy)}.");
                             });
                 },
-                () => throw new Exception());
+                () => throw new ArgumentException($"Expression {by} is not a parsable member expression"));
         }
 
         public Task<TResult> FindModifiedByAsync<TMatch, TEntity, TResult>(object findByValue,
@@ -949,10 +951,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             },
                             () =>
                             {
-                                throw new ArgumentException("TEntity does not contain an attribute of type IProvideFindBy.");
+                                throw new ArgumentException($"{memberCandidate.Identification()} does not contain an attribute that implements {nameof(IProvideFindBy)}.");
                             });
                 },
-                () => throw new Exception());
+                () => throw new ArgumentException($"Expression {by} is not a parsable member expression"));
         }
 
         public static IEnumerableAsync<TEntity> FindAllInternal<TEntity>(
