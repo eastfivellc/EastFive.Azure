@@ -140,10 +140,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             TableClient.DefaultRequestOptions.RetryPolicy =
                 new ExponentialRetry(DefaultBackoffForRetry, DefaultNumberOfTimesToRetry);
 
-            BlobClient = new BlobServiceClient(connectionString,
-                new BlobClientOptions
-                {
-                });
+            var options = new BlobClientOptions();
+            options.Retry.NetworkTimeout = TimeSpan.FromMinutes(10);
+            BlobClient = new BlobServiceClient(connectionString, options);
             
             StorageSharedKeyCredential = GetCredentialFromConnectionString(connectionString);
         }
@@ -3656,7 +3655,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             {
                                 ContentType = contentType,
                                 ContentDisposition = contentDisposition,
-                            }
+                            },
+                            
                         });
                 }
                 return onSuccess();
