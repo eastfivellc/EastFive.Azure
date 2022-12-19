@@ -30,6 +30,8 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
+using Microsoft.Azure.Documents;
+using System.Collections.Concurrent;
 
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
@@ -282,8 +284,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             {
                 var entityRef = rowKey.AsRef<EntityType>();
                 var deletableEntity = new DeletableEntity<EntityType>();
-                deletableEntity.rowKeyValue = entityRef.StorageComputeRowKey();
-                deletableEntity.partitionKeyValue = entityRef.StorageComputePartitionKey(deletableEntity.rowKeyValue);
+                (deletableEntity.rowKeyValue, deletableEntity.partitionKeyValue) = entityRef.StorageComputeRowAndPartitionKey();
                 return deletableEntity;
             }
         }
@@ -2131,8 +2132,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             where TEntity : IReferenceable
         {
             var entityRef = rowId.AsRef<TEntity>();
-            var rowKey = entityRef.StorageComputeRowKey();
-            var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
             return FindByIdAsync<TEntity, TResult>(rowKey, partitionKey,
                 onFound: (v, tr) => onSuccess(v, tr.Etag),
                 onNotFound: onNotFound,
@@ -2520,8 +2520,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             where TData : IReferenceable
         {
             var entityRef = documentId.AsRef<TData>();
-            var rowKey = entityRef.StorageComputeRowKey();
-            var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
             return await UpdateAsyncAsync(rowKey, partitionKey,
                 onUpdate,
                 onNotFound,

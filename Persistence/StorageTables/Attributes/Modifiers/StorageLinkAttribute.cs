@@ -161,26 +161,25 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onFailure)
             where TRefEntity : IReferenceable
         {
-            var rowKey = entityRef.StorageComputeRowKey();
-            var partitionKey = entityRef.StorageComputePartitionKey(rowKey);
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
             return repository.UpdateAsync<TRefEntity, TResult>(rowKey, partitionKey,
                 async (entity, saveAsync) =>
                 {
                     var referencedEntityType = typeof(TRefEntity);
                     var fieldToModifyFieldInfo = referencedEntityType
-                                .GetFields()
-                                .Select(
-                                    field =>
-                                    {
-                                        return field
-                                            .GetAttributesInterface<IPersistInAzureStorageTables>()
-                                            .Where(attr => attr.Name == this.ReferenceProperty)
-                                            .First(
-                                                (attr, next) => field,
-                                                () => default(FieldInfo));
-                                    })
-                                .Where(v => !v.IsDefaultOrNull())
-                                .First();
+                        .GetFields()
+                        .Select(
+                            field =>
+                            {
+                                return field
+                                    .GetAttributesInterface<IPersistInAzureStorageTables>()
+                                    .Where(attr => attr.Name == this.ReferenceProperty)
+                                    .First(
+                                        (attr, next) => field,
+                                        () => default(FieldInfo));
+                            })
+                        .Where(v => !v.IsDefaultOrNull())
+                        .First();
                     var valueToMutate = fieldToModifyFieldInfo.GetValue(entity);
                     var valueToMutateType = valueToMutate.GetType();
                     if (valueToMutateType.IsSubClassOfGeneric(typeof(IRefs<>)))
