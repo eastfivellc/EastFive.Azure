@@ -222,13 +222,12 @@ namespace EastFive.Azure.Auth
                 EastFive.Api.Security security,
                 IHttpRequest request,
             RedirectResponse onRedirection,
-            NotFoundResponse onNotFound,
-            GeneralFailureResponse onFailure)
+            ContentTypeResponse<string> onFailure)
         {
             return authRef.StorageUpdateAsync(
                 async (authorization, saveAsync) =>
                 {
-                    var url = await await Method.ById(authorization.Method, application,
+                    return await await Method.ById(authorization.Method, application,
                         async method =>
                         {
                             return await await method.ParseTokenAsync(authorization.parameters, application,
@@ -239,42 +238,35 @@ namespace EastFive.Azure.Auth
                                         async pingAuthName =>
                                         {
                                             return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
-                                                reportSetId =>
+                                                async (reportSetId) =>
                                                 {
                                                     var requestParams = authorization.parameters
                                                         .AppendIf("PingAuthName".PairWithValue(pingAuthName), !authorization.parameters.ContainsKey("PingAuthName"))
                                                         .AppendIf("ReportSetId".PairWithValue(reportSetId.ToString()), !authorization.parameters.ContainsKey("ReportSetId"))
                                                         .ToDictionary();
 
-                                                    return Auth.Redirection.ProcessAsync(authorization, 
+                                                    return await await Auth.Redirection.ProcessAsync(authorization, 
                                                             updatedAuth => 1.AsTask(),
                                                             method, externalId, requestParams,
                                                             application, request, endpoints, loginProvider, request.RequestUri,
-                                                        (uri, accountIdMaybe, modifier) => uri,
-                                                        (why) => default(Uri),
+                                                        async (uri, accountIdMaybe, modifier) =>
+                                                        {
+                                                            authorization.expired = false;
+                                                            await saveAsync(authorization);
+                                                            return onRedirection(uri);
+                                                        },
+                                                        (why) => onFailure(why).AsTask(),
                                                         application.Telemetry);
                                                 },
-                                                why =>
-                                                {
-                                                    return default(Uri).AsTask();
-                                                });
+                                                why => onFailure(why).AsTask());
                                         },
-                                        why =>
-                                        {
-                                            return default(Uri).AsTask();
-                                        });
+                                        why => onFailure(why).AsTask());
                                 },
-                                (why) => default(Uri).AsTask());
+                                (why) => onFailure(why).AsTask());
                         },
-                        () => default(Uri).AsTask());
-                    if (url.IsDefaultOrNull())
-                        return onFailure("Failed to determine correct redirect URL");
-
-                    authorization.expired = false;
-                    await saveAsync(authorization);
-                    return onRedirection(url);
+                        () => onFailure("This login provider is not available").AsTask());
                 },
-                () => onNotFound());
+                () => onFailure("The authorization was not found"));
         }
 
         public struct RedirectionMinimal
