@@ -90,6 +90,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [EastFive.Api.Meta.Flows.WorkflowStep(
             StepName = "Get Voucher Token",
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = 5.0)]
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(

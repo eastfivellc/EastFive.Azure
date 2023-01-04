@@ -216,6 +216,7 @@ namespace EastFive.Azure.Auth
 
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = 3.0)]
         [HttpPost]
         public async static Task<IHttpResponse> CreateAsync(

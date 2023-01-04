@@ -119,6 +119,7 @@ namespace EastFive.Azure.Login
 
         [WorkflowStep(
             FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Version = Workflows.PasswordLoginCreateAccount.Version,
             Step = 2.0,
             StepName = "Start Authentication Process",
             FollowRedirects = false)]
@@ -182,6 +183,7 @@ namespace EastFive.Azure.Login
 
         [WorkflowStep(
             FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Version = Workflows.PasswordLoginCreateAccount.Version,
             Step = 3.0,
             StepName = "Login")]
         [Api.HttpPatch]

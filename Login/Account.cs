@@ -56,6 +56,7 @@ namespace EastFive.Azure.Login
 
         [WorkflowStep(
             FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Version = Workflows.PasswordLoginCreateAccount.Version,
             Step = 1.0,
             StepName = "Create New Account")]
         [Api.HttpPost]

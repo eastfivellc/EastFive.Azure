@@ -150,6 +150,7 @@ namespace EastFive.Azure.Auth
 
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = 2.0)]
         [Api.HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
@@ -229,6 +230,7 @@ namespace EastFive.Azure.Auth
 
         [WorkflowStep(
             FlowName = Workflows.PasswordLoginCreateAccount.FlowName,
+            Version = Workflows.PasswordLoginCreateAccount.Version,
             Step = 4.0,
             StepName = "Trade Authorization ID for Session")]
         [Api.HttpPost]

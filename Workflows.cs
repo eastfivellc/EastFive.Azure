@@ -11,6 +11,7 @@ namespace EastFive.Azure
         public class AuthorizationFlow
         {
             public const string FlowName = "AuthorizationFlow";
+            public const string Version = "2023.1.4";
 
             public class Variables
             {
@@ -25,6 +26,7 @@ namespace EastFive.Azure
         {
             // WorkflowStep.FlowName
             public const string FlowName = "HijackLogin";
+            public const string Version = "2023.1.4";
 
             public static class Steps
             {
@@ -113,6 +115,8 @@ namespace EastFive.Azure
         public class MonitoringFlow
         {
             public const string FlowName = "Monitoring";
+            public const string Version = "2023.1.4";
+
             public class Variables
             {
                 public const string CreatedNotification = "TeamsNotification";
@@ -123,6 +127,8 @@ namespace EastFive.Azure
         public class PasswordLoginCreateAccount
         {
             public const string FlowName = "CreateAccount";
+            public const string Version = "2023.1.4";
+
             public class Variables
             {
                 public const string UserId = "UserId";

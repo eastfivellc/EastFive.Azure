@@ -63,6 +63,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.HijackLoginFlow.FlowName,
+            Version = Workflows.HijackLoginFlow.Version,
             StepName = Workflows.HijackLoginFlow.Steps.ListLogins,
             Step = Workflows.HijackLoginFlow.Ordinals.ListLogins)]
         [PIIAdminClaim]
@@ -290,6 +291,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpAction("Choose")]
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.HijackLoginFlow.FlowName,
+            Version = Workflows.HijackLoginFlow.Version,
             StepName = Workflows.HijackLoginFlow.Steps.ChooseLogin,
             Step = Workflows.HijackLoginFlow.Ordinals.ChooseLogin)]
         [PIIAdminClaim]

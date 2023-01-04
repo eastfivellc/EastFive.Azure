@@ -59,6 +59,7 @@ namespace EastFive.Azure.Auth
         public const string LaunchAction = "Launch";
         [Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = 1.9)]
         [HttpAction(LaunchAction)]
         public static async Task<IHttpResponse> LaunchAsync(

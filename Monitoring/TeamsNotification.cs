@@ -92,6 +92,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 1.0,
             StepName = "List Notifications")]
         [HttpGet]
@@ -115,6 +116,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 2.0,
             StepName = "Create Notification")]
         [HttpPost]
@@ -149,6 +151,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 3.0,
             StepName = "Modify Notification")]
         [HttpPatch]
@@ -172,6 +175,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 6.0,
             StepName = "Delete Notification")]
         [HttpDelete]
@@ -188,6 +192,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 7.0,
             StepName = "Clear Notifications")]
         [HttpDelete]
@@ -216,6 +221,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 4.0,
             StepName = "Load and Activate Notifications")]
         [HttpAction("Load")]
@@ -232,6 +238,7 @@ namespace EastFive.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = Workflows.MonitoringFlow.FlowName,
+            Version = Workflows.MonitoringFlow.Version,
             Step = 5.0,
             StepName = "List Active Notifications")]
         [HttpAction("Active")]

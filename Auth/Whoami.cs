@@ -51,6 +51,7 @@ namespace EastFive.Azure.Auth
 
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = 4.0)]
         [Api.HttpGet] //(MatchAllBodyParameters = false)]
         public static async Task<IHttpResponse> GetAsync(

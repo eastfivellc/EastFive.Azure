@@ -173,6 +173,7 @@ namespace EastFive.Api.Azure.Monitoring
 
         [WorkflowStep(
             FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Version = EastFive.Azure.Workflows.MonitoringFlow.Version,
             Step = 10.0,
             StepName = "Available Folders")]
         [HttpOptions]
@@ -253,6 +254,7 @@ namespace EastFive.Api.Azure.Monitoring
         public const string PostmanCollectionAction = "PostmanFolder";
         [WorkflowStep(
             FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Version = EastFive.Azure.Workflows.MonitoringFlow.Version,
             Step = 12.0,
             StepName = "Send Folder To Postman")]
         [HttpAction(PostmanCollectionAction)]
@@ -295,6 +297,7 @@ namespace EastFive.Api.Azure.Monitoring
         public const string ClearPostmanAction = "PostmanClear";
         [WorkflowStep(
             FlowName = EastFive.Azure.Workflows.MonitoringFlow.FlowName,
+            Version = EastFive.Azure.Workflows.MonitoringFlow.Version,
             Step = 13.0,
             StepName = "Clear Items")]
         [HttpAction(ClearPostmanAction)]

@@ -93,10 +93,12 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
             StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
         [WorkflowStep2(
             FlowName = Workflows.HijackLoginFlow.FlowName,
+            Version = Workflows.HijackLoginFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
             StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
         public static IHttpResponse QueryAsync(
@@ -120,10 +122,12 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
+            Version = Workflows.AuthorizationFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
             StepName = Workflows.HijackLoginFlow.Steps.ChooseMethod)]
         [WorkflowStep2(
             FlowName = Workflows.HijackLoginFlow.FlowName,
+            Version = Workflows.HijackLoginFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
             StepName = Workflows.HijackLoginFlow.Steps.ChooseMethod)]
         public static IHttpResponse GetMatchAsync(
