@@ -884,7 +884,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Expression<Func<TEntity, TMatch>> by,
                 ILogger logger = default,
                 params Expression<Func<TEntity, bool>>[] queries)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
             return by.MemberInfo(
                 (memberCandidate, expr) =>

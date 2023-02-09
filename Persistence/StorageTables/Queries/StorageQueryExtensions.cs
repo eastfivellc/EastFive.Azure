@@ -17,7 +17,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         [MutatePropertyQuery]
         public static IQueryable<TResource> StorageQueryByProperty<TProperty, TResource>(this IQueryable<TResource> query,
             TProperty propertyValue, Expression<Func<TResource, TProperty>> memberExpression)
-            where TResource : IReferenceable
+            // where TResource : IReferenceable
         {
             if (!typeof(StorageQuery<TResource>).IsAssignableFrom(query.GetType()))
                 throw new ArgumentException($"query must be of type `{typeof(StorageQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");

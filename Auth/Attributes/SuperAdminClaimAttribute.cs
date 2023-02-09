@@ -13,6 +13,8 @@ namespace EastFive.Azure.Auth
         private const string ClaimType = System.Security.Claims.ClaimTypes.Role;
         private const string ClaimValue = ClaimValues.Roles.SuperAdmin;
 
+        public bool AllowLocalHost { get; set; } = false;
+
         public Task<IHttpResponse> ValidateRequest(
             KeyValuePair<ParameterInfo, object>[] parameterSelection,
             MethodInfo method,
@@ -20,12 +22,18 @@ namespace EastFive.Azure.Auth
             IHttpRequest request,
             ValidateHttpDelegate boundCallback)
         {
-            if (!request.IsAuthorizedFor(new Uri(ClaimType), ClaimValue))
-                return request
+            if (request.IsAuthorizedFor(new Uri(ClaimType), ClaimValue))
+                return boundCallback(parameterSelection, method, httpApp, request);
+
+            if(AllowLocalHost)
+                if ("localhost".Equals(request.ServerLocation.Host, StringComparison.OrdinalIgnoreCase))
+                    if ("localhost".Equals(request.RequestUri.Host, StringComparison.OrdinalIgnoreCase))
+                        return boundCallback(parameterSelection, method, httpApp, request);
+
+            return request
                     .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                     .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires claim `{ClaimType}`=`{ClaimValue}`")
                     .AsTask();
-            return boundCallback(parameterSelection, method, httpApp, request);
         }
     }
 }

@@ -67,7 +67,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static string StorageComputeRowKey<TEntity>(this IQueryable<TEntity> entityQuery,
                 Func<EastFive.Persistence.IComputeAzureStorageTableRowKey> onMissing = default)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
             var extraValues = entityQuery
                 .Compile<IEnumerable<Reflection.Assignment>, IProvideQueryValues>(
@@ -672,6 +672,30 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     cache: cache);
         }
 
+        public static async Task<TResult> StorageGetByPropertyAsync<TProperty, TEntity, TResult>(
+                this TProperty rowPartitionKeyValue,
+                Expression<Func<TEntity, TProperty>> propertyExpr,
+                Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, TResult> onFound,
+            Func<TResult> onDoesNotExists = default,
+            ICacheEntites cache = default)
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryByProperty = query.StorageQueryByProperty(rowPartitionKeyValue, propertyExpr);
+            var queryFull = additionalProperties(queryByProperty);
+
+            var rowKey = queryFull.StorageComputeRowKey();
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .FindByIdAsync(rowKey, partitionKey,
+                    onFound: (TEntity entity, TableResult tableResult) => onFound(entity),
+                    onNotFound: onDoesNotExists,
+                    cache: cache);
+        }
+
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IQueryable<TEntity> entityQuery,
             System.Threading.CancellationToken cancellationToken = default)
             where TEntity : IReferenceable, new()
@@ -690,6 +714,31 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .FindBy(entityRef, idProperty, readAhead:readAhead);
+        }
+
+        public static async Task<TResult> StorageFindIdByAsync<TProperty, TEntity, TResult>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> propertyExpr,
+                Func<IRefAst<TEntity>, TResult> onFound,
+                Func<TResult> onNotFound,
+            Expression<Func<TEntity, bool>> additionalQuery1 = default,
+            Expression<Func<TEntity, bool>> additionalQuery2 = default,
+            Expression<Func<TEntity, bool>> additionalQuery3 = default,
+                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+                params IHandleFailedModifications<TResult>[] onModificationFailures)
+            // where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            return await storageDriver
+                .FindIdsBy(propertyValue,
+                    propertyExpr,
+                    queries: new Expression<Func<TEntity, bool>>[] { }
+                        .AppendIf(additionalQuery1, additionalQuery1.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery2, additionalQuery2.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery3, additionalQuery3.IsNotDefaultOrNull())
+                        .ToArray())
+                .FirstAsync(
+                    (index) => onFound(index.Cast<TEntity>()),
+                    () => onNotFound());
         }
 
         //public static IEnumerableAsync<TEntity> StorageGetBy<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
@@ -984,43 +1033,17 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     default);
         }
 
-        public static async Task<TResult> FindIdByAsync<TProperty, TEntity, TResult>(this TProperty propertyValue,
-            Expression<Func<TEntity, TProperty>> propertyExpr,
-                Func<IRefAst<TEntity>, TResult> onFound,
-                Func<TResult> onNotFound,
-            Expression<Func<TEntity, bool>> additionalQuery1 = default,
-            Expression<Func<TEntity, bool>> additionalQuery2 = default,
-            Expression<Func<TEntity, bool>> additionalQuery3 = default,
-                Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-                params IHandleFailedModifications<TResult>[] onModificationFailures)
-            where TEntity : IReferenceable
-        {
-            var storageDriver = AzureTableDriverDynamic.FromSettings();
-            return await storageDriver
-                .FindIdsBy(propertyValue,
-                    propertyExpr,
-                    queries: new Expression<Func<TEntity, bool>>[] { }
-                        .AppendIf(additionalQuery1, additionalQuery1.IsNotDefaultOrNull())
-                        .AppendIf(additionalQuery2, additionalQuery2.IsNotDefaultOrNull())
-                        .AppendIf(additionalQuery3, additionalQuery3.IsNotDefaultOrNull())
-                        .ToArray())
-                .FirstAsync(
-                    (index) => onFound(index.Cast<TEntity>()),
-                    () => onNotFound());
-        }
-
         public static async Task<TResult> StorageCreateOrUpdateByIndexAsync<TProperty, TEntity, TResult>(this TProperty propertyValue,
             Expression<Func<TEntity, TProperty>> propertyExpr,
-            // Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
             Expression<Func<TEntity, bool>> additionalQuery1 = default,
             Expression<Func<TEntity, bool>> additionalQuery2 = default,
             Expression<Func<TEntity, bool>> additionalQuery3 = default,
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onReadyForUpdate = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
-            return await await propertyValue.FindIdByAsync<TProperty, TEntity, Task<TResult>>(
+            return await await propertyValue.StorageFindIdByAsync<TProperty, TEntity, Task<TResult>>(
                 propertyExpr: propertyExpr,
                 onFound: astRef =>
                 {

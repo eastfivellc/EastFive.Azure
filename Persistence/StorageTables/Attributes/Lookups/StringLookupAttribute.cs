@@ -22,29 +22,22 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<string, TResult> onNoMatch)
         {
             if (lookupValues.Count() != 1)
-                return onNoMatch("IdLookupAttribute only supports operations on a single member.");
+                return onNoMatch($"{nameof(StringLookupAttribute)} only supports operations on a single member.");
 
             var lookupValue = lookupValues.Single();
             var rowKeyValue = lookupValue.Value;
             var propertyValueType = lookupValue.Key.GetMemberType();
 
-            if (typeof(string).IsAssignableFrom(propertyValueType))
-            {
-                var rowKey = (string)rowKeyValue;
-                
-                if (IgnoreNull && rowKey.IsDefaultOrNull())
-                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
+            var rowKey = GetStringValue(lookupValue.Key, rowKeyValue, this.GetType());
 
-                if(IgnoreNullWhiteSpace && rowKey.IsNullOrWhiteSpace())
-                    return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
+            if (IgnoreNull && rowKey.IsDefaultOrNull())
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
-                var partitionKey = GetPartitionKey(rowKey);
-                return onLookupValuesMatch(new RefAst(rowKey, partitionKey).AsEnumerable());
-            }
+            if (IgnoreNullWhiteSpace && rowKey.IsNullOrWhiteSpace())
+                return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
 
-            var exMsg = $"{this.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                $"Please override GetRowKeys on `{this.GetType().FullName}`.";
-            throw new NotImplementedException(exMsg);
+            var partitionKey = GetPartitionKey(rowKey);
+            return onLookupValuesMatch(new RefAst(rowKey, partitionKey).AsEnumerable());
         }
 
         internal static string GetStringValue(MemberInfo memberInfo, object memberValue, Type thisAttributeType)
@@ -60,8 +53,15 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var stringValue = Enum.GetName(propertyValueType, memberValue);
                 return stringValue;
             }
-            var exMsg = $"{thisAttributeType.GetType().Name} is not implemented for type `{propertyValueType.FullName}`. " +
-                $"Please override GetRowKeys on `{thisAttributeType.GetType().FullName}`.";
+            if (typeof(int) == propertyValueType)
+            {
+                var intValue = (int)memberValue;
+                var stringValue = intValue.ToString();
+                return stringValue;
+            }
+
+            var exMsg = $"{thisAttributeType.Name} is not implemented for type `{propertyValueType.FullName}`. " +
+                $"Please update GetRowKeys on `{thisAttributeType.FullName}`.";
             throw new NotImplementedException(exMsg);
         }
 
