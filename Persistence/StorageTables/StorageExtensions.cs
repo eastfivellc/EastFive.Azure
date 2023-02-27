@@ -708,7 +708,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
                 Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
                 int readAhead = -1)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
             return AzureTableDriverDynamic
@@ -912,6 +912,15 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             return AzureTableDriverDynamic
                 .FromSettings()
                 .FindAll(query, cache: cache);
+        }
+
+        public static IQueryable<TEntity> StorageGetQueryForPropertyEquals<TEntity, TProperty>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> property)
+        {
+            var driver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(driver);
+            return query
+                .StorageQueryByProperty(propertyValue, property);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetPartition<TEntity>(this string partition)

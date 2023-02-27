@@ -650,7 +650,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindBy<TRefEntity, TEntity>(IRef<TRefEntity> entityRef,
                 Expression<Func<TEntity, IRef<TRefEntity>>> by,
                 int readAhead = -1)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
             return FindByInternal(entityRef, by, readAhead:readAhead);
@@ -712,7 +712,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 ILogger logger = default,
                 int readAhead = -1,
                 params Expression<Func<TEntity, bool>>[] queries)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
             return by.MemberInfo(
                 (memberCandidate, expr) =>
