@@ -254,6 +254,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     // store for rollback
                     var orignalRowAndPartitionKeys = lookup.rowAndPartitionKeys
                         .NullToEmpty()
+                        .Where(kvp => kvp.Key.HasBlackSpace() && kvp.Value.HasBlackSpace()) // omit any bad entries
                         .Select(kvp => kvp.Key.AsAstRef(kvp.Value))
                         .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.PartitionKey}{rowParitionKeyKvp.RowKey}")
                         .ToArray();
