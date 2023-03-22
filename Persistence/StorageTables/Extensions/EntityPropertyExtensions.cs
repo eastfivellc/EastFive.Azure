@@ -722,6 +722,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return onBound(tsValue);
                         }
                     }
+                    if (nullableType.IsEnum)
+                    {
+                        var enumNameString = value.StringValue;
+                        var enumValue = Enum.Parse(nullableType, enumNameString);
+                        return onBound(enumValue);
+                    }
                     return onFailedToBind();
                 },
                 () => onFailedToBind());
