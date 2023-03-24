@@ -99,6 +99,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
+        [AttributeUsage(AttributeTargets.Method)]
         public class MutateRefQueryAttribute : MutateIdQueryAttribute
         {
             public override (MemberInfo, object)[] BindStorageQueryValue(
@@ -118,18 +119,19 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
+        [AttributeUsage(AttributeTargets.Method)]
         public class MutatePropertyQueryAttribute : MutateIdQueryAttribute
         {
             public override (MemberInfo, object)[] BindStorageQueryValue(
                 MethodInfo method,
                 Expression[] arguments)
             {
-                var resType = method
-                    .GetGenericArguments()
-                    .Skip(1)
-                    .First();
+                //var resType = method
+                //    .GetGenericArguments()
+                //    .Skip(1)
+                //    .First();
                 var memberExpressionExpression = (Expression)arguments.Skip(1).First().ResolveExpression();
-                var memberExpression = (MemberExpression)memberExpressionExpression;
+                //var memberExpression = (MemberExpression)memberExpressionExpression;
                 if (!memberExpressionExpression.TryGetMemberExpression(out MemberInfo propertyMember))
                     throw new ArgumentException($"Could not extract field reference from {memberExpressionExpression.GetType().FullName}");
                 var idValue = arguments.First().ResolveExpression();
