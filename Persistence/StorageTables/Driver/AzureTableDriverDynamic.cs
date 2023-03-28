@@ -3836,6 +3836,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default, string fileName = default,
+            System.Net.Mime.ContentDisposition disposition = default,
+            string dispositionString = default,
             IDictionary<string, string> metadata = default,
             RetryDelegate onTimeout = default)
         {
@@ -3868,11 +3870,17 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
                     string GetDisposition()
                     {
+                        if (disposition.IsNotDefaultOrNull())
+                            return disposition.ToString();
+
+                        if (dispositionString.HasBlackSpace())
+                            return dispositionString;
+
                         if (fileName.IsNullOrWhiteSpace())
                             return default;
-                        var disposition = new System.Net.Mime.ContentDisposition();
-                        disposition.FileName = fileName;
-                        return disposition.ToString();
+                        var dispositionCreated = new System.Net.Mime.ContentDisposition();
+                        dispositionCreated.FileName = fileName;
+                        return dispositionCreated.ToString();
                     }
                 }
                 return onSuccess();
@@ -3946,6 +3954,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 var blockClient = await GetBlobClientAsync(
                     containerName, blobName);
 
+                if (!await blockClient.ExistsAsync())
+                    return onNotFound();
+
                 using (var returnStream = await blockClient.OpenReadAsync(
                     new BlobOpenReadOptions(true)
                     {
@@ -3970,6 +3981,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 return ex.ParseExtendedErrorInformation(
                     (code, msg) => onFailure(code, msg),
                     () => throw ex);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
             }
         }
 

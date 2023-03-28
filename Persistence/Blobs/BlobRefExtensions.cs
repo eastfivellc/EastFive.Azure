@@ -122,23 +122,32 @@ namespace EastFive.Azure.Persistence.Blobs
         public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef,
             string newBlobId = default)
         {
-            if (newBlobId.IsNullOrWhiteSpace())
-                newBlobId = Guid.NewGuid().AsBlobName();
-            var (bytes, contentType) = await blobRef.ReadBytesAsync();
-            return await AzureTableDriverDynamic
-                .FromSettings()
-                .BlobCreateAsync(bytes, newBlobId, blobRef.ContainerName,
-                    () =>
-                    {
-                        return (IBlobRef)new BlobRef
-                        {
-                            Id = newBlobId,
-                            ContainerName = blobRef.ContainerName,
-                            ContentType = contentType,
-                            FileName = newBlobId,
-                        };
-                    },
-                    contentType: contentType);
+            return await await blobRef.LoadBytesAsync(
+                async (currentBlobName, bytes, mediaType, disposition) =>
+                {
+                    var contentType = mediaType.MediaType;
+                    if (newBlobId.IsNullOrWhiteSpace())
+                        newBlobId = currentBlobName;
+                    return await AzureTableDriverDynamic
+                        .FromSettings()
+                        .BlobCreateAsync(bytes, newBlobId, blobRef.ContainerName,
+                            () =>
+                            {
+                                return (IBlobRef)new BlobRef
+                                {
+                                    Id = newBlobId,
+                                    ContainerName = blobRef.ContainerName,
+                                    ContentType = contentType,
+                                    FileName = newBlobId,
+                                };
+                            },
+                            contentType: contentType);
+                },
+                onNotFound: () =>
+                {
+                    throw new Exception("Blob could not be loaded.");
+                });
+            
         }
 
         public static async Task<TResult> SaveOrUpdateAsync<TResult>(this IBlobRef blobRef,
@@ -421,6 +430,46 @@ namespace EastFive.Azure.Persistence.Blobs
                     },
                     contentType: contentType,
                     fileName: fileName);
+        }
+
+        public static async Task<IBlobRef> CreateBlobRefAsync<TResource>(
+            this System.Net.Http.HttpContent blobData,
+            Expression<Func<TResource, IBlobRef>> selectProperty,
+            Guid? blobId = default, string blobName = default)
+        {
+            selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
+            var containerName = memberInfo.BlobContainerName();
+            var newBlobId = blobName.HasBlackSpace() ?
+                blobName
+                :
+                blobId.HasValue ?
+                    blobId.Value.AsBlobName()
+                    :
+                    Guid.NewGuid().AsBlobName();
+            var mediaHeader = blobData.GetContentMediaTypeHeaderNullSafe();
+            var contentType = mediaHeader.MediaType;
+            var dispositionHeaderValue = blobData.GetContentDispositionNullSafe();
+            var fileName = dispositionHeaderValue.FileName;
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .BlobCreateAsync(blobName: newBlobId, containerName: containerName,
+                        writeAsync: async (stream) =>
+                        {
+                            var blobStream = await blobData.ReadAsStreamAsync();
+                            await blobStream.CopyToAsync(stream);
+                        },
+                    onSuccess: () =>
+                    {
+                        return (IBlobRef)new BlobRef
+                        {
+                            Id = newBlobId,
+                            ContainerName = containerName,
+                            ContentType = contentType,
+                            FileName = fileName.HasBlackSpace() ? fileName : newBlobId,
+                        };
+                    },
+                    contentType: contentType,
+                    dispositionString: dispositionHeaderValue.ToString());
         }
 
         public static Task<IBlobRef> CreateBlobStorageRefAsync<TResource>(
