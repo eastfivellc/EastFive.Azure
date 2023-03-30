@@ -13,12 +13,21 @@ using EastFive.Reflection;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class RowKeyAttribute : Attribute,
-        IModifyAzureStorageTableRowKey, IComputeAzureStorageTableRowKey, IGenerateAzureStorageTableRowKeyIndex
+        IModifyAzureStorageTableRowKey, IComputeAzureStorageTableRowKey, IGenerateAzureStorageTableRowKeyIndex,
+        IPersistInEntityProperty
     {
         public bool StoresFullValue
         {
             get; set;
         } = true;
+
+        public virtual KeyValuePair<string, Microsoft.Azure.Cosmos.Table.EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper)
+        {
+            var rowKeyValue = ComputeRowKey(value, memberInfo);
+            var rowKeyEpValue = new Microsoft.Azure.Cosmos.Table.EntityProperty(rowKeyValue);
+            return "RowKey".PairWithValue(rowKeyEpValue).AsArray();
+        }
 
         public virtual string ComputeRowKey(object memberValue, MemberInfo memberInfo)
         {

@@ -63,7 +63,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             () => default(KeyValuePair<MemberInfo, IScopeKeys>?));
                 },
                 lookupValues,
-                out bool ignore);
+                out bool ignore, out MemberInfo[] discardRowKey);
 
             if (ignore)
                 return onLookupValuesMatch(Enumerable.Empty<IRefAst>());
@@ -79,7 +79,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             () => default(KeyValuePair<MemberInfo, IScopeKeys>?));
                 },
                 lookupValues,
-                out ignore);
+                out ignore, out MemberInfo[] discardPartition);
 
             if (ignore)
                 return onLookupValuesMatch(Enumerable.Empty<IRefAst>());

@@ -2314,25 +2314,46 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .ToArray();
 
             Func<TEntity, bool> postFilter = (e) => true;
-            var filter = assignments
+            var (assignmentsUsedTotal, filter) = assignments
                 .Distinct(assignment => assignment.member.Name)
-                .Where(assignment => assignment.member.ContainsAttributeInterface<IProvideTableQuery>())
-                .Aggregate(string.Empty,
-                    (queryCurrent, assignment) =>
+                .TryWhere((Assignment assignment, out IProvideTableQuery tableQueryProvider)
+                    => assignment.member.TryGetAttributeInterface(out tableQueryProvider))
+                .Aggregate((assignmentsUsed:new string[] { }, query:string.Empty),
+                    (assignmentsUsedQueryCurrentTpl, assignmentQueryTpl) =>
                     {
-                        var queryValueProvider = assignment.member.GetAttributeInterface<IProvideTableQuery>();
-                        var newFilter = queryValueProvider.ProvideTableQuery<TEntity>(
-                            assignment.member, assignments, out Func<TEntity, bool> postFilterForMember);
+                        var (assignmentsUsedCurrent, queryCurrent) = assignmentsUsedQueryCurrentTpl;
+                        var (assignment, tableQueryProvider) = assignmentQueryTpl;
+                        //var queryValueProvider = assignment.member.GetAttributeInterface<IProvideTableQuery>();
+                        var newFilter = tableQueryProvider.ProvideTableQuery<TEntity>(
+                            assignment.member, assignments,
+                            out Func<TEntity, bool> postFilterForMember,
+                            out string [] assignmentsUsed);
                         var lastPostFilter = postFilter;
                         postFilter = (e) => lastPostFilter(e) && postFilterForMember(e);
 
+                        var assignmentsUsedUpdated = assignmentsUsedCurrent.Concat(assignmentsUsed).ToArray();
                         if (queryCurrent.IsNullOrWhiteSpace())
-                            return newFilter;
+                            return (assignmentsUsedUpdated, newFilter);
                         var combinedFilter = TableQuery.CombineFilters(queryCurrent, TableOperators.And, newFilter);
-                        return combinedFilter;
+                        return (assignmentsUsedUpdated, combinedFilter);
                     });
 
-            return (table, filter);
+            return assignments
+                .Where(assignment => !assignmentsUsedTotal.Contains(assignment.member.Name))
+                .First(
+                    (assignment, next) =>
+                    {
+                        var memberDisplay = $"{assignment.member.DeclaringType.FullName}..{assignment.member.Name} {assignment.type} `{assignment.value}`";
+                        var additionalAssignments = assignments
+                            .Select(assign => $"{assign.member.DeclaringType.FullName}..{assign.member.Name} {assign.type} `{assign.value}`")
+                            .Join(',');
+                        throw new ArgumentException($"{memberDisplay} is used in {typeof(TEntity).FullName} query with additionalAssignments: {additionalAssignments}" +
+                            $" but does not have an attribute that implements {nameof(IProvideTableQuery)}");
+                    },
+                    () =>
+                    {
+                        return (table, filter);
+                    });
         }
 
         private IEnumerableAsync<TEntity> RunQuery<TEntity>(string whereFilter, CloudTable table,

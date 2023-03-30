@@ -1,13 +1,16 @@
-﻿using EastFive.Extensions;
-using EastFive.Linq.Expressions;
-using EastFive.Reflection;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+
+using EastFive;
+using EastFive.Extensions;
+using EastFive.Linq;
+using EastFive.Linq.Expressions;
+using EastFive.Reflection;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -18,38 +21,29 @@ namespace EastFive.Persistence.Azure.StorageTables
         IComputeAzureStorageTablePartitionKey,
         IGenerateAzureStorageTablePartitionIndex
     {
+        public double Order { get; set; }
+
         public interface IModifyPartitionScope
         {
+            double Order { get; }
             string GenerateScopedPartitionKey(MemberInfo memberInfo, object memberValue);
         }
 
-        public class ScopeAttribute : Attribute, IModifyPartitionScope
+        private static string AppendScoping(string current, string nextPartitionScope)
         {
-            public string GenerateScopedPartitionKey(MemberInfo memberInfo, object memberValue)
-            {
-                if (memberValue.IsDefaultOrNull())
-                    return string.Empty;
-                if (typeof(string).IsAssignableFrom(memberValue.GetType()))
-                    return (string)memberValue;
-                if (typeof(Guid).IsAssignableFrom(memberValue.GetType()))
-                {
-                    var guidValue = (Guid)memberValue;
-                    return guidValue.ToString("N");
-                }
-                if (typeof(IReferenceable).IsAssignableFrom(memberValue.GetType()))
-                {
-                    var refValue = (IReferenceable)memberValue;
-                    return refValue.id.ToString("N");
-                }
-                return (string)memberValue;
-            }
+            return $"{current}___{nextPartitionScope}";
+        }
+
+        private IEnumerable<MemberInfo> GetScopedMembers(Type type)
+        {
+            return type
+                .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+                .Where(member => member.ContainsAttributeInterface<IModifyPartitionScope>());
         }
 
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
-            return value.GetType()
-                .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                .Where(member => member.ContainsAttributeInterface<IModifyPartitionScope>())
+            return GetScopedMembers(value.GetType())
                 .OrderBy(member => member.Name)
                 .Aggregate(string.Empty,
                     (current, memberPartitionScoping) =>
@@ -61,7 +55,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         if (current.IsNullOrWhiteSpace())
                             return nextPartitionScope;
 
-                        return $"{current}___{nextPartitionScope}";
+                        return AppendScoping(current, nextPartitionScope);
                     });
         }
 
@@ -74,8 +68,6 @@ namespace EastFive.Persistence.Azure.StorageTables
             return entity;
         }
 
-        
-
         public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
             Expression<Func<TEntity, bool>> filter, 
             out Func<TEntity, bool> postFilter)
@@ -84,9 +76,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             {
                 var filterAssignments = filter.Body.GetFilterAssignments<TEntity>();
 
-                var scopedMembers = memberInfo.DeclaringType
-                    .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(member => member.ContainsAttributeInterface<IModifyPartitionScope>())
+                var scopedMembers = GetScopedMembers(memberInfo.DeclaringType)
                     .ToDictionary(member => member.Name);
 
                 postFilter = (e) => true;
@@ -106,7 +96,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                             if (current.IsNullOrWhiteSpace())
                                 return nextPartitionScope;
 
-                            return $"{current}___{nextPartitionScope}";
+                            return AppendScoping(current, nextPartitionScope);
                         });
                 return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
             }
@@ -115,41 +105,44 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
             Assignment[] assignments,
-            out Func<TEntity, bool> postFilter)
+            out Func<TEntity, bool> postFilter,
+            out string[] assignmentsUsed)
         {
             postFilter = (e) => true;
 
-            var filterAssignments = assignments
-                .Select(assignment => assignment.member.PairWithValue(assignment.value));
-
-            return TableQuery(memberInfo, filterAssignments);
-        }
-
-        private string TableQuery(MemberInfo memberInfo,
-            IEnumerable<KeyValuePair<MemberInfo, object>> filterAssignments)
-        {
             var scopedMembers = memberInfo.DeclaringType
                 .GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                .Where(member => member.ContainsAttributeInterface<IModifyPartitionScope>())
-                .ToDictionary(member => member.Name);
+                .TryWhere((MemberInfo member, out IModifyPartitionScope partitionModifer) =>
+                    member.TryGetAttributeInterface(out partitionModifer))
+                .ToArray();
 
+            var filterAssignments = assignments
+                .Collate(scopedMembers,
+                    (assignment, scopedMember) => (assignment.member, assignment.value, scopeModifier: scopedMember.@out),
+                    tpl => tpl.member.Name)
+                .ToArray();
+                //.Where(assignment => scopedMembers.ContainsKey(assignment.member.Name))
+                //.Select(assignment => assignment.member.PairWithValue(assignment.value));
+
+            assignmentsUsed = filterAssignments.Select(tpl => tpl.member.Name).ToArray();
+            return TableQuery(filterAssignments);
+        }
+
+        private string TableQuery(
+            IEnumerable<(MemberInfo member, object value, IModifyPartitionScope modifier)> filterAssignments)
+        {
             var partitionValue = filterAssignments
-                .OrderBy(kvp => kvp.Key.Name)
+                .OrderBy(tpl => tpl.modifier.Order)
                 .Aggregate(string.Empty,
                     (current, filterAssignment) =>
                     {
-                        if (!scopedMembers.ContainsKey(filterAssignment.Key.Name))
-                            throw new ArgumentException();
-
-                        var memberPartitionScoping = scopedMembers[filterAssignment.Key.Name];
-                        var partitionScoping = memberPartitionScoping.GetAttributeInterface<IModifyPartitionScope>();
-                        var nextPartitionScope = partitionScoping
-                            .GenerateScopedPartitionKey(memberPartitionScoping, filterAssignment.Value);
+                        var nextPartitionScope = filterAssignment.modifier
+                            .GenerateScopedPartitionKey(filterAssignment.member, filterAssignment.value);
 
                         if (current.IsNullOrWhiteSpace())
                             return nextPartitionScope;
 
-                        return $"{current}___{nextPartitionScope}";
+                        return AppendScoping(current, nextPartitionScope);
                     });
             return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
         }

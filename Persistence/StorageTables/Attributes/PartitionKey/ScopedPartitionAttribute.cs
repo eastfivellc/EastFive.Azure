@@ -38,18 +38,21 @@ namespace EastFive.Persistence.Azure.StorageTables
         public string ComputePartitionKey(object refKey, MemberInfo decoratedMember, string rowKey,
             params KeyValuePair<MemberInfo, object>[] lookupValues)
         {
-            return ComputePartitionKey(decoratedMember.DeclaringType, lookupValues);
+            return ComputePartitionKey(decoratedMember.DeclaringType, lookupValues, out MemberInfo[] discard);
         }
 
         public string ProvideTableQuery<TEntity>(MemberInfo decoratedMember,
             Assignment[] assignments,
-            out Func<TEntity, bool> postFilter)
+            out Func<TEntity, bool> postFilter,
+            out string[] assignmentsUsed)
         {
             postFilter = (e) => true;
             var lookupValues = assignments
                 .Select(assignment => assignment.member.PairWithValue(assignment.value))
                 .ToArray();
-            var partitionValue = ComputePartitionKey(decoratedMember.DeclaringType, lookupValues);
+            var partitionValue = ComputePartitionKey(decoratedMember.DeclaringType, lookupValues,
+                out MemberInfo[] membersUsed);
+            assignmentsUsed = membersUsed.Select(m => m.Name).ToArray();
             return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
         }
 
@@ -62,7 +65,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (filter.Body is BinaryExpression)
             {
                 var filterAssignments = filter.Body.GetFilterAssignments<TEntity>().ToArray();
-                var partitionValue = ComputePartitionKey(typeof(TEntity), filterAssignments);
+                var partitionValue = ComputePartitionKey(typeof(TEntity), filterAssignments,
+                    out MemberInfo[] membersUsed);
                 return ExpressionType.Equal.WhereExpression("PartitionKey", partitionValue);
             }
             return filter.ResolveFilter<TEntity>(out postFilter);
@@ -88,7 +92,8 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         private string ComputePartitionKey(Type declaringType,
-            params KeyValuePair<MemberInfo, object>[] lookupValues)
+            KeyValuePair<MemberInfo, object>[] lookupValues,
+            out MemberInfo[] membersUsed)
         {
             var r = ComputeKey(declaringType,
                 mi => mi.GetAttributesInterface<IScopeKeys>()
@@ -96,7 +101,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     .First(
                         (scoper, next) => scoper.PairWithKey(mi),
                         () => default(KeyValuePair<MemberInfo, IScopeKeys>?)),
-                lookupValues, out bool ignore);
+                lookupValues, out bool ignore, out membersUsed);
             if(ignore)
                 throw new Exception("Cannot ignore partition key");
             return r;
@@ -105,14 +110,18 @@ namespace EastFive.Persistence.Azure.StorageTables
         internal static string ComputeKey(Type declaringType,
             Func<MemberInfo, KeyValuePair<MemberInfo, IScopeKeys>?> filter,
             IEnumerable<KeyValuePair<MemberInfo, object>> lookupValues,
-            out bool ignore)
+            out bool ignore, out MemberInfo[] membersUsed)
         {
             bool allIgnored = false;
-            var r = declaringType
+            var matchingKvps = declaringType
                 .GetPropertyOrFieldMembers()
                 .Where(mi => mi.ContainsAttributeInterface<IScopeKeys>())
                 .Select(filter)
-                .SelectWhereHasValue()
+                .SelectWhereHasValue();
+
+            membersUsed = matchingKvps.Select(kvp => kvp.Key).ToArray();
+
+            var r = matchingKvps
                 .OrderBy(memberKvp => memberKvp.Value.Order)
                 .Aggregate(
                     string.Empty,

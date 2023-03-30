@@ -17,6 +17,8 @@ namespace EastFive.Persistence.Azure.StorageTables
         IProvideTableQuery,
         IGenerateAzureStorageTablePartitionIndex
     {
+        public double Order { get; set; }
+
         public string GeneratePartitionKey(string rowKey, object value, MemberInfo memberInfo)
         {
             return ComputePartitionKey(rowKey, value, memberInfo);
@@ -79,17 +81,16 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
             Assignment[] assignments,
-            out Func<TEntity, bool> postFilter)
+            out Func<TEntity, bool> postFilter,
+            out string[] membersUsed)
         {
             postFilter = (e) => true;
-            return assignments.Aggregate("",
-                (current, assignment) =>
-                {
-                    if (assignment.type == ExpressionType.Equal)
-                        return ExpressionType.Equal.WhereExpression("PartitionKey", assignment.value);
 
-                    throw new ArgumentException();
-                });
+            (membersUsed, Assignment assignment) = StorageQueryAttribute.GetAssignment(memberInfo, assignments);
+            if (assignment.type == ExpressionType.Equal)
+                return ExpressionType.Equal.WhereExpression("PartitionKey", assignment.value);
+
+            throw new ArgumentException($"{nameof(PartitionByDayAttribute)} does not generate storage query for comparison type:{assignment.type}");
         }
 
         public string ComputePartitionKey(object memberValue, MemberInfo memberInfo, string rowKey, params KeyValuePair<MemberInfo, object>[] extraValues)

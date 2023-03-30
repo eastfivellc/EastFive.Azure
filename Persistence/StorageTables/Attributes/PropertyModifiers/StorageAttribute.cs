@@ -21,12 +21,12 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 
 namespace EastFive.Persistence
 {
-    public interface IPersistInAzureStorageTables 
+    public interface IPersistInAzureStorageTables : IPersistInEntityProperty
     {
         string Name { get; }
 
-        KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
-            object value, IWrapTableEntity<EntityType> tableEntityWrapper);
+        //KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+        //    object value, IWrapTableEntity<EntityType> tableEntityWrapper);
 
         object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
             Func<object> getDefaultValue = default);
@@ -36,9 +36,12 @@ namespace EastFive.Persistence
 
     public interface IPersistInEntityProperty
     {
-        EntityProperty ConvertValue(object value);
+        KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
+            object value, IWrapTableEntity<EntityType> tableEntityWrapper);
 
-        object GetMemberValue(EntityProperty value);
+        //EntityProperty ConvertValue(object value);
+
+        //object GetMemberValue(EntityProperty value);
     }
 
     public interface IComputeAzureStorageTableRowKey
@@ -102,7 +105,8 @@ namespace EastFive.Persistence
 
         string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
             Assignment [] assignments,
-            out Func<TEntity, bool> postFilter);
+            out Func<TEntity, bool> postFilter,
+            out string[] assignmentsUsed);
     }
 
     public interface IProvideBulkSerialization
@@ -114,33 +118,6 @@ namespace EastFive.Persistence
         string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
             Assignment[] assignments,
             out Func<TEntity, bool> postFilter);
-    }
-
-    public class StorageQueryAttribute : Attribute, IProvideTableQuery
-    {
-        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
-            Expression<Func<TEntity, bool>> filter, 
-            out Func<TEntity, bool> postFilter)
-        {
-            var query = filter.ResolveFilter(out postFilter);
-            return query;
-        }
-
-        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo, 
-            Assignment[] assignments,
-            out Func<TEntity, bool> postFilter)
-        {
-            postFilter = (e) => true;
-            return assignments.Aggregate("",
-                (current, assignment) =>
-                {
-                    var assignmentName = assignment.member.GetTablePropertyName();
-                    var next = assignment.type.WhereExpression(assignmentName, assignment.value);
-                    if (current.IsNullOrWhiteSpace())
-                        return next;
-                    return TableQuery.CombineFilters(current, TableOperators.And, next);
-                });
-        }
     }
 
     public class StorageAttribute : Attribute,
