@@ -245,12 +245,12 @@ namespace EastFive.Azure.Persistence.Blobs
                     return await AzureTableDriverDynamic
                         .FromSettings()
                         .BlobCreateOrUpdateAsync(blobToStore.Id, blobToStore.ContainerName,
-                            writeStreamAsync: async (streamOut) =>
-                            {
-                                await streamOut.WriteAsync(streamIn, 0, streamIn.Length);
-                                return;
-                            },
-                            onSuccess: () =>
+                                writeStreamAsync: async (streamOut) =>
+                                {
+                                    await streamOut.WriteAsync(streamIn, 0, streamIn.Length);
+                                    return;
+                                },
+                            onSuccess: (blobInfo) =>
                             {
                                 var storageBlob = new BlobRefStorage()
                                 {
@@ -259,8 +259,8 @@ namespace EastFive.Azure.Persistence.Blobs
                                 };
                                 return onSaved(storageBlob);
                             },
-                            contentType: mediaType.MediaType,
-                            contentDisposition: cdStr);
+                            contentTypeString: mediaType.MediaType,
+                            contentDispositionString: cdStr);
                 },
                 onNotFound: onFailure.AsAsyncFunc());
 
@@ -306,7 +306,7 @@ namespace EastFive.Azure.Persistence.Blobs
                         .FromSettings()
                         .BlobCreateOrUpdateAsync(blobToStore.Id, blobToStore.ContainerName,
                             writeStreamAsync: (streamOut) => streamOut.WriteAsync(streamIn, 0, streamIn.Length),
-                            onSuccess: () =>
+                            onSuccess: (blobInfo) =>
                             {
                                 var storageBlob = new BlobRefStorage()
                                 {
@@ -315,8 +315,8 @@ namespace EastFive.Azure.Persistence.Blobs
                                 };
                                 return onSaved(storageBlob, streamIn, mediaType, contentDisposition);
                             },
-                            contentType: mediaType.MediaType,
-                            contentDisposition: cdStr);
+                            contentTypeString: mediaType.MediaType,
+                            contentDispositionString: cdStr);
                 },
                 onNotFound: onFailure.AsAsyncFunc());
         }
@@ -503,7 +503,7 @@ namespace EastFive.Azure.Persistence.Blobs
             this string blobName,
             Expression<Func<TResource, IBlobRef>> asPropertyOf,
             Func<Stream, Task> writeBlobData,
-            string contentType = default, ContentDisposition contentDisposition = default)
+            ContentType contentType = default, ContentDisposition contentDisposition = default)
         {
             asPropertyOf.TryParseMemberComparison(out MemberInfo memberInfo);
             var containerName = memberInfo.BlobContainerName();
@@ -512,7 +512,7 @@ namespace EastFive.Azure.Persistence.Blobs
                 .FromSettings()
                 .BlobCreateOrUpdateAsync(blobName: blobName, containerName: containerName,
                         writeStreamAsync: writeBlobData,
-                    onSuccess: () =>
+                    onSuccess: (blobInfo) =>
                     {
                         return (IBlobRef)new BlobRefStorage
                         {
@@ -521,7 +521,7 @@ namespace EastFive.Azure.Persistence.Blobs
                         };
                     },
                     contentType: contentType,
-                    contentDisposition: contentDisposition.ToString());
+                    contentDisposition: contentDisposition);
         }
 
         public static IBlobRef AsBlobStorageRef<TResource>(

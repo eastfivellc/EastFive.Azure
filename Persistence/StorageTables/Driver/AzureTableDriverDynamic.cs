@@ -32,6 +32,7 @@ using EastFive.Reflection;
 using EastFive.Serialization;
 using Microsoft.Azure.Documents;
 using System.Collections.Concurrent;
+using Microsoft.Azure.Amqp.Framing;
 
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
@@ -3644,7 +3645,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, Guid blobId, string containerName,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default, string contentDisposition = default,
+            string contentType = default,
+            string contentDisposition = default,
             IDictionary<string, string> metadata = default,
             RetryDelegate onTimeout = default) => BlobCreateOrUpdateAsync(
                     content, blobId.ToString("N"), containerName,
@@ -3694,9 +3696,13 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public async Task<TResult> BlobCreateOrUpdateAsync<TResult>(string blobName, string containerName,
                 Func<Stream, Task> writeStreamAsync,
-            Func<TResult> onSuccess,
+            Func<BlobContentInfo, TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default, string contentDisposition = default,
+            System.Net.Mime.ContentType contentType = default,
+            string contentTypeString = default,
+            System.Net.Mime.ContentDisposition contentDisposition = default,
+            string contentDispositionString = default,
+            string fileName = default,
             IDictionary<string, string> metadata = default,
             RetryDelegate onTimeout = default)
         {
@@ -3708,18 +3714,42 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     await writeStreamAsync(stream);
                     await stream.FlushAsync();
                     stream.Position = 0;
+                    var disposition = GetDisposition();
+                    var contentTypeToUse = GetContentType();
                     var result = await blockClient.UploadAsync(stream,
                         new global::Azure.Storage.Blobs.Models.BlobUploadOptions
                         {
                             Metadata = metadata,
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
-                                ContentType = contentType,
-                                ContentDisposition = contentDisposition,
+                                ContentType = contentTypeToUse,
+                                ContentDisposition = disposition,
                             }
                         });
+                    return onSuccess(result.Value);
                 }
-                return onSuccess();
+
+                string GetDisposition()
+                {
+                    if (contentDisposition.IsNotDefaultOrNull())
+                        return contentDisposition.ToString();
+
+                    if (contentDispositionString.HasBlackSpace())
+                        return contentDispositionString;
+
+                    if (fileName.IsNullOrWhiteSpace())
+                        return default;
+                    var dispositionCreated = new System.Net.Mime.ContentDisposition();
+                    dispositionCreated.FileName = fileName;
+                    return dispositionCreated.ToString();
+                }
+
+                string GetContentType()
+                {
+                    if (contentType.IsNotDefaultOrNull())
+                        return contentType.ToString();
+                    return contentTypeString;
+                }
             }
             catch (global::Azure.RequestFailedException ex)
             {
