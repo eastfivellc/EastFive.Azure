@@ -464,7 +464,7 @@ namespace EastFive.Persistence
                     }
                     if (arrayType.IsEnum)
                     {
-                        var values = value.BinaryValue.ToEnumsFromByteArray(arrayType);
+                        var values = value.BinaryValue.ToEnumsFromByteArray(arrayType, repair: true);
                         return onBound(values);
                     }
                     if (typeof(object) == arrayType)
