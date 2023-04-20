@@ -62,7 +62,7 @@ namespace EastFive.Azure.Persistence.Blobs
 
             containerName = parameter.Member.DeclaringType
                 .GetPropertyAndFieldsWithAttributesInterface<Api.IProvideApiValue>()
-                .Where(tpl => tpl.Item2.PropertyName == parameterName)
+                .Where(tpl => tpl.Item2.GetPropertyName(tpl.Item1) == parameterName)
                 .First(
                     (tpl, next) =>
                     {
@@ -670,7 +670,7 @@ namespace EastFive.Azure.Persistence.Blobs
                  => from.LoadStreamToAsync(stream, onFound: onFound, onNotFound: onNotFound, onFailure: onFailure);
         }
 
-        private class SerializableBlobRef : IBlobRef, ICastJson
+        private class SerializableBlobRef : IBlobRef, ICastJsonProperty
         {
             public string ContainerName { get; set; }
 

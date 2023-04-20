@@ -51,7 +51,7 @@ namespace EastFive.Azure.Persistence.Blobs
         IBindParameter<string>, IBindApiParameter<string>, IBindApiPropertyOrField<string>,
         IBindParameter<Microsoft.AspNetCore.Http.IFormFile>, IBindApiParameter<Microsoft.AspNetCore.Http.IFormFile>,
         IBindParameter<JToken>, IBindApiParameter<JToken>,
-        IConvertJson, ICastJson
+        IConvertJson, ICastJsonProperty
     {
         #region Bind
 
@@ -435,9 +435,9 @@ namespace EastFive.Azure.Persistence.Blobs
             object objectValue, object memberValue,
             IHttpRequest httpRequest, IApplication application)
         {
-            if(memberValue is ICastJson)
+            if(memberValue is ICastJsonProperty)
             {
-                var blobSelfSerializer = (ICastJson)memberValue;
+                var blobSelfSerializer = (ICastJsonProperty)memberValue;
                 if (blobSelfSerializer.CanConvert(member, paramInfo, httpRequest, application, apiValueProvider, objectValue))
                 {
                     return blobSelfSerializer.WriteAsync(writer, serializer, member, paramInfo, apiValueProvider,
@@ -469,7 +469,7 @@ namespace EastFive.Azure.Persistence.Blobs
                             .First(
                                 (paramInfo, next) =>
                                 {
-                                    var propertyName = apiValueProvider.PropertyName;
+                                    var propertyName = apiValueProvider.GetPropertyName(member);
                                     if (!paramInfo.TryGetAttributeInterface(out IBindApiValue apiBinder))
                                         return next();
 
