@@ -101,6 +101,18 @@ namespace EastFive.Api.Azure.Monitoring
         [Storage]
         public string route;
 
+        public const string ActionPropertyName = "action";
+        [ApiProperty(PropertyName = ActionPropertyName)]
+        [JsonProperty(PropertyName = ActionPropertyName)]
+        [Storage]
+        public string action;
+
+        public const string ResourceIdPropertyName = "resource_id";
+        [ApiProperty(PropertyName = ResourceIdPropertyName)]
+        [JsonProperty(PropertyName = ResourceIdPropertyName)]
+        [Storage]
+        public Guid resourceId;
+
         [Storage]
         public Header[] headers;
 
@@ -362,6 +374,14 @@ namespace EastFive.Api.Azure.Monitoring
             Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request, string folderName, IHttpResponse response)
         {
+            string segmentAfter(string[] toSkip)
+            {
+                return request.RequestUri.Segments
+                    .Where(x => x.HasBlackSpace())
+                    .Where(x => !toSkip.Where(y => y.HasBlackSpace()).Contains(x, StringComparison.OrdinalIgnoreCase))
+                    .First((x, next) => x, () => default(string));
+            }
+
             var doc = new MonitoringRequest();
             doc.title = $"{request.Method.Method} {resourceInvoker.Namespace} {resourceInvoker.Route}";
             doc.monitoringRequestRef = Ref<MonitoringRequest>.NewRef();
@@ -370,6 +390,21 @@ namespace EastFive.Api.Azure.Monitoring
             doc.method = request.Method.Method;
             doc.ns = resourceInvoker.Namespace;
             doc.route = resourceInvoker.Route;
+            var actionSegment = segmentAfter(new[] { resourceInvoker.Namespace, resourceInvoker.Route });
+            if (actionSegment.HasBlackSpace())
+            {
+                if (Guid.TryParse(actionSegment, out Guid resourceId))
+                    doc.resourceId = resourceId;
+                else
+                {
+                    doc.action = actionSegment;
+                    var idSegment = segmentAfter(new[] { resourceInvoker.Namespace, resourceInvoker.Route, actionSegment });
+                    if (idSegment.HasBlackSpace() && Guid.TryParse(idSegment, out resourceId))
+                    {
+                        doc.resourceId = resourceId;
+                    }
+                }
+            }
             doc.headers = request.Headers
                 .Where(kvp => kvp.Value.AnyNullSafe())
                 .Select(
