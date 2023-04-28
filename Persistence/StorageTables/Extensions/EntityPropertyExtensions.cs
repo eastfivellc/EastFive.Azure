@@ -851,20 +851,30 @@ namespace EastFive.Persistence.Azure.StorageTables
             return arrayType.IsNullable(
                 nulledType =>
                 {
-                    if (arrayType.IsAssignableFrom(typeof(Guid)))
+                    if (arrayType.IsAssignableFrom(typeof(Guid?)))
                     {
                         var values = (Guid?[])value;
-                        var bytes = values.ToByteArrayOfNullables(g => g.ToByteArray());
+                        var bytes = values.ToByteArrayOfNullableGuids(); //  values.ToByteArrayOfNullables(g => g.ToByteArray());
                         var ep = new EntityProperty(bytes);
                         return onValue(ep);
                     }
-                    if (arrayType.IsAssignableFrom(typeof(decimal)))
+
+                    if (arrayType.IsAssignableFrom(typeof(decimal?)))
                     {
                         var values = (decimal?[])value;
-                        var bytes = values.ToByteArrayOfNullables(d => d.ConvertToBytes());
+                        var bytes = values.ToByteArrayOfNullableDecimals(); // (d => d.ConvertToBytes());
                         var ep = new EntityProperty(bytes);
                         return onValue(ep);
                     }
+
+                    if (arrayType.IsAssignableFrom(typeof(DateTime?)))
+                    {
+                        var values = (DateTime?[])value;
+                        var bytes = values.ToByteArrayOfNullableDateTimes();
+                        var ep = new EntityProperty(bytes);
+                        return onValue(ep);
+                    }
+
                     return GetDefault();
                 },
                 () =>
@@ -895,13 +905,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                     {
                         var values = (DateTime[])value;
                         var bytes = values.ToByteArrayOfDateTimes();
-                        var ep = new EntityProperty(bytes);
-                        return onValue(ep);
-                    }
-                    if (arrayType.IsAssignableFrom(typeof(DateTime?)))
-                    {
-                        var values = (DateTime?[])value;
-                        var bytes = values.ToByteArrayOfNullableDateTimes();
                         var ep = new EntityProperty(bytes);
                         return onValue(ep);
                     }
@@ -1154,42 +1157,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                             },
                             () => Activator.CreateInstance(arrayType));
                 }
-
-                //var newArrayType = typeof(KeyValuePair<,>)
-                //    .MakeGenericType(arrayType.GenericTypeArguments)
-                //    .MakeArrayType();
-                //return value.BindSingleValueToArray(newArrayType,
-                //    onBound:
-                //        (kvpsObj) =>
-                //        {
-                //            var kvps = (object[])kvpsObj;
-                //            var dict = kvps.KeyValuePairsToDictionary(
-                //                arrayType.GenericTypeArguments[0],
-                //                arrayType.GenericTypeArguments[1]);
-                //            return onBound(dict);
-                //        },
-                //    onFailedToBind);
-
-                //var kvps = value
-                //    .DictionaryKeyValuePairs()
-                //    .ToArray();
-                //var keyValues = kvps.Select(kvp => kvp.Key).ToArray();
-                //return keyValues.CastSingleValueToArray(valueType.GenericTypeArguments[0],
-                //    epKeys =>
-                //    {
-                //        var valueValues = kvps.Select(kvp => kvp.Value).ToArray();
-                //        return valueValues.CastSingleValueToArray(valueType.GenericTypeArguments[1],
-                //            epValues =>
-                //            {
-                //                var bytess = (new[] { epKeys.BinaryValue, epValues.BinaryValue })
-                //                    .ToByteArray();
-                //                var ep = new EntityProperty(bytess);
-                //                return onValue(ep);
-                //            },
-                //            () => throw new NotImplementedException());
-                //    },
-                //    () => throw new NotImplementedException());
-
             }
 
             if (arrayType.IsSubClassOfGeneric(typeof(KeyValuePair<,>)))
@@ -1219,24 +1186,12 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     if (typeof(Guid) == nulledType)
                     {
-                        var values = value.BinaryValue.ToNullablesFromByteArray<Guid>(
-                            (byteArray) =>
-                            {
-                                if (byteArray.Length == 16)
-                                    return new Guid(byteArray);
-                                return default(Guid);
-                            });
+                        var values = value.BinaryValue.ToNullableGuidsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(decimal) == nulledType)
                     {
-                        var values = value.BinaryValue.ToNullablesFromByteArray<decimal>(
-                            byteArray =>
-                            {
-                                if(byteArray.TryConvertToDecimal(out decimal decimalValue))
-                                    return decimalValue;
-                                return default(decimal);
-                            });
+                        var values = value.BinaryValue.ToNullableDecimalsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(DateTime) == nulledType)
