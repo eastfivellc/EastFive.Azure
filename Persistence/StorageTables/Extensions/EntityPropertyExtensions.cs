@@ -428,128 +428,13 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             #region Core types
 
-            if (typeof(Guid) == type)
-            {
-                if (value.PropertyType == EdmType.Guid)
-                {
-                    var guidValue = value.GuidValue;
-                    if(guidValue.HasValue)
-                        return onBound(guidValue.Value);
-                }
-                if(value.PropertyType == EdmType.String)
-                {
-                    var guidStr = value.StringValue;
-                    if(Guid.TryParse(guidStr, out Guid guidValue))
-                        return onBound(guidValue);
-                }
-                return onBound(default(Guid)); // This seems to be the best move in case of data migration
-                // return onFailedToBind();
-            }
-            // TODO: Type check the rest of these like GUID
-            if (typeof(long) == type)
-            {
-                var longValue = value.Int64Value;
-                return onBound(longValue);
-            }
-            if (typeof(int) == type)
-            {
-                if (value.PropertyType == EdmType.Int32
-                    || value.PropertyType == EdmType.Int64
-                    || value.PropertyType == EdmType.Double)
-                {
-                    var intValue = value.Int32Value;
-                    return onBound(intValue);
-                }
-            }
-            if (typeof(float) == type)
-            {
-                var floatValue = (float)value.DoubleValue;
-                return onBound(floatValue);
-            }
-            if (typeof(double) == type)
-            {
-                var floatValue = value.DoubleValue;
-                return onBound(floatValue);
-            }
-            if (typeof(string) == type)
-            {
-                if (value.PropertyType != EdmType.String)
-                    return onBound(default(string));
-                var stringValue = value.StringValue;
-                return onBound(stringValue);
-            }
-            if (typeof(DateTime) == type)
-            {
-                if(value.PropertyType == EdmType.Int64)
-                {
-                    if (value.Int64Value.HasValue)
-                    {
-                        var dtValue = new DateTime(value.Int64Value.Value);
-                        return onBound(dtValue);
-                    }
-                }
-                if(value.PropertyType == EdmType.DateTime)
-                {
-                    if (value.DateTime.HasValue)
-                    {
-                        var dtValue = value.DateTime;
-                        return onBound(dtValue);
-                    }
-                }
-            }
-            if (typeof(TimeSpan) == type)
-            {
-                if (value.DoubleValue.HasValue)
-                {
-                    var seconds = value.DoubleValue.Value;
-                    var tsValue = TimeSpan.FromSeconds(seconds);
-                    return onBound(tsValue);
-                }
-            }
-            if (typeof(TimeZoneInfo) == type)
-            {
-                if (value.PropertyType != EdmType.String)
-                    return onFailedToBind();
-                var stringValue = value.StringValue;
-                try
-                {
-                    var tzi = stringValue.FindSystemTimeZone();
-                    return onBound(tzi);
-                }
-                catch(Exception)
-                {
-                    return onFailedToBind();
-                }
-            }
-            if (typeof(Uri) == type)
-            {
-                var strValue = value.StringValue;
-                if (Uri.TryCreate(strValue, UriKind.RelativeOrAbsolute, out Uri uriValue))
-                    return onBound(uriValue);
-                return onBound(uriValue);
-            }
-            if (typeof(Type) == type)
-            {
-                var typeValueString = value.StringValue;
-                var typeValue = Type.GetType(typeValueString);
-                return onBound(typeValue);
-            }
-            if (type.IsEnum)
-            {
-                var enumNameString = value.StringValue;
-                var enumValue = Enum.Parse(type, enumNameString);
-                return onBound(enumValue);
-            }
-            if (typeof(bool) == type)
-            {
-                var boolValue = value.BooleanValue;
-                return onBound(boolValue);
-            }
+            var (isFailure, isDefault, coreValue) = ParseCoreTypes(type);
+            if (!isFailure)
+                return onBound(coreValue);
 
             #endregion
 
             #region refs
-
 
             if (type.IsSubClassOfGeneric(typeof(IRef<>)))
             {
@@ -662,75 +547,218 @@ namespace EastFive.Persistence.Azure.StorageTables
             return type.IsNullable(
                 nullableType =>
                 {
-                    if (typeof(Guid) == nullableType)
+                    var (isFailure, isDefault, coreValue) = ParseCoreTypes(nullableType);
+
+                    if(isFailure)
+                        return onFailedToBind();
+
+                    if (isDefault)
                     {
-                        var guidValue = value.GuidValue;
-                        return onBound(guidValue);
+                        var nullableDefault = nullableType.GetNullValueForNullableType();
+                        return onBound(nullableDefault);
                     }
-                    if (typeof(long) == nullableType)
-                    {
-                        var longValue = value.Int64Value;
-                        return onBound(longValue);
-                    }
-                    if (typeof(int) == nullableType)
-                    {
-                        var intValue = value.Int32Value;
-                        return onBound(intValue);
-                    }
-                    if (typeof(bool) == nullableType)
-                    {
-                        var boolValue = value.BooleanValue;
-                        return onBound(boolValue);
-                    }
-                    if (typeof(float) == nullableType)
-                    {
-                        var floatValue = value.DoubleValue.HasValue ?
-                            (float)value.DoubleValue.Value
-                            :
-                            default(float?);
-                        return onBound(floatValue);
-                    }
-                    if (typeof(double) == nullableType)
-                    {
-                        var floatValue = value.DoubleValue;
-                        return onBound(floatValue);
-                    }
-                    if (typeof(decimal) == nullableType)
-                    {
-                        var doubleValueMaybe = value.DoubleValue;
-                        var decimalMaybeValue = doubleValueMaybe.HasValue ?
-                            (decimal)doubleValueMaybe.Value
-                            :
-                            default(decimal?);
-                        return onBound(decimalMaybeValue);
-                    }
-                    if (typeof(DateTime) == nullableType)
-                    {
-                        if (value.PropertyType == EdmType.DateTime)
-                        {
-                            var dateTimeValueMaybe = value.DateTime;
-                            return onBound(dateTimeValueMaybe);
-                        }
-                        return onBound(default(DateTime?));
-                    }
-                    if (typeof(TimeSpan) == nullableType)
-                    {
-                        if (value.DoubleValue.HasValue)
-                        {
-                            var seconds = value.DoubleValue.Value;
-                            var tsValue = TimeSpan.FromSeconds(seconds);
-                            return onBound(tsValue);
-                        }
-                    }
-                    if (nullableType.IsEnum)
-                    {
-                        var enumNameString = value.StringValue;
-                        var enumValue = Enum.Parse(nullableType, enumNameString);
-                        return onBound(enumValue);
-                    }
-                    return onFailedToBind();
+
+                    return onBound(coreValue);
                 },
                 () => onFailedToBind());
+
+
+            (bool isFailure, bool isDefault, object value) ParseCoreTypes(Type type)
+            {
+                if (typeof(Guid) == type)
+                {
+                    if (value.PropertyType == EdmType.Guid)
+                    {
+                        var guidValue = value.GuidValue;
+                        if (guidValue.HasValue)
+                            return (false, false, guidValue.Value);
+                    }
+                    if (value.PropertyType == EdmType.String)
+                    {
+                        var guidStr = value.StringValue;
+                        if (Guid.TryParse(guidStr, out Guid guidValue))
+                            return (false, false, guidValue);
+                    }
+
+                    // This seems to be the best move in case of data migration
+                    return (false, true, default(Guid));
+                }
+                // TODO: Type check the rest of these like GUID
+                if (typeof(long) == type)
+                {
+                    if (value.PropertyType == EdmType.Int64)
+                    {
+                        var longValue = value.Int64Value;
+                        if (longValue.HasValue)
+                            return (false, false, longValue.Value);
+                    }
+                    if (value.PropertyType == EdmType.Int32)
+                    {
+                        var intValue = value.Int32Value;
+                        if (!intValue.HasValue)
+                        {
+                            var longValue = (long)intValue;
+                            return (false, false, longValue);
+                        }
+                    }
+                    if (value.PropertyType == EdmType.String)
+                    {
+                        var longStr = value.StringValue;
+                        if (long.TryParse(longStr, out var longValue))
+                            return (false, false, longValue);
+                    }
+                    return (false, true, default(long));
+                }
+                if (typeof(int) == type)
+                {
+                    if (value.PropertyType == EdmType.Int32
+                        || value.PropertyType == EdmType.Int64
+                        || value.PropertyType == EdmType.Double)
+                    {
+                        var intValue = value.Int32Value;
+                        return (false, false, intValue);
+                    }
+                }
+                if (typeof(float) == type)
+                {
+                    if (value.PropertyType == EdmType.Double)
+                    {
+                        var doubleValue = value.DoubleValue;
+                        if (doubleValue.HasValue)
+                            return (false, false, (float)doubleValue.Value);
+                    }
+                    if (value.PropertyType == EdmType.Int32)
+                    {
+                        var intValue = value.Int32Value;
+                        if (intValue.HasValue)
+                        {
+                            var floatValue = (float)intValue;
+                            return (false, false, floatValue);
+                        }
+                    }
+                    if (value.PropertyType == EdmType.String)
+                    {
+                        var floatStr = value.StringValue;
+                        if (float.TryParse(floatStr, out var floatValue))
+                            return (false, false, floatValue);
+                    }
+                    return (false, true, default(float));
+                }
+                if (typeof(double) == type)
+                {
+                    if (value.PropertyType == EdmType.Double)
+                    {
+                        var doubleValue = value.DoubleValue;
+                        if (doubleValue.HasValue)
+                            return (false, false, doubleValue.Value);
+                    }
+                    if (value.PropertyType == EdmType.Int32)
+                    {
+                        var intValue = value.Int32Value;
+                        if (intValue.HasValue)
+                        {
+                            var doubleValue = (double)intValue;
+                            return (false, false, doubleValue);
+                        }
+                    }
+                    if (value.PropertyType == EdmType.String)
+                    {
+                        var doubleStr = value.StringValue;
+                        if (double.TryParse(doubleStr, out var doubleValue))
+                            return (false, false, doubleValue);
+                    }
+                    return (false, true, default(double));
+                }
+                if (typeof(string) == type)
+                {
+                    if (value.PropertyType != EdmType.String)
+                        return (false, true, default(string));
+                    var stringValue = value.StringValue;
+                    return (false, false, stringValue);
+                }
+                if (typeof(DateTime) == type)
+                {
+                    if (value.PropertyType == EdmType.Int64)
+                    {
+                        if (value.Int64Value.HasValue)
+                        {
+                            var dtValue = new DateTime(value.Int64Value.Value);
+                            return (false, false, dtValue);
+                        }
+                    }
+                    if (value.PropertyType == EdmType.DateTime)
+                    {
+                        if (value.DateTime.HasValue)
+                        {
+                            var dtValue = value.DateTime;
+                            return (false, false, dtValue);
+                        }
+                    }
+                    return (false, true, default(DateTime));
+                }
+                if (typeof(TimeSpan) == type)
+                {
+                    if (value.DoubleValue.HasValue)
+                    {
+                        var seconds = value.DoubleValue.Value;
+                        var tsValue = TimeSpan.FromSeconds(seconds);
+                        return (false, false, tsValue);
+                    }
+                    return (false, true, TimeSpan.FromSeconds(0));
+                }
+                if (typeof(TimeZoneInfo) == type)
+                {
+                    if (value.PropertyType != EdmType.String)
+                        return (true, true, default);
+                    var stringValue = value.StringValue;
+                    try
+                    {
+                        var tzi = stringValue.FindSystemTimeZone();
+                        return (false, false, tzi);
+                    }
+                    catch (Exception)
+                    {
+                        return (true, true, default);
+                    }
+                }
+                if (typeof(Uri) == type)
+                {
+                    var strValue = value.StringValue;
+                    if (Uri.TryCreate(strValue, UriKind.RelativeOrAbsolute, out Uri uriValue))
+                        return (false, false, uriValue);
+                    return (false, true, uriValue);
+                }
+                if (typeof(Type) == type)
+                {
+                    var typeValueString = value.StringValue;
+                    var typeValue = Type.GetType(typeValueString);
+                    return (false, typeValue == null, typeValue);
+                }
+                if (type.IsEnum)
+                {
+                    var enumNameString = value.StringValue;
+                    if (enumNameString.IsNullOrWhiteSpace())
+                    {
+                        var defaultValue = type.GetDefault();
+                        return (false, true, defaultValue);
+                    }
+
+                    if (!Enum.TryParse(type, enumNameString, out var enumValue))
+                    {
+                        var defaultValue = type.GetDefault();
+                        return (false, true, defaultValue);
+                    }
+
+                    return (false, false, enumValue);
+                }
+                if (typeof(bool) == type)
+                {
+                    var boolValue = value.BooleanValue;
+                    return (false, !value.BooleanValue.HasValue, boolValue);
+                }
+
+                return (true, true, null);
+            }
         }
 
         public static object GetPropertyAsObject(this EntityProperty epValue, out bool hasValue)
