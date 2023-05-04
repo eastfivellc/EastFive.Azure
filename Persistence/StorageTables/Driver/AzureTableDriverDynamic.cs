@@ -2943,7 +2943,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .Select(
                     async rows =>
                     {
-                        var x = CreateOrReplaceBatch(rows,
+                        var rowsToCreate = rows.ToArray();
+                        var x = CreateOrReplaceBatch(rowsToCreate,
                                 row => row.RowKey,
                                 row => row.PartitionKey,
                                 perItemCallback, table,
@@ -2953,7 +2954,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 readAhead: readAhead)
                             .ToArrayAsync();
                         await modifiersTask;
-                        return await x;
+                        var rowsCreated = await x;
+                        return rowsCreated;
                     })
                 .AsyncEnumerable(readAhead: 50)
                 .SelectMany();
@@ -2971,7 +2973,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     TableClient.GetTableReference(tableName)
                     :
                     default(CloudTable);
-            return CreateOrReplaceBatch<ITableEntity, TResult>(entities,
+            var entitiesToCreate = entities.ToArray();
+            return CreateOrReplaceBatch<ITableEntity, TResult>(entitiesToCreate,
                 entity => entity.RowKey,
                 entity => entity.PartitionKey,
                 perItemCallback,
@@ -2981,7 +2984,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 diagnostics: diagnostics);
         }
 
-        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(IEnumerable<TDocument> entities,
+        public IEnumerableAsync<TResult> CreateOrReplaceBatch<TDocument, TResult>(
+                TDocument[] entities, // Cannot be IEnumerable<TDocument> since GroupBy will iterate the whole thing
                 Func<TDocument, string> getRowKey,
                 Func<TDocument, string> getPartitionKey,
                 Func<TDocument, TableResult, TResult> perItemCallback,
@@ -3015,14 +3019,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 .SelectMany(
                     trs =>
                     {
-                        return trs
+                        var collection = trs
                             .Select(
                                 tableResult =>
                                 {
                                     var resultDocument = (TDocument)tableResult.Result;
                                     var itemResult = perItemCallback(resultDocument, tableResult);
                                     return itemResult;
-                                });
+                                })
+                            .ToArray();
+                        return collection;
                     });
 
             Task<object[]> SaveModifiersAsync() => entities
