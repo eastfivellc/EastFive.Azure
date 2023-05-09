@@ -20,6 +20,7 @@ namespace EastFive.Persistence.Azure.StorageTables
     //    years,
     //}
 
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = true)]
     public class ScopeDateTimeAttribute : Attribute, IScopeKeys
     {
         public string Scope { get; private set; }
@@ -97,12 +98,5 @@ namespace EastFive.Persistence.Azure.StorageTables
             return $"{key}{memberValue.Second.ToString("D2")}";
         }
 
-    }
-
-    public class ScopeDateTime1Attribute : ScopeDateTimeAttribute
-    {
-        public ScopeDateTime1Attribute(string scope) : base(scope)
-        {
-        }
     }
 }

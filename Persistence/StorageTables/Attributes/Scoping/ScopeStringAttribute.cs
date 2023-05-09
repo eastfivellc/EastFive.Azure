@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = true)]
     public class ScopeStringAttribute : Attribute, IScopeKeys
     {
         public string Scope { get; private set; }
@@ -49,10 +50,10 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
     }
 
-    public class ScopeString1Attribute : ScopeStringAttribute
-    {
-        public ScopeString1Attribute(string scope) : base(scope)
-        {
-        }
-    }
+    //public class ScopeString1Attribute : ScopeStringAttribute
+    //{
+    //    public ScopeString1Attribute(string scope) : base(scope)
+    //    {
+    //    }
+    //}
 }
