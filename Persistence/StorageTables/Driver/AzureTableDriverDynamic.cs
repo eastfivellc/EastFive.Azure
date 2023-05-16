@@ -4039,10 +4039,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     (code, msg) => onFailure(code, msg),
                     () => throw ex);
             }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            //catch (Exception ex)
+            //{
+            //    throw ex;
+            //}
         }
 
         /// <summary>
