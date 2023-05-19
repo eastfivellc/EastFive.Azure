@@ -2159,7 +2159,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static IEnumerableAsync<string> StorageRepairModifiers(this Type type, string query, string tableName = default)
         {
             var storageRepairModifiersMethod = typeof(StorageExtensions)
-                .GetMethod("StorageRepairModifiersInternal", BindingFlags.Public | BindingFlags.Static);
+                .GetMethod(nameof(StorageRepairModifiersInternal), BindingFlags.Public | BindingFlags.Static);
             var storageRepairModifiersCast = storageRepairModifiersMethod.MakeGenericMethod(type.AsArray());
             return (IEnumerableAsync<string>)storageRepairModifiersCast.Invoke(null, new object[] { query, tableName });
         }
