@@ -753,8 +753,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                 }
                 if (typeof(bool) == type)
                 {
-                    var boolValue = value.BooleanValue;
-                    return (false, !value.BooleanValue.HasValue, boolValue);
+                    if (value.PropertyType == EdmType.Boolean)
+                    {
+                        var boolValue = value.BooleanValue;
+                        return (false, !value.BooleanValue.HasValue, boolValue);
+                    }
+                    if(value.PropertyType == EdmType.String)
+                    {
+                        var isDefault = !value.StringValue.TryParseBool(out var boolValue);
+                        return (false, isDefault, boolValue);
+                    }
+
+                    throw new Exception($"Cannot cast {value.PropertyType} to {nameof(Boolean)}");
                 }
 
                 return (true, true, null);
