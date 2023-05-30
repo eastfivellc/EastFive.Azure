@@ -26,9 +26,8 @@ namespace EastFive.Azure.Auth
                 return boundCallback(parameterSelection, method, httpApp, request);
 
             if(AllowLocalHost)
-                if ("localhost".Equals(request.ServerLocation.Host, StringComparison.OrdinalIgnoreCase))
-                    if ("localhost".Equals(request.RequestUri.Host, StringComparison.OrdinalIgnoreCase))
-                        return boundCallback(parameterSelection, method, httpApp, request);
+                if(request.IsLocalHostRequest())
+                    return boundCallback(parameterSelection, method, httpApp, request);
 
             return request
                     .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
