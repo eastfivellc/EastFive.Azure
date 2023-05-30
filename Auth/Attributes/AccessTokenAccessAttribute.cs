@@ -13,6 +13,8 @@ namespace EastFive.Azure.Auth
 {
     public class AccessTokenAccessAttribute : Attribute, IHandleRoutes
     {
+        public bool ShouldSkipValidationForLocalhost { get; set; }
+
         public Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
@@ -25,7 +27,7 @@ namespace EastFive.Azure.Auth
             if (request.GetAuthorization().HasBlackSpace())
                 return continueExecution(controllerType, httpApp, request);
 
-            return request.RequestUri.ValidateAccessTokenAccount(
+            return request.ValidateAccessTokenAccount(this.ShouldSkipValidationForLocalhost,
                 accessTokenInfo =>
                 {
                     return EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
