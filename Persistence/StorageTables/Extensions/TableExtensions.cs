@@ -9,6 +9,7 @@ using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
+using EastFive.Persistence.Azure.StorageTables;
 
 namespace EastFive.Azure.Persistence.StorageTables
 {
@@ -34,6 +35,23 @@ namespace EastFive.Azure.Persistence.StorageTables
                         return yieldBreak;
                     return yieldReturn(segment.Results.ToArray());
                 });
+        }
+
+        public static string GetStorageTableName(this Type tableType)
+        {
+            return tableType.GetAttributesInterface<IProvideTable>()
+                .First(
+                    (attr, next) => attr.GetTableName(tableType),
+                    () =>
+                    {
+                        if (tableType.IsSubClassOfGeneric(typeof(TableEntity<>)))
+                        {
+                            var genericTableType = tableType.GenericTypeArguments.First();
+                            return genericTableType.GetStorageTableName();
+                        }
+                        var tableName = tableType.Name.ToLower();
+                        return tableName;
+                    });
         }
     }
 }

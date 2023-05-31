@@ -36,6 +36,15 @@ namespace EastFive.Persistence.Azure.StorageTables
                 properties);
         }
 
+        public string GetTableName(Type tableType)
+        {
+            var tableName = this.TableName.HasBlackSpace() ?
+                this.TableName
+                :
+                tableType.Name.ToLower();
+            return tableName;
+        }
+
         public CloudTable GetTable(Type tableType, CloudTableClient client)
         {
             if (tableType.IsSubClassOfGeneric(typeof(TableEntity<>)))
@@ -43,10 +52,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var genericTableType = tableType.GenericTypeArguments.First();
                 return this.GetTable(genericTableType, client);
             }
-            var tableName = this.TableName.HasBlackSpace()?
-                this.TableName
-                :
-                tableType.Name.ToLower();
+            var tableName = this.GetTableName(tableType);
             var table = client.GetTableReference(tableName);
             return table;
         }
