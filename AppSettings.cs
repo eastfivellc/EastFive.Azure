@@ -295,6 +295,24 @@ namespace EastFive.Azure
             }
 
             [Config]
+            public static class Microsoft
+            {
+                [ConfigKey("ID used to identify the application to MS.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > Home > App Registrations > {YOUR APP}",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientId = "EastFive.Microsoft.ClientID";
+
+                [ConfigKey("Key used to redeem a token code to MS.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > Home > App Registrations > {YOUR APP}",
+                    DeploymentSecurityConcern = true,
+                    PrivateRepositoryOnly = true)]
+                public const string ClientSecret = "EastFive.Microsoft.ClientSecret";
+            }
+
+            [Config]
             public static class Ping
             {
                 public const string PingIdentityAthenaRestApiKey = "EastFive.Security.LoginProvider.PingIdentity.Athena.RestApiKey";

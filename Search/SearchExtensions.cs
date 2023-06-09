@@ -94,7 +94,32 @@ namespace EastFive.Azure.Search
             
             try
             {
-                var result = searchClient.IndexDocuments(batch);
+                var result = await searchClient.IndexDocumentsAsync(batch);
+                return result.Value;
+            }
+            catch (Exception)
+            {
+                // Sometimes when your Search service is under load, indexing will fail for some of the documents in
+                // the batch. Depending on your application, you can take compensating actions like delaying and
+                // retrying. For now, just log the failed document keys and continue.
+                Console.WriteLine("Failed to index some of the documents: {0}");
+                throw;
+            }
+        }
+
+        public static async Task<IndexDocumentsResult> SearchUpdateBatchAsync<T>(this IEnumerable<T> items)
+        {
+            if (items.None())
+                return default;
+            var searchClient = GetClient<T>();
+            var itemsArray = items
+                .Select(item => IndexDocumentsAction.MergeOrUpload(item))
+                .ToArray();
+            var batch = IndexDocumentsBatch.Create(itemsArray);
+
+            try
+            {
+                var result = await searchClient.IndexDocumentsAsync(batch);
                 return result.Value;
             }
             catch (Exception)
