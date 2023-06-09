@@ -84,6 +84,14 @@ namespace EastFive.Azure.Search
             return response.Value;
         }
 
+        public static async Task<Response> SearchDeleteIndex(this Type type)
+        {
+            var searchIndexClient = GetIndexClient();
+            var indexName = type.GetIndexName();
+            var response = await searchIndexClient.DeleteIndexAsync(indexName);
+            return response;
+        }
+
         public static async Task<IndexDocumentsResult> SearchUpdateBatchAsync<T>(this IEnumerableAsync<T> items)
         {
             var searchClient = GetClient<T>();

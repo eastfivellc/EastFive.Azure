@@ -214,7 +214,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 //var claims = new ClaimsPrincipal();
                 return onSuccess(claims);
             }
-            catch (Microsoft.IdentityModel.Tokens.SecurityTokenException ex)
+            catch (global::Microsoft.IdentityModel.Tokens.SecurityTokenException ex)
             {
                 return onFailed(ex.Message);
             }

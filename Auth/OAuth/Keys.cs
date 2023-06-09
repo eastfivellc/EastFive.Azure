@@ -99,15 +99,15 @@ namespace EastFive.Azure.Auth.OAuth
                     {
                         return onInvalidToken(ex.Message);
                     }
-                    catch (Microsoft.IdentityModel.Tokens.SecurityTokenInvalidIssuerException ex)
+                    catch (global::Microsoft.IdentityModel.Tokens.SecurityTokenInvalidIssuerException ex)
                     {
                         return onInvalidToken(ex.Message);
                     }
-                    catch (Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException ex)
+                    catch (global::Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException ex)
                     {
                         return onInvalidToken(ex.Message);
                     }
-                    catch (Microsoft.IdentityModel.Tokens.SecurityTokenException ex)
+                    catch (global::Microsoft.IdentityModel.Tokens.SecurityTokenException ex)
                     {
                         return onInvalidToken(ex.Message);
                     }
