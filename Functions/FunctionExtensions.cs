@@ -1,6 +1,7 @@
 ﻿using System;
-
+using System.Linq;
 using System.Threading.Tasks;
+using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
@@ -53,5 +54,81 @@ namespace EastFive.Azure.Functions
 
             return tpls.Await().SelectWhere();
         }
-	}
+
+        public async static Task<(bool, int)> DataLakeIngestAsync<TResource>(
+            this IDurableActivityContext context,
+            Func<TResource, Task<bool>> processAsync,
+            ILogger log)
+        {
+            try
+            {
+                var (path, skip, containerName) = context.GetInput<(string, int, string)>();
+
+                var startTime = System.Diagnostics.Stopwatch.StartNew();
+
+                try
+                {
+                    return await await path.ReadParquetDataFromDataLakeAsync(containerName,
+                        async (TResource[] resourceLines) =>
+                        {
+                            log.LogInformation($"[{path}] Loaded--{resourceLines.Length} lines (skipping {skip})");
+                            var timeout = TimeSpan.FromMinutes(4);
+
+                            var (linesProcessed, isComplete) = await resourceLines
+                                .Skip(skip)
+                                .Aggregate(
+                                    (index:skip, complete:false).AsTask(),
+                                    async (indexTask, resource) =>
+                                    {
+                                        var (index, complete) = await indexTask;
+                                        if (complete)
+                                            return (index, true);
+
+                                        var timedOut = startTime.Elapsed > timeout;
+                                        if (timedOut)
+                                            return (index, true);
+
+                                        try
+                                        {
+                                            var shouldCount = await processAsync(resource);
+                                            if (shouldCount)
+                                                return (index + 1, false);
+                                            return (index, false);
+                                        } catch(Exception ex)
+                                        {
+                                            log.LogError($"EXCEPTION [{path}] Line {index}:{ex.Message}");
+                                            return (index + 1, complete);
+                                        }
+                                    });
+
+                            var state = isComplete ? "completed" : "terminated";
+                            log.LogInformation($"[{path}] {state} at index {linesProcessed}");
+                            return (isComplete, linesProcessed);
+                        },
+                        onNotFound: () =>
+                        {
+                            log.LogInformation($"[{path}]: Not found");
+                            return (true, skip).AsTask();
+                        });
+                }
+                catch (Exception ex)
+                {
+                    log.LogInformation($"[{path}]:Failure--{ex.Message}");
+                    return (true, 0);
+                }
+            }
+            catch (Newtonsoft.Json.JsonReaderException parsingException)
+            {
+                log.LogError(parsingException.Message);
+                log.LogError("Bad resource input -- discarding");
+                return (true, 0);
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex.Message);
+                log.LogError(ex.StackTrace);
+                throw;
+            }
+        }
+    }
 }

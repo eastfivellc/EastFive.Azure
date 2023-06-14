@@ -28,6 +28,7 @@ using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Azure.Storage.Blobs.Models;
 using Microsoft.Azure.Documents;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -2149,6 +2150,30 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onNotFound,
                     onFailure: onFailure,
                     onTimeout: onTimeout);
+        }
+
+        public static Task<BlobItem[]> BlobFindFilesAsync(this string containerName,
+            string filePath, string fileSuffix = default,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return containerName.BlobListFilesAsync(
+                items =>
+                {
+                    var resources = items
+                        .Where(item => item.Properties.ContentLength > 0)
+                        .Where(item => item.Name.Contains(filePath, StringComparison.OrdinalIgnoreCase))
+                        .Where(
+                            item =>
+                            {
+                                if (fileSuffix.IsNullOrWhiteSpace())
+                                    return true;
+                                return item.Name.EndsWith(fileSuffix, StringComparison.OrdinalIgnoreCase);
+                            })
+                        .ToArray();
+                    return resources;
+                },
+                onNotFound:() => new BlobItem[] { },
+                connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
         }
 
         #endregion
