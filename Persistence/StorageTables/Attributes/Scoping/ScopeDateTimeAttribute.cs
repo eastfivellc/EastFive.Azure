@@ -38,7 +38,21 @@ namespace EastFive.Persistence.Azure.StorageTables
         /// <summary>
         /// If the SpanUnits are weeks, this is the day of the first week.
         /// </summary>
-        public DateTime WeeksEpoch { get; set; } = new DateTime(2017, 1, 1);
+        public string WeeksEpoch
+        {
+            get
+            {
+                return this.weeksEpoch.ToShortDateString();
+            }
+            set
+            {
+                DateTime.TryParse(value, out var dt);
+                weeksEpoch = dt;
+            }
+        }
+
+
+        public DateTime weeksEpoch = new DateTime(2017, 1, 1);
 
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
@@ -62,7 +76,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             ignore = false;
             if (!OffsetHours.IsDefault())
                 dateTime = dateTime + TimeSpan.FromHours(OffsetHours);
-            var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, WeeksEpoch);
+            var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, weeksEpoch);
             return $"{currentKey}{dtPartition}";
         }
 
