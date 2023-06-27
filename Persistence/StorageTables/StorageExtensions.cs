@@ -2173,7 +2173,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     return resources;
                 },
                 onNotFound:() => new BlobItem[] { },
-                connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                connectionStringConfigKey: connectionStringConfigKey);
         }
 
         #endregion
