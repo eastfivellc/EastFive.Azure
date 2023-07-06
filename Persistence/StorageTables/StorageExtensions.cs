@@ -1601,6 +1601,28 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onFailure:onFailure);
         }
 
+        public static async Task<TResult> StorageDeleteByPropertyAsync<TProperty, TEntity, TResult>(
+                this TProperty rowPartitionKeyValue,
+                Expression<Func<TEntity, TProperty>> propertyExpr,
+                Func<IQueryable<TEntity>, IQueryable<TEntity>> additionalProperties,
+            Func<TEntity, TResult> onDeleted,
+            Func<TResult> onDoesNotExists = default)
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            var query = new StorageQuery<TEntity>(storageDriver);
+            var queryByProperty = query.StorageQueryByProperty(rowPartitionKeyValue, propertyExpr);
+            var queryFull = additionalProperties(queryByProperty);
+
+            var rowKey = queryFull.StorageComputeRowKey();
+            var partitionKey = queryFull.StorageComputePartitionKey(rowKey);
+
+            return await AzureTableDriverDynamic
+                .FromSettings()
+                .DeleteAsync(rowKey, partitionKey,
+                    onSuccess: (TEntity entity) => onDeleted(entity),
+                    onNotFound: onDoesNotExists);
+        }
+
         public static IEnumerableAsync<TResult> StorageDeleteBatch<TEntity, TResult>(this IEnumerableAsync<IRef<TEntity>> entityRefs,
             Func<TableResult, TResult> onSuccess)
             where TEntity : IReferenceable
