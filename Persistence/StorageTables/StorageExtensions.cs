@@ -742,6 +742,29 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     () => onNotFound());
         }
 
+        public static IEnumerableAsync<IRefAst<TEntity>> StorageFindIdsByAsync<TProperty, TEntity>(this TProperty propertyValue,
+            Expression<Func<TEntity, TProperty>> propertyExpr,
+            Expression<Func<TEntity, bool>> additionalQuery1 = default,
+            Expression<Func<TEntity, bool>> additionalQuery2 = default,
+            Expression<Func<TEntity, bool>> additionalQuery3 = default)
+        // where TEntity : IReferenceable
+        {
+            var storageDriver = AzureTableDriverDynamic.FromSettings();
+            return storageDriver
+                .FindIdsBy(propertyValue,
+                    propertyExpr,
+                    queries: new Expression<Func<TEntity, bool>>[] { }
+                        .AppendIf(additionalQuery1, additionalQuery1.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery2, additionalQuery2.IsNotDefaultOrNull())
+                        .AppendIf(additionalQuery3, additionalQuery3.IsNotDefaultOrNull())
+                        .ToArray())
+                .Select(
+                    astRef =>
+                    {
+                        return astRef.Cast<TEntity>();
+                    });
+        }
+
         //public static IEnumerableAsync<TEntity> StorageGetBy<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
         //        Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
         //        Expression<Func<TEntity, bool>> query1 = default,
