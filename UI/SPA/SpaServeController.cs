@@ -14,6 +14,7 @@ using EastFive.Api.Azure.Modules;
 using EastFive.Api;
 using EastFive.Web.Configuration;
 using EastFive.Persistence.Azure.StorageTables.Driver;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Spa
 {
@@ -23,10 +24,12 @@ namespace EastFive.Azure.Spa
     public class SpaServeController
     {
         public const string BoundAction = "bounce";
+
         [HttpAction(method: BoundAction)]
+        [SuperAdminClaim]
         public static IHttpResponse RedeemAsync(
                 IApplication app,
-                //Security security,
+                EastFive.Api.Security security,
             NoContentResponse onBounced)
         {
             SpaHandler.SetupSpa(app);
@@ -34,8 +37,11 @@ namespace EastFive.Azure.Spa
         }
 
         public const string DownloadAction = "download";
+
         [HttpAction(method: DownloadAction)]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> DownloadAsync(
+                EastFive.Api.Security security,
             StreamResponse onFound,
             NotFoundResponse onNotFound)
         {
