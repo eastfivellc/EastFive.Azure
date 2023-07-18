@@ -155,6 +155,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<string, IRefOptional<Authorization>, TResult> onSuccess, 
             Func<string, TResult> onFailure)
         {
+            if(responseParams.IsDefaultNullOrEmpty())
+                return onFailure($"No parameters, could not load `{Subject}`");
             if (!responseParams.TryGetValue(Subject, out string subject))
                 return onFailure($"Missing `{Subject}`");
             if (!responseParams.TryGetValue(PracticeId, out string practiceId))
@@ -162,11 +164,6 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
             var accountKey = $"{practiceId}_{subject}";
             return onSuccess(accountKey, RefOptional<Authorization>.Empty());
-
-            // TODO: should do a data migration for all ping account lookups
-            //if (subject == "bduchene" && practiceId == "380")
-            //{
-            //}
         }
 
         #region IProvideLogin
