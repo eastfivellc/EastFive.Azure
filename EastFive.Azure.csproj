@@ -68,6 +68,7 @@
     <None Remove="Microsoft.Azure.WebJobs.Extensions.DurableTask" />
     <None Remove="Auth\Salesforce\Resources\" />
     <None Remove="Auth\Salesforce\Attribute\" />
+    <None Remove="Auth\Superadmin\" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Auth\Google\" />
@@ -78,5 +79,6 @@
     <Folder Include="Auth\Salesforce\" />
     <Folder Include="Auth\Salesforce\Resources\" />
     <Folder Include="Auth\Salesforce\Attributes\" />
+    <Folder Include="Auth\Superadmin\" />
   </ItemGroup>
 </Project>

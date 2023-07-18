@@ -350,6 +350,59 @@ namespace EastFive.Azure.Auth
                 () => onNotFound().AsTask());
         }
 
+        [Api.HttpAction("CreateRedirection")]
+        [SuperAdminClaim(AllowLocalHost =true)]
+        public static async Task<IHttpResponse> CreateRedirectionAsync(
+                [QueryParameter(Name = "account")]Guid account,
+                AzureApplication application,
+                IInvokeApplication endpoints,
+                IHttpRequest request,
+            RedirectResponse onSuccess,
+            NotFoundResponse onNotFound,
+            GeneralConflictResponse onFailure,
+            ForbiddenResponse onDisabled)
+        {
+            return await await application.CreateHijackableAuthorizationAsync(account,
+                onCreated: async (Authorization authorization) =>
+                {
+                    return await await Method.ById(authorization.Method, application,
+                        async method =>
+                        {
+                            return await method.GetLoginProvider(application,
+                                (loginProvider) =>
+                                {
+                                    var authorizationRef = authorization.authorizationRef;
+                                    return Auth.Redirection.CreateLoginResponseAsync(account,
+                                            authorization.parameters, method, authorization,
+                                            application, request, endpoints,
+                                            request.RequestUri, loginProvider,
+                                            onRedirect:(uri, modifier) =>
+                                            {
+                                                var response = onSuccess(uri);
+                                                var modifiedResponse = modifier(response);
+                                                return modifiedResponse;
+                                            },
+                                            onBadResponse:(why) => onFailure(why),
+                                            application.Telemetry);
+                                },
+                                why => onFailure(why).AsTask());
+                        },
+                        () => onFailure("Method no longer supported").AsTask());
+                },
+                onDisabled: () =>
+                {
+                    return onDisabled().AddReason("Disabled.").AsTask();
+                },
+                onNotFound: () =>
+                {
+                    return onNotFound().AsTask();
+                },
+                onFailure: (why) =>
+                {
+                    return onFailure(why).AsTask();
+                });
+        }
+
         #endregion
 
         #endregion

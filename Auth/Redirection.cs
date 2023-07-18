@@ -281,9 +281,6 @@ namespace EastFive.Azure.Auth
         {
             if (!(application is IProvideAccountInformation))
             {
-                authorization.authorized = true;
-                authorization.LocationAuthentication = null;
-                // return await OnLegacy();
                 return onGeneralFailure($"{application.GetType().FullName} does not implement {nameof(IProvideAccountInformation)}.");
             }
             var accountInfoProvider = (IProvideAccountInformation)application;
@@ -397,7 +394,7 @@ namespace EastFive.Azure.Auth
         //    }
         //}
 
-        private static Task<TResult> CreateLoginResponseAsync<TResult>(
+        public static Task<TResult> CreateLoginResponseAsync<TResult>(
                 Guid? accountId, IDictionary<string, string> extraParams,
                 Method method, Authorization authorization,
                 IAuthApplication application,

@@ -569,5 +569,13 @@ namespace EastFive.Api.Azure
             return wrapper;
         }
 
+        public virtual Task<TResult> CreateHijackableAuthorizationAsync<TResult>(Guid account,
+            Func<EastFive.Azure.Auth.Authorization, TResult> onCreated,
+            Func<TResult> onDisabled,
+            Func<TResult> onNotFound,
+            Func<string, TResult> onFailure)
+        {
+            return onDisabled().AsTask();
+        }
     }
 }
