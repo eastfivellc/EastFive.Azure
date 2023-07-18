@@ -320,20 +320,33 @@ namespace EastFive.Azure.Auth
             Func<string, IProvideLogin, TResult> onParsed,
             Func<string, TResult> onFailure)
         {
+            return GetLoginProvider(application,
+                (matchingLoginProvider) =>
+                {
+                    return matchingLoginProvider.ParseCredentailParameters(parameters,
+                        (externalId, authorizationIdMaybeDiscard) =>
+                        {
+                            return onParsed(externalId, matchingLoginProvider);
+                        },
+                        onFailure).AsTask();
+                },
+                onFailure: (why) => onFailure(why).AsTask());
+        }
+
+        public TResult GetLoginProvider<TResult>(
+            IAuthApplication application,
+            Func<IProvideLogin, TResult> onParsed,
+            Func<string, TResult> onFailure)
+        {
             var methodName = this.name;
-            if (!application.LoginProviders
+            if (application.LoginProviders
                     .NullToEmpty()
                     .SelectValues()
                     .Where(loginProvider => loginProvider.Method == methodName)
                     .TryGetAny(out IProvideLogin matchingLoginProvider))
-                return onFailure("Method does not match any existing authentication.").AsTask();
+                return onParsed(matchingLoginProvider);
 
-            return matchingLoginProvider.ParseCredentailParameters(parameters,
-                (externalId, authorizationIdMaybeDiscard) =>
-                {
-                    return onParsed(externalId, matchingLoginProvider);
-                },
-                onFailure).AsTask();
+            return onFailure("Method does not match any existing authentication.");
         }
 
         public async Task<TResult> RedeemTokenAsync<TResult>(
