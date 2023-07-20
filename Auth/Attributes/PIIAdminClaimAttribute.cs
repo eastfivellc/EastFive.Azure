@@ -12,6 +12,7 @@ namespace EastFive.Azure.Auth
     public class PIIAdminClaimAttribute : Attribute, IValidateHttpRequest
     {
         private const string ClaimValue = ClaimValues.Roles.PIIAdmin;
+        public bool AllowLocalHost { get; set; } = false;
 
         public Task<IHttpResponse> ValidateRequest(
             KeyValuePair<ParameterInfo, object>[] parameterSelection,
@@ -20,11 +21,16 @@ namespace EastFive.Azure.Auth
             IHttpRequest request,
             ValidateHttpDelegate boundCallback)
         {
+            if (AllowLocalHost)
+                if (request.IsLocalHostRequest())
+                    return boundCallback(parameterSelection, method, httpApp, request);
+
             if (!request.IsAuthorizedForRole(ClaimValue))
                 return request
                     .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                     .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires roll claim `{ClaimValue}`")
                     .AsTask();
+
             return boundCallback(parameterSelection, method, httpApp, request);
         }
     }
