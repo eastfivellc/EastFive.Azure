@@ -257,7 +257,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             query[StateKey] = stateGuid.ToString("N"); //  redirect_uri.Base64(System.Text.Encoding.ASCII);
 
             query["nonce"] = Guid.NewGuid().ToString("N");
-            uriBuilder.Query = query.ToString();
+            uriBuilder.Query = query.CompileQueryParameters();
             var redirect = uriBuilder.Uri; // .ToString();
             return redirect;
         }
