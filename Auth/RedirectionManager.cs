@@ -66,7 +66,7 @@ namespace EastFive.Azure.Auth
             Version = Workflows.HijackLoginFlow.Version,
             StepName = Workflows.HijackLoginFlow.Steps.ListLogins,
             Step = Workflows.HijackLoginFlow.Ordinals.ListLogins)]
-        [PIIAdminClaim]
+        [PIIAdminClaim(AllowLocalHost = true)]
         public async static Task<IHttpResponse> QueryAsync(
                 [WorkflowParameterFromVariable(
                     Value = Workflows.HijackLoginFlow.Variables.Method.Get.Value,
@@ -86,7 +86,7 @@ namespace EastFive.Azure.Auth
                 [OptionalQueryParameter(Name = "days")] int? daysMaybe,
 
                 AzureApplication application,
-                EastFive.Api.Security security,
+                //EastFive.Api.Security security,
                 IHttpRequest request,
 
             ContentTypeResponse<RedirectionManager[]> onContent,
@@ -145,8 +145,14 @@ namespace EastFive.Azure.Auth
                             var id = Guid.Parse(entity.RowKey);
                             var when = entity.Timestamp.DateTime;
                             var props = entity.WriteEntity(default);
-                            var paramKeys = props["parameters__keys"].BinaryValue.ToStringsFromUTF8ByteArray();
-                            var paramValues = props["parameters__values"].BinaryValue.ToStringsFromUTF8ByteArray();
+                            var paramKeys = props.TryGetValue("parameters__keys", out var parameterKeysEP)?
+                                parameterKeysEP.BinaryValue.ToStringsFromUTF8ByteArray()
+                                :
+                                new string[] {};
+                            var paramValues = props.TryGetValue("parameters__values", out var parameterValuesEp)?
+                                parameterValuesEp.BinaryValue.ToStringsFromUTF8ByteArray()
+                                :
+                                new string[] { };
                             var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
 
                             if (search.HasBlackSpace())
