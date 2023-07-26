@@ -10,11 +10,15 @@ using EastFive.Api.Auth;
 using EastFive.Api.Azure;
 using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Serialization;
+using EastFive.Web.Configuration;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
@@ -626,6 +630,86 @@ namespace EastFive.Azure.Auth
                     //        () => onFailure("Method does not match any existing authentication."));
                 },
                 () => onFailure("Authentication not found"));
+        }
+
+        public static IEnumerableAsync<(Guid, DateTime, IDictionary<string, string>)> GetMatchingAuthorizations(IRef<Method> method, int days)
+        {
+            var since = DateTime.UtcNow.Date.AddDays(-days);
+            var query = new TableQuery<GenericTableEntity>().Where(
+            TableQuery.CombineFilters(
+                TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
+                TableOperators.And,
+                TableQuery.CombineFilters(
+                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, since),
+                    TableOperators.And,
+                    TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
+                    )
+                )
+            );
+            var table = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
+                (conn) =>
+                {
+                    var account = CloudStorageAccount.Parse(conn);
+                    var client = account.CreateCloudTableClient();
+                    return client.GetTableReference("authorization");
+                },
+                (why) => throw new Exception(why));
+
+            var segment = default(TableQuerySegment<GenericTableEntity>);
+            var token = default(TableContinuationToken);
+            var segmentIndex = 0;
+            return EnumerableAsync.Yield<(Guid, DateTime, IDictionary<string, string>)>(
+                async (yieldCont, yieldBreak) =>
+                {
+                    while (DoesNeedRefresh())
+                    {
+                        if (IsCompleted())
+                            return yieldBreak;
+                        segment = await table.ExecuteQuerySegmentedAsync(query, token);
+                        segmentIndex = 0;
+                        token = segment.ContinuationToken;
+
+                        bool IsCompleted()
+                        {
+                            // token is valid for another call
+                            if (token != null)
+                                return false;
+
+                            // First run
+                            if (segment.IsDefaultOrNull())
+                                return false;
+
+                            return true; // It's done
+                        }
+                    }
+
+                    var entity = segment.Results[segmentIndex];
+                    var id = Guid.Parse(entity.RowKey);
+                    var when = entity.Timestamp.DateTime;
+                    var props = entity.WriteEntity(default);
+                    var paramKeys = props.TryGetValue("parameters__keys", out var parameterKeysEP) ?
+                        parameterKeysEP.BinaryValue.ToStringsFromUTF8ByteArray()
+                        :
+                        new string[] { };
+                    var paramValues = props.TryGetValue("parameters__values", out var parameterValuesEp) ?
+                        parameterValuesEp.BinaryValue.ToStringsFromUTF8ByteArray()
+                        :
+                        new string[] { };
+                    var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
+
+                    return yieldCont((id, when, parameters));
+
+                    bool DoesNeedRefresh()
+                    {
+                        if (segment.IsDefaultOrNull())
+                            return true;
+                        if (segment.Results.IsDefaultOrNull())
+                            return true;
+                        if (segmentIndex >= segment.Results.Count)
+                            return true;
+                        return false;
+                    }
+                });
         }
     }
 

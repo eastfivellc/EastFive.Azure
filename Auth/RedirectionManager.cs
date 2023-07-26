@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using DocumentFormat.OpenXml.Spreadsheet;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Meta.Flows;
@@ -110,104 +111,65 @@ namespace EastFive.Azure.Auth
 
             var method = methodMaybe.Value;
             var days = daysMaybe.HasValue ? Math.Abs(daysMaybe.Value) : 31;
-            var since = DateTime.UtcNow.Date.AddDays(-days);
-            var query = new TableQuery<GenericTableEntity>().Where(
-            TableQuery.CombineFilters(
-                TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
-                TableOperators.And,
-                TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, since),
-                    TableOperators.And,
-                    TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
-                    )
-                )
-            );
-            var table = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
-                (conn) =>
-                {
-                    var account = CloudStorageAccount.Parse(conn);
-                    var client = account.CreateCloudTableClient();
-                    return client.GetTableReference("authorization");
-                },
-                (why) => throw new Exception(why));
 
-            var segment = default(TableQuerySegment<GenericTableEntity>);
-            var token = default(TableContinuationToken);
-            var redirections = new RedirectionManager[] { };
-            do
-            {
-                segment = await table.ExecuteQuerySegmentedAsync(query, token);
-                token = segment.ContinuationToken;
-                var result = await segment.Results
-                    .Select(
-                        async (entity) =>
-                        {
-                            var id = Guid.Parse(entity.RowKey);
-                            var when = entity.Timestamp.DateTime;
-                            var props = entity.WriteEntity(default);
-                            var paramKeys = props.TryGetValue("parameters__keys", out var parameterKeysEP)?
-                                parameterKeysEP.BinaryValue.ToStringsFromUTF8ByteArray()
+
+            var authorizations = Authorization.GetMatchingAuthorizations(method.authenticationId, days);
+
+            var redirections = await authorizations
+                .Where(
+                    authorizationTpl =>
+                    {
+                        var (id, when, parameters) = authorizationTpl;
+                        if (search.IsNullOrWhiteSpace())
+                            return true;
+
+                        var searchSet = search.Contains(',') ?
+                                search.Split(',')
                                 :
-                                new string[] {};
-                            var paramValues = props.TryGetValue("parameters__values", out var parameterValuesEp)?
-                                parameterValuesEp.BinaryValue.ToStringsFromUTF8ByteArray()
-                                :
-                                new string[] { };
-                            var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
+                                search.AsArray();
+                        var match = parameters.Values
+                                .SelectWhereNotNull()
+                                .Any(val => searchSet.Any(searchItem => val.IndexOf(searchItem, StringComparison.OrdinalIgnoreCase) != -1));
 
-                            if (search.HasBlackSpace())
+                        return match;
+                    })
+                .Select(
+                    async authorizationTpl =>
+                    {
+                        var (id, when, parameters) = authorizationTpl;
+                        return await method.ParseTokenAsync(parameters, application,
+                            (externalId, loginProvider) =>
                             {
-                                var searchSet = search.Contains(',') ?
-                                    search.Split(',')
-                                    :
-                                    search.AsArray();
-                                var match = parameters.Values
-                                    .SelectWhereNotNull()
-                                    .Any(val => searchSet.Any(searchItem => val.IndexOf(searchItem, StringComparison.OrdinalIgnoreCase) != -1));
-                                if (!match)
-                                {
-                                    if(parameters.Count() < 10)
-                                        return default(RedirectionManager?);
-                                    return default(RedirectionManager?);
-                                }
-                            }
-
-                            RedirectionManager? Failure(string why)
-                            {
-                                if (successOnly.GetValueOrDefault())
-                                    return default(RedirectionManager?);
-
                                 return new RedirectionManager
                                 {
                                     authorizationRef = id.AsRef<Authorization>(),
-                                    info = why,
+                                    info = $"{externalId}",
                                     fields = parameters.Count,
                                     when = when,
+                                    link = new Uri(
+                                        request.RequestUri,
+                                        $"/api/RedirectionManager?authorization={id}{apiVoucher}"),
                                 };
-                            }
+                            },
+                            (why) => Failure(why));
 
-                            return await method.ParseTokenAsync(parameters, application,
-                                (externalId, loginProvider) =>
-                                {
-                                    return new RedirectionManager
-                                    {
-                                        authorizationRef = id.AsRef<Authorization>(),
-                                        info = $"{externalId}",
-                                        fields = parameters.Count,
-                                        when = when,
-                                        link = new Uri(
-                                            request.RequestUri,
-                                            $"/api/RedirectionManager?authorization={id}{apiVoucher}"),
-                                    };
-                                },
-                                (why) => Failure(why));
-                        })
-                    .AsyncEnumerable(readAhead: 10)
-                    .SelectWhereHasValue()
-                    .ToArrayAsync();
-                redirections = redirections.Concat(result).ToArray();
+                        RedirectionManager? Failure(string why)
+                        {
+                            if (successOnly.GetValueOrDefault())
+                                return default(RedirectionManager?);
 
-            } while (token != null);
+                            return new RedirectionManager
+                            {
+                                authorizationRef = id.AsRef<Authorization>(),
+                                info = why,
+                                fields = parameters.Count,
+                                when = when,
+                            };
+                        }
+                    })
+                .Await()
+                .SelectWhereHasValue()
+                .ToArrayAsync();
             return onContent(redirections.OrderByDescending(x => x.when).ToArray());
         }
 

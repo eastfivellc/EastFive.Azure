@@ -143,6 +143,7 @@ namespace EastFive.Azure.Auth.Superadmin
 
         public Uri GetLoginUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {
+            
             throw new NotImplementedException();
         }
 
