@@ -96,7 +96,7 @@ namespace EastFive.Azure.Auth
             Version = Workflows.AuthorizationFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
             StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
-        [WorkflowStep2(
+        [WorkflowStep(
             FlowName = Workflows.HijackLoginFlow.FlowName,
             Version = Workflows.HijackLoginFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
@@ -125,7 +125,7 @@ namespace EastFive.Azure.Auth
             Version = Workflows.AuthorizationFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
             StepName = Workflows.HijackLoginFlow.Steps.ChooseMethod)]
-        [WorkflowStep2(
+        [WorkflowStep(
             FlowName = Workflows.HijackLoginFlow.FlowName,
             Version = Workflows.HijackLoginFlow.Version,
             Step = Workflows.HijackLoginFlow.Ordinals.ChooseMethod,
