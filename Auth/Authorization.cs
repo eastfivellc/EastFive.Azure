@@ -632,7 +632,7 @@ namespace EastFive.Azure.Auth
                 () => onFailure("Authentication not found"));
         }
 
-        public static IEnumerableAsync<(Guid, DateTime, IDictionary<string, string>)> GetMatchingAuthorizations(IRef<Method> method, int days)
+        public static IEnumerableAsync<(Guid id, DateTime when, IDictionary<string, string> parameters, Guid? accountIdMaybe)> GetMatchingAuthorizations(IRef<Method> method, int days)
         {
             var since = DateTime.UtcNow.Date.AddDays(-days);
             var query = new TableQuery<GenericTableEntity>().Where(
@@ -658,7 +658,7 @@ namespace EastFive.Azure.Auth
             var segment = default(TableQuerySegment<GenericTableEntity>);
             var token = default(TableContinuationToken);
             var segmentIndex = 0;
-            return EnumerableAsync.Yield<(Guid, DateTime, IDictionary<string, string>)>(
+            return EnumerableAsync.Yield<(Guid, DateTime, IDictionary<string, string>, Guid?)>(
                 async (yieldCont, yieldBreak) =>
                 {
                     while (DoesNeedRefresh())
@@ -697,7 +697,14 @@ namespace EastFive.Azure.Auth
                         new string[] { };
                     var parameters = Enumerable.Range(0, paramKeys.Length).ToDictionary(i => paramKeys[i].Substring(1), i => paramValues[i].Substring(1));
 
-                    return yieldCont((id, when, parameters));
+                    var accountIdMaybe = default(Guid?);
+                    if(props.TryGetValue(nameof(accountIdMaybe), out var accountIdEp))
+                    {
+                        if(accountIdEp.PropertyType == EdmType.Guid)
+                            accountIdMaybe = accountIdEp.GuidValue;
+                    }
+
+                    return yieldCont((id, when, parameters, accountIdMaybe));
 
                     bool DoesNeedRefresh()
                     {
