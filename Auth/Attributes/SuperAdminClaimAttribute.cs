@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Extensions;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
@@ -14,6 +15,12 @@ namespace EastFive.Azure.Auth
         private const string ClaimValue = ClaimValues.Roles.SuperAdmin;
 
         public bool AllowLocalHost { get; set; } = false;
+
+        private static bool allowLocalHostGlobal = EastFive.Azure.AppSettings.Auth.AllowLocalHostGlobalSuperAdmin
+            .ConfigurationBoolean(
+                allow => allow,
+                onFailure: (why) => false,
+                onNotSpecified: () => false);
 
         public Task<IHttpResponse> ValidateRequest(
             KeyValuePair<ParameterInfo, object>[] parameterSelection,
@@ -25,7 +32,7 @@ namespace EastFive.Azure.Auth
             if (request.IsAuthorizedFor(new Uri(ClaimType), ClaimValue))
                 return boundCallback(parameterSelection, method, httpApp, request);
 
-            if(AllowLocalHost)
+            if(AllowLocalHost || allowLocalHostGlobal)
                 if(request.IsLocalHostRequest())
                     return boundCallback(parameterSelection, method, httpApp, request);
 

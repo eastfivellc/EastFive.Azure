@@ -367,6 +367,8 @@ namespace EastFive.Azure
             public const string OpenApiCollectionName = "EastFive.Azure.Auth";
 
             public const string TokenExpirationInMinutes = "EastFive.Security.SessionServer.tokenExpirationInMinutes";
+
+            public static string AllowLocalHostGlobalSuperAdmin = "EastFive.Azure.Auth.AllowLocalHostGlobalSuperAdmin";
         }
 
         [Config]
