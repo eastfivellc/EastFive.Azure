@@ -1,14 +1,17 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
 using EastFive.Serialization;
 using EastFive.Web.Configuration;
+using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -53,6 +56,12 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [ApiProperty(PropertyName = DescriptionPropertyName)]
         [JsonProperty(PropertyName = DescriptionPropertyName)]
         public string description { get; set; }
+
+        public const string LastModifiedByPropertyName = "last_modified_by";
+        [Storage]
+        [ApiProperty(PropertyName = LastModifiedByPropertyName)]
+        [JsonProperty(PropertyName = LastModifiedByPropertyName)]
+        public string lastModifiedBy { get; set; }
 
         public const string KeyPropertyName = "key";
         [ApiProperty(PropertyName = KeyPropertyName)]
@@ -106,6 +115,12 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{$randomDateFuture}}")]
                 [Property(Name = ExpirationPropertyName)] DateTime expiration,
 
+                [Api.Meta.Flows.WorkflowParameter(Value = "", Description = "Who will use this token?")]
+                [Property(Name = DescriptionPropertyName)] string description,
+
+                [Api.Meta.Flows.WorkflowParameter(Value = "", Description = "Who created this token?")]
+                [Property(Name = LastModifiedByPropertyName)] string lastModifiedBy,
+
                 [Api.Meta.Flows.WorkflowObjectParameter(
                     Key0 ="http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
                     Value0 = ClaimValues.RoleType + "fb7f557f458c4eadb08652c4a7315fd6",
@@ -120,6 +135,12 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             AlreadyExistsResponse onAlreadyExists,
             GeneralConflictResponse onFailure)
         {
+            if (string.IsNullOrWhiteSpace(description))
+                return onFailure("Please include a description.");
+
+            if (string.IsNullOrWhiteSpace(lastModifiedBy))
+                return onFailure($"Please include a {LastModifiedByPropertyName} person.");
+
             return await VoucherTools.GenerateUrlToken(voucherTokenRef.id, expiration,
                     key,
                 token =>
@@ -161,8 +182,40 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             return onFound(security.performingAsActorId);
         }
 
+        [HttpGet]
+        [ApiKeyAccess]
+        [SuperAdminClaim]
+        public static async Task<IHttpResponse> GetAsync(
+                [OptionalQueryParameter(Name = IdPropertyName)]Guid? idMaybe,
+                [OptionalQueryParameter(Name = AuthIdPropertyName)]Guid? authIdMaybe,
+
+                EastFive.Api.Security security,
+            ContentTypeResponse<VoucherToken> onFound,
+            NotFoundResponse onNotFound,
+            BadRequestResponse onBadRequest)
+        {
+            if (idMaybe.HasValue)
+                return await idMaybe.Value.AsRef<VoucherToken>().StorageGetAsync(
+                    (x) => onFound(x),
+                    () => onNotFound());
+
+            if (authIdMaybe.HasValue)
+                return await FindByAuthId(authIdMaybe.Value)
+                    .FirstAsync(
+                        (x) => onFound(x),
+                        () => onNotFound());
+
+            return onBadRequest().AddReason($"Either {IdPropertyName} or {AuthIdPropertyName} must be provided.");
+        }
+
         #endregion
 
-
+        public static IEnumerableAsync<VoucherToken> FindByAuthId(Guid authId)
+        {
+            var query = new TableQuery<GenericTableEntity>().Where(
+                TableQuery.GenerateFilterConditionForGuid(AuthIdPropertyName, QueryComparisons.Equal, authId));
+            return query.FilterString
+                .StorageFindbyQuery<VoucherToken>();
+        }
     }
 }

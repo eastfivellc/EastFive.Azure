@@ -11,7 +11,7 @@ namespace EastFive.Azure
         public class AuthorizationFlow
         {
             public const string FlowName = "AuthorizationFlow";
-            public const string Version = "2023.1.4";
+            public const string Version = "2023.8.3";
 
             public class Variables
             {
