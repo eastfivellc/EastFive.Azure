@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Drawing.Drawing2D;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
@@ -55,7 +57,7 @@ namespace EastFive.Azure.Functions
             return tpls.Await().SelectWhere();
         }
 
-        public async static Task<(bool, int)> DataLakeIngestAsync<TResource>(
+        public static async Task<(bool, int)> DataLakeIngestAsync<TResource>(
             this IDurableActivityContext context,
             Func<TResource, Task<bool>> processAsync,
             ILogger log)
@@ -63,59 +65,16 @@ namespace EastFive.Azure.Functions
             try
             {
                 var (path, skip, containerName) = context.GetInput<(string, int, string)>();
-
                 var startTime = System.Diagnostics.Stopwatch.StartNew();
-
-                try
-                {
-                    return await await path.ReadParquetDataFromDataLakeAsync(containerName,
-                        async (TResource[] resourceLines) =>
-                        {
-                            log.LogInformation($"[{path}] Loaded--{resourceLines.Length} lines (skipping {skip})");
-                            var timeout = TimeSpan.FromMinutes(4);
-
-                            var (linesProcessed, isComplete) = await resourceLines
-                                .Skip(skip)
-                                .Aggregate(
-                                    (index:skip, complete:false).AsTask(),
-                                    async (indexTask, resource) =>
-                                    {
-                                        var (index, complete) = await indexTask;
-                                        if (complete)
-                                            return (index, true);
-
-                                        var timedOut = startTime.Elapsed > timeout;
-                                        if (timedOut)
-                                            return (index, true);
-
-                                        try
-                                        {
-                                            var shouldCount = await processAsync(resource);
-                                            if (shouldCount)
-                                                return (index + 1, false);
-                                            return (index, false);
-                                        } catch(Exception ex)
-                                        {
-                                            log.LogError($"EXCEPTION [{path}] Line {index}:{ex.Message}");
-                                            return (index + 1, complete);
-                                        }
-                                    });
-
-                            var state = isComplete ? "completed" : "terminated";
-                            log.LogInformation($"[{path}] {state} at index {linesProcessed}");
-                            return (isComplete, linesProcessed);
-                        },
-                        onNotFound: () =>
-                        {
-                            log.LogInformation($"[{path}]: Not found");
-                            return (true, skip).AsTask();
-                        });
-                }
-                catch (Exception ex)
-                {
-                    log.LogInformation($"[{path}]:Failure--{ex.Message}");
-                    return (true, 0);
-                }
+                var timeout = TimeSpan.FromMinutes(4);
+                return await DataLakeIngestFileAsync(
+                    (path: path, containerName: containerName, skip:skip),
+                    processAsync: processAsync,
+                    isTimedOut: () =>
+                    {
+                        return startTime.Elapsed > timeout;
+                    },
+                    log:log);
             }
             catch (Newtonsoft.Json.JsonReaderException parsingException)
             {
@@ -128,6 +87,71 @@ namespace EastFive.Azure.Functions
                 log.LogError(ex.Message);
                 log.LogError(ex.StackTrace);
                 throw;
+            }
+        }
+
+        public async static Task<(bool, int)> DataLakeIngestFileAsync<TResource>(
+            this (string path, string containerName, int skip) tpl,
+            Func<TResource, Task<bool>> processAsync,
+            Func<bool> isTimedOut,
+            ILogger log)
+        {
+            var (path, containerName, skip) = tpl;
+            try
+            {
+                return await await path.ReadParquetDataFromDataLakeAsync(containerName,
+                    async (TResource[] resourceLines) =>
+                    {
+                        if(log.IsNotDefaultOrNull())
+                            log.LogInformation($"[{path}] Loaded--{resourceLines.Length} lines (skipping {skip})");
+
+                        var (linesProcessed, isComplete) = await resourceLines
+                            .Skip(skip)
+                            .Aggregate(
+                                (index: skip, complete: false).AsTask(),
+                                async (indexTask, resource) =>
+                                {
+                                    var (index, complete) = await indexTask;
+                                    if (complete)
+                                        return (index, true);
+
+                                    var timedOut = isTimedOut();
+                                    if (timedOut)
+                                        return (index, true);
+
+                                    try
+                                    {
+                                        var shouldCount = await processAsync(resource);
+                                        if (shouldCount)
+                                            return (index + 1, false);
+                                        return (index, false);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        if (log.IsNotDefaultOrNull())
+                                            log.LogError($"EXCEPTION [{path}] Line {index}:{ex.Message}");
+                                        return (index + 1, complete);
+                                    }
+                                });
+
+                        var state = isComplete ? "completed" : "terminated";
+
+                        if (log.IsNotDefaultOrNull())
+                            log.LogInformation($"[{path}] {state} at index {linesProcessed}");
+                        return (isComplete, linesProcessed);
+                    },
+                    onNotFound: () =>
+                    {
+                        if (log.IsNotDefaultOrNull())
+                            log.LogInformation($"[{path}]: Not found");
+                        return (true, skip).AsTask();
+                    });
+            }
+            catch (Exception ex)
+            {
+                if (log.IsNotDefaultOrNull())
+                    log.LogInformation($"[{path}]:Failure--{ex.Message}");
+                return (true, 0);
             }
         }
     }
