@@ -783,7 +783,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 Expression<Func<TEntity, bool>> query2 = default,
                 int readAhead = -1,
                 ILogger logger = default)
-            where TEntity : IReferenceable
+            //where TEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()

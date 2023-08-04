@@ -663,7 +663,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 Expression<Func<TEntity, bool>> query2 = default,
                 int readAhead = -1,
                 ILogger logger = default)
-            where TEntity : IReferenceable
+            //where TEntity : IReferenceable
         {
             return FindByInternal(propertyValue, propertyExpr,
                 logger: logger, readAhead: readAhead,
