@@ -1250,6 +1250,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var values = value.BinaryValue.ToGuidsFromByteArray();
                         return onBound(values);
                     }
+                    if (typeof(EastFive.Azure.Persistence.Blobs.IBlobRef) == arrayType)
+                    {
+                        var values = value.BinaryValue.ToGuidsFromByteArray();
+                        return onBound(values);
+                    }
                     if (typeof(byte) == arrayType)
                     {
                         return onBound(value.BinaryValue);

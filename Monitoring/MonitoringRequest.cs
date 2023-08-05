@@ -27,6 +27,7 @@ using EastFive.Azure.Monitoring;
 using EastFive.Api.Meta.Postman.Resources;
 using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Auth;
+using EastFive.Api.Serialization.Json;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -36,6 +37,7 @@ namespace EastFive.Api.Azure.Monitoring
         ContentType = "x-application/meta-montioring-request",
         ContentTypeVersion = "0.1")]
     [StorageTable]
+    [CastSerialization]
     public class MonitoringRequest : IReferenceable
     {
         #region Properties

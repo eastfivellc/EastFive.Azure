@@ -1,20 +1,113 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EastFive.Azure
+﻿namespace EastFive.Azure
 {
     public class Workflows
     {
         public class AuthorizationFlow
         {
             public const string FlowName = "AuthorizationFlow";
-            public const string Version = "2023.8.3";
+            public const string Version = "2023.8.5";
 
-            public class Variables
+            public static class Scopes
             {
+                // WorkflowStep.Scope
+                public const string Voucher = "Voucher";
+            }
+
+            public static class Steps
+            {
+                public const string ListVouchers = "List Vouchers";
+                public const string ChooseVoucher = "Choose Voucher";
+                public const string CreateVoucher = "Add Voucher";
+                public const string UpdateVoucher = "Modify Voucher";
+                public const string SecurityLog = "Security Log";
+                public const string ActivityLog = "Activity Log";
+            }
+
+            public static class Ordinals
+            {
+                public const double ListVouchers = 1.0;
+                public const double ChooseVoucher = 1.1;
+                public const double CreateVoucher = 1.2;
+                public const double UpdateVoucher = 1.3;
+                public const double SecurityLog = 1.4;
+                public const double ActivityLog = 1.5;
+            }
+
+            public static class Variables
+            {
+                public static class ShowExpired
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "false";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter show expired [true | false]";
+                    }
+                }
+
+                public static class VoucherId
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter voucher id";
+                    }
+                    public static class Get
+                    {
+                        // WorkflowParameter.Value or WorkflowVariable.VariableName
+                        public const string Value = "VoucherId";
+                        // WorkflowParameter.Description
+                        public const string Description = "Run Choose Voucher first to select a value";
+                    }
+                }
+
+                public static class AuthId
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter authorization id";
+                    }
+                }
+
+                public static class VoucherDescription
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter description";
+                    }
+                }
+
+                public static class VoucherExpiration
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter expiration date";
+                    }
+                }
+
+                public static class MonitoringStart
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter search start";
+                    }
+                }
+
                 public const string TokenName = "TOKEN";
                 public const string AuthHeaderName = "AuthorizationHeaderName";
                 public const string ApiVoucher = "ApiVoucher";
