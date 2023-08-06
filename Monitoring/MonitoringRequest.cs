@@ -28,6 +28,8 @@ using EastFive.Api.Meta.Postman.Resources;
 using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Auth;
 using EastFive.Api.Serialization.Json;
+using System.IO;
+using EastFive.Web;
 
 namespace EastFive.Api.Azure.Monitoring
 {
@@ -661,6 +663,92 @@ namespace EastFive.Api.Azure.Monitoring
                         return onNotFound();
                     });
             }
+        }
+
+        public struct ActivityLog : IComparable<ActivityLog>
+        {
+            public string method;
+            public string route;
+            public int status;
+            public DateTime timestamp;
+            public string url;
+            public Guid id;
+            public KeyValuePair<string, string>[] formdata;
+            public string blob;
+
+            public ActivityLog(MonitoringRequest request)
+            {
+                method = request.method;
+                route = request.route;
+                status = request.status;
+                timestamp = request.when;
+                url = request.url.AbsoluteUri;
+                id = request.id;
+                formdata = request.formData
+                    .NullToEmpty()
+                    .Select(x => x.key.PairWithValue(x.contents.NullToEmpty().Join(",")))
+                    .ToArray();
+                blob = default(string);
+            }
+
+            public static async Task<ActivityLog> ConvertAsync(MonitoringRequest request)
+            {
+                var log = new ActivityLog(request);
+                if (request.body != null)
+                {
+                    try
+                    {
+                        log.blob = await request.body.LoadStreamAsync(
+                        (id, stream, mediaType, disposition) =>
+                        {
+                            using (var reader = new StreamReader(stream))
+                            {
+                                var json = reader.ReadToEnd();
+                                return json;
+                            }
+                        },
+                        () => default(string));
+                    }
+                    catch (Exception) { }
+                }
+                return log;
+            }
+
+            public int CompareTo(ActivityLog other)
+            {
+                // ascending
+                return timestamp.CompareTo(other.timestamp);
+            }
+        }
+
+        public static IEnumerableAsync<ActivityLog> GetActivityLog(Guid actorId, DateTime when)
+        {
+            return when
+                .StorageGetBy((MonitoringRequest mr) => mr.when)
+                .Where(mr =>
+                {
+                    var tryAuth = mr.headers
+                        .NullToEmpty()
+                        .First(
+                            (x, next) =>
+                            {
+                                if (x.key == "Authorization")
+                                    return x.value;
+
+                                return next();
+                            },
+                            () => default(string));
+                    if (string.IsNullOrWhiteSpace(tryAuth))
+                        return false;
+
+                    var jwtActorId = tryAuth.GetClaimsJwtString(
+                            (claims) => claims.GetActorId(x => x, () => default(Guid?)),
+                            (why) => default(Guid?));
+
+                    return jwtActorId == actorId;
+                })
+                .Select(ActivityLog.ConvertAsync)
+                .Await(readAhead: 25);
         }
     }
 }

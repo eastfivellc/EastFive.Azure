@@ -97,14 +97,14 @@
                     }
                 }
 
-                public static class MonitoringStart
+                public static class MonitoringWhen
                 {
                     public static class Set
                     {
                         // WorkflowParameter.Value
                         public const string Value = "";
                         // WorkflowParameter.Description
-                        public const string Description = "Enter search start";
+                        public const string Description = "Enter search when";
                     }
                 }
 

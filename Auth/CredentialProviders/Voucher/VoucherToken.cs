@@ -151,62 +151,6 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             return onComplete(sorted.AsAsync());
         }
 
-        public struct ActivityLog : IComparable<ActivityLog>
-        {
-            public string method;
-            public string route;
-            public int status;
-            public DateTime timestamp;
-            public string url;
-            public Guid id;
-            public KeyValuePair<string, string>[] formdata;
-            public string blob;
-
-            public ActivityLog(Api.Azure.Monitoring.MonitoringRequest request)
-            {
-                method = request.method;
-                route = request.route;
-                status = request.status;
-                timestamp = request.when;
-                url = request.url.AbsoluteUri;
-                id = request.id;
-                formdata = request.formData
-                    .NullToEmpty()
-                    .Select(x => x.key.PairWithValue(x.contents.NullToEmpty().Join(",")))
-                    .ToArray();
-                blob = default(string);
-            }
-
-            public static async Task<ActivityLog> ConvertAsync(Api.Azure.Monitoring.MonitoringRequest request)
-            {
-                var log = new ActivityLog(request);
-                if (request.body != null)
-                {
-                    try
-                    {
-                        log.blob = await request.body.LoadStreamAsync(
-                        (id, stream, mediaType, disposition) =>
-                        {
-                            using (var reader = new StreamReader(stream))
-                            {
-                                var json = reader.ReadToEnd();
-                                return json;
-                            }
-                        },
-                        () => default(string));
-                    }
-                    catch (Exception) { }
-                }
-                return log;
-            }
-
-            public int CompareTo(ActivityLog other)
-            {
-                // ascending
-                return timestamp.CompareTo(other.timestamp);
-            }
-        }
-
         [HttpAction("ActivityLog")]
         [EastFive.Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
@@ -222,13 +166,13 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [QueryParameter(Name = IdPropertyName)] IRef<VoucherToken> voucherRef,
 
                 [WorkflowParameter(
-                    Value = Workflows.AuthorizationFlow.Variables.MonitoringStart.Set.Value,
-                    Description = Workflows.AuthorizationFlow.Variables.MonitoringStart.Set.Description)]
-                [QueryParameter(Name = "start")] DateTime start,
+                    Value = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Value,
+                    Description = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Description)]
+                [QueryParameter(Name = "when")] DateTime when,
 
                 EastFive.Api.Security security,
 
-            MultipartAsyncResponse<ActivityLog> onComplete,
+            MultipartAsyncResponse<Api.Azure.Monitoring.MonitoringRequest.ActivityLog> onComplete,
             BadRequestResponse onBadRequest)
         {
             var voucherActorId = await voucherRef.StorageGetAsync(
@@ -237,46 +181,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             if (voucherActorId.IsDefault())
                 return onBadRequest().AddReason($"The voucher ID `{voucherRef.id}` does not have an authorization id");
 
-            var r = Guid.Parse("0036f91c8d22489495df94e36b5774cd").AsRef<Api.Azure.Monitoring.MonitoringRequest>();
-            var results = await start
-                .StorageGetBy((Api.Azure.Monitoring.MonitoringRequest mr) => mr.when)
-                .Where(mr =>
-                {
-                    var tryAuth = mr.headers
-                        .NullToEmpty()
-                        .First(
-                            (x, next) =>
-                            {
-                                if (x.key == "Authorization")
-                                    return x.value;
-
-                                return next();
-                            },
-                            () => default(string));
-                    if (string.IsNullOrWhiteSpace(tryAuth))
-                        return false;
-
-                    var actorId = tryAuth.GetClaimsJwtString(
-                            (claims) => claims.GetActorId(x => x, () => default(Guid?)),
-                            (why) => default(Guid?));
-
-                    return actorId == voucherActorId;
-                })
-                .Select(ActivityLog.ConvertAsync)
-                .Await(readAhead: 25)
+            var results = await Api.Azure.Monitoring.MonitoringRequest.GetActivityLog(voucherActorId.Value, when)
                 .ToArrayAsync();
-
-            //var v = await r.StorageGetAsync(
-            //    (IQueryable<Api.Azure.Monitoring.MonitoringRequest> mr) => mr
-            //        .Where(m => m.when == start),
-            //    (mr) => mr,
-            //    () => default(Api.Azure.Monitoring.MonitoringRequest));
-
-            //var results = await voucherQuery
-            //    .StorageGet()
-            //    .Select(q => new ActivityLog(q))
-            //    .ToArrayAsync();
-            var sorted = new List<ActivityLog>(results);
+            var sorted = new List<Api.Azure.Monitoring.MonitoringRequest.ActivityLog>(results);
             sorted.Sort();
             return onComplete(sorted.AsAsync());
         }
