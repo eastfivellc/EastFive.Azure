@@ -424,6 +424,54 @@ namespace EastFive.Persistence.Azure.StorageTables
                     onFailedToBind);
             }
 
+            if (type.IsSubClassOfGeneric(typeof(IDictionary<,>)))
+            {
+                var keyType = type.GenericTypeArguments[0];
+                var valueType = type.GenericTypeArguments[1];
+
+                var epKeysEpValues = value.BinaryValue.FromByteArray().ToArray();
+                if (epKeysEpValues.Length != 2)
+                    return onBound(GetDefaultDictValue());
+                var epKeys = epKeysEpValues[0];
+                var epValues = epKeysEpValues[1];
+
+                return new EntityProperty(epKeys).BindSingleValueToArray(keyType,
+                    keys =>
+                    {
+                        return new EntityProperty(epValues).BindSingleValueToArray(valueType,
+                            values =>
+                            {
+                                var defaultValue = GetDefaultDictValue();
+                                var valuesEnumerator = values.ObjectToEnumerable().GetEnumerator();
+                                var dict = keys
+                                    .ObjectToEnumerable()
+                                    .Select(
+                                        (key) =>
+                                        {
+                                            if (!valuesEnumerator.MoveNext())
+                                                return (false, default(KeyValuePair<object, object>));
+                                            var kvp = key.PairWithValue(valuesEnumerator.Current);
+                                            return (true, kvp);
+                                        })
+                                    .SelectWhere()
+                                    .Select(kvp => (object)kvp)
+                                    .ToArray()
+                                    .KeyValuePairsToDictionary(keyType, valueType);
+
+                                return onBound(dict);
+                            },
+                            onFailedToBind: onFailedToBind);
+                    },
+                    onFailedToBind: onFailedToBind);
+
+                object GetDefaultDictValue()
+                {
+                    var nonInterfaceType = typeof(Dictionary<,>).MakeGenericType(type.GenericTypeArguments);
+
+                    return Activator.CreateInstance(nonInterfaceType);
+                }
+            }
+
             #region Basic values
 
             #region Core types
@@ -1342,11 +1390,39 @@ namespace EastFive.Persistence.Azure.StorageTables
                             },
                             () =>
                             {
+                                if(value.PropertyType == EdmType.Binary)
+                                {
+                                    var arrayValues = value.BinaryValue
+                                        .FromEdmTypedByteArrayToEntityProperties(arrayType)
+                                        .Select(
+                                            entityProperty =>
+                                            {
+                                                return entityProperty.Bind(typeof(IDictionary<string, object>),
+                                                    v =>
+                                                    {
+                                                        var dict = (IDictionary<string, object>)v;
+                                                        var emptyInstance = Activator.CreateInstance(arrayType);
+                                                        var populatedInstance = arrayType
+                                                            .GetPropertyOrFieldMembers()
+                                                            .Aggregate(emptyInstance,
+                                                                (v, memberInfo) =>
+                                                                {
+                                                                    if (dict.TryGetValue(memberInfo.Name, out var memberValue))
+                                                                        memberInfo.SetPropertyOrFieldValue(v, memberValue);
+                                                                    return v;
+                                                                });
+                                                        return onBound(populatedInstance);
+                                                    },
+                                                    onFailedToBind: () => arrayType.GetDefault());
+                                            })
+                                        .ToArray()
+                                        .CastArray(arrayType);
+
+                                    return onBound(arrayValues);
+                                }
                                 throw new Exception($"Cannot serialize array of `{arrayType.FullName}`.");
                             });
-                    
                 });
-
         }
 
     }
