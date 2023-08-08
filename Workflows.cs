@@ -108,6 +108,28 @@
                     }
                 }
 
+                public static class MonitoringRoute
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Blank or enter route";
+                    }
+                }
+
+                public static class MonitoringMethod
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Blank or enter HTTP method";
+                    }
+                }
+
                 public const string TokenName = "TOKEN";
                 public const string AuthHeaderName = "AuthorizationHeaderName";
                 public const string ApiVoucher = "ApiVoucher";

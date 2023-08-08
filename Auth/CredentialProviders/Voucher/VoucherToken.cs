@@ -162,26 +162,39 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         public static async Task<IHttpResponse> GetActivityLogAsync(
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.VoucherId.Set.Value,
-                    Description = Workflows.AuthorizationFlow.Variables.VoucherId.Set.Description)]
-                [QueryParameter(Name = IdPropertyName)] IRef<VoucherToken> voucherRef,
+                    Description = "Blank or " + Workflows.AuthorizationFlow.Variables.VoucherId.Set.Description)]
+                [OptionalQueryParameter(Name = IdPropertyName)] IRefOptional<VoucherToken> voucherRefMaybe,
+
+                [WorkflowParameter(
+                    Value = Workflows.AuthorizationFlow.Variables.MonitoringRoute.Set.Value,
+                    Description = Workflows.AuthorizationFlow.Variables.MonitoringRoute.Set.Description)]
+                [OptionalQueryParameter] string route,
+
+                [WorkflowParameter(
+                    Value = Workflows.AuthorizationFlow.Variables.MonitoringMethod.Set.Value,
+                    Description = Workflows.AuthorizationFlow.Variables.MonitoringMethod.Set.Description)]
+                [OptionalQueryParameter] string method,
 
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Description)]
-                [QueryParameter(Name = "when")] DateTime when,
+                [QueryParameter] DateTime when,
 
                 EastFive.Api.Security security,
 
             MultipartAsyncResponse<Api.Azure.Monitoring.MonitoringRequest.ActivityLog> onComplete,
             BadRequestResponse onBadRequest)
         {
-            var voucherActorId = await voucherRef.StorageGetAsync(
+            var actorIdMaybe = await voucherRefMaybe.StorageGetAsync(
                 (x) => x.authId,
                 () => default(Guid?));
-            if (voucherActorId.IsDefault())
-                return onBadRequest().AddReason($"The voucher ID `{voucherRef.id}` does not have an authorization id");
+            if (voucherRefMaybe.HasValueNotNull() && actorIdMaybe.IsDefault())
+                return onBadRequest().AddReason($"The voucher ID `{voucherRefMaybe.id}` does not have an authorization id");
 
-            var results = await Api.Azure.Monitoring.MonitoringRequest.GetActivityLog(voucherActorId.Value, when)
+            if (actorIdMaybe.IsDefault() && string.IsNullOrWhiteSpace(route) && string.IsNullOrWhiteSpace(method))
+                return onBadRequest().AddReason("You must have one of id, route, or method");
+
+            var results = await Api.Azure.Monitoring.MonitoringRequest.GetActivityLog(actorIdMaybe, route, method, when)
                 .ToArrayAsync();
             var sorted = new List<Api.Azure.Monitoring.MonitoringRequest.ActivityLog>(results);
             sorted.Sort();

@@ -673,27 +673,42 @@ namespace EastFive.Api.Azure.Monitoring
             public DateTime timestamp;
             public string url;
             public Guid id;
+            public Guid actorId;
             public KeyValuePair<string, string>[] formdata;
             public string blob;
 
-            public ActivityLog(MonitoringRequest request)
+            public ActivityLog(MonitoringRequest request, Guid actorId)
             {
+                KeyValuePair<string,string>[] getFormData() =>
+                    request.formData
+                    .NullToEmpty()
+                    .Select(x => x.key.PairWithValue(x.contents.NullToEmpty().Join(", ")))
+                    .ToArray();
+
+                KeyValuePair<string, string>[] getFormDataFiles() =>
+                    request.formDataFiles
+                    .NullToEmpty()
+                    .Select(x => x.fileName.PairWithValue($"disposition:{x.contentDisposition}, mime:{x.contentType}, bytes:{x.length}, blobId:{(x.contents != null ? x.contents.Id : string.Empty)}"))
+                    .ToArray();
+
                 method = request.method;
                 route = request.route;
                 status = request.status;
                 timestamp = request.when;
                 url = request.url.AbsoluteUri;
                 id = request.id;
-                formdata = request.formData
-                    .NullToEmpty()
-                    .Select(x => x.key.PairWithValue(x.contents.NullToEmpty().Join(",")))
+                this.actorId = actorId;
+                formdata = getFormData()
+                    .Concat(getFormDataFiles())
                     .ToArray();
                 blob = default(string);
             }
 
-            public static async Task<ActivityLog> ConvertAsync(MonitoringRequest request)
+            public static async Task<ActivityLog> ConvertAsync(KeyValuePair<Guid,MonitoringRequest> kvp)
             {
-                var log = new ActivityLog(request);
+                var actorId = kvp.Key;
+                var request = kvp.Value;
+                var log = new ActivityLog(request, actorId);
                 if (request.body != null)
                 {
                     try
@@ -721,32 +736,52 @@ namespace EastFive.Api.Azure.Monitoring
             }
         }
 
-        public static IEnumerableAsync<ActivityLog> GetActivityLog(Guid actorId, DateTime when)
+        public static IEnumerableAsync<ActivityLog> GetActivityLog(Guid? actorIdMaybe, string tryRoute, string tryMethod, DateTime when)
         {
+
             return when
                 .StorageGetBy((MonitoringRequest mr) => mr.when)
-                .Where(mr =>
-                {
-                    var tryAuth = mr.headers
-                        .NullToEmpty()
-                        .First(
-                            (x, next) =>
-                            {
-                                if (x.key == "Authorization")
-                                    return x.value;
+                .Select(
+                    (mr) =>
+                    {
+                        var tryAuth = mr.headers
+                            .NullToEmpty()
+                            .First(
+                                (x, next) =>
+                                {
+                                    if (x.key == "Authorization")
+                                        return x.value;
 
-                                return next();
-                            },
-                            () => default(string));
-                    if (string.IsNullOrWhiteSpace(tryAuth))
-                        return false;
+                                    return next();
+                                },
+                                () => default(string));
+                        if (string.IsNullOrWhiteSpace(tryAuth))
+                            return default(KeyValuePair<Guid, MonitoringRequest>?);
 
-                    var jwtActorId = tryAuth.GetClaimsJwtString(
+                        var jwtActorIdMaybe = tryAuth.GetClaimsJwtString(
                             (claims) => claims.GetActorId(x => x, () => default(Guid?)),
                             (why) => default(Guid?));
 
-                    return jwtActorId == actorId;
-                })
+                        if (jwtActorIdMaybe.IsDefault())
+                            return default(KeyValuePair<Guid, MonitoringRequest>?);
+
+                        return jwtActorIdMaybe.Value.PairWithValue(mr);
+                    })
+                .SelectWhereHasValue()
+                .Where(
+                    (kvp) =>
+                    {
+                        if (!actorIdMaybe.IsDefault() && actorIdMaybe.Value != kvp.Key)
+                            return false;
+
+                        if (tryRoute.HasBlackSpace() && !kvp.Value.route.Equals(tryRoute, StringComparison.OrdinalIgnoreCase))
+                            return false;
+
+                        if (tryMethod.HasBlackSpace() && !kvp.Value.method.Equals(tryMethod, StringComparison.OrdinalIgnoreCase))
+                            return false;
+
+                        return true;
+                    })
                 .Select(ActivityLog.ConvertAsync)
                 .Await(readAhead: 25);
         }
