@@ -27,7 +27,7 @@ namespace EastFive.Azure.Persistence.Blobs
 {
     public class BlobRefSerializerAttribute :
         Attribute, ISerialize<IDictionary<string, EntityProperty>>,
-        IDeserializeFromBody<JsonReader>
+        IDeserializeFromBody<JsonReader>, IBind<EntityProperty>, ICast<EntityProperty>
     {
         public TResult Bind<TResult>(IDictionary<string, EntityProperty> value,
                 Type type, string pathStart, MemberInfo member,
@@ -84,7 +84,7 @@ namespace EastFive.Azure.Persistence.Blobs
             }
             
         }
-
+        
         public TResult Cast<TResult>(object value, 
                 Type valueType, string path, MemberInfo member,
             Func<IDictionary<string, EntityProperty>, TResult> onValue, 
@@ -102,6 +102,84 @@ namespace EastFive.Azure.Persistence.Blobs
             var ep = new EntityProperty(blobRef.Id);
             var dict = ep.PairWithKey(path).AsArray().ToDictionary();
             return onValue(dict);
+        }
+
+
+        public TResult Bind<TResult>(EntityProperty epValue, Type type, string path, MemberInfo member,
+            Func<object, TResult> onBound,
+            Func<TResult> onFailedToBind)
+        {
+            if(epValue.PropertyType == EdmType.Binary)
+            {
+                var strings = epValue.BinaryValue.ToStringsFromUTF8ByteArray();
+                if (strings.Length != 2)
+                    return onFailedToBind();
+                var id = strings[0];
+                var containerName = strings[1];
+                var blobRef = new BlobRefStorage
+                {
+                    Id = id,
+                    ContainerName = containerName,
+                };
+                return onBound(blobRef);
+            }
+
+            return GetId(
+                id =>
+                {
+                    if (member.IsDefaultOrNull())
+                        return onFailedToBind();
+                    var containerName = member.BlobContainerName();
+                    var blobRef = new BlobRefStorage
+                    {
+                        Id = id,
+                        ContainerName = containerName,
+                    };
+                    return onBound(blobRef);
+                },
+                () =>
+                {
+                    return onBound(default(IBlobRef));
+                });
+
+            TResult GetId(
+                Func<string, TResult> onFound,
+                Func<TResult> onNoValue)
+            {
+                if (epValue.PropertyType == EdmType.String)
+                {
+                    if (epValue.StringValue.HasBlackSpace())
+                        return onFound(epValue.StringValue);
+                    return onNoValue();
+                }
+                if (epValue.PropertyType == EdmType.Guid)
+                {
+                    var guidValue = epValue.GuidValue;
+                    if (guidValue.HasValue)
+                        return onFound(guidValue.Value.ToString("N"));
+                }
+                return onNoValue();
+            }
+        }
+
+        public TResult Cast<TResult>(object value,
+                Type valueType, string path, MemberInfo member,
+            Func<EntityProperty, TResult> onValue,
+            Func<TResult> onNoCast)
+        {
+            if (value.IsDefaultOrNull())
+                return onNoCast();
+
+            var valueActualType = value.GetType();
+            if (!typeof(IBlobRef).IsAssignableFrom(valueActualType))
+                return onNoCast();
+
+            var blobRef = (IBlobRef)value;
+
+            var valuesToSerialize = new string[] { blobRef.Id, blobRef.ContainerName };
+            var bytesToSerialize = valuesToSerialize.ToUTF8ByteArrayOfStrings();
+            var ep = new EntityProperty(bytesToSerialize);
+            return onValue(ep);
         }
 
         public object UpdateInstance(string propertyKey,
