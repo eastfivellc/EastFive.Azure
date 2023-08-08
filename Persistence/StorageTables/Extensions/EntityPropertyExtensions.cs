@@ -429,6 +429,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 var keyType = type.GenericTypeArguments[0];
                 var valueType = type.GenericTypeArguments[1];
 
+                if (value.PropertyType != EdmType.Binary)
+                    return onBound(GetDefaultDictValue());
+
                 var epKeysEpValues = value.BinaryValue.FromByteArray().ToArray();
                 if (epKeysEpValues.Length != 2)
                     return onBound(GetDefaultDictValue());
@@ -1293,12 +1296,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 },
                 () =>
                 {
+                    #region Built in types
+
                     if (typeof(Guid) == arrayType)
-                    {
-                        var values = value.BinaryValue.ToGuidsFromByteArray();
-                        return onBound(values);
-                    }
-                    if (typeof(EastFive.Azure.Persistence.Blobs.IBlobRef) == arrayType)
                     {
                         var values = value.BinaryValue.ToGuidsFromByteArray();
                         return onBound(values);
@@ -1368,19 +1368,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return onBound(urls);
                     }
 
+                    #endregion
+
                     return arrayType
                         .GetAttributesInterface<IBind<EntityProperty>>(true)
                         .First<IBind<EntityProperty>, TResult>(
                             (epSerializer, next) =>
                             {
-                                var values = value.BinaryValue.FromEdmTypedByteArray(typeof(byte[]));
+                                var values = value.BinaryValue.FromEdmTypedByteArrayToEntityProperties(typeof(byte[]));
                                 var boundValues = values
-                                    .Where(valueObject => valueObject is byte[])
+                                    //.Where(valueObject => valueObject is byte[])
                                     .Select(
                                         valueObject =>
                                         {
-                                            var valueBytes = valueObject as byte[];
-                                            var valueEp = new EntityProperty(valueBytes);
+                                            //var valueBytes = valueObject as byte[];
+                                            var valueEp = valueObject; // new EntityProperty(valueBytes);
                                             return epSerializer.Bind(valueEp, arrayType, string.Empty, default,
                                                 v => v,
                                                 () => arrayType.GetDefault());
