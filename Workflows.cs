@@ -5,7 +5,7 @@
         public class AuthorizationFlow
         {
             public const string FlowName = "AuthorizationFlow";
-            public const string Version = "2023.8.5";
+            public const string Version = "2023.8.10";
 
             public static class Scopes
             {
@@ -192,6 +192,17 @@
                         public const string Value = "";
                         // WorkflowParameter.Description
                         public const string Description = "Blank or search phrase";
+                    }
+                }
+
+                public static class ValidTokens
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "true";
+                        // WorkflowParameter.Description
+                        public const string Description = "Show valid tokens only";
                     }
                 }
 

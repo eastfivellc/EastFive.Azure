@@ -2,19 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using DocumentFormat.OpenXml.Spreadsheet;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Meta.Flows;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Serialization;
-using EastFive.Web.Configuration;
-using Microsoft.Azure.Cosmos.Table;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Auth
@@ -47,6 +42,15 @@ namespace EastFive.Azure.Auth
         public string info { get; set; }
 
         [JsonProperty]
+        public bool authorized { get; set; }
+
+        [JsonProperty]
+        public bool valid_token { get; set; }
+
+        [JsonProperty]
+        public Guid? actor_id { get; set; }
+
+        [JsonProperty]
         public int fields { get; set; }
 
         [JsonProperty]
@@ -74,8 +78,6 @@ namespace EastFive.Azure.Auth
                     Description = Workflows.HijackLoginFlow.Variables.Method.Get.Description)]
                 [QueryParameter(Name = "method")] IRef<Method> methodRef,
 
-                [OptionalQueryParameter(Name = "successOnly")] bool? successOnly,
-
                 [WorkflowParameter(
                     Value = Workflows.HijackLoginFlow.Variables.Search.Set.Value,
                     Description = Workflows.HijackLoginFlow.Variables.Search.Set.Description)]
@@ -86,8 +88,13 @@ namespace EastFive.Azure.Auth
                     Description = Workflows.HijackLoginFlow.Variables.History.Set.Description)]
                 [OptionalQueryParameter(Name = "days")] int? daysMaybe,
 
+                [WorkflowParameter(
+                    Value = Workflows.HijackLoginFlow.Variables.ValidTokens.Set.Value,
+                    Description = Workflows.HijackLoginFlow.Variables.ValidTokens.Set.Description)]
+                [OptionalQueryParameter(Name = "valid_tokens_only")] bool? validTokensOnly,
+
                 AzureApplication application,
-                //EastFive.Api.Security security,
+                EastFive.Api.Security security,
                 IHttpRequest request,
 
             ContentTypeResponse<RedirectionManager[]> onContent,
@@ -96,9 +103,6 @@ namespace EastFive.Azure.Auth
             var methodMaybe = await Method.ById(methodRef, application, (m) => m, () => default(Method?));
             if (methodMaybe.IsDefault())
                 return onBadRequest().AddReason("Method no longer supported");
-
-            if (!successOnly.HasValue)
-                successOnly = true;
 
             request.Headers.TryGetValue(
                 EastFive.Azure.Auth.ApiKeyAccessAttribute.ParameterName,
@@ -113,13 +117,13 @@ namespace EastFive.Azure.Auth
             var days = daysMaybe.HasValue ? Math.Abs(daysMaybe.Value) : 31;
 
 
-            var authorizations = Authorization.GetMatchingAuthorizations(method.authenticationId, days);
+            var authorizations = Authorization.GetMatchingAuthorizations(method.authenticationId, days, false);
 
             var redirections = await authorizations
                 .Where(
                     authorizationTpl =>
                     {
-                        var (id, when, parameters, accountIdMaybe) = authorizationTpl;
+                        var (id, when, parameters, accountIdMaybe, authorized) = authorizationTpl;
                         if (search.IsNullOrWhiteSpace())
                             return true;
 
@@ -136,7 +140,7 @@ namespace EastFive.Azure.Auth
                 .Select(
                     async authorizationTpl =>
                     {
-                        var (id, when, parameters, accountIdMaybe) = authorizationTpl;
+                        var (id, when, parameters, accountIdMaybe, authorized) = authorizationTpl;
                         return await method.ParseTokenAsync(parameters, application,
                             (externalId, loginProvider) =>
                             {
@@ -144,6 +148,9 @@ namespace EastFive.Azure.Auth
                                 {
                                     authorizationRef = id.AsRef<Authorization>(),
                                     info = $"{externalId}",
+                                    authorized = authorized,
+                                    valid_token = true,
+                                    actor_id = accountIdMaybe,
                                     fields = parameters.Count,
                                     when = when,
                                     link = new Uri(
@@ -155,16 +162,18 @@ namespace EastFive.Azure.Auth
 
                         RedirectionManager? Failure(string why)
                         {
-                            if (successOnly.GetValueOrDefault())
+                            if (validTokensOnly.GetValueOrDefault())
                                 return default(RedirectionManager?);
 
                             return new RedirectionManager
-                            {
-                                authorizationRef = id.AsRef<Authorization>(),
-                                info = why,
-                                fields = parameters.Count,
-                                when = when,
-                            };
+                                {
+                                    authorizationRef = id.AsRef<Authorization>(),
+                                    info = why,
+                                    authorized = authorized,
+                                    actor_id = accountIdMaybe,
+                                    fields = parameters.Count,
+                                    when = when,
+                                };
                         }
                     })
                 .Await()

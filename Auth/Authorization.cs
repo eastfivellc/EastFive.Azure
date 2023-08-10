@@ -632,19 +632,23 @@ namespace EastFive.Azure.Auth
                 () => onFailure("Authentication not found"));
         }
 
-        public static IEnumerableAsync<(Guid id, DateTime when, IDictionary<string, string> parameters, Guid? accountIdMaybe)> GetMatchingAuthorizations(IRef<Method> method, int days)
+        public static IEnumerableAsync<(Guid id, DateTime when, IDictionary<string, string> parameters, Guid? accountIdMaybe, bool authorized)> GetMatchingAuthorizations(IRef<Method> method, int days, bool successOnly)
         {
             var since = DateTime.UtcNow.Date.AddDays(-days);
-            var query = new TableQuery<GenericTableEntity>().Where(
-            TableQuery.CombineFilters(
-                TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
-                TableOperators.And,
+            var subQuery = successOnly ?
                 TableQuery.CombineFilters(
                     TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, since),
                     TableOperators.And,
                     TableQuery.GenerateFilterConditionForBool("authorized", QueryComparisons.Equal, true)
                     )
-                )
+                :
+                TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, since);
+
+            var query = new TableQuery<GenericTableEntity>().Where(
+            TableQuery.CombineFilters(
+                TableQuery.GenerateFilterConditionForGuid("method", QueryComparisons.Equal, method.id),
+                TableOperators.And,
+                subQuery)
             );
             var table = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
                 (conn) =>
@@ -658,7 +662,7 @@ namespace EastFive.Azure.Auth
             var segment = default(TableQuerySegment<GenericTableEntity>);
             var token = default(TableContinuationToken);
             var segmentIndex = 0;
-            return EnumerableAsync.Yield<(Guid, DateTime, IDictionary<string, string>, Guid?)>(
+            return EnumerableAsync.Yield<(Guid, DateTime, IDictionary<string, string>, Guid?, bool)>(
                 async (yieldCont, yieldBreak) =>
                 {
                     while (DoesNeedRefresh())
@@ -683,7 +687,7 @@ namespace EastFive.Azure.Auth
                         }
                     }
 
-                    var entity = segment.Results[segmentIndex];
+                    var entity = segment.Results[segmentIndex++];
                     var id = Guid.Parse(entity.RowKey);
                     var when = entity.Timestamp.DateTime;
                     var props = entity.WriteEntity(default);
@@ -704,7 +708,14 @@ namespace EastFive.Azure.Auth
                             accountIdMaybe = accountIdEp.GuidValue;
                     }
 
-                    return yieldCont((id, when, parameters, accountIdMaybe));
+                    bool? authorized = false;
+                    if (props.TryGetValue(nameof(authorized), out var authorizedEp))
+                    {
+                        if (authorizedEp.PropertyType == EdmType.Boolean)
+                            authorized = authorizedEp.BooleanValue;
+                    }
+
+                    return yieldCont((id, when, parameters, accountIdMaybe, authorized.GetValueOrDefault()));
 
                     bool DoesNeedRefresh()
                     {
