@@ -85,6 +85,12 @@ namespace EastFive.Persistence
                         return defaultValue;
                     return new DateTime(ep.Int32Value.Value, DateTimeKind.Utc);
                 }
+                if (ep.PropertyType == EdmType.DateTime)
+                {
+                    if (!ep.DateTime.HasValue)
+                        return defaultValue;
+                    return ep.DateTime.Value;
+                }
                 return defaultValue;
             }
 
