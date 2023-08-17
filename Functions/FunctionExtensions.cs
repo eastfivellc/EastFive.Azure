@@ -108,29 +108,25 @@ namespace EastFive.Azure.Functions
                         var (linesProcessed, isComplete) = await resourceLines
                             .Skip(skip)
                             .Aggregate(
-                                (index: skip, complete: false).AsTask(),
+                                (index: skip, complete: true).AsTask(),
                                 async (indexTask, resource) =>
                                 {
                                     var (index, complete) = await indexTask;
-                                    if (complete)
-                                        return (index, true);
 
-                                    var timedOut = isTimedOut();
-                                    if (timedOut)
-                                        return (index, true);
+                                    var isTimedOutResult = isTimedOut();
+                                    if (isTimedOutResult)
+                                        return (index, false);
 
                                     try
                                     {
                                         var shouldCount = await processAsync(resource);
-                                        if (shouldCount)
-                                            return (index + 1, false);
-                                        return (index, false);
+                                        return (index + 1, true);
                                     }
                                     catch (Exception ex)
                                     {
                                         if (log.IsNotDefaultOrNull())
                                             log.LogError($"EXCEPTION [{path}] Line {index}:{ex.Message}");
-                                        return (index + 1, complete);
+                                        return (index + 1, true);
                                     }
                                 });
 
