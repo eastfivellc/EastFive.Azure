@@ -2165,6 +2165,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobLoadStreamAsync<TResult>(this IRefBlob blob,
+            Func<System.IO.Stream, BlobProperties, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobLoadStreamAsync(blob.Path, blob.Container,
+                    onSuccess,
+                    onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
         public static Task<TResult> BlobLoadStreamAsync<TResult>(this string blobName, string containerName,
             Func<System.IO.Stream, BlobProperties, TResult> onSuccess,
             Func<TResult> onNotFound = default,
@@ -2201,14 +2217,18 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             string filePath, string fileSuffix = default,
             string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
-            if (filePath.IsNullOrWhiteSpace())
-                return new BlobItem[] { }.AsTask();
             return containerName.BlobListFilesAsync(
                 items =>
                 {
                     var resources = items
                         .Where(item => item.Properties.ContentLength > 0)
-                        .Where(item => item.Name.Contains(filePath, StringComparison.OrdinalIgnoreCase))
+                        .Where(
+                            item =>
+                            {
+                                if (filePath.IsNullOrWhiteSpace())
+                                    return true;
+                                return item.Name.Contains(filePath, StringComparison.OrdinalIgnoreCase);
+                            })
                         .Where(
                             item =>
                             {
