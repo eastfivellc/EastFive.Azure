@@ -2201,6 +2201,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             string filePath, string fileSuffix = default,
             string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
         {
+            if (filePath.IsNullOrWhiteSpace())
+                return new BlobItem[] { }.AsTask();
             return containerName.BlobListFilesAsync(
                 items =>
                 {
