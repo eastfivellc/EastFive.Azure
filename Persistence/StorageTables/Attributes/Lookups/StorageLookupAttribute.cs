@@ -6,7 +6,6 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
-using EastFive.Linq.Expressions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using Microsoft.Azure.Cosmos.Table;
 using System;
@@ -14,9 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using EastFive.Reflection;
-using System.Net.Http;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
@@ -68,7 +65,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                         var rowAndPartitionKeys = dictEntity.rowAndPartitionKeys
                                             .NullToEmpty()
                                             .Where(rowPartitionKeyKvp => rowPartitionKeyKvp.Key.HasBlackSpace() && rowPartitionKeyKvp.Value.HasBlackSpace())
-                                            .Distinct(rowPartitionKeyKvp => $"{rowPartitionKeyKvp.Key}{rowPartitionKeyKvp.Value}")
+                                            .Distinct(rowPartitionKeyKvp => $"{rowPartitionKeyKvp.Key}|{rowPartitionKeyKvp.Value}")
                                             .Select(rowPartitionKeyKvp => rowPartitionKeyKvp.Key.AsAstRef(rowPartitionKeyKvp.Value))
                                             .ToArray();
                                         scopedLogger.Trace($"{lookupRef.PartitionKey}/{lookupRef.RowKey} = {rowAndPartitionKeys.Length} lookups");
@@ -256,7 +253,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         .NullToEmpty()
                         .Where(kvp => kvp.Key.HasBlackSpace() && kvp.Value.HasBlackSpace()) // omit any bad entries
                         .Select(kvp => kvp.Key.AsAstRef(kvp.Value))
-                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.PartitionKey}{rowParitionKeyKvp.RowKey}")
+                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
                         .ToArray();
                     var updatedRowAndPartitionKeys = mutateCollection(orignalRowAndPartitionKeys)
                         .Where(kvp => kvp.RowKey.HasBlackSpace() && kvp.PartitionKey.HasBlackSpace())
@@ -291,7 +288,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                 {
                                     var currentLookups = currentDoc.rowAndPartitionKeys
                                         .Select(rpk => rpk.Key.AsAstRef(rpk.Value))
-                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}{rowParitionKeyKvp.PartitionKey}")
+                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
                                         .NullToEmpty()
                                         .ToArray();
                                     var rolledBackRowAndPartitionKeys = currentLookups
@@ -436,7 +433,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                                         var rowAndParitionKeys = lookup.rowAndPartitionKeys;
                                         var rowKeyFound = rowAndParitionKeys
                                             .NullToEmpty()
-                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
+                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}|{rowParitionKeyKvp.Value}")
                                             .Where(kvp => kvp.Key == rowKeyRef)
                                             .Where(kvp => kvp.Value == partitionKeyRef)
                                             .Any();
@@ -478,12 +475,14 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     {
                                         return MutateLookupTable(rowKey.RowKey, rowKey.PartitionKey, memberInfo,
                                             repository,
-                                            (rowAndParitionKeys) => rowAndParitionKeys
-                                                .NullToEmpty()
-                                                .Where(kvp =>
-                                                    kvp.RowKey != existingEntity.RowKey &&
-                                                    kvp.PartitionKey != existingEntity.PartitionKey)
-                                                .ToArray());
+                                            (rowAndParitionKeys) =>
+                                            {
+                                                var existingEntityMarker = $"{existingEntity.RowKey}|{existingEntity.PartitionKey}";
+                                                return rowAndParitionKeys
+                                                    .NullToEmpty()
+                                                    .Where(kvp => $"{kvp.RowKey}|{kvp.PartitionKey}" != existingEntityMarker)
+                                                    .ToArray();
+                                            });
                                     });
                             var additionRollbacks = rowKeysAdded
                                  .Select(
@@ -657,7 +656,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var rollbacks = await lookupTable
                             .rowAndPartitionKeys
                             .NullToEmpty()
-                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}{rowParitionKeyKvp.Value}")
+                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}|{rowParitionKeyKvp.Value}")
                             .Select(rowParitionKeyKvp =>
                                 repository.DeleteAsync<Func<Task>>(rowParitionKeyKvp.Key, rowParitionKeyKvp.Value, memberInfo.DeclaringType,
                                     (entity, data) => 
@@ -699,5 +698,4 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
             Func<string, TResult> onNoMatch);
     }
-
 }
