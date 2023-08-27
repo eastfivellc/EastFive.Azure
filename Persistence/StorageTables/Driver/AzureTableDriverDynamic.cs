@@ -1708,7 +1708,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        private async Task<TResult> DeleteAsync<TResult>(ITableEntity entity, CloudTable table,
+        public async Task<TResult> DeleteAsync<TResult>(ITableEntity entity, CloudTable table,
             Func<TResult> onSuccess,
             Func<TResult> onNotFound,
             Func<TResult> onModified = default,

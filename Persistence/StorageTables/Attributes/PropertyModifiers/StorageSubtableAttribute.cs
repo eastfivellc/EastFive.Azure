@@ -339,9 +339,28 @@ namespace EastFive.Persistence
                 (created, tr) => onSuccessWithRollback(() => 1.AsTask()));
         }
 
-        public Task<TResult> ExecuteDeleteAsync<TEntity, TResult>(MemberInfo memberInfo, string rowKeyRef, string partitionKeyRef, TEntity value, IDictionary<string, EntityProperty> dictionary, AzureTableDriverDynamic repository, Func<Func<Task>, TResult> onSuccessWithRollback, Func<TResult> onFailure)
+        public async Task<TResult> ExecuteDeleteAsync<TEntity, TResult>(MemberInfo memberInfo, string rowKeyRef, string partitionKeyRef, TEntity value, IDictionary<string, EntityProperty> dictionary, AzureTableDriverDynamic repository, Func<Func<Task>, TResult> onSuccessWithRollback, Func<TResult> onFailure)
         {
-            throw new NotImplementedException();
+            var propertyValue = memberInfo.GetValue(value);
+            if (propertyValue == default)
+                return onSuccessWithRollback(() => true.AsTask());
+
+            var newValueType = propertyValue.GetType();
+            if (!newValueType.IsSubClassOfGeneric(typeof(Func<>)))
+            {
+                return onSuccessWithRollback(() => true.AsTask());
+            }
+            var taskValue = propertyValue.ExecuteFunction(out Type taskType);
+            var resultValue = await taskValue.CastAsTaskObjectAsync(out Type typeToSave);
+            var rawValues = Serialize(resultValue, typeToSave);
+
+            ITableEntity subtableEntity = new SubtableEntity(rowKeyRef, partitionKeyRef, rawValues);
+            var tableName = StorageLookupAttribute.GetMemberTableName(memberInfo);
+            var tableRef = repository.TableClient.GetTableReference(tableName);
+            return await repository.DeleteAsync(subtableEntity, tableRef,
+                () => onSuccessWithRollback(() => 1.AsTask()),
+                () => onSuccessWithRollback(() => 1.AsTask()),
+                onFailure: (codes, why) => onSuccessWithRollback(() => 1.AsTask()));
         }
 
         public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member, string rowKey, string partitionKey, TEntity entity, IDictionary<string, EntityProperty> serializedEntity)
