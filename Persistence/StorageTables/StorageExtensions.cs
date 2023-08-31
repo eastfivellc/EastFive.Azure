@@ -1022,6 +1022,8 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
+
+
         #endregion
 
         #region CreateOrUpdate
@@ -1145,7 +1147,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
-        public static Task<TResult> StorageInsertOrReplaceAsync<TEntity, TResult>(this TEntity entity,
+        public static Task<TResult> StorageCreateOrReplaceAsync<TEntity, TResult>(this TEntity entity,
             Func<bool, TResult> onSuccess,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = null,
