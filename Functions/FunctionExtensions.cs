@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Persistence.Blobs;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
@@ -59,7 +60,7 @@ namespace EastFive.Azure.Functions
 
         public static async Task<(bool, int)> DataLakeIngestAsync<TResource>(
             this IDurableActivityContext context,
-            Func<TResource, Task<bool>> processAsync,
+            Func<TResource, (string path, string container), int, Task<bool>> processAsync,
             ILogger log)
         {
             try
@@ -69,7 +70,7 @@ namespace EastFive.Azure.Functions
                 var timeout = TimeSpan.FromMinutes(4);
                 return await DataLakeIngestFileAsync(
                     (path: path, containerName: containerName, skip:skip),
-                    processAsync: processAsync,
+                    processAsync: (TResource res, int index) => processAsync(res, (path, containerName), index),
                     isTimedOut: () =>
                     {
                         return startTime.Elapsed > timeout;
@@ -92,7 +93,7 @@ namespace EastFive.Azure.Functions
 
         public async static Task<(bool, int)> DataLakeIngestFileAsync<TResource>(
             this (string path, string containerName, int skip) tpl,
-            Func<TResource, Task<bool>> processAsync,
+            Func<TResource, int, Task<bool>> processAsync,
             Func<bool> isTimedOut,
             ILogger log)
         {
@@ -119,7 +120,7 @@ namespace EastFive.Azure.Functions
 
                                     try
                                     {
-                                        var shouldCount = await processAsync(resource);
+                                        var shouldCount = await processAsync(resource, index);
                                         return (index + 1, true);
                                     }
                                     catch (Exception ex)
