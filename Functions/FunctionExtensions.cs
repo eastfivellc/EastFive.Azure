@@ -106,35 +106,35 @@ namespace EastFive.Azure.Functions
                         if(log.IsNotDefaultOrNull())
                             log.LogInformation($"[{path}] Loaded--{resourceLines.Length} lines (skipping {skip})");
 
-                        var (linesProcessed, isComplete) = await resourceLines
+                        var (linesProcessed, isComplete, countProcessed, errorsProcessed) = await resourceLines
                             .Skip(skip)
                             .Aggregate(
-                                (index: skip, complete: true).AsTask(),
+                                (index: skip, complete: true, count: 0, errorCount: 0).AsTask(),
                                 async (indexTask, resource) =>
                                 {
-                                    var (index, complete) = await indexTask;
+                                    var (index, complete, count, errorCount) = await indexTask;
 
                                     var isTimedOutResult = isTimedOut();
                                     if (isTimedOutResult)
-                                        return (index, false);
+                                        return (index, false, count, errorCount);
 
                                     try
                                     {
                                         var shouldCount = await processAsync(resource, index);
-                                        return (index + 1, true);
+                                        return (index + 1, true, count + 1, errorCount);
                                     }
                                     catch (Exception ex)
                                     {
                                         if (log.IsNotDefaultOrNull())
                                             log.LogError($"EXCEPTION [{path}] Line {index}:{ex.Message}");
-                                        return (index + 1, true);
+                                        return (index + 1, true, count, errorCount + 1);
                                     }
                                 });
 
                         var state = isComplete ? "completed" : "terminated";
 
                         if (log.IsNotDefaultOrNull())
-                            log.LogInformation($"[{path}] {state} at index {linesProcessed}");
+                            log.LogInformation($"[{path}] {state} at index {linesProcessed} after processing {countProcessed} and {errorsProcessed} errors.");
                         return (isComplete, linesProcessed);
                     },
                     onNotFound: () =>
