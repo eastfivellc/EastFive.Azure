@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text;
+using System.IO;
 
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.Blobs;
@@ -12,9 +13,8 @@ using EastFive.Linq.Async;
 
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using System.IO;
-using EastFive.Serialization.Json;
+using Azure.Storage.Blobs.Models;
+using static EastFive.Azure.Monitoring.MessageCard.ActionCard;
 
 namespace EastFive.Azure.Functions
 {
@@ -66,18 +66,19 @@ namespace EastFive.Azure.Functions
 
         public static async Task<(bool, int)> DataLakeIngestAsync<TResource>(
             this IDurableActivityContext context,
-            Func<TResource, (string path, string container), int, Task<bool>> processAsync,
+            Func<TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
             Microsoft.Extensions.Logging.ILogger log)
         {
             try
             {
                 var instanceId = context.InstanceId.Replace(':', '_');
-                var (path, skip, containerName) = context.GetInput<(string, int, string)>();
+                var (path, skip, containerName, folder) = context.GetInput<(string, int, string, string)>();
+                if (folder.IsNullOrWhiteSpace())
+                    return (true, 0);
                 var startTime = System.Diagnostics.Stopwatch.StartNew();
                 var timeout = TimeSpan.FromMinutes(4);
-                return await DataLakeIngestFileAsync(
-                    (path: path, containerName: containerName, skip:skip),
-                    instanceId:instanceId,
+                return await instanceId.DataLakeIngestFileAsync(
+                        path: path, containerName: containerName, folder:folder, skip:skip,
                     processAsync: (TResource res, int index) => processAsync(res, (path, containerName), index),
                     isTimedOut: () =>
                     {
@@ -99,33 +100,18 @@ namespace EastFive.Azure.Functions
             }
         }
 
-        public struct Report
-        {
-            public string path;
-            public int linesProcessed;
-            public bool isComplete;
-            public int countProcessed;
-            public Error[] errorsProcessed;
-
-            public struct Error
-            {
-                public int index;
-                public string message;
-            }
-        }
-
         public async static Task<(bool, int)> DataLakeIngestFileAsync<TResource>(
-            this (string path, string containerName, int skip) tpl,
-            string instanceId,
-            Func<TResource, int, Task<bool>> processAsync,
+            this string instanceId,
+            string path, string containerName,  string folder, int skip,
+            Func<TResource, int, Task<(bool, string)>> processAsync,
             Func<bool> isTimedOut,
             Microsoft.Extensions.Logging.ILogger log)
         {
             var capturedLog = new EastFive.Analytics.CaptureLog(
                 new Analytics.AnalyticsLogger(log));
-            var (path, containerName, skip) = tpl;
+            var directoryFileSplit = path.LastIndexOf('/');
+            var file = path.Substring(directoryFileSplit+1);
             var dateTime = DateTime.UtcNow;
-            var logPath = path + $".instance-{instanceId}-{dateTime.Year}.{dateTime.Month}.{dateTime.Day}-{dateTime.Hour}_{dateTime.Minute}_{dateTime.Second}.json";
             try
             {
                 return await await path.ReadParquetDataFromDataLakeAsync(containerName,
@@ -136,20 +122,25 @@ namespace EastFive.Azure.Functions
                         var report = await resourceLines
                             .Skip(skip)
                             .Aggregate(
-                                new Report
+                                new DataLakeImportReport
                                 {
+                                    container = containerName,
+                                    directory = folder,
+
+                                    file = file,
+                                    instanceId = instanceId,
+                                    when = dateTime,
+
                                     path = path,
-                                    linesProcessed = skip,
+                                    linesProcessedStart = skip,
+                                    linesProcessedEnd = skip,
                                     isComplete = true,
-                                    countProcessed = 0,
-                                    errorsProcessed = new Report.Error[] { },
+                                    errorsProcessed = new DataLakeImportReport.Error[] { },
                                 }.AsTask(),
                                 async (reportTask, resource) =>
                                 {
                                     var currentReport = await reportTask;
-                                    var index = currentReport.linesProcessed;
-                                    var complete = currentReport.isComplete;
-                                    var count = currentReport.countProcessed;
+                                    var index = currentReport.linesProcessedEnd;
 
                                     var isTimedOutResult = isTimedOut();
                                     if (isTimedOutResult)
@@ -160,53 +151,51 @@ namespace EastFive.Azure.Functions
 
                                     try
                                     {
-                                        var shouldCount = await processAsync(resource, index);
-                                        currentReport.linesProcessed = currentReport.linesProcessed + 1;
-                                        currentReport.countProcessed = currentReport.countProcessed + 1;
-                                        return currentReport;
+                                        var (wasSuccessful, errorMessage) = await processAsync(resource, index);
+                                        if(!wasSuccessful)
+                                        {
+                                            currentReport.errorsProcessed = currentReport.errorsProcessed
+                                                .Append(
+                                                    new DataLakeImportReport.Error
+                                                    {
+                                                        index = index,
+                                                        message = errorMessage,
+                                                    })
+                                                .ToArray();
+                                        }
                                     }
                                     catch (Exception ex)
                                     {
                                         capturedLog.Critical($"EXCEPTION [{path}] Line {index}:{ex.Message}");
                                         currentReport.errorsProcessed = currentReport.errorsProcessed
                                             .Append(
-                                                new Report.Error
+                                                new DataLakeImportReport.Error
                                                 {
                                                     index = index,
                                                     message = ex.Message,
                                                 })
                                             .ToArray();
-                                        return currentReport;
                                     }
+                                    finally
+                                    {
+                                        currentReport.linesProcessedEnd = currentReport.linesProcessedEnd + 1;
+                                    }
+                                    return currentReport;
                                 });
 
                         var state = report.isComplete ? "completed" : "terminated";
 
-                        capturedLog.Information($"[{path}] {state} at index {report.linesProcessed} after processing {report.countProcessed} and {report.errorsProcessed.Length} errors.");
+                        capturedLog.Information($"[{path}] {state} at index {report.linesProcessedEnd} after processing {report.linesProcessedEnd - report.linesProcessedStart} lines with {report.errorsProcessed.Length} errors.");
 
                         try
                         {
-                            bool success = await logPath.BlobCreateOrUpdateAsync(containerName,
-                                        async stream =>
-                                        {
-                                            var json = report.JsonSerialize(
-                                                j => j);
-                                            var writer = new StreamWriter(stream);
-                                            await writer.WriteAsync(json);
-                                            await writer.FlushAsync();
-                                        },
-                                    onSuccess: contentInfo =>
-                                    {
-                                        return true;
-                                    },
-                                    onFailure: (errorinfo, why) =>
-                                    {
-                                        if (log.IsNotDefaultOrNull())
-                                            log.LogError(why);
-                                        return false;
-                                    },
-                                    contentTypeString: "text/log", fileName: $"{instanceId}.{DateTime.UtcNow.Ticks}.log",
-                                    connectionStringConfigKey:EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                            bool success = await report.StorageCreateAsync(
+                                result => true,
+                                onAlreadyExists: () =>
+                                {
+                                    log.LogCritical($"Duplicate report:{report.file}, {report.instanceId}");
+                                    return false;
+                                });
                         }
                         catch (Exception ex)
                         {
@@ -214,7 +203,7 @@ namespace EastFive.Azure.Functions
                                 log.LogError(ex.Message);
                         }    
 
-                        return (report.isComplete, report.linesProcessed);
+                        return (report.isComplete, report.linesProcessedEnd);
                     },
                     onNotFound: () =>
                     {
@@ -231,6 +220,45 @@ namespace EastFive.Azure.Functions
             {
                 
             }
+        }
+
+        public static DataLakeItem[] ConvertToResources(this BlobItem[] blobItems,
+            string containerName, string folder)
+        {
+            return blobItems
+                .Select(
+                    item =>
+                    {
+                        return new DataLakeItem
+                        {
+                            container = containerName,
+                            folder = folder,
+                            path = item.Name,
+                            display = item.Name,
+                        };
+                    })
+                .ToArray();
+        }
+
+        public static async Task<int> RunActivityFromDurableFunctionAsync<TInput>(this IDurableOrchestrationContext context,
+            string functionName,
+            Microsoft.Extensions.Logging.ILogger log)
+        {
+            //log.LogInformation($"[{context.InstanceId}/{context.Name}]...Starting");
+            var (input, resource) = context.GetInput<(TInput, DataLakeItem)>();
+            var skip = 0;
+            var complete = false;
+
+            while (!complete)
+            {
+                (complete, skip) = await context.CallActivityAsync<(bool, int)>(
+                    functionName,
+                    (resource.path, skip, resource.container, resource.folder));
+                log.LogInformation($"[{context.InstanceId}/{context.Name}/{resource.display}]...SEGMENT:{skip} records");
+            }
+
+            log.LogInformation($"[{context.InstanceId}/{context.Name}/{resource.display}]...Complete ({complete}) with `{skip}` records");
+            return skip;
         }
     }
 }
