@@ -14,10 +14,10 @@ using EastFive.Reflection;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
-    public class ParititionKeyAttribute : Attribute,
+    public class PartitionKeyAttribute : Attribute,
         IModifyAzureStorageTablePartitionKey, 
         IProvideTableQuery,
-        ParititionKeyAttribute.IModifyPartitionScope,
+        PartitionKeyAttribute.IModifyPartitionScope,
         IComputeAzureStorageTablePartitionKey,
         IGenerateAzureStorageTablePartitionIndex
     {
@@ -174,7 +174,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return memberValue as string;
 
             throw new Exception(
-                $"{nameof(ParititionKeyAttribute)} only works on string members." + 
+                $"{nameof(PartitionKeyAttribute)} only works on string members." + 
                 $" Issue is on {memberInfo.DeclaringType.FullName}..{memberInfo.Name}.");
         }
 

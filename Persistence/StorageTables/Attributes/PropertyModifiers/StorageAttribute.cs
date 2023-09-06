@@ -46,7 +46,8 @@ namespace EastFive.Persistence
 
     public interface IComputeAzureStorageTableRowKey
     {
-        string ComputeRowKey(object memberValue, MemberInfo memberInfo);
+        string ComputeRowKey(object memberValue, MemberInfo memberInfo,
+            params KeyValuePair<MemberInfo, object>[] extraValues);
     }
 
     public interface IModifyAzureStorageTableRowKey

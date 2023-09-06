@@ -29,7 +29,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             return "RowKey".PairWithValue(rowKeyEpValue).AsArray();
         }
 
-        public virtual string ComputeRowKey(object memberValue, MemberInfo memberInfo)
+        public virtual string ComputeRowKey(object memberValue, MemberInfo memberInfo,
+            params KeyValuePair<MemberInfo, object>[] extraValues)
         {
             if (memberValue.IsDefaultOrNull())
                 return null;

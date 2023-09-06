@@ -35,6 +35,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool IgnoreNull { get; set; } = false;
 
+        public string Separator { get; set; } = "";
+
         /// <summary>
         /// If the SpanUnits are weeks, this is the day of the first week.
         /// </summary>
@@ -77,6 +79,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (!OffsetHours.IsDefault())
                 dateTime = dateTime + TimeSpan.FromHours(OffsetHours);
             var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, weeksEpoch);
+
+            if (currentKey.HasBlackSpace() && Separator.HasBlackSpace())
+                return $"{currentKey}{Separator}{dtPartition}";
             return $"{currentKey}{dtPartition}";
         }
 

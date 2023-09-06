@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace EastFive.Persistence
@@ -37,6 +38,14 @@ namespace EastFive.Persistence
                         var attr = attrs.First() as IPersistInAzureStorageTables;
                         return attr.PairWithKey(propInfo);
                     });
+        }
+
+        public static readonly Regex DisallowedCharsInTableKeys = new Regex(@"[\\\\#%+/?\u0000-\u001F\u007F-\u009F]");
+
+        public static string AsAzureStorageTablesSafeKey(this string keyValueRow)
+        {
+            string sanitizedKey = DisallowedCharsInTableKeys.Replace(keyValueRow, "_");
+            return sanitizedKey;
         }
     }
 }

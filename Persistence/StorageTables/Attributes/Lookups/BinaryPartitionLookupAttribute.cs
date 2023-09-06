@@ -113,7 +113,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             [RowKey]
             public string rowKey;
 
-            [ParititionKey]
+            [PartitionKey]
             public string partitionKey;
 
             [ETag]

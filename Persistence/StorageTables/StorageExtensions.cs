@@ -38,6 +38,39 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         #region Row / Partition keys
 
+        private static Assignment[] ParseAssignments<TEntity>(this IQueryable<TEntity> query)
+        {
+            var extraValues = query
+                .Compile<IEnumerable<Assignment>, IProvideQueryValues>(
+                    Enumerable.Empty<Assignment>(),
+                    (extraValuesCurrent, attr, methodInfo, methodArguments) =>
+                    {
+                        var queryValue = attr.GetStorageValues(methodInfo, methodArguments);
+                        return extraValuesCurrent.Concat(queryValue);
+                    },
+                    (extraValuesCurrent, unrecognizedMethod, methodArguments) =>
+                    {
+                        if (unrecognizedMethod.Name == "Where")
+                        {
+                            return unrecognizedMethod.TryParseMemberAssignment(methodArguments,
+                                (memberInfo, expressionType, memberValue) =>
+                                    extraValuesCurrent.Append(
+                                        new Assignment
+                                        {
+                                            member = memberInfo,
+                                            type = ExpressionType.Equal,
+                                            value = memberValue,
+                                        }),
+                                () => throw new ArgumentException(
+                                    $"Could not parse `{unrecognizedMethod}`({methodArguments})"));
+                        }
+                        // Don't throw here since query may have values for other members
+                        return extraValuesCurrent;
+                    })
+                .ToArray();
+            return extraValues;
+        }
+
         #region Row
 
         public static string StorageComputeRowKey<TRowKey, TEntity>(this TRowKey rowKey,
@@ -70,34 +103,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 Func<EastFive.Persistence.IComputeAzureStorageTableRowKey> onMissing = default)
             // where TEntity : IReferenceable
         {
-            var extraValues = entityQuery
-                .Compile<IEnumerable<Reflection.Assignment>, IProvideQueryValues>(
-                    Enumerable.Empty<Reflection.Assignment>(),
-                    (extraValuesCurrent, attr, methodInfo, methodArguments) =>
-                    {
-                        var queryValue = attr.GetStorageValues(methodInfo, methodArguments);
-                        return extraValuesCurrent.Concat(queryValue);
-                    },
-                    (extraValuesCurrent, unrecognizedMethod, methodArguments) =>
-                    {
-                        if (unrecognizedMethod.Name == "Where")
-                        {
-                            return unrecognizedMethod.TryParseMemberAssignment(methodArguments,
-                                (memberInfo, expressionType, memberValue) =>
-                                    extraValuesCurrent.Append(
-                                        new Assignment
-                                        {
-                                            member = memberInfo,
-                                            type = ExpressionType.Equal,
-                                            value = memberValue,
-                                        }),
-                                () => throw new ArgumentException(
-                                    $"Could not parse `{unrecognizedMethod}`({methodArguments})"));
-                        }
-                        // Don't throw here since query may include non-partition members
-                        return extraValuesCurrent;
-                    })
-                .ToArray();
+            var extraValues = entityQuery.ParseAssignments();
 
             return extraValues
                 .Where(extraValue => extraValue.member
@@ -109,7 +115,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                         var value = memberValueKvp.value;
                         var computeAzureStorageTableRowKey = member
                             .GetAttributeInterface<EastFive.Persistence.IComputeAzureStorageTableRowKey>();
-                        var rowKey = computeAzureStorageTableRowKey.ComputeRowKey(value, member);
+                        var extraValuesKvp = extraValues
+                                .Select(
+                                    ev =>
+                                    {
+                                        return ev.member.PairWithValue(ev.value);
+                                    })
+                                .ToArray();
+                        var rowKey = computeAzureStorageTableRowKey.ComputeRowKey(value, member, extraValuesKvp);
                         return rowKey;
                     },
                     () =>
@@ -332,34 +345,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         public static string StorageComputePartitionKey<TEntity>(this IQueryable<TEntity> query,
                 string rowKey)
         {
-            var extraValues = query
-                .Compile<IEnumerable<Assignment>, IProvideQueryValues>(
-                    Enumerable.Empty<Assignment>(),
-                    (extraValuesCurrent, attr, methodInfo, methodArguments) =>
-                    {
-                        var queryValue = attr.GetStorageValues(methodInfo, methodArguments);
-                        return extraValuesCurrent.Concat(queryValue);
-                    },
-                    (extraValuesCurrent, unrecognizedMethod, methodArguments) =>
-                    {
-                        if (unrecognizedMethod.Name == "Where")
-                        {
-                            return unrecognizedMethod.TryParseMemberAssignment(methodArguments,
-                                (memberInfo, expressionType, memberValue) => 
-                                    extraValuesCurrent.Append(
-                                        new Assignment
-                                        {
-                                            member = memberInfo,
-                                            type = ExpressionType.Equal,
-                                            value = memberValue,
-                                        }),
-                                () => throw new ArgumentException(
-                                    $"Could not parse `{unrecognizedMethod}`({methodArguments})"));
-                        }
-                        // Don't throw here since query may include non-partition members
-                        return extraValuesCurrent;
-                    })
-                .ToArray();
+            var extraValues = query.ParseAssignments();
 
             return extraValues
                 .Where(extraValue => extraValue.member
@@ -699,7 +685,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IQueryable<TEntity> entityQuery,
             System.Threading.CancellationToken cancellationToken = default)
-            where TEntity : IReferenceable, new()
         {
             return AzureTableDriverDynamic
                 .FromSettings()

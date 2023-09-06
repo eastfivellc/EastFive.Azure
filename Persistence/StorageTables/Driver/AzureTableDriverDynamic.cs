@@ -2253,7 +2253,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         public IEnumerableAsync<TEntity> FindBy<TEntity>(IQueryable<TEntity> entityQuery,
             string tableName = default,
             System.Threading.CancellationToken cancellationToken = default)
-            where TEntity : IReferenceable, new()
         {
             var runQueryData = ParseFindBy(entityQuery, tableName);
 
