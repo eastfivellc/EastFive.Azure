@@ -18,12 +18,16 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public bool IgnoreNullOrDefault { get; set; } = false;
 
+        public string Separator { get; set; } = "";
+
         public string MutateKey(string currentKey, MemberInfo key, object value, out bool ignore)
         {
             ignore = false;
             var idValue = IdLookupAttribute.RowKey(this.GetType(), key.GetPropertyOrFieldType(), value);
             if (idValue.IsNullOrWhiteSpace())
                 ignore = true;
+            if(Separator.IsNotDefaultOrNull())
+                return $"{currentKey}{Separator}{idValue}";
             return $"{currentKey}{idValue}";
         }
 

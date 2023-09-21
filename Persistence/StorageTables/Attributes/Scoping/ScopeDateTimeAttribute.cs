@@ -31,6 +31,8 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public TimeSpanUnits SpanUnits { get; set; } = TimeSpanUnits.days;
 
+        public string Format { get; set; }
+
         public double OffsetHours { get; set; } = default;
 
         public bool IgnoreNull { get; set; } = false;
@@ -78,11 +80,23 @@ namespace EastFive.Persistence.Azure.StorageTables
             ignore = false;
             if (!OffsetHours.IsDefault())
                 dateTime = dateTime + TimeSpan.FromHours(OffsetHours);
-            var dtPartition = ComputeLookupKey(dateTime, SpanLength, SpanUnits, weeksEpoch);
+
+            var dtPartition = GetPartitionValue();
 
             if (currentKey.HasBlackSpace() && Separator.HasBlackSpace())
                 return $"{currentKey}{Separator}{dtPartition}";
             return $"{currentKey}{dtPartition}";
+
+            string GetPartitionValue()
+            {
+                if (this.Format.HasBlackSpace())
+                {
+                    var strDateTime = dateTime.ToString(this.Format);
+                    return strDateTime;
+                }
+
+                return ComputeLookupKey(dateTime, SpanLength, SpanUnits, weeksEpoch);
+            }
         }
 
         public ScopeDateTimeAttribute(string scope)

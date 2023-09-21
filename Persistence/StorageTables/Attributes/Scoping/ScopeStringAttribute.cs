@@ -34,9 +34,17 @@ namespace EastFive.Persistence.Azure.StorageTables
                     return currentKey;
                 }
             }
-            ignore = false;
-            var stringValue = StringLookupAttribute.GetStringValue(key, value, this.GetType());
+            var stringValue = GetValue(key, value);
+            if (stringValue == null)
+            {
+                if (IgnoreScopeIfNull)
+                {
+                    ignore = true;
+                    return currentKey;
+                }
+            }
 
+            ignore = false;
             if (KeyFilter)
                 stringValue = stringValue.AsAzureStorageTablesSafeKey();
 
@@ -47,6 +55,11 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return $"{currentKey}{Separator}{stringValue}";
 
             return $"{currentKey}{stringValue}";
+        }
+
+        protected virtual string GetValue(MemberInfo key, object value)
+        {
+            return StringLookupAttribute.GetStringValue(key, value, this.GetType());
         }
 
         public ScopeStringAttribute(string scope)

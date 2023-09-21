@@ -173,6 +173,12 @@ namespace EastFive.Persistence.Azure.StorageTables
             if(memberValue is string)
                 return memberValue as string;
 
+            if (memberValue is Type)
+            {
+                var type = memberValue as Type;
+                return type.FullName;
+            }
+            
             throw new Exception(
                 $"{nameof(PartitionKeyAttribute)} only works on string members." + 
                 $" Issue is on {memberInfo.DeclaringType.FullName}..{memberInfo.Name}.");
