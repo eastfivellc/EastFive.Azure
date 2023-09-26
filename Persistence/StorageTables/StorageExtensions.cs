@@ -551,9 +551,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 cancellationToken:cancellationToken);
         }
 
-
-        private delegate TResult GenericCallback<T, TResult>(T value);
-
         public static Task<TResult> StorageGetAsync<TResult>(this Guid resourceId, Type type,
             Func<object, TResult> onFound,
             Func<TResult> onDoesNotExists = default(Func<TResult>))
