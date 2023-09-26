@@ -21,7 +21,7 @@ namespace EastFive.Azure.Functions
         /// <param name="linesTotal"></param>
         /// <returns></returns>
         internal DataLakeImportReport GenerateReport(Guid dataLakeExportId,
-            DatalakeImportStatus status, int linesTotal)
+            DataLakeImportStatus status, int linesTotal)
         {
             return new DataLakeImportReport
             {

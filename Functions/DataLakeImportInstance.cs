@@ -127,9 +127,9 @@ namespace EastFive.Azure.Functions
 
                         var report = item.GenerateReport(this.export,
                             didTimeOut ?
-                                DatalakeImportStatus.Partial
+                                DataLakeImportStatus.Partial
                                 :
-                                DatalakeImportStatus.Complete,
+                                DataLakeImportStatus.Complete,
                             resourceLines.Length);
 
                         foreach (var rowProcessed in rowsProcessed)

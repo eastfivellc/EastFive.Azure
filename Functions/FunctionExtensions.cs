@@ -68,6 +68,17 @@ namespace EastFive.Azure.Functions
             return tpls.Await().SelectWhere();
         }
 
+        public static IEnumerableAsync<BlobItem> GetDatalakeFiles(this IExportFromDatalake import)
+        {
+            var practiceFolder = import.exportFolder;
+            if (import.exportContainer.IsNullOrWhiteSpace())
+                return EnumerableAsync.Empty<BlobItem>();
+            return import.exportContainer.BlobFindFilesAsync(
+                    practiceFolder, fileSuffix: ".parquet",
+                    connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString)
+                .FoldTask();
+        }
+
         public static async Task<DataLakeImportReport> DataLakeIngestAsync<TResource, TImportInstance>(
             this IDurableActivityContext context,
             Func<TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
@@ -93,7 +104,7 @@ namespace EastFive.Azure.Functions
                             log.LogError(ex.Message);
                         return new DataLakeImportReport
                         {
-                            status = DatalakeImportStatus.FaultedInstance,
+                            status = DataLakeImportStatus.FaultedInstance,
                         };
                     }
                 },
@@ -101,14 +112,14 @@ namespace EastFive.Azure.Functions
                 {
                     return new DataLakeImportReport
                     {
-                        status = DatalakeImportStatus.FaultedInstance,
+                        status = DataLakeImportStatus.FaultedInstance,
                     }.AsTask();
                 },
                 onException: (ex) =>
                 {
                     return new DataLakeImportReport
                     {
-                        status = DatalakeImportStatus.FaultedInstance,
+                        status = DataLakeImportStatus.FaultedInstance,
                     }.AsTask();
                 },
                 log);
@@ -136,7 +147,7 @@ namespace EastFive.Azure.Functions
                 if (dataLakeImportInstance.cancelled)
                 {
                     var report = dataLakeItem
-                        .GenerateReport(dataLakeImportInstance.export, DatalakeImportStatus.Cancelled, 0);
+                        .GenerateReport(dataLakeImportInstance.export, DataLakeImportStatus.Cancelled, 0);
                     return onProcessed(report);
                 }
 
@@ -146,7 +157,7 @@ namespace EastFive.Azure.Functions
                 var intervals = new (int, int)[] { };
                 if (folder.IsNullOrWhiteSpace())
                 {
-                    var report = dataLakeItem.GenerateReport(dataLakeImportInstance.export, DatalakeImportStatus.FaultyExport, 0);
+                    var report = dataLakeItem.GenerateReport(dataLakeImportInstance.export, DataLakeImportStatus.FaultyExport, 0);
                     return onProcessed(report);
                 }
                 var startTime = System.Diagnostics.Stopwatch.StartNew();
@@ -162,7 +173,7 @@ namespace EastFive.Azure.Functions
                         onFileNotFound: () =>
                         {
                             var report = dataLakeItem.GenerateReport(
-                                dataLakeImportInstance.export, DatalakeImportStatus.FaultedFile, 0);
+                                dataLakeImportInstance.export, DataLakeImportStatus.FaultedFile, 0);
                             return report;
                         },
                         isTimedOut: () =>
@@ -178,7 +189,7 @@ namespace EastFive.Azure.Functions
                     log.LogError(ex.StackTrace);
 
                     var report = dataLakeItem.GenerateReport(
-                        dataLakeImportInstance.export, DatalakeImportStatus.FaultedFile, 0);
+                        dataLakeImportInstance.export, DataLakeImportStatus.FaultedFile, 0);
                     return onProcessed(report);
                 }
             }
@@ -270,7 +281,7 @@ namespace EastFive.Azure.Functions
                 dataLakeItem.skip = report.GetLastLineProcessed();
                 var linesProcessed = report.GetTotalLinesProcessed();
                 
-                if (status == DatalakeImportStatus.Running || status == DatalakeImportStatus.Partial)
+                if (status == DataLakeImportStatus.Running || status == DataLakeImportStatus.Partial)
                     continue;
 
                 log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
