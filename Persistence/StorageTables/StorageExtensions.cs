@@ -29,6 +29,8 @@ using Azure.Storage.Blobs.Models;
 using Microsoft.Azure.Documents;
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using EastFive.Azure.Functions;
+using HtmlAgilityPack;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -549,10 +551,58 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 cancellationToken:cancellationToken);
         }
 
+
+        private delegate TResult GenericCallback<T, TResult>(T value);
+
+        public static Task<TResult> StorageGetAsync<TResult>(this Guid resourceId, Type type,
+            Func<object, TResult> onFound,
+            Func<TResult> onDoesNotExists = default(Func<TResult>))
+        {
+            return typeof(StorageExtensions)
+                .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
+                .Where(method => method.Name.Equals(nameof(StorageExtensions.StorageGetAsync)))
+                .Where(
+                    method =>
+                    {
+                        var paramsToMethod = method.GetParameters();
+                        if (paramsToMethod.Length != 3)
+                            return false;
+                        return paramsToMethod.First(
+                            (param, next) =>
+                            {
+                                return param.ParameterType == typeof(Guid);
+                            },
+                            () => false);
+                    })
+                .First<MethodInfo, Task<TResult>>(
+                    (method, next) =>
+                    {
+                        var castGetToObj = typeof(StorageExtensions)
+                            .GetMethod(nameof(CastGetToObj), BindingFlags.Static | BindingFlags.NonPublic);
+                        var castGetToObjTyped = castGetToObj.MakeGenericMethod(type, typeof(TResult));
+                        var onFoundCast = castGetToObjTyped.Invoke(null, new object[] { onFound });
+
+                        var storageGetAsync = method.MakeGenericMethod(type, typeof(TResult));
+
+                        var result = storageGetAsync.Invoke(null, new object[] { resourceId, onFoundCast, onDoesNotExists });
+                        var resultCast = result.CastTask<TResult>();
+                        return resultCast;
+                    },
+                    () =>
+                    {
+                        throw new Exception($"Could not locate {nameof(StorageExtensions.StorageGetAsync)} method for generic call");
+                    });
+        }
+
+        private static Func<T, TResult> CastGetToObj<T, TResult>(Func<object, TResult> callback)
+        {
+            return tValue => callback(tValue);
+        }
+
+
         public static Task<TResult> StorageGetAsync<TEntity, TResult>(this Guid resourceId,
             Func<TEntity, TResult> onFound,
-            Func<TResult> onDoesNotExists = default(Func<TResult>),
-            Func<string> getPartitionKey = default(Func<string>))
+            Func<TResult> onDoesNotExists = default(Func<TResult>))
             where TEntity : IReferenceable
         {
             return resourceId
