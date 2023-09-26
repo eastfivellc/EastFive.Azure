@@ -556,7 +556,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<TResult> onDoesNotExists = default(Func<TResult>))
         {
             return typeof(StorageExtensions)
-                .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)
+                .GetMethods(BindingFlags.Static | BindingFlags.Public)
                 .Where(method => method.Name.Equals(nameof(StorageExtensions.StorageGetAsync)))
                 .Where(
                     method =>
