@@ -120,14 +120,18 @@ namespace EastFive.Azure.Persistence.Blobs
         }
 
         public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef,
-            string newBlobId = default)
+            string newBlobId = default,
+            Func<string, string> mutateBlobId = default)
         {
             return await await blobRef.LoadBytesAsync(
                 async (currentBlobName, bytes, mediaType, disposition) =>
                 {
                     var contentType = mediaType.MediaType;
                     if (newBlobId.IsNullOrWhiteSpace())
-                        newBlobId = currentBlobName;
+                        newBlobId = mutateBlobId.IsNotDefaultOrNull()?
+                            mutateBlobId(newBlobId)
+                            :
+                            currentBlobName;
                     return await AzureTableDriverDynamic
                         .FromSettings()
                         .BlobCreateAsync(bytes, newBlobId, blobRef.ContainerName,
