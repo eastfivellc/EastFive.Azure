@@ -80,7 +80,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             async Task<IHttpResponse> ContinueAsync()
             {
                 if (tag.IsNullOrWhiteSpace())
-                    tag = "OpioidTool";
+                    tag = "ACPTool";
 
                 var methodName = PingProvider.IntegrationName;
                 var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);

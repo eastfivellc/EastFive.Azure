@@ -211,7 +211,7 @@ namespace EastFive.Azure.Auth
                             return await await method.ParseTokenAsync(authorization.parameters, application,
                                 async (externalId, loginProvider) =>
                                 {
-                                    var tag = "OpioidTool";
+                                    var tag = "ACPTool";
                                     return await EastFive.Web.Configuration.Settings.GetString($"AffirmHealth.PDMS.PingRedirect.{tag}.PingAuthName",
                                         async pingAuthName =>
                                         {
