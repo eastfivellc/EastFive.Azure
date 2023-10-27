@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using System.Text;
 using System.Xml;
@@ -30,9 +29,6 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
-using Microsoft.Azure.Documents;
-using System.Collections.Concurrent;
-using Microsoft.Azure.Amqp.Framing;
 
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
@@ -2347,8 +2343,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         var additionalAssignments = assignments
                             .Select(assign => $"{assign.member.DeclaringType.FullName}..{assign.member.Name} {assign.type} `{assign.value}`")
                             .Join(',');
-                        throw new ArgumentException($"{memberDisplay} is used in {typeof(TEntity).FullName} query with additionalAssignments: {additionalAssignments}" +
-                            $" but does not have an attribute that implements {nameof(IProvideTableQuery)}");
+                        throw new ArgumentException($"{memberDisplay} does not have an attribute implementing {nameof(IProvideTableQuery)}" +
+                            $" but is used in a {typeof(TEntity).FullName} query. AdditionalAssignments includes: {additionalAssignments}");
                     },
                     () =>
                     {
@@ -3984,6 +3980,29 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     throw;
                 return ex.ParseExtendedErrorInformation(
                     (code, msg) => onFailure(code, msg),
+                    () => throw ex);
+            }
+        }
+
+        public async Task<TResult> BlobDeleteIfExistsAsync<TResult>(string containerName, string blobName,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            RetryDelegate onTimeout = default)
+        {
+            try
+            {
+                var blockClient = await GetBlobClientAsync(containerName, blobName);
+
+                var response = await blockClient.DeleteIfExistsAsync(snapshotsOption:DeleteSnapshotsOption.IncludeSnapshots);
+                return onSuccess();
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseStorageException(
+                    (errorCode, errorMessage) =>
+                        onFailure(errorCode, errorMessage),
                     () => throw ex);
             }
         }

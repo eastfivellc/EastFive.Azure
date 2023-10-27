@@ -2277,6 +2277,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 connectionStringConfigKey: connectionStringConfigKey);
         }
 
+
+
+        public static Task<TResult> BlobDeleteIfExistsAsync<TResult>(this string containerName, string blobName,
+            Func<TResult> onSuccess,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobDeleteIfExistsAsync(containerName, blobName,
+                    onSuccess: onSuccess,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
         #endregion
 
         #region Maintainence
