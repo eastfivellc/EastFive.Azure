@@ -5,6 +5,11 @@ namespace EastFive.Azure.Functions
     {
         string exportContainer { get; }
         string exportFolder { get; }
+
+        /// <summary>
+        /// This is a hash that represents the current instance of the source data
+        /// </summary>
+        Guid sourceId { get; }
     }
 }
 

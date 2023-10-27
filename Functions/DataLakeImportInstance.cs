@@ -1,21 +1,26 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Collections.Generic;
 
+using Newtonsoft.Json;
+
+using EastFive;
 using EastFive.Linq;
 using EastFive.Api;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using Newtonsoft.Json;
 using EastFive.Extensions;
-using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
 using EastFive.Analytics;
 
 namespace EastFive.Azure.Functions
 {
+    /// <summary>
+    /// This class should be subclassed for each type of data lake import.
+    /// One instance of the subclass is created each time the orchistration is run.
+    /// </summary>
 	[StorageTable]
 	public class DataLakeImportInstance : IReferenceable
     {
@@ -48,6 +53,7 @@ namespace EastFive.Azure.Functions
         /// ID of resource that implements IExportFromDatalake
         /// </summary>
         [Storage]
+        [StorageQuery]
         public Guid export;
 
         [Storage]
@@ -65,8 +71,17 @@ namespace EastFive.Azure.Functions
         [Storage]
         public bool cancelled;
 
+        /// <summary>
+        /// Instance ID of the orchestration that is running.
+        /// </summary>
         [Storage]
         public string instance;
+
+        /// <summary>
+        /// Id that is the unique to the file being sourced.
+        /// </summary>
+        [Storage]
+        public Guid sourceId;
 
         public async Task<TResult> DataLakeIngestFileAsync<TResource, TResult>(DataLakeItem item,
                 Func<TResource, int, Task<(bool, string)>> processAsync,

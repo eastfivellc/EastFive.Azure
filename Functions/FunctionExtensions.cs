@@ -19,6 +19,8 @@ using EastFive.Azure.Persistence.Blobs;
 using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Linq.Async;
+using Microsoft.AspNetCore.Mvc;
+using static EastFive.Azure.Monitoring.MessageCard.ActionCard;
 
 namespace EastFive.Azure.Functions
 {
@@ -77,6 +79,41 @@ namespace EastFive.Azure.Functions
                     practiceFolder, fileSuffix: ".parquet",
                     connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString)
                 .FoldTask();
+        }
+
+        public static async Task<TResult> PopulateInstanceAsync<TInstance, TResult>(this IExportFromDatalake import, TInstance instance,
+                IDurableOrchestrationClient starter, string nameOfFunctionToRun,
+            Func<TInstance, TResult> onPopulated,
+            Func<string, TResult> onFailure)
+            where TInstance : DataLakeImportInstance
+        {
+            try
+            {
+                var now = DateTime.UtcNow;
+                instance.exportContainer = import.exportContainer;
+                instance.exportFolder = import.exportFolder;
+                instance.when = now;
+                instance.cancelled = false;
+                instance.sourceId = import.sourceId;
+                var instanceIdToTry = $"{instance.id}:{now.Year}{now.Month}{now.Day}{now.Hour}{now.Minute}{now.Second}";
+                string instanceId = await starter.StartNewAsync(nameOfFunctionToRun,
+                    instanceIdToTry, instance);
+                instance.instance = instanceId;
+
+                return await instance.StorageCreateAsync(
+                    (result) =>
+                    {
+                        return onPopulated(result.Entity);
+                    },
+                    onAlreadyExists: () =>
+                    {
+                        return onFailure($"ID is already in use.");
+                    });
+            }
+            catch (Exception ex)
+            {
+                return onFailure(ex.Message);
+            }
         }
 
         public static async Task<DataLakeImportReport> DataLakeIngestAsync<TResource, TImportInstance>(
