@@ -116,13 +116,14 @@ namespace EastFive.Azure.Functions
             }
         }
 
-        public static async Task<DataLakeImportReport> DataLakeIngestAsync<TResource, TImportInstance>(
+        public static async Task<DataLakeImportReport> DataLakeIngestAsync<TResource, TImportInstance, TDataLakeItem>(
             this IDurableActivityContext context,
-            Func<TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
+            Func<TImportInstance, TDataLakeItem, TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
             Microsoft.Extensions.Logging.ILogger log)
             where TImportInstance : DataLakeImportInstance
+            where TDataLakeItem : DataLakeItem
         {
-            return await await IngestAndProduceReportAsync<TResource, TImportInstance, Task<DataLakeImportReport>>(context, processAsync,
+            return await await IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, Task<DataLakeImportReport>>(context, processAsync,
                 onProcessed:async (report) =>
                 {
                     try
@@ -163,19 +164,20 @@ namespace EastFive.Azure.Functions
             
         }
 
-        private static async Task<TResult> IngestAndProduceReportAsync<TResource, TImportInstance, TResult>(
+        private static async Task<TResult> IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, TResult>(
                 IDurableActivityContext context,
-                Func<TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
+                Func<TImportInstance, TDataLakeItem, TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
             Func<DataLakeImportReport, TResult> onProcessed,
             Func<TResult> onParsingIssue,
             Func<Exception, TResult> onException,
                 Microsoft.Extensions.Logging.ILogger log)
+            where TDataLakeItem : DataLakeItem
             where TImportInstance : DataLakeImportInstance
         {
             try
             {
                 var instanceId = context.InstanceId.Replace(':', '_');
-                var (dataLakeImportInstance, dataLakeItem) = context.GetInput<(TImportInstance, DataLakeItem)>();
+                var (dataLakeImportInstance, dataLakeItem) = context.GetInput<(TImportInstance, TDataLakeItem)>();
                 if (dataLakeImportInstance.IsDefaultOrNull() || dataLakeItem.IsDefaultOrNull())
                     return onParsingIssue();
 
@@ -202,7 +204,7 @@ namespace EastFive.Azure.Functions
                 try
                 {
                     var ingestedReport = await dataLakeImportInstance.DataLakeIngestFileAsync(dataLakeItem,
-                        processAsync: (TResource res, int index) => processAsync(res, (path, containerName), index),
+                        processAsync: (TResource res, int index) => processAsync(dataLakeImportInstance, dataLakeItem, res, (path, containerName), index),
                         onFileIngested: (report) =>
                         {
                             return report;
@@ -244,9 +246,11 @@ namespace EastFive.Azure.Functions
             }
         }
 
-        public static DataLakeItem[] ConvertToDataLakeItems(this BlobItem[] blobItems,
+        public static TDataLakeItem[] ConvertToDataLakeItems<TDataLakeItem>(this BlobItem[] blobItems,
             Guid dataLakeInstanceId, DataLakeImportReport [] priorRuns,
-            bool shouldRunErrors)
+            bool shouldRunErrors,
+            Func<Guid, string, int, int[], TDataLakeItem> constructItem)
+            where TDataLakeItem : DataLakeItem
         {
             return blobItems
                 .Select(
@@ -264,13 +268,7 @@ namespace EastFive.Azure.Functions
                         if (DoesNotNeedToRun(out var linesToRun))
                             return null;
 
-                        return new DataLakeItem
-                        {
-                            dataLakeInstance = dataLakeInstanceId,
-                            path = item.Name,
-                            skip = skip,
-                        }
-                            .SetLinesToRun(linesToRun);
+                        return constructItem(dataLakeInstanceId, item.Name, skip, linesToRun);
 
                         bool DoesNotNeedToRun(out int[] linesToRun)
                         {
@@ -299,9 +297,33 @@ namespace EastFive.Azure.Functions
                     :
                     new DataLakeImportReport[] { };
             return blobItems.ConvertToDataLakeItems(
-                dataLakeImportId, priorRuns, shouldRunErrors);
+                dataLakeImportId, priorRuns, shouldRunErrors,
+                (dataLakeInstanceId, path, skip, linesToRun) =>
+                {
+                    return new DataLakeItem
+                    {
+                        dataLakeInstance = dataLakeInstanceId,
+                        path = path,
+                        skip = skip,
+                    }
+                        .SetLinesToRun(linesToRun);
+                });
         }
 
+        public static async Task<TDataLakeItem[]> ConvertToDataLakeItemsAsync<TDataLakeItem>(this BlobItem[] blobItems,
+            Guid dataLakeImportId, Guid importId, DateTime? usePriorRunsFromMaybe, bool shouldRunErrors,
+            Func<Guid, string, int, int[], TDataLakeItem> constructItem)
+            where TDataLakeItem : DataLakeItem
+        {
+            var priorRuns = usePriorRunsFromMaybe.HasValue ?
+                    await DataLakeImportReport.GetFromStorage(importId, usePriorRunsFromMaybe.Value)
+                        .ToArrayAsync()
+                    :
+                    new DataLakeImportReport[] { };
+            return blobItems.ConvertToDataLakeItems(
+                dataLakeImportId, priorRuns, shouldRunErrors,
+                constructItem);
+        }
 
         public static async Task<DataLakeImportReport> RunActivityFromDurableFunctionAsync<TImportInstance>(this IDurableOrchestrationContext context,
             string functionName,
