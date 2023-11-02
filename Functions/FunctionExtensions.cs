@@ -94,6 +94,7 @@ namespace EastFive.Azure.Functions
                 instance.exportFolder = import.exportFolder;
                 instance.when = now;
                 instance.cancelled = false;
+                instance.ignoreFaultedFiles = false;
                 instance.sourceId = import.sourceId;
                 var instanceIdToTry = $"{instance.id}:{now.Year}{now.Month}{now.Day}{now.Hour}{now.Minute}{now.Second}";
                 string instanceId = await starter.StartNewAsync(nameOfFunctionToRun,
@@ -183,10 +184,15 @@ namespace EastFive.Azure.Functions
 
                 var path = dataLakeItem.path;
                 var skip = dataLakeItem.skip;
-                if (dataLakeImportInstance.cancelled)
+
+
+                var isCancelled = await dataLakeImportInstance.id.AsRef<TImportInstance>().StorageGetAsync(
+                    onFound: (updatedInstance) => updatedInstance.cancelled,
+                    onDoesNotExists:() => true);
+                if (isCancelled)
                 {
                     var report = dataLakeItem
-                        .GenerateReport(dataLakeImportInstance.export, DataLakeImportStatus.Cancelled, 0);
+                        .GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.Cancelled, 0);
                     return onProcessed(report);
                 }
 
@@ -196,7 +202,7 @@ namespace EastFive.Azure.Functions
                 var intervals = new (int, int)[] { };
                 if (folder.IsNullOrWhiteSpace())
                 {
-                    var report = dataLakeItem.GenerateReport(dataLakeImportInstance.export, DataLakeImportStatus.FaultyExport, 0);
+                    var report = dataLakeItem.GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultyExport, 0);
                     return onProcessed(report);
                 }
                 var startTime = System.Diagnostics.Stopwatch.StartNew();
@@ -212,7 +218,7 @@ namespace EastFive.Azure.Functions
                         onFileNotFound: () =>
                         {
                             var report = dataLakeItem.GenerateReport(
-                                dataLakeImportInstance.export, DataLakeImportStatus.FaultedFile, 0);
+                                dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
                             return report;
                         },
                         isTimedOut: () =>
@@ -228,7 +234,7 @@ namespace EastFive.Azure.Functions
                     log.LogError(ex.StackTrace);
 
                     var report = dataLakeItem.GenerateReport(
-                        dataLakeImportInstance.export, DataLakeImportStatus.FaultedFile, 0);
+                        dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
                     return onProcessed(report);
                 }
             }
