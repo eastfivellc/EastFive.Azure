@@ -20,13 +20,13 @@ namespace EastFive.Azure.Functions
         /// <param name="status"></param>
         /// <param name="linesTotal"></param>
         /// <returns></returns>
-        internal DataLakeImportReport GenerateReport(Guid dataLakeExportId,
+        internal DataLakeImportReport GenerateReport(IImplementRef<IExportFromDatalake> dataLakeExportId,
             DataLakeImportStatus status, int linesTotal)
         {
             return new DataLakeImportReport
             {
                 instanceId = this.dataLakeInstance,
-                export = dataLakeExportId,
+                export = dataLakeExportId.id,
                 status = status,
                 path = this.path,
                 intervalsProcessed = new DataLakeImportReport.Interval[] { },

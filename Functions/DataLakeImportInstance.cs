@@ -22,7 +22,8 @@ namespace EastFive.Azure.Functions
     /// One instance of the subclass is created each time the orchistration is run.
     /// </summary>
 	[StorageTable]
-	public class DataLakeImportInstance : IReferenceable
+	public abstract class DataLakeImportInstance : IReferenceable
+        // where TDatalakeExporter : IExportFromDatalake
     {
         #region Base
 
@@ -56,6 +57,10 @@ namespace EastFive.Azure.Functions
         [StorageQuery]
         public Guid export;
 
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public abstract IImplementRef<IExportFromDatalake> exportFromDataLake { get; }
+
         [Storage]
         public string exportContainer;
 
@@ -70,6 +75,9 @@ namespace EastFive.Azure.Functions
 
         [Storage]
         public bool cancelled;
+
+        [Storage]
+        public bool ignoreFaultedFiles;
 
         /// <summary>
         /// Instance ID of the orchestration that is running.
@@ -140,7 +148,7 @@ namespace EastFive.Azure.Functions
                             .AsyncEnumerable()
                             .ToArrayAsync();
 
-                        var report = item.GenerateReport(this.export,
+                        var report = item.GenerateReport(this.exportFromDataLake,
                             didTimeOut ?
                                 DataLakeImportStatus.Partial
                                 :
