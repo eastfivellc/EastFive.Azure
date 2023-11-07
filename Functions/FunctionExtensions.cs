@@ -19,8 +19,6 @@ using EastFive.Azure.Persistence.Blobs;
 using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Linq.Async;
-using Microsoft.AspNetCore.Mvc;
-using static EastFive.Azure.Monitoring.MessageCard.ActionCard;
 
 namespace EastFive.Azure.Functions
 {
