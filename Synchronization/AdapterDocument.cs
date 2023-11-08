@@ -50,17 +50,17 @@ namespace EastFive.Azure.Synchronization.Persistence
 
         #region ConnectorIds
 
-        public byte[] ConnectorIds
-        {
-            get
-            {
-                return new byte[] { };
-            }
-            set
-            {
-                SetConnectorIds(value.ToGuidsFromByteArray());
-            }
-        }
+        //public byte[] ConnectorIds
+        //{
+        //    get
+        //    {
+        //        return new byte[] { };
+        //    }
+        //    set
+        //    {
+        //        SetConnectorIds(value.ToGuidsFromByteArray());
+        //    }
+        //}
 
         public byte[] ConnectorIds_00 { get; set; }
         public byte[] ConnectorIds_01 { get; set; }
@@ -187,39 +187,39 @@ namespace EastFive.Azure.Synchronization.Persistence
                     onNotFound));
         }
 
-        public static IEnumerableAsync<Adapter> FindAll(Guid integrationId, string resourceType)
-        {
-            if (resourceType.IsNullOrWhiteSpace())
-                return EnumerableAsync.Empty<Adapter>();
+        //public static IEnumerableAsync<Adapter> FindAll(Guid integrationId, string resourceType)
+        //{
+        //    if (resourceType.IsNullOrWhiteSpace())
+        //        return EnumerableAsync.Empty<Adapter>();
 
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var whereIntegrationQuery = TableQuery.GenerateFilterConditionForGuid("IntegrationId", QueryComparisons.Equal, integrationId);
-                    var whereResourceTypeQuery = TableQuery.GenerateFilterCondition("ResourceType", QueryComparisons.Equal, resourceType);
-                    var whereQuery = TableQuery.CombineFilters(whereIntegrationQuery, TableOperators.And, whereResourceTypeQuery);
-                    var adapterQuery = new TableQuery<AdapterDocument>().Where(whereQuery);
-                    return azureStorageRepository
-                        .FindAllAsync(adapterQuery)
-                        .Select(Convert);
-                });
-        }
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var whereIntegrationQuery = TableQuery.GenerateFilterConditionForGuid("IntegrationId", QueryComparisons.Equal, integrationId);
+        //            var whereResourceTypeQuery = TableQuery.GenerateFilterCondition("ResourceType", QueryComparisons.Equal, resourceType);
+        //            var whereQuery = TableQuery.CombineFilters(whereIntegrationQuery, TableOperators.And, whereResourceTypeQuery);
+        //            var adapterQuery = new TableQuery<AdapterDocument>().Where(whereQuery);
+        //            return azureStorageRepository
+        //                .FindAllAsync(adapterQuery)
+        //                .Select(Convert);
+        //        });
+        //}
 
-        public static IEnumerableAsync<Adapter> FindAll(string resourceType)
-        {
-            if (resourceType.IsNullOrWhiteSpace())
-                return EnumerableAsync.Empty<Adapter>();
+        //public static IEnumerableAsync<Adapter> FindAll(string resourceType)
+        //{
+        //    if (resourceType.IsNullOrWhiteSpace())
+        //        return EnumerableAsync.Empty<Adapter>();
 
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var whereResourceTypeQuery = TableQuery.GenerateFilterCondition("ResourceType", QueryComparisons.Equal, resourceType);
-                    var adapterQuery = new TableQuery<AdapterDocument>().Where(whereResourceTypeQuery);
-                    return azureStorageRepository
-                        .FindAllAsync(adapterQuery)
-                        .Select(Convert);
-                });
-        }
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var whereResourceTypeQuery = TableQuery.GenerateFilterCondition("ResourceType", QueryComparisons.Equal, resourceType);
+        //            var adapterQuery = new TableQuery<AdapterDocument>().Where(whereResourceTypeQuery);
+        //            return azureStorageRepository
+        //                .FindAllAsync(adapterQuery)
+        //                .Select(Convert);
+        //        });
+        //}
         
         internal static Adapter Convert(AdapterDocument syncDoc)
         {
@@ -302,32 +302,32 @@ namespace EastFive.Azure.Synchronization.Persistence
                 });
         }
 
-        internal static IEnumerableAsync<Adapter> CreateOrUpdateBatch(IEnumerable<KeyValuePair<string, Guid>> keyAndConnectorKvps, Guid integrationId, string resourceType)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var adapters = keyAndConnectorKvps
-                        .Select(
-                            keyAndConnectorKvp =>
-                            {
-                                var adapter = new AdapterDocument()
-                                {
-                                    Key = keyAndConnectorKvp.Key,
-                                    IntegrationId = integrationId,
-                                    ResourceType = resourceType,
-                                };
-                                adapter.SetConnectorIds(new[] { keyAndConnectorKvp.Value });
-                                return adapter;
-                            });
-                    return azureStorageRepository
-                        .CreateOrReplaceBatch(adapters,
-                                adapter => GetId(adapter.Key, integrationId, resourceType),
-                            (successAdapter) => successAdapter,
-                            (failedAdapter) => failedAdapter)
-                        .Select(adapter => Convert(adapter));
-                });
-        }
+        //internal static IEnumerableAsync<Adapter> CreateOrUpdateBatch(IEnumerable<KeyValuePair<string, Guid>> keyAndConnectorKvps, Guid integrationId, string resourceType)
+        //{
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var adapters = keyAndConnectorKvps
+        //                .Select(
+        //                    keyAndConnectorKvp =>
+        //                    {
+        //                        var adapter = new AdapterDocument()
+        //                        {
+        //                            Key = keyAndConnectorKvp.Key,
+        //                            IntegrationId = integrationId,
+        //                            ResourceType = resourceType,
+        //                        };
+        //                        adapter.SetConnectorIds(new[] { keyAndConnectorKvp.Value });
+        //                        return adapter;
+        //                    });
+        //            return azureStorageRepository
+        //                .CreateOrReplaceBatch(adapters,
+        //                        adapter => GetId(adapter.Key, integrationId, resourceType),
+        //                    (successAdapter) => successAdapter,
+        //                    (failedAdapter) => failedAdapter)
+        //                .Select(adapter => Convert(adapter));
+        //        });
+        //}
         
         internal static Task<TResult> UpdateAsync<TResult>(Guid sourceAdapterId,
             Func<Adapter, Func<Guid[], string, KeyValuePair<string, string>[], Task>, Task<TResult>> onFound,

@@ -15,7 +15,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
 {
     public partial class AzureStorageRepository
     {
-        
+
         //[Obsolete("Use FindByIdAsync")]
         //public Task<TEntity> FindById<TEntity>(Guid rowId)
         //    where TEntity : class,ITableEntity
@@ -37,7 +37,7 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         //        throw new Exception("Unable to query Azure.");
         //    return entity;
         //}
-        
+
         //private delegate void QueryDelegate<in TData>(int retries, TData data);
         //[Obsolete("Use FindByIdAsync")]
         //private async Task<bool> TryFindByIdAsync<TData>(string rowKey, QueryDelegate<TData> callback) where TData : class, ITableEntity
@@ -75,131 +75,132 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
         //    return false;
         //}
 
-        [Obsolete("Use FindAllAsync")]
-        public async Task<IEnumerable<TData>> FindByQueryAsync<TData>(TableQuery<TData> query, int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
-            where TData : class, ITableEntity, new()
-        {
-            var table = GetTable<TData>();
-            while (true)
-            {
-                try
-                {
-                    // The ToList is needed so that evaluation is immediate rather than returning
-                    // a lazy object and avoiding our try/catch here.
-                    TableContinuationToken token = null;
-                    var results = new TData[] { };
-                    do
-                    {
-                        var segment = await table.ExecuteQuerySegmentedAsync(query, token);
-                        token = segment.ContinuationToken;
-                        results = results.Concat(segment.Results).ToArray();
-                    } while (token != null);
-                    return results;
-                }
-                catch (AggregateException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    if (!await table.ExistsAsync()) return new TData[] { };
-                    if (ex is StorageException except && except.IsProblemTimeout())
-                    {
-                        if (--numberOfTimesToRetry > 0)
-                        {
-                            await Task.Delay(DefaultBackoffForRetry);
-                            continue;
-                        }
-                    }
-                    throw;
-                }
-            }
-        }
+        //[Obsolete("Use FindAllAsync")]
+        //public async Task<IEnumerable<TData>> FindByQueryAsync<TData>(TableQuery<TData> query, int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    var table = GetTable<TData>();
+        //    while (true)
+        //    {
+        //        try
+        //        {
+        //            // The ToList is needed so that evaluation is immediate rather than returning
+        //            // a lazy object and avoiding our try/catch here.
+        //            TableContinuationToken token = null;
+        //            var results = new TData[] { };
+        //            do
+        //            {
+        //                var segment = await table.ExecuteQuerySegmentedAsync(query, token);
+        //                token = segment.ContinuationToken;
+        //                results = results.Concat(segment.Results).ToArray();
+        //            } while (token != null);
+        //            return results;
+        //        }
+        //        catch (AggregateException)
+        //        {
+        //            throw;
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            if (!await table.ExistsAsync()) return new TData[] { };
+        //            if (ex is StorageException except && except.IsProblemTimeout())
+        //            {
+        //                if (--numberOfTimesToRetry > 0)
+        //                {
+        //                    await Task.Delay(DefaultBackoffForRetry);
+        //                    continue;
+        //                }
+        //            }
+        //            throw;
+        //        }
+        //    }
+        //}
 
-        public IEnumerableAsync<TData> FindAll<TData>(int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
-            where TData : class, ITableEntity, new()
-        {
-            var query = new TableQuery<TData>();
-            return FindAllAsync(query);
-        }
+        //public IEnumerableAsync<TData> FindAll<TData>(int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    var query = new TableQuery<TData>();
+        //    return FindAllAsync(query);
+        //}
 
-        public IEnumerableAsync<TData> FindAllAsync<TData>(TableQuery<TData> query, int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
-            where TData : class, ITableEntity, new()
-        {
-            var table = GetTable<TData>();
-            var token = default(TableContinuationToken);
-            var segment = default(TableQuerySegment<TData>);
-            var resultsIndex = 0;
-            return EnumerableAsync.Yield<TData>(
-                async (yieldReturn, yieldBreak) =>
-                {
-                    if(segment.IsDefaultOrNull() || segment.Results.Count <= resultsIndex)
-                    {
-                        resultsIndex = 0;
-                        while (true)
-                        {
-                            try
-                            {
-                                if ((!segment.IsDefaultOrNull()) && token.IsDefaultOrNull())
-                                    return yieldBreak;
+        //[Obsolete("Use FindAllAsync")]
+        //public IEnumerableAsync<TData> FindAllAsync<TData>(TableQuery<TData> query, int numberOfTimesToRetry = DefaultNumberOfTimesToRetry)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    var table = GetTable<TData>();
+        //    var token = default(TableContinuationToken);
+        //    var segment = default(TableQuerySegment<TData>);
+        //    var resultsIndex = 0;
+        //    return EnumerableAsync.Yield<TData>(
+        //        async (yieldReturn, yieldBreak) =>
+        //        {
+        //            if(segment.IsDefaultOrNull() || segment.Results.Count <= resultsIndex)
+        //            {
+        //                resultsIndex = 0;
+        //                while (true)
+        //                {
+        //                    try
+        //                    {
+        //                        if ((!segment.IsDefaultOrNull()) && token.IsDefaultOrNull())
+        //                            return yieldBreak;
 
-                                segment = await table.ExecuteQuerySegmentedAsync(query, token);
-                                token = segment.ContinuationToken;
-                                if (!segment.Results.Any())
-                                    continue;
-                                break;
-                            }
-                            catch (AggregateException)
-                            {
-                                throw;
-                            }
-                            catch (Exception ex)
-                            {
-                                if (!await table.ExistsAsync())
-                                    return yieldBreak;
-                                if (ex is StorageException except && except.IsProblemTimeout())
-                                {
-                                    if (--numberOfTimesToRetry > 0)
-                                    {
-                                        await Task.Delay(DefaultBackoffForRetry);
-                                        continue;
-                                    }
-                                }
-                                throw;
-                            }
-                        }
-                    }
+        //                        segment = await table.ExecuteQuerySegmentedAsync(query, token);
+        //                        token = segment.ContinuationToken;
+        //                        if (!segment.Results.Any())
+        //                            continue;
+        //                        break;
+        //                    }
+        //                    catch (AggregateException)
+        //                    {
+        //                        throw;
+        //                    }
+        //                    catch (Exception ex)
+        //                    {
+        //                        if (!await table.ExistsAsync())
+        //                            return yieldBreak;
+        //                        if (ex is StorageException except && except.IsProblemTimeout())
+        //                        {
+        //                            if (--numberOfTimesToRetry > 0)
+        //                            {
+        //                                await Task.Delay(DefaultBackoffForRetry);
+        //                                continue;
+        //                            }
+        //                        }
+        //                        throw;
+        //                    }
+        //                }
+        //            }
 
-                    var result = segment.Results[resultsIndex];
-                    resultsIndex++;
-                    return yieldReturn(result);
-                });
-        }
+        //            var result = segment.Results[resultsIndex];
+        //            resultsIndex++;
+        //            return yieldReturn(result);
+        //        });
+        //}
 
-        public async Task<IEnumerable<TData>> FindByQueryAsync<TData>(string filter)
-            where TData : class, ITableEntity, new()
-        {
-            var resultsAllPartitions = await Enumerable
-                .Range(-13, 27)
-                .Select(
-                    partitionIndex =>
-                    {
-                        var query = new TableQuery<TData>().Where(
-                        TableQuery.CombineFilters(
-                            TableQuery.GenerateFilterCondition(
-                                "PartitionKey",
-                                QueryComparisons.Equal,
-                                partitionIndex.ToString()),
-                            TableOperators.And,
-                            filter));
+        //public async Task<IEnumerable<TData>> FindByQueryAsync<TData>(string filter)
+        //    where TData : class, ITableEntity, new()
+        //{
+        //    var resultsAllPartitions = await Enumerable
+        //        .Range(-13, 27)
+        //        .Select(
+        //            partitionIndex =>
+        //            {
+        //                var query = new TableQuery<TData>().Where(
+        //                TableQuery.CombineFilters(
+        //                    TableQuery.GenerateFilterCondition(
+        //                        "PartitionKey",
+        //                        QueryComparisons.Equal,
+        //                        partitionIndex.ToString()),
+        //                    TableOperators.And,
+        //                    filter));
 
-                        var foundDocs = this.FindAllAsync(query);
-                        return foundDocs;
-                    })
-                .SelectMany()
-                .Async();
-            return resultsAllPartitions;
-        }
+        //                var foundDocs = this.FindAllAsync(query);
+        //                return foundDocs;
+        //            })
+        //        .SelectMany()
+        //        .Async();
+        //    return resultsAllPartitions;
+        //}
         
     }
 }

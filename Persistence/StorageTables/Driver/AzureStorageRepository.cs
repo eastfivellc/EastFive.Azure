@@ -82,19 +82,19 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             return TableClient.GetTableReference(tableName);
         }
 
-        public async Task DeleteTableAsync<T>()
-        {
-            try
-            {
-                var table = GetTable<T>();
-                await table.DeleteAsync();
-            }
-            catch (StorageException ex)
-            {
-                if (!ex.IsProblemTableDoesNotExist())
-                    throw;
-            }
-        }
+        //public async Task DeleteTableAsync<T>()
+        //{
+        //    try
+        //    {
+        //        var table = GetTable<T>();
+        //        await table.DeleteAsync();
+        //    }
+        //    catch (StorageException ex)
+        //    {
+        //        if (!ex.IsProblemTableDoesNotExist())
+        //            throw;
+        //    }
+        //}
 
         #endregion
 
@@ -469,17 +469,17 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             return await CreateAsync(rowKey, partitionKey, document, onSuccess, onAlreadyExists, onFailure, onTimeout);
         }
 
-        public async Task<TResult> CreateAsync<TResult, TDocument>(Guid id, string partitionKey, TDocument document,
-           Func<TResult> onSuccess,
-           Func<TResult> onAlreadyExists,
-                Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
-                    default(Func<ExtendedErrorInformationCodes, string, TResult>),
-           RetryDelegate onTimeout = default(RetryDelegate))
-           where TDocument : class, ITableEntity
-        {
-            var rowKey = id.AsRowKey();
-            return await CreateAsync(rowKey, partitionKey, document, onSuccess, onAlreadyExists, onFailure, onTimeout);
-        }
+        //public async Task<TResult> CreateAsync<TResult, TDocument>(Guid id, string partitionKey, TDocument document,
+        //   Func<TResult> onSuccess,
+        //   Func<TResult> onAlreadyExists,
+        //        Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
+        //            default(Func<ExtendedErrorInformationCodes, string, TResult>),
+        //   RetryDelegate onTimeout = default(RetryDelegate))
+        //   where TDocument : class, ITableEntity
+        //{
+        //    var rowKey = id.AsRowKey();
+        //    return await CreateAsync(rowKey, partitionKey, document, onSuccess, onAlreadyExists, onFailure, onTimeout);
+        //}
 
         public Task<TResult> CreateOrUpdateAsync<TDocument, TResult>(Guid id,
                 Func<bool, TDocument, SaveDocumentDelegate<TDocument>, Task<TResult>> success,
@@ -665,17 +665,17 @@ namespace BlackBarLabs.Persistence.Azure.StorageTables
             return await DeleteIfAsync(rowKey, partitionKey, found, notFound, onFailure, onTimeout);
         }
 
-        public async Task<TResult> DeleteIfAsync<TDocument, TResult>(Guid documentId, string partitionKey,
-            Func<TDocument, Func<Task>, Task<TResult>> found,
-            Func<TResult> notFound,
-                Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
-                    default(Func<ExtendedErrorInformationCodes, string, TResult>),
-            RetryDelegate onTimeout = default(RetryDelegate))
-            where TDocument : class, ITableEntity
-        {
-            var rowKey = documentId.AsRowKey();
-            return await DeleteIfAsync(rowKey, partitionKey, found, notFound, onFailure, onTimeout);
-        }
+        //public async Task<TResult> DeleteIfAsync<TDocument, TResult>(Guid documentId, string partitionKey,
+        //    Func<TDocument, Func<Task>, Task<TResult>> found,
+        //    Func<TResult> notFound,
+        //        Func<ExtendedErrorInformationCodes, string, TResult> onFailure =
+        //            default(Func<ExtendedErrorInformationCodes, string, TResult>),
+        //    RetryDelegate onTimeout = default(RetryDelegate))
+        //    where TDocument : class, ITableEntity
+        //{
+        //    var rowKey = documentId.AsRowKey();
+        //    return await DeleteIfAsync(rowKey, partitionKey, found, notFound, onFailure, onTimeout);
+        //}
 
         public async Task<TResult> DeleteIfAsync<TDocument, TResult>(string rowKey, string partitionKey,
             Func<TDocument, Func<Task>, Task<TResult>> found,

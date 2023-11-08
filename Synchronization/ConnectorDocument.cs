@@ -73,81 +73,81 @@ namespace EastFive.Azure.Synchronization.Persistence
         public static Func<string, string> GetMutatePartitionKey(string resourceType) =>
             partition => $"{resourceType}___{partition}";
 
-        public static Task<TResult> CreateAndUpdateAdaptersAsync<TResult>(Guid connectorId,
-                Guid adapterInternalId, Guid adapterExternalId, Connector.SynchronizationMethod method, string resourceType,
-            Func<TResult> onCreated,
-            Func<TResult> onAlreadyExists,
-            Func<Func<Task<Connector>>, TResult> onRelationshipAlreadyExists,
-            Func<Guid, TResult> onAdapterDoesNotExist)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var lookupId = GetId(adapterInternalId, adapterExternalId);
-                    var rollback = new RollbackAsync<TResult>();
-                    rollback.AddTaskCreate(connectorId,
-                            new ConnectorDocument()
-                            {
-                                LocalAdapter = adapterInternalId,
-                                RemoteAdapter = adapterExternalId,
-                                Method = Enum.GetName(typeof(Connector.SynchronizationMethod), method),
-                            },
-                        onAlreadyExists,
-                        azureStorageRepository);
-                    rollback.AddTaskCreate(lookupId,
-                            new EastFive.Persistence.Azure.Documents.LookupDocument()
-                            {
-                                Lookup = connectorId,
-                            },
-                        () => onRelationshipAlreadyExists(
-                            async () => await await azureStorageRepository.FindByIdAsync(lookupId,
-                                (EastFive.Persistence.Azure.Documents.LookupDocument lookupDoc) =>
-                                    azureStorageRepository.FindByIdAsync(lookupDoc.Lookup,
-                                        (ConnectorDocument connectorDoc) => Convert(connectorDoc),
-                                        () => default(Connector)),
-                                () => default(Connector).AsTask())),
-                        azureStorageRepository);
+        //public static Task<TResult> CreateAndUpdateAdaptersAsync<TResult>(Guid connectorId,
+        //        Guid adapterInternalId, Guid adapterExternalId, Connector.SynchronizationMethod method, string resourceType,
+        //    Func<TResult> onCreated,
+        //    Func<TResult> onAlreadyExists,
+        //    Func<Func<Task<Connector>>, TResult> onRelationshipAlreadyExists,
+        //    Func<Guid, TResult> onAdapterDoesNotExist)
+        //{
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var lookupId = GetId(adapterInternalId, adapterExternalId);
+        //            var rollback = new RollbackAsync<TResult>();
+        //            rollback.AddTaskCreate(connectorId,
+        //                    new ConnectorDocument()
+        //                    {
+        //                        LocalAdapter = adapterInternalId,
+        //                        RemoteAdapter = adapterExternalId,
+        //                        Method = Enum.GetName(typeof(Connector.SynchronizationMethod), method),
+        //                    },
+        //                onAlreadyExists,
+        //                azureStorageRepository);
+        //            rollback.AddTaskCreate(lookupId,
+        //                    new EastFive.Persistence.Azure.Documents.LookupDocument()
+        //                    {
+        //                        Lookup = connectorId,
+        //                    },
+        //                () => onRelationshipAlreadyExists(
+        //                    async () => await await azureStorageRepository.FindByIdAsync(lookupId,
+        //                        (EastFive.Persistence.Azure.Documents.LookupDocument lookupDoc) =>
+        //                            azureStorageRepository.FindByIdAsync(lookupDoc.Lookup,
+        //                                (ConnectorDocument connectorDoc) => Convert(connectorDoc),
+        //                                () => default(Connector)),
+        //                        () => default(Connector).AsTask())),
+        //                azureStorageRepository);
 
-                    rollback.AddTaskCreate(connectorId,
-                            new ConnectorSynchronizationDocument
-                            {
-                                Locked = false,
-                            },
-                        () => onRelationshipAlreadyExists(
-                            () => azureStorageRepository.FindByIdAsync(connectorId,
-                                (ConnectorDocument connectorDoc) => Convert(connectorDoc),
-                                () => default(Connector))),
-                        azureStorageRepository,
-                            mutatePartition:GetMutatePartitionKey(resourceType));
+        //            rollback.AddTaskCreate(connectorId,
+        //                    new ConnectorSynchronizationDocument
+        //                    {
+        //                        Locked = false,
+        //                    },
+        //                () => onRelationshipAlreadyExists(
+        //                    () => azureStorageRepository.FindByIdAsync(connectorId,
+        //                        (ConnectorDocument connectorDoc) => Convert(connectorDoc),
+        //                        () => default(Connector))),
+        //                azureStorageRepository,
+        //                    mutatePartition:GetMutatePartitionKey(resourceType));
 
-                    rollback.AddTaskUpdate<Guid[], TResult, AdapterDocument>(adapterInternalId,
-                        (adapterDoc, updated, noChange, onReject) =>
-                        {
-                            var connectorIds = adapterDoc.GetConnectorIds();
-                            if (adapterDoc.AddConnectorId(connectorId))
-                                return updated(connectorIds);
-                            return noChange();
-                        },
-                        (connectorIds, adapterDoc) => adapterDoc.SetConnectorIds(connectorIds),
-                        "Rejection is not an option".AsFunctionException<TResult>(),
-                        () => onAdapterDoesNotExist(adapterInternalId),
-                        azureStorageRepository);
+        //            rollback.AddTaskUpdate<Guid[], TResult, AdapterDocument>(adapterInternalId,
+        //                (adapterDoc, updated, noChange, onReject) =>
+        //                {
+        //                    var connectorIds = adapterDoc.GetConnectorIds();
+        //                    if (adapterDoc.AddConnectorId(connectorId))
+        //                        return updated(connectorIds);
+        //                    return noChange();
+        //                },
+        //                (connectorIds, adapterDoc) => adapterDoc.SetConnectorIds(connectorIds),
+        //                "Rejection is not an option".AsFunctionException<TResult>(),
+        //                () => onAdapterDoesNotExist(adapterInternalId),
+        //                azureStorageRepository);
 
-                    rollback.AddTaskUpdate<Guid[], TResult, AdapterDocument>(adapterExternalId,
-                        (adapterDoc, updated, noChange, onReject) =>
-                        {
-                            var connectorIds = adapterDoc.GetConnectorIds();
-                            if (adapterDoc.AddConnectorId(connectorId))
-                                return updated(connectorIds);
-                            return noChange();
-                        },
-                        (connectorIds, adapterDoc) => adapterDoc.SetConnectorIds(connectorIds),
-                        "Rejection is not an option".AsFunctionException<TResult>(),
-                        () => onAdapterDoesNotExist(adapterInternalId),
-                        azureStorageRepository);
-                    return rollback.ExecuteAsync(onCreated);
-                });
-        }
+        //            rollback.AddTaskUpdate<Guid[], TResult, AdapterDocument>(adapterExternalId,
+        //                (adapterDoc, updated, noChange, onReject) =>
+        //                {
+        //                    var connectorIds = adapterDoc.GetConnectorIds();
+        //                    if (adapterDoc.AddConnectorId(connectorId))
+        //                        return updated(connectorIds);
+        //                    return noChange();
+        //                },
+        //                (connectorIds, adapterDoc) => adapterDoc.SetConnectorIds(connectorIds),
+        //                "Rejection is not an option".AsFunctionException<TResult>(),
+        //                () => onAdapterDoesNotExist(adapterInternalId),
+        //                azureStorageRepository);
+        //            return rollback.ExecuteAsync(onCreated);
+        //        });
+        //}
 
         public static Task<TResult> CreateWithoutAdapterUpdateAsync<TResult>(Guid connectorId,
                 Guid adapterInternalId, Guid adapterExternalId, Connector.SynchronizationMethod method, string resourceType,
@@ -379,40 +379,40 @@ namespace EastFive.Azure.Synchronization.Persistence
                     });
         }
 
-        internal static TResult ShimFindByLocalAdapterAsync<TResult>(Guid localAdapterId,
-            Func<IEnumerableAsync<KeyValuePair<Connector,Adapter>>, TResult> onSuccess)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var results = Enumerable
-                        .Range(-12,25)
-                        .Select(
-                            partitionKey =>
-                            {
-                                var query = new TableQuery<ConnectorDocument>().Where(TableQuery.CombineFilters(
-                                    TableQuery.GenerateFilterConditionForGuid("LocalAdapter", QueryComparisons.Equal, localAdapterId),
-                                    TableOperators.And,
-                                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey.ToString())));
-                                return azureStorageRepository.FindAllAsync(query);
-                            })
-                        .SelectMany()
-                        .Select(
-                            connector =>
-                            {
-                                var remoteAdapterId = connector.RemoteAdapter;
-                                if (remoteAdapterId == default(Guid))
-                                    return EnumerableAsync.Empty<KeyValuePair<Connector, Adapter>>();
-                                return AdapterDocument
-                                    .FindByIdAsync(remoteAdapterId,
-                                        (adapter) => EnumerableAsync.EnumerableAsyncStart(Convert(connector).PairWithValue(adapter)),
-                                        () => EnumerableAsync.Empty<KeyValuePair<Connector, Adapter>>())
-                                    .FoldTask();
-                            })
-                        .SelectAsyncMany();
-                    return onSuccess(results);
-                });
-        }
+        //internal static TResult ShimFindByLocalAdapterAsync<TResult>(Guid localAdapterId,
+        //    Func<IEnumerableAsync<KeyValuePair<Connector,Adapter>>, TResult> onSuccess)
+        //{
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var results = Enumerable
+        //                .Range(-12,25)
+        //                .Select(
+        //                    partitionKey =>
+        //                    {
+        //                        var query = new TableQuery<ConnectorDocument>().Where(TableQuery.CombineFilters(
+        //                            TableQuery.GenerateFilterConditionForGuid("LocalAdapter", QueryComparisons.Equal, localAdapterId),
+        //                            TableOperators.And,
+        //                            TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, partitionKey.ToString())));
+        //                        return azureStorageRepository.FindAllAsync(query);
+        //                    })
+        //                .SelectMany()
+        //                .Select(
+        //                    connector =>
+        //                    {
+        //                        var remoteAdapterId = connector.RemoteAdapter;
+        //                        if (remoteAdapterId == default(Guid))
+        //                            return EnumerableAsync.Empty<KeyValuePair<Connector, Adapter>>();
+        //                        return AdapterDocument
+        //                            .FindByIdAsync(remoteAdapterId,
+        //                                (adapter) => EnumerableAsync.EnumerableAsyncStart(Convert(connector).PairWithValue(adapter)),
+        //                                () => EnumerableAsync.Empty<KeyValuePair<Connector, Adapter>>())
+        //                            .FoldTask();
+        //                    })
+        //                .SelectAsyncMany();
+        //            return onSuccess(results);
+        //        });
+        //}
 
         internal static Task<TResult> FindByAdapterWithConnectionAsync<TResult>(Guid adapterId,
             Func<Adapter, KeyValuePair<Connector, Adapter>[], TResult> onFound,
@@ -546,33 +546,33 @@ namespace EastFive.Azure.Synchronization.Persistence
                         onNotFound));
         }
 
-        public static IEnumerableAsync<Connection> FindAllByType(string resourceType)
-        {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var query = new TableQuery<ConnectorDocument>();
-                    var connectors = azureStorageRepository.FindAllAsync(query);
-                    return connectors
-                        .SelectAsyncOptional<ConnectorDocument, Connection>(
-                            async (connector, select, skip) => await await AdapterDocument.FindByIdAsync(connector.LocalAdapter,
-                                async adapterInternal =>
-                                {
-                                    if (adapterInternal.resourceType != resourceType)
-                                        return skip();
-                                    return await AdapterDocument.FindByIdAsync(connector.RemoteAdapter,
-                                        adapterExternal => select(
-                                            new Connection()
-                                            {
-                                                connector = Convert(connector),
-                                                adapterInternal = adapterInternal,
-                                                adapterExternal = adapterExternal,
-                                            }),
-                                        () => skip());
-                                },
-                                () => skip().AsTask()));
-                });
-        }
+        //public static IEnumerableAsync<Connection> FindAllByType(string resourceType)
+        //{
+        //    return AzureStorageRepository.Connection(
+        //        azureStorageRepository =>
+        //        {
+        //            var query = new TableQuery<ConnectorDocument>();
+        //            var connectors = azureStorageRepository.FindAllAsync(query);
+        //            return connectors
+        //                .SelectAsyncOptional<ConnectorDocument, Connection>(
+        //                    async (connector, select, skip) => await await AdapterDocument.FindByIdAsync(connector.LocalAdapter,
+        //                        async adapterInternal =>
+        //                        {
+        //                            if (adapterInternal.resourceType != resourceType)
+        //                                return skip();
+        //                            return await AdapterDocument.FindByIdAsync(connector.RemoteAdapter,
+        //                                adapterExternal => select(
+        //                                    new Connection()
+        //                                    {
+        //                                        connector = Convert(connector),
+        //                                        adapterInternal = adapterInternal,
+        //                                        adapterExternal = adapterExternal,
+        //                                    }),
+        //                                () => skip());
+        //                        },
+        //                        () => skip().AsTask()));
+        //        });
+        //}
 
         public static Task<T> FindAllAsync<T>(Guid actorId, Guid integrationId, string resourceType,
             Func<Connector[], T> callback)

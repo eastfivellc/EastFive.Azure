@@ -279,31 +279,32 @@ namespace EastFive.Azure.Persistence
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists)
         {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var rollback = new RollbackAsync<TResult>();
+            throw new NotImplementedException();
+            //return AzureStorageRepository.Connection(
+            //    azureStorageRepository =>
+            //    {
+            //        var rollback = new RollbackAsync<TResult>();
 
-                    var procStageDoc = new ProcessStageDocument()
-                    {
-                        Owner = actorId,
-                        ProcessStageType = processStageTypeId,
-                        Title = title,
-                    };
-                    procStageDoc.SetConfirmables(confirmableActorIds);
-                    procStageDoc.SetEditables(editableActorIds);
-                    procStageDoc.SetViewables(viewableActorIds);
-                    rollback.AddTaskCreate(processStageId, procStageDoc,
-                        onAlreadyExists, azureStorageRepository);
+            //        var procStageDoc = new ProcessStageDocument()
+            //        {
+            //            Owner = actorId,
+            //            ProcessStageType = processStageTypeId,
+            //            Title = title,
+            //        };
+            //        procStageDoc.SetConfirmables(confirmableActorIds);
+            //        procStageDoc.SetEditables(editableActorIds);
+            //        procStageDoc.SetViewables(viewableActorIds);
+            //        rollback.AddTaskCreate(processStageId, procStageDoc,
+            //            onAlreadyExists, azureStorageRepository);
 
-                    rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStageActorLookupDocument>(actorId,
-                        (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processStageId),
-                        lookupDoc => lookupDoc.RemoveLookupDocumentId(processStageId),
-                        azureStorageRepository);
+            //        rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStageActorLookupDocument>(actorId,
+            //            (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processStageId),
+            //            lookupDoc => lookupDoc.RemoveLookupDocumentId(processStageId),
+            //            azureStorageRepository);
 
 
-                    return rollback.ExecuteAsync(onSuccess);
-                });
+            //        return rollback.ExecuteAsync(onSuccess);
+            //    });
         }
 
         private static Task<ProcessStage> UpdateAsync(Guid adapterId,

@@ -56,24 +56,24 @@ namespace EastFive.Azure.Synchronization
         }
 
 
-        [EastFive.Api.HttpGet]
-        public static Task<IHttpResponse> FindByRelatedAsync(
-                [QueryParameter]Guid relatedTo, [QueryParameter]Guid integration, // int top, int skip
-                Api.Security security,
-            MultipartAcceptArrayResponse onMultipart,
-            ReferencedDocumentNotFoundResponse onReferenceNotFound,
-            UnauthorizedResponse onUnauthorized)
-        {
-            return EastFive.Azure.Synchronization.Connections.FindAdaptersByRelatedAsync(relatedTo, integration,
-                    security.claims,
-                synchronizations =>
-                {
-                    var r = onMultipart(synchronizations.Cast<object>());
-                    return r;
-                },
-                () => onReferenceNotFound(),
-                () => onUnauthorized());
-        }
+        //[EastFive.Api.HttpGet]
+        //public static Task<IHttpResponse> FindByRelatedAsync(
+        //        [QueryParameter]Guid relatedTo, [QueryParameter]Guid integration, // int top, int skip
+        //        Api.Security security,
+        //    MultipartAcceptArrayResponse onMultipart,
+        //    ReferencedDocumentNotFoundResponse onReferenceNotFound,
+        //    UnauthorizedResponse onUnauthorized)
+        //{
+        //    return EastFive.Azure.Synchronization.Connections.FindAdaptersByRelatedAsync(relatedTo, integration,
+        //            security.claims,
+        //        synchronizations =>
+        //        {
+        //            var r = onMultipart(synchronizations.Cast<object>());
+        //            return r;
+        //        },
+        //        () => onReferenceNotFound(),
+        //        () => onUnauthorized());
+        //}
 
         [EastFive.Api.HttpGet]
         public static Task<IHttpResponse> FindByRelatedAsync([QueryParameter]string key, [QueryParameter]Guid integration, [QueryParameter]string resourceType,
@@ -588,22 +588,22 @@ namespace EastFive.Azure.Synchronization
                 () => onNotFound());
         }
         
-        public static async Task<TResult> FindAdaptersByRelatedAsync<TResult>(Guid relatedAdapterId, Guid integrationId,
-                System.Security.Claims.Claim[] claims,
-            Func<Adapter[], TResult> onFound,
-            Func<TResult> onReferenceNotFound,
-            Func<TResult> onUnauthorized)
-        {
-            return await await Persistence.AdapterDocument.FindByIdAsync(relatedAdapterId,
-                async relatedAdapter =>
-                {
-                    var orderedAdapters = await Persistence.AdapterDocument
-                        .FindAll(integrationId, relatedAdapter.resourceType)
-                        .OrderByAsync(adapter => relatedAdapter.name.SmithWaterman(adapter.name));
-                    return onFound(orderedAdapters.ToArray());
-                },
-                onReferenceNotFound.AsAsyncFunc());
-        }
+        //public static async Task<TResult> FindAdaptersByRelatedAsync<TResult>(Guid relatedAdapterId, Guid integrationId,
+        //        System.Security.Claims.Claim[] claims,
+        //    Func<Adapter[], TResult> onFound,
+        //    Func<TResult> onReferenceNotFound,
+        //    Func<TResult> onUnauthorized)
+        //{
+        //    return await await Persistence.AdapterDocument.FindByIdAsync(relatedAdapterId,
+        //        async relatedAdapter =>
+        //        {
+        //            var orderedAdapters = await Persistence.AdapterDocument
+        //                .FindAll(integrationId, relatedAdapter.resourceType)
+        //                .OrderByAsync(adapter => relatedAdapter.name.SmithWaterman(adapter.name));
+        //            return onFound(orderedAdapters.ToArray());
+        //        },
+        //        onReferenceNotFound.AsAsyncFunc());
+        //}
 
         public static Task<TResult> FindAdapterByKeyAsync<TResult>(string key, Guid integrationId, string resourceType,
                 System.Security.Claims.Claim[] claims,
@@ -1066,17 +1066,17 @@ namespace EastFive.Azure.Synchronization
         }
 
 
-        public static IEnumerableAsync<Adapter> FindAdaptersByType(string resourceType)
-        {
-            var adapters = EastFive.Azure.Synchronization.Persistence.AdapterDocument.FindAll(resourceType);
-            return adapters;
-        }
+        //public static IEnumerableAsync<Adapter> FindAdaptersByType(string resourceType)
+        //{
+        //    var adapters = EastFive.Azure.Synchronization.Persistence.AdapterDocument.FindAll(resourceType);
+        //    return adapters;
+        //}
         
-        public static IEnumerableAsync<Connection> FindConnectionsByType(string resourceType)
-        {
-            var adapters = Persistence.ConnectorDocument.FindAllByType(resourceType);
-            return adapters;
-        }
+        //public static IEnumerableAsync<Connection> FindConnectionsByType(string resourceType)
+        //{
+        //    var adapters = Persistence.ConnectorDocument.FindAllByType(resourceType);
+        //    return adapters;
+        //}
 
         /// <summary>
         /// Convenience method for looking up an external to "internal"/default resource mapping.
@@ -1269,34 +1269,34 @@ namespace EastFive.Azure.Synchronization
 
         #endregion
 
-        public static Task<TResult> SynchronizeLockedAsync<TResult>(Guid connectorId, string resourceType,
-            Func<TimeSpan?, 
-                Func<TResult, Task<Persistence.ConnectorDocument.ILockResult<TResult>>>, 
-                Func<TResult, Task<Persistence.ConnectorDocument.ILockResult<TResult>>>,
-                Task<Persistence.ConnectorDocument.ILockResult<TResult>>> onLockAquired,
-            Func<int, 
-                TimeSpan,
-                TimeSpan?,
-                Func<Task<TResult>>, 
-                Func<Task<TResult>>,
-                Task<TResult>> onAlreadyLocked,
-            Func<TResult> onNotFound)
-        {
-            return Persistence.ConnectorDocument.SynchronizeLockedAsync(connectorId, resourceType,
-                async (duration, unlockAndSave, unlock) =>
-                {
-                    var result = await onLockAquired(duration,
-                        (t) => unlockAndSave(t),
-                        (t) => unlock(t));
-                    return result;
-                },
-                onAlreadyLocked:
-                    (retryCount, retryDuration, lastSyncDuration, continueAquiring, force) =>
-                    {
-                        return onAlreadyLocked(retryCount, retryDuration, lastSyncDuration, continueAquiring, force);
-                    },
-                onNotFound:onNotFound);
-        }
+        //public static Task<TResult> SynchronizeLockedAsync<TResult>(Guid connectorId, string resourceType,
+        //    Func<TimeSpan?, 
+        //        Func<TResult, Task<Persistence.ConnectorDocument.ILockResult<TResult>>>, 
+        //        Func<TResult, Task<Persistence.ConnectorDocument.ILockResult<TResult>>>,
+        //        Task<Persistence.ConnectorDocument.ILockResult<TResult>>> onLockAquired,
+        //    Func<int, 
+        //        TimeSpan,
+        //        TimeSpan?,
+        //        Func<Task<TResult>>, 
+        //        Func<Task<TResult>>,
+        //        Task<TResult>> onAlreadyLocked,
+        //    Func<TResult> onNotFound)
+        //{
+        //    return Persistence.ConnectorDocument.SynchronizeLockedAsync(connectorId, resourceType,
+        //        async (duration, unlockAndSave, unlock) =>
+        //        {
+        //            var result = await onLockAquired(duration,
+        //                (t) => unlockAndSave(t),
+        //                (t) => unlock(t));
+        //            return result;
+        //        },
+        //        onAlreadyLocked:
+        //            (retryCount, retryDuration, lastSyncDuration, continueAquiring, force) =>
+        //            {
+        //                return onAlreadyLocked(retryCount, retryDuration, lastSyncDuration, continueAquiring, force);
+        //            },
+        //        onNotFound:onNotFound);
+        //}
 
         public static async Task<TResult> DeleteAdapterAndConnections<TResult>(Adapter adapter, 
             Func<TResult> onDeleted,

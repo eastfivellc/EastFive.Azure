@@ -190,57 +190,58 @@ namespace EastFive.Azure.Persistence
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists)
         {
-            return AzureStorageRepository.Connection(
-                azureStorageRepository =>
-                {
-                    var rollback = new RollbackAsync<TResult>();
+            throw new NotImplementedException();
+            //return AzureStorageRepository.Connection(
+            //    azureStorageRepository =>
+            //    {
+            //        var rollback = new RollbackAsync<TResult>();
 
-                    var resourceTypeString = resourceType.AssemblyQualifiedName;
-                    var processDocument = new ProcessDocument()
-                    {
-                        ProcessStage = processStageId,
+            //        var resourceTypeString = resourceType.AssemblyQualifiedName;
+            //        var processDocument = new ProcessDocument()
+            //        {
+            //            ProcessStage = processStageId,
 
-                        Resource = resourceId,
-                        ResourceType = resourceTypeString,
-                        CreatedOn = createdOn,
-                        Owner = actorId,
+            //            Resource = resourceId,
+            //            ResourceType = resourceTypeString,
+            //            CreatedOn = createdOn,
+            //            Owner = actorId,
 
-                        ConfirmedBy = confirmedBy,
-                        PreviousStep = previousStepId,
-                        ConfirmedWhen = confirmedWhen,
-                    };
-                    processDocument.SetResources(resources);
-                    rollback.AddTaskCreate(processId, processDocument,
-                        onAlreadyExists, azureStorageRepository);
+            //            ConfirmedBy = confirmedBy,
+            //            PreviousStep = previousStepId,
+            //            ConfirmedWhen = confirmedWhen,
+            //        };
+            //        processDocument.SetResources(resources);
+            //        rollback.AddTaskCreate(processId, processDocument,
+            //            onAlreadyExists, azureStorageRepository);
 
-                    foreach(var lookupActorId in lookupActorIds.Distinct())
-                        rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepActorLookupDocument>(lookupActorId, resourceTypeString,
-                            (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
-                            actorDoc => actorDoc.RemoveLookupDocumentId(processId),
-                            azureStorageRepository);
+            //        foreach(var lookupActorId in lookupActorIds.Distinct())
+            //            rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepActorLookupDocument>(lookupActorId, resourceTypeString,
+            //                (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
+            //                actorDoc => actorDoc.RemoveLookupDocumentId(processId),
+            //                azureStorageRepository);
 
-                    rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepResourceLookupDocument>(resourceId, resourceTypeString,
-                        (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
-                        actorDoc =>actorDoc.RemoveLookupDocumentId(processId),
-                        azureStorageRepository);
+            //        rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepResourceLookupDocument>(resourceId, resourceTypeString,
+            //            (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
+            //            actorDoc =>actorDoc.RemoveLookupDocumentId(processId),
+            //            azureStorageRepository);
                     
-                    bool[] updates = resources
-                        .Select(
-                            resource =>
-                            {
-                                if (!resource.resourceId.HasValue)
-                                    return true;
-                                rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepResourceKeyLookupDocument>(
-                                        resource.resourceId.Value, resource.type.AssemblyQualifiedName,
-                                    (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
-                                    lookupDoc => lookupDoc.RemoveLookupDocumentId(processId),
-                                    azureStorageRepository);
-                                return true;
-                            })
-                        .ToArray();
+            //        bool[] updates = resources
+            //            .Select(
+            //                resource =>
+            //                {
+            //                    if (!resource.resourceId.HasValue)
+            //                        return true;
+            //                    rollback.AddTaskCreateOrUpdate<TResult, Documents.ProcessStepResourceKeyLookupDocument>(
+            //                            resource.resourceId.Value, resource.type.AssemblyQualifiedName,
+            //                        (created, lookupDoc) => lookupDoc.AddLookupDocumentId(processId),
+            //                        lookupDoc => lookupDoc.RemoveLookupDocumentId(processId),
+            //                        azureStorageRepository);
+            //                    return true;
+            //                })
+            //            .ToArray();
 
-                    return rollback.ExecuteAsync(onSuccess);
-                });
+            //        return rollback.ExecuteAsync(onSuccess);
+            //    });
         }
 
         internal static Task<TResult> UpdateAsync<TResult>(Guid processId,
