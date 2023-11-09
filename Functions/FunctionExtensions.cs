@@ -19,6 +19,9 @@ using EastFive.Azure.Persistence.Blobs;
 using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Linq.Async;
+using EastFive.Persistence.Azure.StorageTables.Driver;
+using Azure.Search.Documents.Models;
+using EastFive.Serialization.Text;
 
 namespace EastFive.Azure.Functions
 {
@@ -248,6 +251,39 @@ namespace EastFive.Azure.Functions
                 log.LogError(ex.StackTrace);
                 return onException(ex);
             }
+        }
+
+        public static Task<TResult> ListExportedFilesAsync<TResult>(this IExportFromDatalake dataLakeExported,
+            Func<BlobItem[], TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string extension = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString)
+        {
+            return dataLakeExported.exportContainer.BlobListFilesAsync(
+                files =>
+                {
+                    var folderFiles = files
+                        .Where(
+                            file =>
+                            {
+                                if (!file.Name.StartsWith(dataLakeExported.exportFolder))
+                                    return false;
+
+                                if (extension.IsNullOrWhiteSpace())
+                                    return true;
+
+                                if (file.Name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                                        return true;
+
+                                return false;
+                            })
+                        .ToArray();
+                    return onSuccess(folderFiles);
+                },
+                onNotFound:() => onNotFound(),
+                    connectionStringConfigKey: connectionStringConfigKey);
         }
 
         public static TDataLakeItem[] ConvertToDataLakeItems<TDataLakeItem>(this BlobItem[] blobItems,
