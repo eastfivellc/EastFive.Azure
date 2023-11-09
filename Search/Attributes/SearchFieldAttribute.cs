@@ -9,7 +9,7 @@ namespace EastFive.Azure.Search
 {
     public interface IProvideSearchField
     {
-        string Name { get; }
+        string GetKeyName(MemberInfo member);
 
         public SearchField GetSearchField(MemberInfo member);
 

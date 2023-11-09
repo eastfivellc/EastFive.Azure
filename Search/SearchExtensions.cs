@@ -1,8 +1,19 @@
-﻿using Azure;
+﻿
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Threading.Tasks;
+using System.Linq.Expressions;
+
+using Azure;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using Azure.Search.Documents.Models;
+
+using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Linq;
@@ -10,12 +21,6 @@ using EastFive.Reflection;
 using EastFive.Collections;
 using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EastFive.Azure.Search
 {
@@ -47,7 +52,7 @@ namespace EastFive.Azure.Search
         private static string GetIndexName(this Type type)
         {
             var searchIndexProvider = type.GetAttributeInterface<IProvideSearchIndex>();
-            return searchIndexProvider.Index;
+            return searchIndexProvider.GetIndexName(type);
         }
 
         private static (MemberInfo, TInterface)[] GetMemberSupportingInterface<TInterface>(this Type type)
@@ -115,20 +120,36 @@ namespace EastFive.Azure.Search
             }
         }
 
-        public static async Task<IndexDocumentsResult> SearchUpdateBatchAsync<T>(this IEnumerable<T> items)
+        public static async Task<IndexDocumentsResult[]> SearchUpdateBatchAsync<T>(this IEnumerable<T> items)
         {
             if (items.None())
                 return default;
+
+            var documentSerializer = typeof(T)
+                .GetAttributeInterface<IProvideSearchSerialization>();
+
             var searchClient = GetClient<T>();
-            var itemsArray = items
-                .Select(item => IndexDocumentsAction.MergeOrUpload(item))
+            var itemsToProcess = items.Take(32000).ToArray();
+            var remainingItems = items.Skip(32000).ToArray();
+            var itemsArray = itemsToProcess
+                .Select(
+                    item =>
+                    {
+                        var serializedItem = documentSerializer.GetSerializedObject(item);
+                        return IndexDocumentsAction.MergeOrUpload(serializedItem);
+                    })
                 .ToArray();
             var batch = IndexDocumentsBatch.Create(itemsArray);
 
             try
             {
                 var result = await searchClient.IndexDocumentsAsync(batch);
-                return result.Value;
+                if(remainingItems.Any())
+                {
+                    var remainingResults = await SearchUpdateBatchAsync(remainingItems);
+                    return remainingResults.Prepend(result).ToArray();
+                }
+                return result.Value.AsArray();
             }
             catch (Exception)
             {
@@ -139,45 +160,5 @@ namespace EastFive.Azure.Search
                 throw;
             }
         }
-
-        public static IEnumerableAsync<T> SearchQuery<T>(IQueryable<T> query, string searchText)
-        {
-            var searchClient = GetClient<T>();
-            var searchExpression = query.Compile<string, IProvideSearchQuery>(searchText,
-                onRecognizedAttribute: (ss, queryProvider, methodInfo, expressions) =>
-                {
-                    var searchParam = queryProvider.GetSearchParameter(
-                        methodInfo, expressions);
-                    return ss + searchParam;
-                },
-                onUnrecognizedAttribute: (ss, methodInfo, expressions) =>
-                {
-                    if (methodInfo.Name == nameof(System.Linq.Queryable.Where))
-                    {
-                        return ss;
-                    }
-                    throw new ArgumentException($"Cannot compile Method `{methodInfo.DeclaringType.FullName}..{methodInfo.Name}`");
-                });
-
-            return GetResultsAsync().FoldTask();
-
-            async Task<IEnumerableAsync<T>> GetResultsAsync()
-            {
-                var result = await searchClient.SearchAsync<T>(searchExpression);
-                var pageResultAsync = result.Value.GetResultsAsync();
-                var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
-                return EnumerableAsync.Yield<T>(
-                    async (yieldReturn, yieldBreak) =>
-                    {
-                        if (!await pageEnumerator.MoveNextAsync())
-                            return yieldBreak;
-
-                        var searchResult = pageEnumerator.Current;
-                        var doc = searchResult.Document;
-                        return yieldReturn(doc);
-                    });
-            }
-        }
-
     }
 }

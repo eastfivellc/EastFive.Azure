@@ -6,8 +6,8 @@ using System.Text;
 
 namespace EastFive.Azure.Search
 {
-    interface IProvideSearchQuery
+    public interface IProvideSearchQuery
     {
-        string GetSearchParameter(MethodInfo methodInfo, Expression[] expressions);
+        string[] GetSearchParameter(MethodInfo methodInfo, Expression[] expressions);
     }
 }

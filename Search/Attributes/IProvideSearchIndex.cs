@@ -8,7 +8,6 @@ namespace EastFive.Azure.Search
 {
     public interface IProvideSearchIndex
     {
-        public string Index { get; }
-
+        string GetIndexName(Type type);
     }
 }
