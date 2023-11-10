@@ -304,7 +304,7 @@ namespace EastFive.Azure.Search
                 var comparsionStr = GetComparison();
                 return $"{key} {comparsionStr} '{v}'".AsArray();
 
-
+                // https://learn.microsoft.com/en-us/azure/search/search-query-odata-filter
                 string GetComparison()
                 {
                     if (expressions.Length == 2)
