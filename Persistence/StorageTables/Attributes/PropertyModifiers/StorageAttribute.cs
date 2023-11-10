@@ -25,9 +25,6 @@ namespace EastFive.Persistence
     {
         string Name { get; }
 
-        //KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
-        //    object value, IWrapTableEntity<EntityType> tableEntityWrapper);
-
         object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
             Func<object> getDefaultValue = default);
 
@@ -38,10 +35,6 @@ namespace EastFive.Persistence
     {
         KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
             object value, IWrapTableEntity<EntityType> tableEntityWrapper);
-
-        //EntityProperty ConvertValue(object value);
-
-        //object GetMemberValue(EntityProperty value);
     }
 
     public interface IComputeAzureStorageTableRowKey

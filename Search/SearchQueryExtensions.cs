@@ -155,7 +155,7 @@ namespace EastFive.Azure.Search
         {
             public string[] GetSearchParameter(MethodInfo methodInfo, Expression[] expressions)
             {
-                var propertyValue = (IReferenceableOptional)expressions.First().ResolveExpression();
+                var propertyValue = (IReferenceable)expressions.First().ResolveExpression();
 
                 var propertyExpr = (Expression)expressions[1].ResolveExpression();
                 propertyExpr.TryGetMemberExpression(out var memberInfo);
@@ -163,7 +163,7 @@ namespace EastFive.Azure.Search
                     out IProvideSearchField searchFieldAttr))
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
-                return $"{key} eq {propertyValue}".AsArray();
+                return $"{key} eq '{propertyValue.id}'".AsArray();
             }
         }
 
