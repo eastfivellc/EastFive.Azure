@@ -69,6 +69,7 @@
     <None Remove="Auth\Salesforce\Resources\" />
     <None Remove="Auth\Salesforce\Attribute\" />
     <None Remove="Auth\Superadmin\" />
+    <None Remove="Search\Api\" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Auth\Google\" />
@@ -80,5 +81,6 @@
     <Folder Include="Auth\Salesforce\Resources\" />
     <Folder Include="Auth\Salesforce\Attributes\" />
     <Folder Include="Auth\Superadmin\" />
+    <Folder Include="Search\Api\" />
   </ItemGroup>
 </Project>

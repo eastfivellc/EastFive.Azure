@@ -22,6 +22,7 @@ namespace EastFive.Azure.Search
         public bool IsFilterable { get; set; }
         public bool IsSortable { get; set; }
         public bool IsSearchable { get; set; }
+        public bool IsFacetable { get; set; }
 
         public SearchField GetSearchField(MemberInfo member)
         {
@@ -54,6 +55,7 @@ namespace EastFive.Azure.Search
             searchField.IsSearchable = this.IsSearchable;
             searchField.IsFilterable = this.IsFilterable;
             searchField.IsSortable = this.IsSortable;
+            searchField.IsFacetable = this.IsFacetable;
             return searchField;
         }
     }

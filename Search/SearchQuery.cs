@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Http;
 using EastFive.Extensions;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents;
+using Azure.Search.Documents.Models;
 
 namespace EastFive.Azure.Search
 {
@@ -35,22 +36,31 @@ namespace EastFive.Azure.Search
             IProvideSearchExpression<TResource>
     {
         public SearchClient searchIndexClient;
+        public IList<Action<IDictionary<string, IList<FacetResult>>>> Facets;
 
-        public SearchQuery(SearchClient searchIndexClient)
-            : base(new SearchQueryProvideQuery(searchIndexClient))
+        public static SearchQuery<TResource> FromIndex(SearchClient searchIndexClient)
         {
-            this.searchIndexClient = searchIndexClient;
+            var facets = new List<Action<IDictionary<string, IList<FacetResult>>>>();
+            return new SearchQuery<TResource>(searchIndexClient, facets);
         }
 
-        private SearchQuery(SearchClient searchIndexClient, Expression expr)
-            : base(new SearchQueryProvideQuery(searchIndexClient), expr)
+        public SearchQuery(SearchClient searchIndexClient, IList<Action<IDictionary<string, IList<FacetResult>>>> facets)
+            : base(new SearchQueryProvideQuery(searchIndexClient, facets))
         {
             this.searchIndexClient = searchIndexClient;
+            this.Facets = facets;
+        }
+
+        private SearchQuery(SearchClient searchIndexClient, IList<Action<IDictionary<string, IList<FacetResult>>>> facets, Expression expr)
+            : base(new SearchQueryProvideQuery(searchIndexClient, facets), expr)
+        {
+            this.searchIndexClient = searchIndexClient;
+            this.Facets = facets;
         }
 
         public SearchQuery<TRelatedResource> Related<TRelatedResource>()
         {
-            return new SearchQuery<TRelatedResource>(this.searchIndexClient);
+            return new SearchQuery<TRelatedResource>(this.searchIndexClient, this.Facets);
         }
 
         public class SearchQueryProvideQuery :
@@ -58,16 +68,16 @@ namespace EastFive.Azure.Search
                 EastFive.Linq.Queryable<TResource,
                     EastFive.Azure.Search.SearchQuery<TResource>.SearchQueryProvideQuery>>
         {
-            public SearchQueryProvideQuery(SearchClient searchIndexClient)
+            public SearchQueryProvideQuery(SearchClient searchIndexClient, IList<Action<IDictionary<string, IList<FacetResult>>>> facets)
                 : base(
                     (queryProvider, type) => (queryProvider is SearchQuery<TResource>) ?
                         (queryProvider as SearchQuery<TResource>).From()
                         :
-                        new SearchQuery<TResource>(searchIndexClient),
+                        new SearchQuery<TResource>(searchIndexClient, facets),
                     (queryProvider, expression, type) => (queryProvider is SearchQuery<TResource>) ?
                         (queryProvider as SearchQuery<TResource>).FromExpression(expression)
                         :
-                        new SearchQuery<TResource>(searchIndexClient, expression))
+                        new SearchQuery<TResource>(searchIndexClient, facets, expression))
             {
             }
 
@@ -80,14 +90,14 @@ namespace EastFive.Azure.Search
         internal virtual SearchQuery<TResource> FromExpression(Expression condition)
         {
             return new SearchQuery<TResource>(
-                  this.searchIndexClient,
+                  this.searchIndexClient, this.Facets,
                   condition);
         }
 
         internal virtual SearchQuery<TResource> From()
         {
             return new SearchQuery<TResource>(
-                  this.searchIndexClient);
+                  this.searchIndexClient, this.Facets);
         }
 
         public SearchQuery<TResource> ActivateQueryable(QueryProvider<SearchQuery<TResource>> provider, Type type)

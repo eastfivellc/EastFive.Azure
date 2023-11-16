@@ -31,43 +31,73 @@ namespace EastFive.Azure.Search
 
         public static IQueryable<T> GetQuery<T>(this SearchClient searchIndexClient)
         {
-            return new SearchQuery<T>(searchIndexClient);
+            return EastFive.Azure.Search.SearchQuery<T>.FromIndex(searchIndexClient);
+        }
+
+        public delegate TProp SearchPropertyDelegate<TItem, TProp>(IQueryable<TItem> items, out Func<TProp[]> getFacets);
+
+        private static SearchOptions AppendFilterOption(this SearchOptions searchOptions, string filterToAppend)
+        {
+            var currentFilter = searchOptions.Filter;
+            
+            searchOptions.Filter = GetFilter();
+            return searchOptions;
+            string GetFilter()
+            {
+                if (currentFilter.HasBlackSpace())
+                    return $"{currentFilter} and {filterToAppend}";
+                return filterToAppend;
+            }
         }
 
         public static IEnumerableAsync<(double?, T)> SearchQuery<T>(this IQueryable<T> query, string searchText)
         {
+            var searchTextComplete = searchText.HasBlackSpace() ?
+                $"{searchText}~"
+                :
+                "*";
+
             var searchClient = (query as SearchQuery<T>).searchIndexClient;
-            var filterExpressions = query.Compile<string[], IProvideSearchQuery>(new string[] { },
-                onRecognizedAttribute: (ss, queryProvider, methodInfo, expressions) =>
+
+            var searchOptionsNaked = new SearchOptions
+            {
+                QueryType = SearchQueryType.Full,
+            };
+
+            var searchOptionsPopulated = query.Compile<SearchOptions, ICompileSearchOptions>(searchOptionsNaked,
+                onRecognizedAttribute: (searchOptionsCurrent, queryProvider, methodInfo, expressions) =>
                 {
-                    var searchParam = queryProvider.GetSearchParameter(
+                    var searchOptionsUpdated = queryProvider.GetSearchFilters(searchOptionsCurrent,
                         methodInfo, expressions);
-                    return ss.Concat(searchParam).ToArray();
+                    return searchOptionsUpdated;
                 },
-                onUnrecognizedAttribute: (ss, unrecognizedMethod, methodArguments) =>
+                onUnrecognizedAttribute: (searchOptionsCurrent, unrecognizedMethod, methodArguments) =>
                 {
+                    if (unrecognizedMethod.Name == nameof(System.Linq.Queryable.Skip))
+                    {
+                        var skip = (int)methodArguments.First().ResolveExpression();
+                        searchOptionsCurrent.Skip = skip;
+                        return searchOptionsCurrent;
+                    }
+                    if (unrecognizedMethod.Name == nameof(System.Linq.Queryable.Take))
+                    {
+                        var limit = (int)methodArguments.First().ResolveExpression();
+                        searchOptionsCurrent.Size = limit;
+                        return searchOptionsCurrent;
+                    }
                     if (unrecognizedMethod.Name == nameof(System.Linq.Queryable.Where))
                     {
                         return unrecognizedMethod.TryParseMemberAssignment(methodArguments,
                                 (memberInfo, expressionType, memberValue) =>
-                                    ss.Append($"{memberInfo.Name} eq {memberValue}").ToArray(),
+                                {
+                                    return searchOptionsCurrent
+                                        .AppendFilterOption($"{memberInfo.Name} eq {memberValue}");
+                                },
                                 () => throw new ArgumentException(
                                     $"Could not parse `{unrecognizedMethod}`({methodArguments})"));
                     }
                     throw new ArgumentException($"Search cannot compile Method `{unrecognizedMethod.DeclaringType.FullName}..{unrecognizedMethod.Name}`");
                 });
-            var filterExpression = filterExpressions
-                .Select(expr => $"({expr})")
-                .Join(" and ");
-            var searchOptions = new SearchOptions
-            {
-                Filter = filterExpression,
-                QueryType = SearchQueryType.Full,
-            };
-            var searchTextComplete = searchText.HasBlackSpace() ?
-                $"{searchText}~"
-                :
-                "*";
 
             return GetResultsAsync().FoldTask();
 
@@ -82,20 +112,20 @@ namespace EastFive.Azure.Search
                         BindingFlags.Public | BindingFlags.Instance);
                     var methodGeneric = method.MakeGenericMethod(searchResultsType.AsArray());
                     var resultsObj = methodGeneric.Invoke(searchClient,
-                        new object [] { searchTextComplete, searchOptions, default(System.Threading.CancellationToken) });
+                        new object [] { searchTextComplete, searchOptionsPopulated, default(System.Threading.CancellationToken) });
                     var resultsTaskObj = resultsObj.CastAsTaskObjectAsync(out var discard);
                     var responseObj = await resultsTaskObj;
 
                     var queryItemsEnumAsyncObj = typeof(SearchQueryExtensions)
                         .GetMethod(nameof(CastSearchResult), BindingFlags.Public | BindingFlags.Static)
                         .MakeGenericMethod(new[] { searchResultsType, typeof(T) })
-                        .Invoke(null, new object[] { responseObj, searchSerializer } );
+                        .Invoke(null, new object[] { responseObj, searchSerializer, query } );
 
                     var queryItemsEnumAsync = (IEnumerableAsync<(double?, T)>)queryItemsEnumAsyncObj;
                     return queryItemsEnumAsync;
                 }
 
-                var result = await searchClient.SearchAsync<T>(searchTextComplete, searchOptions);
+                var result = await searchClient.SearchAsync<T>(searchTextComplete, searchOptionsPopulated);
                 var pageResultAsync = result.Value.GetResultsAsync();
                 var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
                 return EnumerableAsync.Yield<(double?, T)>(
@@ -113,8 +143,16 @@ namespace EastFive.Azure.Search
         }
 
         public static IEnumerableAsync<(double?, TResponse)> CastSearchResult<TIntermediary, TResponse>(
-            Response<SearchResults<TIntermediary>> result, IProvideSearchSerialization searchDeserializer)
+            Response<SearchResults<TIntermediary>> result, IProvideSearchSerialization searchDeserializer, SearchQuery<TResponse> query)
         {
+            bool[] didPopulateFacets = query.Facets
+                .Select(
+                    facetPopulator =>
+                    {
+                        facetPopulator(result.Value.Facets);
+                        return true;
+                    })
+                .ToArray();
             var pageResultAsync = result.Value.GetResultsAsync();
             var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
             return EnumerableAsync.Yield<(double?, TResponse)>(
@@ -151,9 +189,10 @@ namespace EastFive.Azure.Search
         }
 
         [AttributeUsage(AttributeTargets.Method)]
-        public class SearchFilterMethodAttribute : Attribute, IProvideSearchQuery
+        public class SearchFilterMethodAttribute : Attribute, ICompileSearchOptions
         {
-            public string[] GetSearchParameter(MethodInfo methodInfo, Expression[] expressions)
+
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
             {
                 var propertyValue = (IReferenceable)expressions.First().ResolveExpression();
 
@@ -163,7 +202,7 @@ namespace EastFive.Azure.Search
                     out IProvideSearchField searchFieldAttr))
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
-                return $"{key} eq '{propertyValue.id}'".AsArray();
+                return searchOptions.AppendFilterOption($"{key} eq '{propertyValue.id}'");
             }
         }
 
@@ -188,16 +227,16 @@ namespace EastFive.Azure.Search
         }
 
         [AttributeUsage(AttributeTargets.Method)]
-        public class SearchFilterIfRefSpecified : Attribute, IProvideSearchQuery
+        public class SearchFilterIfRefSpecified : Attribute, ICompileSearchOptions
         {
-            public string[] GetSearchParameter(MethodInfo methodInfo, Expression[] expressions)
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
             {
                 var idValueMaybe = (IReferenceableOptional)expressions.First().ResolveExpression();
                 if (idValueMaybe.IsNull())
-                    return new string[] { };
+                    return searchOptions;
 
                 if (!idValueMaybe.HasValue)
-                    return new string[] { };
+                    return searchOptions;
 
                 var propertyExpr = (Expression)expressions[1].ResolveExpression();
                 propertyExpr.TryGetMemberExpression(out var memberInfo);
@@ -206,7 +245,7 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
 
-                return $"{key} eq '{idValueMaybe.id}'".AsArray();
+                return searchOptions.AppendFilterOption($"{key} eq '{idValueMaybe.id}'");
             }
         }
 
@@ -272,20 +311,20 @@ namespace EastFive.Azure.Search
         }
 
         [AttributeUsage(AttributeTargets.Method)]
-        public class SearchFilterIfSpecified : Attribute, IProvideSearchQuery
+        public class SearchFilterIfSpecified : Attribute, ICompileSearchOptions
         {
-            public string[] GetSearchParameter(MethodInfo methodInfo, Expression[] expressions)
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
             {
                 var idValueMaybeObj = expressions.First().ResolveExpression();
 
                 if(idValueMaybeObj.IsDefaultOrNull())
-                    return new string[] { };
+                    return searchOptions;
 
                 var v = idValueMaybeObj;
 
                 if(idValueMaybeObj.GetType().IsNullable())
                     if(!idValueMaybeObj.TryGetNullableValue(out v))
-                        return new string[] { };
+                        return searchOptions;
 
 
                 var propertyExpr = (Expression)expressions[1].ResolveExpression();
@@ -302,7 +341,7 @@ namespace EastFive.Azure.Search
                 }
 
                 var comparsionStr = GetComparison();
-                return $"{key} {comparsionStr} '{v}'".AsArray();
+                return searchOptions.AppendFilterOption($"{key} {comparsionStr} '{v}'");
 
                 // https://learn.microsoft.com/en-us/azure/search/search-query-odata-filter
                 string GetComparison()
@@ -327,6 +366,101 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException($"GetComparison in search filter needs case for {comparison}");
                 }
 
+            }
+        }
+
+        [FacetOption]
+        public static IQueryable<TResource> FacetOptions<TProperty, TResource>(this IQueryable<TResource> query,
+            Expression<Func<TResource, TProperty>> propertySelector, out Func<FacetResult[]> getFacetResults, int? limit = default)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            propertySelector.TryGetMemberExpression(out var memberInfo);
+            if (!memberInfo.TryGetAttributeInterface(
+                out IProvideSearchField searchFieldAttr))
+                throw new ArgumentException("Cannot use this prop for a FacetOption");
+            var key = searchFieldAttr.GetKeyName(memberInfo);
+
+            FacetResult[] facetResultsThis = default;
+            getFacetResults = () =>
+            {
+                return facetResultsThis;
+            };
+
+            Action<IDictionary<string, IList<FacetResult>>> callback = (allFacetResults) =>
+            {
+                if (!allFacetResults.TryGetValue(key, out var matchingResults))
+                    return;
+                facetResultsThis = matchingResults.ToArray();
+            };
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.FacetOptions),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)),
+                Expression.Constant(getFacetResults, typeof(Func<FacetResult[]>)),
+                Expression.Constant(limit, typeof(int?)));
+
+            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            requestMessageNewQuery.Facets.Add(callback);
+
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class FacetOptionAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var propertyExpr = (Expression)expressions[0].ResolveExpression();
+                propertyExpr.TryGetMemberExpression(out var memberInfo);
+                if (!memberInfo.TryGetAttributeInterface(
+                    out IProvideSearchField searchFieldAttr))
+                    throw new ArgumentException("Cannot use this prop for search expression");
+                var key = searchFieldAttr.GetKeyName(memberInfo);
+
+                var limit = (int?)expressions[2].ResolveExpression();
+                if(limit.HasValue)
+                {
+                    var facetWithLimit = $"{key},count:{limit.Value}";
+                    searchOptions.Facets.Add(facetWithLimit);
+                    return searchOptions;
+                }
+                
+                searchOptions.Facets.Add(key);
+                return searchOptions;
+            }
+        }
+
+        [TopOption]
+        public static IQueryable<TResource> Top<TResource>(this IQueryable<TResource> query, int maxResults)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.Top),
+                new Type[] { typeof(TResource) },
+                query.Expression,
+                Expression.Constant(maxResults, typeof(int)));
+
+            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class TopOptionAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var top = (int)expressions[0].ResolveExpression();
+                searchOptions.Size = top;
+                return searchOptions;
             }
         }
     }
