@@ -11,6 +11,7 @@ using Azure.Search.Documents.Models;
 using EastFive.Api;
 using EastFive.Api.Resources;
 using EastFive.Api.Serialization;
+using EastFive.Extensions;
 using EastFive.Linq.Async;
 using Microsoft.AspNetCore.Http.Headers;
 using Newtonsoft.Json;
@@ -19,7 +20,8 @@ namespace EastFive.Azure.Search.Api
 {
     [SearchResultsResponseGeneric]
 	public delegate IHttpResponse SearchResultsResponse<T>(IEnumerableAsync<T> items,
-        IDictionary<string, Func<FacetResult[]>> facetResults =default);
+        IDictionary<string, Func<FacetResult[]>> facetResults =default,
+        Func<long> getTotals = default);
 
     public class SearchResultsResponseGenericAttribute : HttpGenericDelegateAttribute, IProvideResponseType
     {
@@ -29,11 +31,11 @@ namespace EastFive.Azure.Search.Api
 
         [InstigateMethod]
         public IHttpResponse EnumerableAsyncHttpResponse<T>(IEnumerableAsync<T> items,
-            IDictionary<string, Func<FacetResult[]>> facetResults = default)
+            IDictionary<string, Func<FacetResult[]>> facetResults = default, Func<long> getTotals = default)
         {
             var response = new SearchResponse<T>(this.httpApp, request, this.parameterInfo,
                 this.StatusCode,
-                items, facetResults);
+                items, facetResults, getTotals);
             return UpdateResponse(parameterInfo, httpApp, request, response);
         }
 
@@ -55,16 +57,18 @@ namespace EastFive.Azure.Search.Api
             private IApplication application;
             private ParameterInfo parameterInfo;
             private IDictionary<string, Func<FacetResult[]>> facetResults;
+            private Func<long> getTotals;
 
             public SearchResponse(IApplication application,
                 IHttpRequest request, ParameterInfo parameterInfo, HttpStatusCode statusCode,
-                IEnumerableAsync<T> items, IDictionary<string, Func<FacetResult[]>> facetResults)
+                IEnumerableAsync<T> items, IDictionary<string, Func<FacetResult[]>> facetResults, Func<long> getTotals = default)
                 : base(request, statusCode)
             {
                 this.application = application;
                 this.items = items;
                 this.parameterInfo = parameterInfo;
                 this.facetResults = facetResults;
+                this.getTotals = getTotals;
             }
 
             public override void WriteHeaders(Microsoft.AspNetCore.Http.HttpContext context, ResponseHeaders headers)
@@ -95,25 +99,35 @@ namespace EastFive.Azure.Search.Api
                         {
                             if (first)
                             {
-                                var facetString = this.facetResults
-                                    .Select(
-                                        keyGetFacetResult =>
-                                        {
-                                            var key = keyGetFacetResult.Key;
-                                            var facetResults = keyGetFacetResult.Value();
-                                            var facetResultString = facetResults
-                                                .Select(facetResult => SerializeFacet(facetResult))
-                                                .Join(",");
-                                            return $"{{\"key\":\"{key}\",\n\"results\":[{facetResultString}]}}";
-                                        })
-                                    .Join(",");
-                                if (facetString.HasBlackSpace())
+                                if (this.facetResults.IsNotDefaultOrNull())
                                 {
-                                    await streamWriter.WriteAsync("\"facets\":");
-                                    await streamWriter.WriteAsync($"[{facetString}],");
+                                    var facetString = this.facetResults
+                                            .Select(
+                                                keyGetFacetResult =>
+                                                {
+                                                    var key = keyGetFacetResult.Key;
+                                                    var facetResults = keyGetFacetResult.Value();
+                                                    var facetResultString = facetResults
+                                                        .Select(facetResult => SerializeFacet(facetResult))
+                                                        .Join(",");
+                                                    return $"{{\"key\":\"{key}\",\n\"results\":[{facetResultString}]}}";
+                                                })
+                                            .Join(",");
+                                    if (facetString.HasBlackSpace())
+                                    {
+                                        await streamWriter.WriteAsync($"\"facets\":[{facetString}],");
+                                    }
                                 }
+
+                                if(this.getTotals.IsNotDefaultOrNull())
+                                {
+                                    var totals = this.getTotals();
+                                    await streamWriter.WriteAsync($"\"total\":{totals},");
+                                }
+
                                 await streamWriter.WriteAsync($"\"results\":[");
                                 await streamWriter.FlushAsync();
+
                             }
                             else
                             {

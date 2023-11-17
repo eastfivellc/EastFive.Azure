@@ -145,11 +145,12 @@ namespace EastFive.Azure.Search
         public static IEnumerableAsync<(double?, TResponse)> CastSearchResult<TIntermediary, TResponse>(
             Response<SearchResults<TIntermediary>> result, IProvideSearchSerialization searchDeserializer, SearchQuery<TResponse> query)
         {
-            bool[] didPopulateFacets = query.Facets
+            var searchResponse = SearchResponse.FromResult(result);
+            bool[] didPopulateFacets = query.Callbacks
                 .Select(
                     facetPopulator =>
                     {
-                        facetPopulator(result.Value.Facets);
+                        facetPopulator(searchResponse);
                         return true;
                     })
                 .ToArray();
@@ -389,8 +390,9 @@ namespace EastFive.Azure.Search
                 return facetResultsThis;
             };
 
-            Action<IDictionary<string, IList<FacetResult>>> callback = (allFacetResults) =>
+            SearchResponseDelegate callback = (searchResponse) =>
             {
+                var allFacetResults = searchResponse.Facets;
                 if (!allFacetResults.TryGetValue(key, out var matchingResults))
                     return;
                 facetResultsThis = matchingResults.ToArray();
@@ -405,7 +407,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(limit, typeof(int?)));
 
             var requestMessageNewQuery = searchQuery.FromExpression(condition);
-            requestMessageNewQuery.Facets.Add(callback);
+            requestMessageNewQuery.Callbacks.Add(callback);
 
             return requestMessageNewQuery;
         }
@@ -460,6 +462,45 @@ namespace EastFive.Azure.Search
             {
                 var top = (int)expressions[0].ResolveExpression();
                 searchOptions.Size = top;
+                return searchOptions;
+            }
+        }
+
+        [IncludeTotalCount]
+        public static IQueryable<TResource> IncludeTotalCount<TResource>(this IQueryable<TResource> query, out Func<long> getTotalSearchResults)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            long totalResultsThis = default;
+            getTotalSearchResults = () =>
+            {
+                return totalResultsThis;
+            };
+
+            SearchResponseDelegate callback = (searchResponse) =>
+            {
+                totalResultsThis = searchResponse.TotalCount.Value;
+            };
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.IncludeTotalCount),
+                new Type[] { typeof(TResource) },
+                query.Expression,
+                Expression.Constant(getTotalSearchResults, typeof(Func<long>)));
+
+            searchQuery.Callbacks.Add(callback);
+            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class IncludeTotalCountAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                searchOptions.IncludeTotalCount = true;
                 return searchOptions;
             }
         }
