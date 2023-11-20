@@ -23,6 +23,8 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence;
 using EastFive.Serialization.Text;
+using static EastFive.Azure.Search.Api.SearchResultsResponseGenericAttribute;
+using DocumentFormat.OpenXml.Drawing.Charts;
 
 namespace EastFive.Azure.Search
 {
@@ -50,6 +52,8 @@ namespace EastFive.Azure.Search
             }
         }
 
+        private static HashSet<string> fullResponseHashes = new HashSet<string>();
+
         public static IEnumerableAsync<(double?, T)> SearchQuery<T>(this IQueryable<T> query, string searchText)
         {
             var searchTextComplete = searchText.HasBlackSpace() ?
@@ -57,7 +61,7 @@ namespace EastFive.Azure.Search
                 :
                 "*";
 
-            var searchClient = (query as SearchQuery<T>).searchIndexClient;
+            var searchClient = (query as SearchQuery<T>).carry.searchIndexClient;
 
             var searchOptionsNaked = new SearchOptions
             {
@@ -98,6 +102,42 @@ namespace EastFive.Azure.Search
                     }
                     throw new ArgumentException($"Search cannot compile Method `{unrecognizedMethod.DeclaringType.FullName}..{unrecognizedMethod.Name}`");
                 });
+
+            var allHashesAvailable = ((EastFive.Azure.Search.SearchQuery<T>)query).FullResponseHashes
+                .All(
+                    fullResponseHash =>
+                    {
+                        var hashMatch = fullResponseHashes.Contains(fullResponseHash);
+                        return hashMatch;
+                    });
+
+            Func<IEnumerableAsync<T>, IEnumerableAsync<T>> afterFilter = (x) => x;
+
+            if (!allHashesAvailable)
+            {
+                var skipMaybe = searchOptionsPopulated.Skip;
+                var topMaybe = searchOptionsPopulated.Size;
+                if (skipMaybe.HasValue)
+                {
+                    if (topMaybe.HasValue)
+                    {
+                        afterFilter = (x) => x.Skip(skipMaybe.Value).Take(topMaybe.Value);
+                    }
+                    else
+                    {
+                        afterFilter = (x) => x.Skip(skipMaybe.Value);
+                    }
+                }
+                else
+                {
+                    if (topMaybe.HasValue)
+                    {
+                        afterFilter = (x) => x.Take(topMaybe.Value);
+                    }
+                }
+                searchOptionsPopulated.Skip = default;
+                searchOptionsPopulated.Top = default;
+            }
 
             return GetResultsAsync().FoldTask();
 
@@ -146,7 +186,7 @@ namespace EastFive.Azure.Search
             Response<SearchResults<TIntermediary>> result, IProvideSearchSerialization searchDeserializer, SearchQuery<TResponse> query)
         {
             var searchResponse = SearchResponse.FromResult(result);
-            bool[] didPopulateFacets = query.Callbacks
+            bool[] didPopulateFacets = query.carry.callbacks
                 .Select(
                     facetPopulator =>
                     {
@@ -185,7 +225,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertyValue, typeof(TProperty)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 
@@ -223,7 +263,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertyValue, typeof(IRefOptional<TProperty>)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, IRef<TProperty>>>)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 
@@ -266,7 +306,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertyValue, typeof(Nullable<TProperty>)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 
@@ -286,7 +326,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertyValue, typeof(Nullable<TProperty>)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty?>>)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 
@@ -307,7 +347,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty?>>)),
                 Expression.Constant(comparison, typeof(ComparisonRelationship)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 
@@ -372,7 +412,9 @@ namespace EastFive.Azure.Search
 
         [FacetOption]
         public static IQueryable<TResource> FacetOptions<TProperty, TResource>(this IQueryable<TResource> query,
-            Expression<Func<TResource, TProperty>> propertySelector, out Func<FacetResult[]> getFacetResults, int? limit = default)
+            Expression<Func<TResource, TProperty>> propertySelector,
+            out Func<FacetResult[]> getFacetResults, int? limit = default,
+            Expression<Func<TResource, string>> associatedTitle = default)
         {
             if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
                 throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
@@ -404,9 +446,10 @@ namespace EastFive.Azure.Search
                 query.Expression,
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)),
                 Expression.Constant(getFacetResults, typeof(Func<FacetResult[]>)),
-                Expression.Constant(limit, typeof(int?)));
+                Expression.Constant(limit, typeof(int?)),
+                Expression.Constant(associatedTitle, typeof(Expression<Func<TResource, string>>)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             requestMessageNewQuery.Callbacks.Add(callback);
 
             return requestMessageNewQuery;
@@ -450,7 +493,7 @@ namespace EastFive.Azure.Search
                 query.Expression,
                 Expression.Constant(maxResults, typeof(int)));
 
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
 
             return requestMessageNewQuery;
         }
@@ -491,7 +534,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(getTotalSearchResults, typeof(Func<long>)));
 
             searchQuery.Callbacks.Add(callback);
-            var requestMessageNewQuery = searchQuery.FromExpression(condition);
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             return requestMessageNewQuery;
         }
 

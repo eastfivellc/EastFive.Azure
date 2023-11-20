@@ -10,117 +10,70 @@ using System.Threading.Tasks;
 
 using Newtonsoft.Json;
 
+using EastFive;
+using EastFive.Extensions;
 using EastFive.Collections.Generic;
 using EastFive.Linq;
 using EastFive.Reflection;
-using Microsoft.AspNetCore.Http;
-using EastFive.Extensions;
+
+using Azure;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Models;
-using Azure;
+using DocumentFormat.OpenXml.Presentation;
 
 namespace EastFive.Azure.Search
 {
-    public interface IProvideSearchExpression<TResource>
+    public class SearchQuery<TResource> : Query<TResource,
+        (
+            SearchClient searchIndexClient,
+            IList<SearchResponseDelegate> callbacks,
+            IList<string> fullResponseHashes
+        )>
     {
-        IQueryable<TResource> FromExpression(Expression condition);
-    }
-
-    public class SearchQuery<TResource>
-        :
-            EastFive.Linq.Queryable<
-                TResource,
-                SearchQuery<TResource>.SearchQueryProvideQuery>,
-            IQueryable<TResource>,
-            Linq.ISupplyQueryProvider<SearchQuery<TResource>>,
-            IProvideSearchExpression<TResource>
-    {
-        public SearchClient searchIndexClient;
-        public IList<SearchResponseDelegate> Callbacks;
-
-        public struct SearchResponse
-        {
-            
-        }
+        public SearchClient SearchIndexClient => this.carry.searchIndexClient;
+        public IList<SearchResponseDelegate> Callbacks => this.carry.callbacks;
+        public IList<string> FullResponseHashes => this.carry.fullResponseHashes;
 
         public static SearchQuery<TResource> FromIndex(SearchClient searchIndexClient)
         {
             var callbacks = new List<SearchResponseDelegate>();
-            return new SearchQuery<TResource>(searchIndexClient, callbacks);
+            var fullResponseHashes = new List<string>();
+            return new SearchQuery<TResource>((searchIndexClient, callbacks, fullResponseHashes));
         }
 
-        public SearchQuery(SearchClient searchIndexClient, IList<SearchResponseDelegate> facets)
-            : base(new SearchQueryProvideQuery(searchIndexClient, facets))
+        public SearchQuery((SearchClient, IList<SearchResponseDelegate>, IList<string> fullResponseHashes) carry) : base(carry)
         {
-            this.searchIndexClient = searchIndexClient;
-            this.Callbacks = facets;
         }
 
-        private SearchQuery(SearchClient searchIndexClient, IList<SearchResponseDelegate> facets, Expression expr)
-            : base(new SearchQueryProvideQuery(searchIndexClient, facets), expr)
+        public SearchQuery((SearchClient, IList<SearchResponseDelegate>, IList<string> fullResponseHashes) carry, Expression condition)
+            : base(carry, condition)
         {
-            this.searchIndexClient = searchIndexClient;
-            this.Callbacks = facets;
         }
 
-        //public SearchQuery<TRelatedResource> Related<TRelatedResource>()
-        //{
-        //    return new SearchQuery<TRelatedResource>(this.searchIndexClient, this.Callbacks);
-        //}
-
-        public class SearchQueryProvideQuery :
-            EastFive.Linq.QueryProvider<
-                EastFive.Linq.Queryable<TResource,
-                    EastFive.Azure.Search.SearchQuery<TResource>.SearchQueryProvideQuery>>
+        public SearchQuery<TResource> SearchQueryFromExpression(Expression condition)
         {
-            public SearchQueryProvideQuery(SearchClient searchIndexClient, IList<SearchResponseDelegate> facets)
-                : base(
-                    (queryProvider, type) => (queryProvider is SearchQuery<TResource>) ?
-                        (queryProvider as SearchQuery<TResource>).From()
-                        :
-                        new SearchQuery<TResource>(searchIndexClient, facets),
-                    (queryProvider, expression, type) => (queryProvider is SearchQuery<TResource>) ?
-                        (queryProvider as SearchQuery<TResource>).FromExpression(expression)
-                        :
-                        new SearchQuery<TResource>(searchIndexClient, facets, expression))
-            {
-            }
-
-            public override object Execute(Expression expression)
-            {
-                return 1;
-            }
+            return new SearchQuery<TResource>(this.carry, condition);
         }
 
-        internal virtual SearchQuery<TResource> FromExpression(Expression condition)
+        protected override Query<TResource,
+            (
+                SearchClient searchIndexClient,
+                IList<SearchResponseDelegate> callbacks,
+                IList<string> fullResponseHashes
+            )> From()
         {
-            return new SearchQuery<TResource>(
-                  this.searchIndexClient, this.Callbacks,
-                  condition);
+            return new SearchQuery<TResource>(this.carry);
         }
 
-        internal virtual SearchQuery<TResource> From()
+        protected override Query<TResource,
+            (
+                SearchClient searchIndexClient,
+                IList<SearchResponseDelegate> callbacks,
+                IList<string> fullResponseHashes
+            )> FromExpression(Expression condition)
         {
-            return new SearchQuery<TResource>(
-                  this.searchIndexClient, this.Callbacks);
+            return new SearchQuery<TResource>(this.carry, condition);
         }
-
-        public SearchQuery<TResource> ActivateQueryable(QueryProvider<SearchQuery<TResource>> provider, Type type)
-        {
-            return From();
-        }
-
-        public SearchQuery<TResource> ActivateQueryableWithExpression(QueryProvider<SearchQuery<TResource>> queryProvider,
-            Expression expression, Type elementType)
-        {
-            return FromExpression(expression);
-        }
-
-        IQueryable<TResource> IProvideSearchExpression<TResource>.FromExpression(Expression condition)
-            => FromExpression(condition);
     }
-
-
-
 }
