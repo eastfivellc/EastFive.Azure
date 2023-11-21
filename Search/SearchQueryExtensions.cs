@@ -23,8 +23,6 @@ using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence;
 using EastFive.Serialization.Text;
-using static EastFive.Azure.Search.Api.SearchResultsResponseGenericAttribute;
-using DocumentFormat.OpenXml.Drawing.Charts;
 
 namespace EastFive.Azure.Search
 {
@@ -54,9 +52,9 @@ namespace EastFive.Azure.Search
 
         private static HashSet<string> fullResponseHashes = new HashSet<string>();
 
-        public static IEnumerableAsync<(double?, T)> SearchQuery<T>(this IQueryable<T> query, string searchText)
+        public static IEnumerableAsync<(double?, T)> SearchQuery<T>(this IQueryable<T> query, string searchText = default)
         {
-            var searchTextComplete = searchText.HasBlackSpace() ?
+            var searchTextComplete = (!searchText.IsDefault()) ?
                 $"{searchText}~"
                 :
                 "*";
@@ -111,7 +109,7 @@ namespace EastFive.Azure.Search
                         return hashMatch;
                     });
 
-            Func<IEnumerableAsync<T>, IEnumerableAsync<T>> afterFilter = (x) => x;
+            Func<IEnumerableAsync<(double?, T)>, IEnumerableAsync<(double?, T)>> afterFilter = (x) => x;
 
             if (!allHashesAvailable)
             {
@@ -136,7 +134,7 @@ namespace EastFive.Azure.Search
                     }
                 }
                 searchOptionsPopulated.Skip = default;
-                searchOptionsPopulated.Top = default;
+                searchOptionsPopulated.Size = default;
             }
 
             return GetResultsAsync().FoldTask();
@@ -162,13 +160,13 @@ namespace EastFive.Azure.Search
                         .Invoke(null, new object[] { responseObj, searchSerializer, query } );
 
                     var queryItemsEnumAsync = (IEnumerableAsync<(double?, T)>)queryItemsEnumAsyncObj;
-                    return queryItemsEnumAsync;
+                    return afterFilter(queryItemsEnumAsync);
                 }
 
                 var result = await searchClient.SearchAsync<T>(searchTextComplete, searchOptionsPopulated);
                 var pageResultAsync = result.Value.GetResultsAsync();
                 var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
-                return EnumerableAsync.Yield<(double?, T)>(
+                return afterFilter(EnumerableAsync.Yield<(double?, T)>(
                     async (yieldReturn, yieldBreak) =>
                     {
                         if (!await pageEnumerator.MoveNextAsync())
@@ -178,7 +176,7 @@ namespace EastFive.Azure.Search
                         var doc = searchResult.Document;
                         var score = searchResult.Score;
                         return yieldReturn((score, doc));
-                    });
+                    }));
             }
         }
 

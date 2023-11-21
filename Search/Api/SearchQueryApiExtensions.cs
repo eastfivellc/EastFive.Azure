@@ -32,13 +32,14 @@ namespace EastFive.Azure.Search
     {
         public static IHttpResponse SearchQueryResponse<T>(this IEnumerableAsync<(double?, T)> query,
             SearchResultsResponse<T> onSearchResults,
-            Dictionary<string, Func<FacetResult[]>> facets = default, Func<long> getTotals = default)
+            IDictionary<string, Func<FacetResult[]>> facets = default,
+            Func<long> getTotals = default)
         {
             var results = query
                 .Select(tpl => tpl.Item2);
             return onSearchResults(results,
-                facets,
-                getTotals);
+                facetResults: facets,
+                getTotals: getTotals);
         }
 
     }
