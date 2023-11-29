@@ -16,13 +16,6 @@ using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Linq;
 using EastFive.Reflection;
-using EastFive.Collections;
-using EastFive.Collections.Generic;
-using EastFive.Web.Configuration;
-using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Persistence;
-using EastFive.Serialization.Text;
 using EastFive.Api;
 using EastFive.Azure.Search.Api;
 

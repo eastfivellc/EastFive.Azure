@@ -411,8 +411,8 @@ namespace EastFive.Azure.Search
         [FacetOption]
         public static IQueryable<TResource> FacetOptions<TProperty, TResource>(this IQueryable<TResource> query,
             Expression<Func<TResource, TProperty>> propertySelector,
-            out Func<FacetResult[]> getFacetResults, int? limit = default,
-            Expression<Func<TResource, string>> associatedTitle = default)
+            out Func<FacetResult[]> getFacetResults,
+            int? limit = default, object[] facetBreakingPoints = default)
         {
             if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
                 throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
@@ -445,7 +445,7 @@ namespace EastFive.Azure.Search
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)),
                 Expression.Constant(getFacetResults, typeof(Func<FacetResult[]>)),
                 Expression.Constant(limit, typeof(int?)),
-                Expression.Constant(associatedTitle, typeof(Expression<Func<TResource, string>>)));
+                Expression.Constant(facetBreakingPoints, typeof(object[])));
 
             var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
             requestMessageNewQuery.Callbacks.Add(callback);
@@ -466,14 +466,36 @@ namespace EastFive.Azure.Search
                 var key = searchFieldAttr.GetKeyName(memberInfo);
 
                 var limit = (int?)expressions[2].ResolveExpression();
-                if(limit.HasValue)
+                var facetString = key;
+                if (limit.HasValue)
                 {
-                    var facetWithLimit = $"{key},count:{limit.Value}";
-                    searchOptions.Facets.Add(facetWithLimit);
-                    return searchOptions;
+                    facetString = $"{facetString},count:{limit.Value}";
                 }
-                
-                searchOptions.Facets.Add(key);
+
+                var facetBreakingPoints = (object[])expressions[3].ResolveExpression();
+                if (!facetBreakingPoints.IsDefaultNullOrEmpty())
+                {
+                    var valuesString = facetBreakingPoints
+                        .Select(
+                            facetBreak =>
+                            {
+                                if (facetBreak.IsNull())
+                                    return "";
+                                var facetBreakType = facetBreak.GetType();
+                                if (typeof(DateTime).IsAssignableFrom(facetBreakType))
+                                {
+                                    var facetBreakDt = (DateTime)facetBreak;
+                                    return facetBreakDt.ToString("O");
+                                }
+                                return facetBreak.ToString();
+                            })
+                        .Join(" | ");
+
+                    facetString = $"{facetString},interval:year";
+                    //facetString = $"{facetString},values:{valuesString}";
+                }
+
+                searchOptions.Facets.Add(facetString);
                 return searchOptions;
             }
         }
