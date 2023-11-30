@@ -167,19 +167,24 @@ namespace EastFive.Azure.Persistence.Blobs
             Func<EntityProperty, TResult> onValue,
             Func<TResult> onNoCast)
         {
+            TResult getOnValue(string[] valuesToSerialize)
+            {
+                var bytesToSerialize = valuesToSerialize.ToUTF8ByteArrayOfStrings();
+                var ep = new EntityProperty(bytesToSerialize);
+                return onValue(ep);
+            }
+
             if (value.IsDefaultOrNull())
-                return onNoCast();
+                return getOnValue(new[] { string.Empty, string.Empty });
 
             var valueActualType = value.GetType();
             if (!typeof(IBlobRef).IsAssignableFrom(valueActualType))
-                return onNoCast();
+                return getOnValue(new[] { string.Empty, string.Empty });
 
             var blobRef = (IBlobRef)value;
 
             var valuesToSerialize = new string[] { blobRef.Id, blobRef.ContainerName };
-            var bytesToSerialize = valuesToSerialize.ToUTF8ByteArrayOfStrings();
-            var ep = new EntityProperty(bytesToSerialize);
-            return onValue(ep);
+            return getOnValue(valuesToSerialize);
         }
 
         public object UpdateInstance(string propertyKey,
