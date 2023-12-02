@@ -91,7 +91,7 @@ namespace EastFive.Azure.Auth.Superadmin
 
         public Type CallbackController => typeof(SuperadminRedirect);
 
-        public virtual async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
+        public virtual Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> responseParams,
             Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
@@ -100,10 +100,10 @@ namespace EastFive.Azure.Auth.Superadmin
             Func<string, TResult> onFailure)
         {
             if (!responseParams.ContainsKey(SuperadminProvider.responseParamCode))
-                return onInvalidCredentials($"`{SuperadminProvider.responseParamCode}` code was not provided");
-            var code = responseParams[SuperadminProvider.responseParamCode];
+                return onInvalidCredentials($"`{SuperadminProvider.responseParamCode}` code was not provided").AsTask();
 
-            return onFailure("Not implemented.");
+            var code = responseParams[SuperadminProvider.responseParamCode];
+            return onFailure("Not implemented.").AsTask();
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,

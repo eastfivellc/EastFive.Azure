@@ -407,10 +407,10 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             if (expirationMaybe.HasValue && expirationMaybe.Value < AzureStorageHelpers.MinDate)
                 return onBadRequest().AddReason($"The minimum date is {AzureStorageHelpers.MinDate}");
 
-            var lastModifiedByTask = FindByAuthId(security.performingAsActorId)
+            var voucherTask = FindByAuthId(security.performingAsActorId)
                 .FirstAsync(
                     (item) => item,
-                    () => default(VoucherToken?));
+                    () => default(VoucherToken));
             return await voucherRef.StorageCreateOrUpdateAsync(
                 async (created, item, saveAsync) =>
                 {
@@ -427,11 +427,11 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         if (expirationMaybe.HasValue)
                             item.expiration = expirationMaybe.Value;
 
-                        var lastModifiedBy = await lastModifiedByTask;
-                        if (string.IsNullOrWhiteSpace(lastModifiedBy.description))
+                        var voucher = await voucherTask;
+                        if (voucher == null || string.IsNullOrWhiteSpace(voucher.description))
                             return onBadRequest().AddReason($"The user issuing this request has a blank description.");
 
-                        item.lastModifiedBy = $"{lastModifiedBy.description} (id={lastModifiedBy.id})";
+                        item.lastModifiedBy = $"{voucher.description} (id={voucher.id})";
                         await saveAsync(item);
                     }
                     return onFound(item);

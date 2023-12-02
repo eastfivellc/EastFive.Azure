@@ -19,9 +19,10 @@ namespace EastFive.Azure.Persistence.StorageTables
 
         private static IDictionary<IComparable, byte[]> encryptionTables;
 
-        public static async Task LoadEncryptionTableAsync()
+        public static Task LoadEncryptionTableAsync()
         {
             encryptionTables = new Dictionary<IComparable, byte[]>();
+            return true.AsTask();
         }
 
         protected override TResult BindEntityProperties<TResult>(string propertyName, Type type, 

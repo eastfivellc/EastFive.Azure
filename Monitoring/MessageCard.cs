@@ -13,11 +13,12 @@ namespace EastFive.Azure.Monitoring
         [JsonProperty(PropertyName ="@type")]
         public string type => "MessageCard";
 
+        [JsonProperty(PropertyName = "@context")]
+        public string context => "http://schema.org/extensions";
+
         public string summary;
 
         public string themeColor;
-
-        public string title;
 
         public struct Section
         {
@@ -55,6 +56,7 @@ namespace EastFive.Azure.Monitoring
                 public string id;
                 public bool? isMultiline;
                 public string title;
+                public bool? isMultiSelect;
                 public string name;
                 public Uri target;
                 public Choice[] choices;

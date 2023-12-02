@@ -10,6 +10,7 @@ using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Azure;
 using EastFive.Collections.Generic;
+using EastFive.Extensions;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
 
@@ -32,7 +33,7 @@ namespace EastFive.Azure.Auth.Superadmin
         public const string HdPropertyName = "hd";
 
         [HttpGet]
-        public static async Task<IHttpResponse> Redirected(
+        public static Task<IHttpResponse> Redirected(
                 [QueryParameter(Name = CodePropertyName)]string code,
                 [OptionalQueryParameter(Name = AuthUserPropertyName)] string authUser,
                 [OptionalQueryParameter(Name = PromptPropertyName)] string prompt,
@@ -46,7 +47,7 @@ namespace EastFive.Azure.Auth.Superadmin
             HtmlResponse onCouldNotConnect,
             HtmlResponse onGeneralFailure)
         {
-            return onBadCredentials();
+            return onBadCredentials().AsTask();
             //var method = EastFive.Azure.Auth.Method.ByMethodName(
             //    GoogleProvider.IntegrationName, application);
             //var requestParams = new Dictionary<string, string>();
