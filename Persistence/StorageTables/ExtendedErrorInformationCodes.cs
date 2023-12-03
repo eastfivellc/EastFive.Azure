@@ -106,5 +106,7 @@ namespace EastFive.Azure.Persistence.StorageTables
         /// Status: 404 (The specified blob does not exist.)
         /// </summary>
         BlobNotFound,
+
+        ResourceNotFound,
     }
 }

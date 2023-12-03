@@ -92,6 +92,8 @@ namespace EastFive.Azure.StorageTables.Driver
                         return true;
                     if (errorCode == ExtendedErrorInformationCodes.BlobNotFound)
                         return true;
+                    if (errorCode == ExtendedErrorInformationCodes.ResourceNotFound)
+                        return true;
                     return false;
                 },
                 () =>

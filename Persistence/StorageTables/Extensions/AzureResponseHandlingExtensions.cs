@@ -232,6 +232,7 @@ namespace EastFive.Azure.StorageTables.Driver
                             return ExecuteIfNotDefault(onTableBeingDeleted);
                         case ExtendedErrorInformationCodes.TableNotFound:
                         case ExtendedErrorInformationCodes.BlobNotFound:
+                        case ExtendedErrorInformationCodes.ResourceNotFound:
                             return ExecuteIfNotDefault(onNotFound);
                         case ExtendedErrorInformationCodes.TooManyProperties:
                             return ExecuteIfNotDefault(onTooManyProperties);
