@@ -237,10 +237,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.ShowExpired.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.ShowExpired.Set.Description)]
-                [QueryParameter(Name = "show_expired")] bool showExpired,
+                [OptionalQueryParameter(Name = "show_expired")] bool showExpired,
 
                 StorageResources<VoucherToken> voucherQuery,
-                EastFive.Api.Security security,
 
             MultipartAsyncResponse<VoucherReport> onComplete)
         {
@@ -267,14 +266,17 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.VoucherId.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.VoucherId.Set.Description)]
-                [QueryParameter(Name = IdPropertyName)] Guid? idMaybe,
+                [OptionalQueryParameter(Name = IdPropertyName)] Guid? idMaybe,
 
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.AuthId.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.AuthId.Set.Description)]
-                [QueryParameter(Name = AuthIdPropertyName)] Guid? authIdMaybe,
+                [OptionalQueryParameter(Name = AuthIdPropertyName)] Guid? authIdMaybe,
 
-                EastFive.Api.Security security,
+                [WorkflowParameter(
+                    Value = "",
+                    Description = "Voucher Key")]
+                [OptionalQueryParameter(Name = KeyPropertyName)] string keyMaybe,
 
             [WorkflowVariable(
                 Workflows.AuthorizationFlow.Variables.VoucherId.Get.Value,
@@ -285,7 +287,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         {
             if (idMaybe.HasValue)
                 return await idMaybe.Value.AsRef<VoucherToken>().StorageGetAsync(
-                    (x) => onFound(x),
+                    (x) => onFound(x.PopulateToken(keyMaybe)),
                     () => onNotFound());
 
             if (authIdMaybe.HasValue)
@@ -295,6 +297,18 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         () => onNotFound());
 
             return onBadRequest().AddReason($"Either {IdPropertyName} or {AuthIdPropertyName} must be provided.");
+        }
+
+        private VoucherToken PopulateToken(string key)
+        {
+            return VoucherTools.GenerateUrlToken(this.id, this.expiration, key,
+                token =>
+                {
+                    this.token = token;
+                    this.key = key;
+                    return this;
+                },
+                (why) => this);
         }
 
         [EastFive.Api.Meta.Flows.WorkflowStep(
@@ -358,14 +372,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         .NullToEmpty()
                         .Append(Api.AppSettings.ActorIdClaimType.ConfigurationString(
                             (accountIdClaimType) => accountIdClaimType.PairWithValue(authorizationId.ToString("N"))))
+                        .Concat(extraClaims.NullToEmpty())
                         .Distinct(kvp => kvp.Key)
                         .ToDictionary();
-
-                    voucherToken.claims = voucherToken.claims
-                            .NullToEmpty()
-                            .Concat(extraClaims.NullToEmpty())
-                            .Distinct(kvp => kvp.Key)
-                            .ToDictionary();
 
                     return voucherToken.StorageCreateAsync(
                         createdId => onCreated(voucherToken),
