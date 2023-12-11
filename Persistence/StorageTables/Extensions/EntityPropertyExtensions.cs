@@ -1,4 +1,5 @@
-﻿using EastFive.Collections.Generic;
+﻿using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Reflection;
@@ -391,6 +392,13 @@ namespace EastFive.Persistence.Azure.StorageTables
                             return onValue(ep);
                         }
                         return CastEntityProperty(value, valueTypeOfInstance, onValue, onNoCast);
+                    }
+
+                    if(valueType.TryGetAttributeInterface<ICastEntityProperty>(out var attributeInterface, inherit:true))
+                    {
+                        attributeInterface.CastEntityProperty(value: value, valueType,
+                            onValue: onValue,
+                            onNoCast: onNoCast);
                     }
 
                     if (amDesperate)
