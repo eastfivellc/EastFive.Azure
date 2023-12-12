@@ -447,7 +447,7 @@ namespace EastFive.Azure.Auth
                                             .FindAccountByMethodAndKeyAsync(
                                                     method, externalUserKey,
                                                     authorization,
-                                                onAccountFound :(accountId) => onSuccess(accountId, authorization.claims, authorization.authorized).AsTask(),
+                                                onAccountFound :(accountId, updatedClaims) => onSuccess(accountId, updatedClaims, authorization.authorized).AsTask(),
                                                 onReject :() => OnContinue());
                                     }
                                     return await OnContinue();

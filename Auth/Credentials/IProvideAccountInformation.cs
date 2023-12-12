@@ -33,7 +33,7 @@ namespace EastFive.Azure.Auth
         Task<TResult> FindAccountByMethodAndKeyAsync<TResult>(
                 Method authenticationMethod, string externalAccountKey,
                 Authorization authorization,
-            Func<Guid, TResult> onAccountFound,
+            Func<Guid, IDictionary<string, string>, TResult> onAccountFound,
             Func<TResult> onReject);
 
         //Task<TResult> CreateUnpopulatedAccountAsync<TResult>(
