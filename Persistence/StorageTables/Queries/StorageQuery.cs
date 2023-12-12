@@ -43,6 +43,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             this.StorageDriver = storageDriver;
         }
 
+        public static IQueryable<TResource> CreateQuery(
+            string storageConnectionKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            var driver = AzureTableDriverDynamic
+                .FromSettings(storageConnectionKey);
+            return new StorageQuery<TResource>(driver);
+        }
+
         public AzureTableDriverDynamic StorageDriver { get; private set; }
 
         public StorageQuery<TRelatedResource> Related<TRelatedResource>()
