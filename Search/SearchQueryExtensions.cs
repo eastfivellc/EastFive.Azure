@@ -500,6 +500,101 @@ namespace EastFive.Azure.Search
             }
         }
 
+        [SearchOrderByIfSpecified]
+        public static IQueryable<TResource> OrderByIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            bool isSpecified, bool shouldBeDescending, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(shouldBeDescending, typeof(bool)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        public static IQueryable<TResource> OrderByIfInListSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            string [] sortItems, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            propertySelector.TryGetMemberExpression(out var memberInfo);
+            if (!memberInfo.TryGetAttributeInterface(
+                out IProvideSearchField searchFieldAttr))
+                throw new ArgumentException($"Cannot use `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}` prop for OrderBy expression");
+            var key = searchFieldAttr.GetKeyName(memberInfo);
+            var isSpecified = sortItems.NullToEmpty().Contains(key, StringComparison.OrdinalIgnoreCase);
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(false, typeof(bool)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        public static IQueryable<TResource> OrderByDescendingIfInListSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            string[] sortItems, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            propertySelector.TryGetMemberExpression(out var memberInfo);
+            if (!memberInfo.TryGetAttributeInterface(
+                out IProvideSearchField searchFieldAttr))
+                throw new ArgumentException($"Cannot use `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}` prop for OrderBy expression");
+            var key = searchFieldAttr.GetKeyName(memberInfo);
+            var isSpecified = sortItems.NullToEmpty().Contains(key, StringComparison.OrdinalIgnoreCase);
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(true, typeof(bool)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class SearchOrderByIfSpecifiedAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var isSpecified = (bool)expressions[0].ResolveExpression();
+                if (!isSpecified)
+                    return searchOptions;
+
+                var shouldBeDescending = (bool)expressions[1].ResolveExpression();
+
+                var propertyExpr = (Expression)expressions[2].ResolveExpression();
+                propertyExpr.TryGetMemberExpression(out var memberInfo);
+                if (!memberInfo.TryGetAttributeInterface(
+                    out IProvideSearchField searchFieldAttr))
+                    throw new ArgumentException("Cannot use this prop for search expression");
+                var key = searchFieldAttr.GetKeyName(memberInfo);
+
+                searchOptions.OrderBy.Add(shouldBeDescending? $"{key} desc" : key);
+                return searchOptions;
+            }
+        }
+
         [TopOption]
         public static IQueryable<TResource> Top<TResource>(this IQueryable<TResource> query, int maxResults)
         {
