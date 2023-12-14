@@ -157,19 +157,21 @@ namespace EastFive.Azure.Search
                     {
                         var (memberInfo, searchFieldProvider) = memberInfoAndAttr;
                         var v = memberInfo.GetPropertyOrFieldValue(item);
-
-                        if (v.IsDefaultOrNull())
-                            return dyn;
-
                         var memberType = memberInfo.GetPropertyOrFieldType();
+                        var dict = dyn as IDictionary<string, Object>;
+                        var key = searchFieldProvider.GetKeyName(memberInfo);
+                        if (v.IsDefaultOrNull())
+                        {
+                            dict.Add(key, v);
+                            return dyn;
+                        }
+
                         if (memberType.IsSubClassOfGeneric(typeof(IReferenceable)))
                             v = ((IReferenceable)v).id;
 
                         if (memberType.IsEnum)
                             v = Enum.GetName(memberType, v);
 
-                        var dict = dyn as IDictionary<string, Object>;
-                        var key = searchFieldProvider.GetKeyName(memberInfo);
                         dict.Add(key, v);
                         return dyn;
                     });
