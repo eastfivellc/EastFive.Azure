@@ -408,6 +408,54 @@ namespace EastFive.Azure.Search
             }
         }
 
+
+
+        [SearchFilterNullIfSpecified]
+        public static IQueryable<TResource> FilterNullIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            string propertyValue, Expression<Func<TResource, TProperty?>> propertySelector, ComparisonRelationship comparison)
+            where TProperty : struct
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.FilterNullIfSpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(propertyValue, typeof(string)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty?>>)),
+                Expression.Constant(comparison, typeof(ComparisonRelationship)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class SearchFilterNullIfSpecifiedAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var nullString = (string)expressions[0].ResolveExpression();
+
+                if (nullString.IsNullOrWhiteSpace())
+                    return searchOptions;
+
+                if (!"null".Equals(nullString, StringComparison.OrdinalIgnoreCase))
+                    return searchOptions;
+
+                var propertyExpr = (Expression)expressions[1].ResolveExpression();
+                propertyExpr.TryGetMemberExpression(out var memberInfo);
+                if (!memberInfo.TryGetAttributeInterface(
+                    out IProvideSearchField searchFieldAttr))
+                    throw new ArgumentException("Cannot use this prop for search expression");
+                var key = searchFieldAttr.GetKeyName(memberInfo);
+
+                return searchOptions.AppendFilterOption($"{key} eq null");
+            }
+        }
+        
+
         [FacetOption]
         public static IQueryable<TResource> FacetOptions<TProperty, TResource>(this IQueryable<TResource> query,
             Expression<Func<TResource, TProperty>> propertySelector,
