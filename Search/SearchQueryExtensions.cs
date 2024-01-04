@@ -408,7 +408,56 @@ namespace EastFive.Azure.Search
             }
         }
 
+        [FilterIfAnyRefs]
+        public static IQueryable<TResource> FilterIfAnyRefs<TProperty, TResource>(this IQueryable<TResource> query,
+            IRefs<TProperty> refsValues, Expression<Func<TResource, IRef<TProperty>>> propertySelector)
+            where TProperty : IReferenceable
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
 
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.FilterIfAnyRefs),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(refsValues, typeof(IRefs<TProperty>)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, IRef<TProperty>>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class FilterIfAnyRefsAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var refValues = (IReferences)expressions[0].ResolveExpression();
+                if (refValues.IsDefaultOrNull())
+                    return searchOptions;
+
+                if (refValues.ids.IsDefaultNullOrEmpty())
+                    return searchOptions;
+
+                var propertyExpr = (Expression)expressions[1].ResolveExpression();
+                propertyExpr.TryGetMemberExpression(out var memberInfo);
+                if (!memberInfo.TryGetAttributeInterface(
+                    out IProvideSearchField searchFieldAttr))
+                    throw new ArgumentException("Cannot use this prop for search expression");
+                var key = searchFieldAttr.GetKeyName(memberInfo);
+
+                var filterText = refValues.ids
+                    .Select(
+                        id =>
+                        {
+                            return $"{key} eq '{id}'";
+                        })
+                    .Join(" or ");
+
+                return searchOptions.AppendFilterOption(filterText); // room/wallColour eq 1 or room/wallColour eq 2
+            }
+        }
 
         [SearchFilterNullIfSpecified]
         public static IQueryable<TResource> FilterNullIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
