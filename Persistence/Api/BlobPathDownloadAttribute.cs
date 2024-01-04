@@ -3,14 +3,12 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Web;
-using DocumentFormat.OpenXml.Bibliography;
+
 using EastFive.Api;
 using EastFive.Azure.Functions;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Reflection;
-using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
 
 namespace EastFive.Azure.Persistence
 {
