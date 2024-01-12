@@ -29,6 +29,7 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
@@ -1434,7 +1435,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
 
         public async Task<TResult> InsertOrReplaceAsync<TData, TResult>(TData tableData,
-            Func<bool, TResult> onSuccess,
+            Func<bool, TData, TResult> onSuccess,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             RetryDelegate onTimeout = null)
@@ -1449,13 +1450,16 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     {
                         var result = await new E5CloudTable(table).ExecuteAsync(update);
                         var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
-                        return onSuccess(created);
+                        var entity = ((IAzureStorageTableEntity<TData>)result.Result).Entity;
+                        return onSuccess(created, entity);
+                        // Cosmos.Table.TableResult
+                        // 	result.Result	{EastFive.Persistence.Azure.StorageTables.StorageTableAttribute.TableEntity<AffirmHealth.Computations.PatientQualityMeasureStatus>}	
                     }
                     catch (StorageException ex)
                     {
                         return await await ex.ResolveCreate(table,
                             async () => await await InsertOrReplaceAsync<TData, Task<TResult>>(tableData,
-                                (created) => onSuccess(created).AsTask(),
+                                (created, entity) => onSuccess(created, entity).AsTask(),
                                 onFailure:
                                         async (code, msg) =>
                                         {

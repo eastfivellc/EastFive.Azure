@@ -1180,7 +1180,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static Task<TResult> StorageCreateOrReplaceAsync<TEntity, TResult>(this TEntity entity,
-            Func<bool, TResult> onSuccess,
+            Func<bool, TEntity, TResult> onSuccess,
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             AzureTableDriverDynamic.RetryDelegate onTimeout = null)
