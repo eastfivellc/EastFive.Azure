@@ -423,7 +423,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             return await GetKeys(memberInfo, value,
                 async existingRowKeys =>
                 {
-                    var missingRows = existingRowKeys
+                    var allRollbacks = await existingRowKeys
                         .Select(
                             async astKey =>
                             {
@@ -443,13 +443,32 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     },
                                     onNotFound: () => false,
                                     tableName: tableName);
-                                return isGood;
+                                return (isGood, astKey);
                             })
                         .AsyncEnumerable()
-                        .Where(item => !item);
-                    if (await missingRows.AnyAsync())
-                        return onFailure();
-                    return onSuccessWithRollback(() => 1.AsTask());
+                        .SelectWhere()
+                        .Select(
+                            astKey =>
+                            {
+                                return MutateLookupTable(astKey.RowKey, astKey.PartitionKey, memberInfo,
+                                             repository,
+                                             (rowAndParitionKeys) => rowAndParitionKeys
+                                                .NullToEmpty()
+                                                .Append(astKey)
+                                                .ToArray());
+                            })
+                        .Await()
+                        .ToArrayAsync();
+
+                    Func<Task> allRollback =
+                        () =>
+                        {
+                            var tasks = allRollbacks.Select(rb => rb());
+                            return Task.WhenAll(tasks);
+                        };
+                    return onSuccessWithRollback(allRollback);
+
+                    // return onSuccessWithRollback(() => 1.AsTask());
                 },
                 why => throw new Exception(why));
         }
