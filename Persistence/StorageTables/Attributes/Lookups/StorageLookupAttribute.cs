@@ -421,19 +421,19 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var tableName = GetLookupTableName(memberInfo);
             return await GetKeys(memberInfo, value,
-                async existingRowKeys =>
+                async lookupKeys =>
                 {
-                    var allRollbacks = await existingRowKeys
+                    var allRollbacks = await lookupKeys
                         .Select(
-                            async astKey =>
+                            async lookupKey =>
                             {
-                                var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(astKey.RowKey, astKey.PartitionKey,
+                                var isGood = await repository.FindByIdAsync<StorageLookupTable, bool>(lookupKey.RowKey, lookupKey.PartitionKey,
                                     (lookup, tableResult) =>
                                     {
                                         var rowAndParitionKeys = lookup.rowAndPartitionKeys;
                                         var rowKeyFound = rowAndParitionKeys
                                             .NullToEmpty()
-                                            .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}|{rowParitionKeyKvp.Value}")
+                                            //.Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.Key}|{rowParitionKeyKvp.Value}")
                                             .Where(kvp => kvp.Key == rowKeyRef)
                                             .Where(kvp => kvp.Value == partitionKeyRef)
                                             .Any();
@@ -443,18 +443,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                                     },
                                     onNotFound: () => false,
                                     tableName: tableName);
-                                return (isGood, astKey);
+                                return (!isGood, lookupKey);
                             })
                         .AsyncEnumerable()
                         .SelectWhere()
                         .Select(
-                            astKey =>
+                            lookupKey =>
                             {
-                                return MutateLookupTable(astKey.RowKey, astKey.PartitionKey, memberInfo,
+                                return MutateLookupTable(lookupKey.RowKey, lookupKey.PartitionKey, memberInfo,
                                              repository,
                                              (rowAndParitionKeys) => rowAndParitionKeys
                                                 .NullToEmpty()
-                                                .Append(astKey)
+                                                .Append(rowKeyRef.AsAstRef(partitionKeyRef))
                                                 .ToArray());
                             })
                         .Await()
