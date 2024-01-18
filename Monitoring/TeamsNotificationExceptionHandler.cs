@@ -148,8 +148,12 @@ namespace EastFive.Azure.Monitoring
                     (hdr, next) => hdr.Value.First(),
                     () => "");
 
+            // add more info to first activity card because of the "See more" rollup the Teams app does
+            var segments = request.RequestUri.Segments
+                .Where(x => !Guid.TryParse(x, out Guid id)) // omit guids to create a shorter title
+                .Join("");
             var message = await CreateMessageCardAsync(
-                teamsNotifyParam, $"{request} = {response.StatusCode} / {response.ReasonPhrase}",
+                segments, $"{(int)response.StatusCode} (Reason: {response.ReasonPhrase})", //teamsNotifyParam,
                 monitoringRequest,
                 httpApp, request,
                 () =>
@@ -178,7 +182,7 @@ namespace EastFive.Azure.Monitoring
                             new MessageCard.Section.Fact
                             {
                                 name = "Status Code:",
-                                value = $"{response.StatusCode.ToString()} / {(int)response.StatusCode}",
+                                value = $"{response.StatusCode} / {(int)response.StatusCode}",
                             },
                             new MessageCard.Section.Fact
                             {
@@ -187,7 +191,7 @@ namespace EastFive.Azure.Monitoring
                             },
                             new MessageCard.Section.Fact
                             {
-                                name = "RequestID:",
+                                name = "MonitoringRequest:",
                                 value = monitoringRequestId,
                             },
                         },
@@ -201,6 +205,7 @@ namespace EastFive.Azure.Monitoring
 
         //public Task<HttpResponseMessage> HandleMethodAsync(MethodInfo method,
         //        KeyValuePair<ParameterInfo, object>[] queryParameters,
+        //        IApplication httpApp, HttpRequestMessage request,
         //        IApplication httpApp, HttpRequestMessage request,
         //    MethodHandlingDelegate continueExecution)
         //{
@@ -246,44 +251,44 @@ namespace EastFive.Azure.Monitoring
             var stackTrackSection = new MessageCard.Section
             {
                 title = "Stack Trace",
-                text = $"<blockquote>{ex.StackTrace.Replace("\r\n", "<p />")}</blockquote>",
+                text = ex.StackTrace.Replace("\n", "<br />"),
             };
             messageCard.sections = messageCard.sections
                 .Append(stackTrackSection)
                 .ToArray();
 
-            var vsoBugAction =
-                    new MessageCard.ActionCard
-                    {
-                        type = "ActionCard",
-                        name = "Create Bug in Visual Studio Online",
-                        inputs = new MessageCard.ActionCard.Input[]
-                        {
-                            new MessageCard.ActionCard.Input
-                            {
-                                type = "TextInput",
-                                id = "bugtitle",
-                                title = "Title",
-                                isMultiline = false,
-                            },
-                            new MessageCard.ActionCard.Input
-                            {
-                                type = "DateInput",
-                                id = "dueDate",
-                                title = "Select a date",
-                            },
-                            new MessageCard.ActionCard.Input
-                            {
-                                type = "TextInput",
-                                id = "comment",
-                                title = "Enter your comment",
-                                isMultiline = true,
-                            },
-                        }
-                    };
-            messageCard.potentialAction = messageCard.potentialAction
-                .Append(vsoBugAction)
-                .ToArray();
+            //var vsoBugAction =
+            //        new MessageCard.ActionCard
+            //        {
+            //            type = "ActionCard",
+            //            name = "Create Bug in Visual Studio Online",
+            //            inputs = new MessageCard.ActionCard.Input[]
+            //            {
+            //                new MessageCard.ActionCard.Input
+            //                {
+            //                    type = "TextInput",
+            //                    id = "bugtitle",
+            //                    title = "Title",
+            //                    isMultiline = false,
+            //                },
+            //                new MessageCard.ActionCard.Input
+            //                {
+            //                    type = "DateInput",
+            //                    id = "dueDate",
+            //                    title = "Select a date",
+            //                },
+            //                new MessageCard.ActionCard.Input
+            //                {
+            //                    type = "TextInput",
+            //                    id = "comment",
+            //                    title = "Enter your comment",
+            //                    isMultiline = true,
+            //                },
+            //            }
+            //        };
+            //messageCard.potentialAction = messageCard.potentialAction
+            //    .Append(vsoBugAction)
+            //    .ToArray();
 
             return messageCard;
         }
@@ -353,32 +358,54 @@ namespace EastFive.Azure.Monitoring
             {
                 new MessageCard.Section
                 {
-                        activityTitle = appName,
-                        activitySubtitle = (DateTime.UtcNow + utcOffset).ToString("f"),
-                        activityImage = appImage,
+                    activityTitle = title,
+                    activitySubtitle = summary,
+                    activityImage = appImage,
+                    markdown = false,
                 },
                 getRequestInformation(),
                 new MessageCard.Section
                 {
-                        title = "Headers",
-                        markdown = false, // so that underscores are not stripped
-                        facts =  request.Headers
-                            .Select(
-                                header => new MessageCard.Section.Fact
-                                {
-                                    name = $"{header.Key}:",
-                                    value = header.Value.Join(","),
-                                })
-                            .ToArray(),
+                    title = "Headers",
+                    markdown = false, // so that underscores are not stripped
+                    facts =  request.Headers
+                        .Where(x => !x.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase))
+                        .Select(
+                            header => new MessageCard.Section.Fact
+                            {
+                                name = $"{header.Key}:",
+                                value = header.Value.Join(","),
+                            })
+                        .ToArray(),
                 },
-                new MessageCard.Section
-                {
-                    title = "Content",
-                    text = $"<blockquote>{content}</blockquote>",
-                }
             };
 
+            // put authorization header in own section for more compact viewing on mobile
+            var authorizations = request.Headers.Where(x => x.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (authorizations.Any())
+            {
+                sections = sections
+                    .Append(
+                        new MessageCard.Section
+                        {
+                            title = "Authorization",
+                            text = authorizations[0].Value.Join(","),
+                            markdown = false,
+                        })
+                    .ToArray();
+            }
 
+            if (content.HasBlackSpace())
+            {
+                sections = sections
+                    .Append(
+                        new MessageCard.Section
+                        {
+                            title = "Content",
+                            text = $"<blockquote>{content}</blockquote>",
+                        })
+                    .ToArray();
+            }
 
             if (request.Properties.ContainsKey(HttpApplication.DiagnosticsLogProperty))
             {
@@ -392,7 +419,6 @@ namespace EastFive.Azure.Monitoring
                         })
                     .ToArray();
             }
-
 
             if (request.Properties.TryGetValue(EnableProfilingAttribute.ResponseProperty, out object profileObj))
             {
@@ -412,93 +438,98 @@ namespace EastFive.Azure.Monitoring
                     .ToArray();
             }
 
-            var postmanLink = new QueryableServer<Api.Azure.Monitoring.MonitoringRequest>(request)
-                .Where(mr => mr.monitoringRequestRef == monitoringRequest.monitoringRequestRef)
-                .Where(mr => mr.when == monitoringRequest.when)
-                .HttpAction(MonitoringRequest.PostmanAction)
-                .Location()
-                .SignWithAccessTokenAccount(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddYears(1),
-                    url => url);
+            var actions = new MessageCard.ActionCard[] { };
+            if (monitoringRequest != null)
+            {
+                var postmanLink = new QueryableServer<Api.Azure.Monitoring.MonitoringRequest>(request)
+                    .Where(mr => mr.monitoringRequestRef == monitoringRequest.monitoringRequestRef)
+                    .Where(mr => mr.when == monitoringRequest.when.Date)
+                    .HttpAction(MonitoringRequest.PostmanAction)
+                    .Location()
+                    .SignWithAccessTokenAccount(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddYears(1),
+                        url => url);
+                actions = actions
+                    .Append(
+                        new MessageCard.ActionCard
+                        {
+                            name = "Add to Postman Collection",
+                            type = "OpenUri",
+                            targets = new MessageCard.ActionCard.Target[]
+                            {
+                                new MessageCard.ActionCard.Target
+                                {
+                                    os = "default",
+                                    uri = postmanLink,
+                                }
+                            }
+                        })
+                    .ToArray();
+            }
 
             var message = new MessageCard
             {
-                summary = summary,
+                summary = appName,
                 themeColor = "F00807",
-                title = title,
                 sections = sections,
-                potentialAction = new MessageCard.ActionCard[]
-                {
-                    new MessageCard.ActionCard
-                    {
-                        name = "Postman",
-                        type = "OpenUri",
-                        targets = new MessageCard.ActionCard.Target[]
-                        {
-                            new MessageCard.ActionCard.Target
-                            {
-                                os = "default",
-                                uri = postmanLink,
-                            }
-                        }
-                    },
-                    new MessageCard.ActionCard
-                    {
-                        name = "Application Insights",
-                        type = "OpenUri",
-                        targets = new MessageCard.ActionCard.Target[]
-                        {
-                            new MessageCard.ActionCard.Target
-                            {
-                                os = "default",
-                                uri = new Uri("https://www.example.com/ai/message/1234"),
-                            }
-                        }
-                    },
-                    new MessageCard.ActionCard
-                    {
-                        type = "ActionCard",
-                        name = "Run in TestFramework",
-                        inputs = new MessageCard.ActionCard.Input[]
-                        {
-                            new MessageCard.ActionCard.Input
-                            {
-                                type = "TextInput",
-                                id = "comment",
-                                title = "Test ID",
-                                isMultiline = false,
-                            },
-                            new MessageCard.ActionCard.Input
-                            {
-                                type = "MultichoiceInput",
-                                id = "move",
-                                title = "Pick a test function",
-                                choices = new MessageCard.ActionCard.Input.Choice []
-                                {
-                                    new MessageCard.ActionCard.Input.Choice
-                                    {
-                                        display = "Unauthenticated",
-                                        value = "unauthenticated",
-                                    },
-                                    new MessageCard.ActionCard.Input.Choice
-                                    {
-                                        display = "Physicial Redirect",
-                                        value = "redirect",
-                                    },
-                                    new MessageCard.ActionCard.Input.Choice
-                                    {
-                                        display = "Session Authenticated",
-                                        value = "session",
-                                    },
-                                    new MessageCard.ActionCard.Input.Choice
-                                    {
-                                        display = "Account Authenticated",
-                                        value = "account",
-                                    },
-                                },
-                            }
-                        }
-                    },
-                }
+                potentialAction = actions,
+                    //new MessageCard.ActionCard
+                    //{
+                    //    name = "Application Insights",
+                    //    type = "OpenUri",
+                    //    targets = new MessageCard.ActionCard.Target[]
+                    //    {
+                    //        new MessageCard.ActionCard.Target
+                    //        {
+                    //            os = "default",
+                    //            uri = new Uri("https://www.example.com/ai/message/1234"),
+                    //        }
+                    //    }
+                    //},
+                    //new MessageCard.ActionCard
+                    //{
+                    //    type = "ActionCard",
+                    //    name = "Run in TestFramework",
+                    //    inputs = new MessageCard.ActionCard.Input[]
+                    //    {
+                    //        new MessageCard.ActionCard.Input
+                    //        {
+                    //            type = "TextInput",
+                    //            id = "comment",
+                    //            title = "Test ID",
+                    //            isMultiline = false,
+                    //        },
+                    //        new MessageCard.ActionCard.Input
+                    //        {
+                    //            type = "MultichoiceInput",
+                    //            id = "move",
+                    //            title = "Pick a test function",
+                    //            isMultiSelect = false,
+                    //            choices = new MessageCard.ActionCard.Input.Choice []
+                    //            {
+                    //                new MessageCard.ActionCard.Input.Choice
+                    //                {
+                    //                    display = "Unauthenticated",
+                    //                    value = "unauthenticated",
+                    //                },
+                    //                new MessageCard.ActionCard.Input.Choice
+                    //                {
+                    //                    display = "Physicial Redirect",
+                    //                    value = "redirect",
+                    //                },
+                    //                new MessageCard.ActionCard.Input.Choice
+                    //                {
+                    //                    display = "Session Authenticated",
+                    //                    value = "session",
+                    //                },
+                    //                new MessageCard.ActionCard.Input.Choice
+                    //                {
+                    //                    display = "Account Authenticated",
+                    //                    value = "account",
+                    //                },
+                    //            },
+                    //        }
+                    //    }
+                    //},
             };
             return message;
 
