@@ -1953,6 +1953,35 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+                Func<Stream, Task> writeStreamAsync,
+            Func<BlobContentInfo, TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            System.Net.Mime.ContentType contentType = default,
+            string contentTypeString = default,
+            System.Net.Mime.ContentDisposition contentDisposition = default,
+            string contentDispositionString = default,
+            string fileName = default,
+            IDictionary<string, string> metadata = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobCreateOrUpdateAsync(
+                        blobName: abfsUri.path, containerName: abfsUri.containerName,
+                        writeStreamAsync: writeStreamAsync,
+                    onSuccess,
+                    onFailure,
+                    contentType: contentType,
+                    contentTypeString: contentTypeString,
+                    metadata: metadata,
+                    contentDisposition: contentDisposition,
+                    contentDispositionString: contentDispositionString,
+                    fileName: fileName,
+                    onTimeout: onTimeout);
+        }
+
         public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this string blobName, string containerName,
                 Func<Stream, Task> writeStreamAsync,
             Func<BlobContentInfo, TResult> onSuccess,
@@ -2246,6 +2275,12 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onFailure: onFailure,
                     onTimeout: onTimeout);
         }
+
+        public static Task<BlobItem[]> BlobFindFilesAsync(this AzureBlobFileSystemUri abfsUri,
+            string fileSuffix = default,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString) =>
+                BlobFindFilesAsync(abfsUri.containerName, abfsUri.path, fileSuffix: fileSuffix,
+                    connectionStringConfigKey: connectionStringConfigKey);
 
         public static Task<BlobItem[]> BlobFindFilesAsync(this string containerName,
             string filePath, string fileSuffix = default,

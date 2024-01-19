@@ -194,6 +194,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onNoCast,
             bool amDesperate = false)
         {
+            if (valueType.TryGetAttributeInterface<ICastEntityProperty>(out var attributeInterface, inherit: true))
+            {
+                return attributeInterface.CastEntityProperty(value: value, valueType,
+                    onValue: onValue,
+                    onNoCast: onNoCast);
+            }
+
             if (valueType.IsArray)
             {
                 var arrayType = valueType.GetElementType();
@@ -394,13 +401,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                         return CastEntityProperty(value, valueTypeOfInstance, onValue, onNoCast);
                     }
 
-                    if(valueType.TryGetAttributeInterface<ICastEntityProperty>(out var attributeInterface, inherit:true))
-                    {
-                        attributeInterface.CastEntityProperty(value: value, valueType,
-                            onValue: onValue,
-                            onNoCast: onNoCast);
-                    }
-
                     if (amDesperate)
                     {
                         var dict = valueType
@@ -424,6 +424,13 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<object, TResult> onBound,
             Func<TResult> onFailedToBind)
         {
+            if (type.TryGetAttributeInterface<IBindEntityProperty>(out var attributeInterface, inherit: true))
+            {
+                return attributeInterface.BindEntityProperty(value: value, type:type,
+                    onBound: onBound,
+                    onFailedToBind: onFailedToBind);
+            }
+
             if (type.IsArray)
             {
                 var arrayType = type.GetElementType();
