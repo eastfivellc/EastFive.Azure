@@ -81,7 +81,7 @@ namespace EastFive.Azure.Auth
                 [WorkflowParameter(
                     Value = Workflows.HijackLoginFlow.Variables.Search.Set.Value,
                     Description = Workflows.HijackLoginFlow.Variables.Search.Set.Description)]
-                [OptionalQueryParameter(Name = "search")] string search,
+                [OptionalQueryParameter(Name = "search")] string[] search,
 
                 [WorkflowParameter(
                     Value = Workflows.HijackLoginFlow.Variables.History.Set.Value,
@@ -115,25 +115,20 @@ namespace EastFive.Azure.Auth
 
             var method = methodMaybe.Value;
             var days = daysMaybe.HasValue ? Math.Abs(daysMaybe.Value) : 31;
-
+            var hasSearch = search.Length > 0 && search[0].HasBlackSpace();
 
             var authorizations = Authorization.GetMatchingAuthorizations(method.authenticationId, days, false);
-
             var redirections = await authorizations
                 .Where(
                     authorizationTpl =>
                     {
-                        var (id, when, parameters, accountIdMaybe, authorized) = authorizationTpl;
-                        if (search.IsNullOrWhiteSpace())
+                        if (!hasSearch)
                             return true;
 
-                        var searchSet = search.Contains(',') ?
-                                search.Split(',')
-                                :
-                                search.AsArray();
+                        var (id, when, parameters, accountIdMaybe, authorized) = authorizationTpl;
                         var match = parameters.Values
                                 .SelectWhereNotNull()
-                                .Any(val => searchSet.Any(searchItem => val.IndexOf(searchItem, StringComparison.OrdinalIgnoreCase) != -1));
+                                .Any(val => search.Any(searchItem => val.IndexOf(searchItem, StringComparison.OrdinalIgnoreCase) != -1));
 
                         return match;
                     })
@@ -176,7 +171,7 @@ namespace EastFive.Azure.Auth
                                 };
                         }
                     })
-                .Await()
+                .Await(readAhead: 10)
                 .SelectWhereHasValue()
                 .ToArrayAsync();
             return onContent(redirections.OrderByDescending(x => x.when).ToArray());

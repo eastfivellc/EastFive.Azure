@@ -141,7 +141,7 @@
         {
             // WorkflowStep.FlowName
             public const string FlowName = "HijackLogin";
-            public const string Version = "2023.1.4";
+            public const string Version = "2024.1.19";
 
             public static class Steps
             {
@@ -191,7 +191,7 @@
                         // WorkflowParameter.Value
                         public const string Value = "";
                         // WorkflowParameter.Description
-                        public const string Description = "Blank or search phrase";
+                        public const string Description = "Blank or search phrase (use ; to separate and \\; if there is a semicolon in the name)";
                     }
                 }
 
