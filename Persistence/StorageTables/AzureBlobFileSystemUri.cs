@@ -63,7 +63,7 @@ namespace EastFive.Azure.Persistence.StorageTables
                 var pathRegexVariable = "path";
                 var fileNameRegexVariable = "filename";
 				if (!value.TryMatchRegex(
-						$"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
+						$"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
 						out (string, string)[] matches))
 					return;
 
@@ -84,7 +84,7 @@ namespace EastFive.Azure.Persistence.StorageTables
                         () => string.Empty);
 
                 this.path = fileName.HasBlackSpace() ?
-                    $"{path}/{fileName}"
+                    $"{path}{fileName}"
                     :
                     path;
             }
@@ -98,13 +98,13 @@ namespace EastFive.Azure.Persistence.StorageTables
             Func<object, TResult> onBound,
             Func<TResult> onFailedToBind)
         {
+            var abfsUriValue = new AzureBlobFileSystemUri();
             if (value.PropertyType != EdmType.String)
-                return onFailedToBind();
+                return onBound(abfsUriValue);
 
             if (value.StringValue.IsNullOrWhiteSpace())
-                return onFailedToBind();
+                return onBound(abfsUriValue);
 
-            var abfsUriValue = new AzureBlobFileSystemUri();
             abfsUriValue.AbfssUri = value.StringValue;
             return onBound(abfsUriValue);
         }
