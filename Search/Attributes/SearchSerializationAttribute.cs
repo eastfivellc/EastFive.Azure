@@ -11,6 +11,7 @@ using System.Dynamic;
 using EastFive.Reflection;
 using System.Reflection;
 using System.Reflection.Emit;
+using EastFive.Serialization.Text;
 
 namespace EastFive.Azure.Search
 {
@@ -135,8 +136,8 @@ namespace EastFive.Azure.Search
                                     if (v is string)
                                     {
                                         var vString = (string)v;
-                                        var assigner = Serialization.Text.TextPropertyAttribute.ParseAssignment<TResponse>(
-                                            memberInfo.GetPropertyOrFieldType(), memberInfo, vString, StringComparison.Ordinal);
+                                        var assigner = memberInfo.ParseTextAsAssignment<TResponse>(
+                                            memberInfo.GetPropertyOrFieldType(), vString, StringComparison.Ordinal);
                                         return assigner(dyn);
                                     }
                                     var updatedObj = memberInfo.SetPropertyOrFieldValue(dyn, v);
