@@ -1216,7 +1216,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 TResult onEmpty()
                 {
                     var emptyArray = typeof(Array)
-                        .GetMethod("Empty", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                        .GetMethod(nameof(Array.Empty), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
                         .MakeGenericMethod(arrayType)
                         .Invoke(null, new object[] { });
                     return onBound(emptyArray);

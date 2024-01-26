@@ -143,7 +143,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 throw new Exception($"`{propertyValueType.FullName}` is instance of IRef<>");
 
             Task<TResult> result = (Task<TResult>)this.GetType()
-                .GetMethod("ExecuteTypedAsync", BindingFlags.Public | BindingFlags.Instance)
+                .GetMethod(nameof(StorageLinkAttribute.ExecuteTypedAsync), BindingFlags.Public | BindingFlags.Instance)
                 .MakeGenericMethod(typeof(TEntity), referencedEntityType, typeof(TResult))
                 .Invoke(this, new object[] { rowKeyValue,
                     memberInfo, rowKeyRef, partitionKeyRef, value, dictionary, repository, onSuccessWithRollback, onFailure });

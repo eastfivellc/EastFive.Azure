@@ -588,7 +588,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 //    rowKeyEntity, partitionKeyEntity, properties, etag, timestamp);
 
                                 var entityPopulated = entityProvider.GetType()
-                                    .GetMethod("CreateEntityInstance", BindingFlags.Instance | BindingFlags.Public)
+                                    .GetMethod(nameof(IProvideEntity.CreateEntityInstance), BindingFlags.Instance | BindingFlags.Public)
                                     .MakeGenericMethod(typeData.AsArray())
                                     .Invoke(entityProvider,
                                         new object[] { rowKeyEntity, partitionKeyEntity, properties, etag, timestamp });
@@ -2713,7 +2713,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
                 //READ AS: return GetTable<TEntity>();
                 return (CloudTable)typeof(AzureTableDriverDynamic)
-                    .GetMethod("GetTable", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetMethod(nameof(AzureTableDriverDynamic.GetTable), BindingFlags.NonPublic | BindingFlags.Instance)
                     .MakeGenericMethod(typeData.AsArray())
                     .Invoke(this, new object[] { });
             }
@@ -2728,7 +2728,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         {
                             // READ AS: GetEntity(currentStorage)
                             var entity = typeof(AzureTableDriverDynamic)
-                                .GetMethod("GetEntity", BindingFlags.NonPublic | BindingFlags.Static)
+                                .GetMethod(nameof(AzureTableDriverDynamic.GetEntity), BindingFlags.NonPublic | BindingFlags.Static)
                                 .MakeGenericMethod(typeData.AsArray())
                                 .Invoke(this, currentStorage.AsArray());
 
@@ -2756,7 +2756,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             //    onTimeout: GetRetryDelegate(),
                             //    table: table);
                             useResultGlobal = await await (Task<Task<bool>>)typeof(AzureTableDriverDynamic)
-                                .GetMethod("UpdateIfNotModifiedAsync", BindingFlags.NonPublic | BindingFlags.Instance)
+                                .GetMethod(nameof(AzureTableDriverDynamic.UpdateIfNotModifiedAsync), BindingFlags.NonPublic | BindingFlags.Instance)
                                 .MakeGenericMethod(new Type[] { typeData, typeof(Task<bool>) })
                                 .Invoke(this, new object[] { documentToSave, entity, success, documentModified, null,
                                     GetRetryDelegate(), table });
@@ -3189,7 +3189,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 {
                     // ITableEntity entity = GetEntity(data);
                     var getEntityMethod = typeof(AzureTableDriverDynamic)
-                        .GetMethod("GetEntity", BindingFlags.Static | BindingFlags.NonPublic);
+                        .GetMethod(nameof(AzureTableDriverDynamic.GetEntity), BindingFlags.Static | BindingFlags.NonPublic);
                     var getEntityTyped = getEntityMethod.MakeGenericMethod(typeData);
                     var entity = (ITableEntity)getEntityTyped.Invoke(null, data.AsArray());
                     entity.ETag = "*";

@@ -377,7 +377,10 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         .ToDictionary();
 
                     return voucherToken.StorageCreateAsync(
-                        createdId => onCreated(voucherToken),
+                        createdId =>
+                        {
+                            return onCreated(voucherToken);
+                        },
                         () => onAlreadyExists());
                 },
                 (why) => onFailure(why).AsTask());

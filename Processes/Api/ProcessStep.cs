@@ -101,62 +101,6 @@ namespace EastFive.Api.Azure.Resources
 
         #endregion
 
-        [EastFive.Api.HttpPost(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<IHttpResponse> CreateAsync(
-                [Property(Name = ProcessStep.IdPropertyName)]Guid processId,
-                [PropertyOptional(Name = ProcessStep.PreviousPropertyName)]Guid? previousStepId,
-                [Property(Name = ProcessStep.ResourcePropertyName)]Guid resourceId,
-                [Property(Name = ProcessStep.StagePropertyName)]Guid processStageId,
-                [Property(Name = ProcessStep.CreatedOnPropertyName)]DateTime createdOn,
-                [PropertyOptional(Name = ProcessStep.ConfirmedByPropertyName)]Guid? confirmedById,
-                [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
-                [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
-                [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, IProvideUrl url,
-            CreatedResponse onCreated,
-            AlreadyExistsResponse onAlreadyExists,
-            ReferencedDocumentDoesNotExistsResponse<Resources.ProcessStage> onStageNotFound,
-            UnauthorizedResponse onUnauthorized,
-            GeneralConflictResponse onFailure)
-        {
-            return EastFive.Azure.Processes.CreateAsync(processId, processStageId, resourceId, createdOn,
-                    resourceKeys.NullToEmpty().Zip(resources.NullToEmpty(), (k, id) => k.PairWithValue(id)).ToArray(),
-                    previousStepId, confirmedWhen, confirmedById,
-                    security,
-                () => onCreated(),
-                () => onAlreadyExists(),
-                () => onStageNotFound(),
-                (why) => onFailure(why));
-        }
-
-        [EastFive.Api.HttpPatch(Type = typeof(Resources.ProcessStep), MatchAllBodyParameters = false)]
-        public static Task<IHttpResponse> UpdateProcessStepAsync(
-                [QueryParameter(Name = ProcessStep.IdPropertyName, CheckFileName = true)]Guid processId,
-                [PropertyOptional(Name = ProcessStep.ConfirmedByPropertyName)]Guid? confirmedById,
-                [PropertyOptional(Name = ProcessStep.ConfirmedWhenPropertyName)]DateTime? confirmedWhen,
-                [PropertyOptional(Name = ProcessStep.ResourceKeysPropertyName)]string[] resourceKeys,
-                [PropertyOptional(Name = ProcessStep.ResourcesPropertyName)]Guid[] resources,
-                EastFive.Api.Security security, IProvideUrl url,
-            NoContentResponse onUpdated,
-            NotFoundResponse onNotFound,
-            UnauthorizedResponse onUnauthorized,
-            GeneralConflictResponse onFailure)
-        {
-            return EastFive.Azure.Processes.UpdateAsync(processId,
-                    confirmedById, confirmedWhen,
-                    resourceKeys.NullToEmpty().Zip(resources.NullToEmpty(), (k, id) => k.PairWithValue(id)).ToArray(),
-                    security,
-                () => onUpdated(),
-                () => onNotFound(),
-                () => onUnauthorized(),
-                (why) => onFailure(why));
-
-            //return Connectors.UpdateConnectorAsync(id,
-            //        Flow, security.performingAsActorId, security.claims,
-            //    () => onUpdated(),
-            //    () => onNotFound(),
-            //    (why) => onFailure(why));
-        }
 
         [EastFive.Api.HttpDelete]
         public static Task<IHttpResponse> DeleteByIdAsync(
