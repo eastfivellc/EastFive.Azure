@@ -33,6 +33,15 @@ namespace EastFive.Azure.Persistence.StorageTables
             this.path = path;
         }
 
+        public AzureBlobFileSystemUri AppendToPath(string fileNameOrDirectory)
+        {
+            var newPath = this.path.EndsWith('/') ?
+                $"{this.path}{fileNameOrDirectory}"
+                :
+                $"{this.path}/{fileNameOrDirectory}";
+            return new AzureBlobFileSystemUri(this.containerName, newPath);
+        }
+
         public string AbfssUri
 		{
 			get
