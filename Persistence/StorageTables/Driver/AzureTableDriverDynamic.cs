@@ -30,7 +30,9 @@ using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
-
+using Azure.Storage.Blobs.Specialized;
+using System.ComponentModel;
+using Microsoft.Azure.Amqp.Framing;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -3642,9 +3644,24 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         async Task<BlobClient> GetBlobClientAsync(string containerReference, string blobName)
         {
-            var container = BlobClient.GetBlobContainerClient(containerReference);
-            var createResponse = await container.CreateIfNotExistsAsync();
-            return container.GetBlobClient(blobName);
+            var blobContainerClient = BlobClient.GetBlobContainerClient(containerReference);
+            var createResponse = await blobContainerClient.CreateIfNotExistsAsync();
+            return blobContainerClient.GetBlobClient(blobName);
+        }
+
+        async Task<BlobClient> GetBlobClientAsync(AzureBlobFileSystemUri blobUri)
+        {
+            var blobContainerClient = BlobClient.GetBlobContainerClient(blobUri.containerName);
+            global::Azure.Response<BlobContainerInfo> createResponse = await blobContainerClient.CreateIfNotExistsAsync();
+            return blobContainerClient.GetBlobClient(blobUri.path);
+        }
+
+        async Task<BlockBlobClient> GetBlockBlobClientAsync(AzureBlobFileSystemUri blobUri)
+        {
+            var blobContainerClient = BlobClient.GetBlobContainerClient(blobUri.containerName);
+            global::Azure.Response<BlobContainerInfo> createResponse = await blobContainerClient.CreateIfNotExistsAsync();
+            var blobClient = blobContainerClient.GetBlockBlobClient(blobUri.path);
+            return blobClient;
         }
 
         public Task<TResult> BlobCreateOrUpdateAsync<TResult>(byte[] content, Guid blobId, string containerName,
@@ -3733,6 +3750,100 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         });
                     return onSuccess(result.Value);
                 }
+
+                string GetDisposition()
+                {
+                    if (contentDisposition.IsNotDefaultOrNull())
+                        return contentDisposition.ToString();
+
+                    if (contentDispositionString.HasBlackSpace())
+                        return contentDispositionString;
+
+                    if (fileName.IsNullOrWhiteSpace())
+                        return default;
+                    var dispositionCreated = new System.Net.Mime.ContentDisposition();
+                    dispositionCreated.FileName = fileName;
+                    return dispositionCreated.ToString();
+                }
+
+                string GetContentType()
+                {
+                    if (contentType.IsNotDefaultOrNull())
+                        return contentType.ToString();
+                    return contentTypeString;
+                }
+            }
+            catch (global::Azure.RequestFailedException ex)
+            {
+                if (onFailure.IsDefaultOrNull())
+                    throw;
+                return ex.ParseStorageException(
+                    (errorCode, errorMessage) =>
+                        onFailure(errorCode, errorMessage),
+                    () => throw ex);
+            }
+        }
+
+        public async Task<TResult> BlobCreateOrUpdateSegmentedAsync<TResult>(AzureBlobFileSystemUri blobUri,
+                Func<Stream, Task<bool>> writeSegmentAsync,
+            Func<BlobContentInfo, TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            System.Net.Mime.ContentType contentType = default,
+            string contentTypeString = default,
+            System.Net.Mime.ContentDisposition contentDisposition = default,
+            string contentDispositionString = default,
+            string fileName = default,
+            IDictionary<string, string> metadata = default)
+        {
+            try
+            {
+                var blobClient = await GetBlockBlobClientAsync(blobUri);
+
+                var hasMore = true;
+                var blockIDArray = await EnumerableAsync
+                    .Yield<(string, Task, MemoryStream)>(
+                        async (yieldReturn, yieldBreak) =>
+                        {
+                            if (!hasMore)
+                                return yieldBreak;
+
+                            var stream = new MemoryStream();
+                            hasMore = await writeSegmentAsync(stream);
+                            if (stream.Position != 0)
+                            {
+                                stream.Position = 0;
+                                var blockID = Convert.ToBase64String(
+                                Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()));
+
+                                var blockWriteTask = blobClient.StageBlockAsync(blockID, stream);
+                                return yieldReturn((blockID, blockWriteTask, stream));
+                            }
+                            return yieldReturn((default, default, default));
+                        })
+                    .Where(tpl => tpl.Item1.HasBlackSpace())
+                    .Select(
+                        async blockItemTpl =>
+                        {
+                            await blockItemTpl.Item2;
+                            await blockItemTpl.Item3.DisposeAsync();
+                            return blockItemTpl.Item1;
+                        })
+                    .Await(readAhead:10)
+                    .ToArrayAsync();
+
+                var disposition = GetDisposition();
+                var contentTypeToUse = GetContentType();
+                var result = await blobClient.CommitBlockListAsync(blockIDArray,
+                    new global::Azure.Storage.Blobs.Models.CommitBlockListOptions()
+                    {
+                        Metadata = metadata,
+                        HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                        {
+                            ContentType = contentTypeToUse,
+                            ContentDisposition = disposition,
+                        }
+                    });
+                return onSuccess(result.Value);
 
                 string GetDisposition()
                 {

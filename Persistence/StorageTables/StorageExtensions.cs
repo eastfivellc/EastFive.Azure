@@ -1982,6 +1982,33 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobCreateOrUpdateSegmentedAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+                Func<Stream, Task<bool>> writeSegmentAsync,
+            Func<BlobContentInfo, TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            System.Net.Mime.ContentType contentType = default,
+            string contentTypeString = default,
+            System.Net.Mime.ContentDisposition contentDisposition = default,
+            string contentDispositionString = default,
+            string fileName = default,
+            IDictionary<string, string> metadata = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobCreateOrUpdateSegmentedAsync(
+                        abfsUri, writeSegmentAsync,
+                    onSuccess,
+                    onFailure,
+                    contentType: contentType,
+                    contentTypeString: contentTypeString,
+                    metadata: metadata,
+                    contentDisposition: contentDisposition,
+                    contentDispositionString: contentDispositionString,
+                    fileName: fileName);
+        }
+
         public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this string blobName, string containerName,
                 Func<Stream, Task> writeStreamAsync,
             Func<BlobContentInfo, TResult> onSuccess,
@@ -2312,7 +2339,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 connectionStringConfigKey: connectionStringConfigKey);
         }
 
-
+        public static Task<TResult> BlobInformationAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+            Func<BlobProperties, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobInformationAsync(abfsUri.path, abfsUri.containerName,
+                    onFound,
+                    onNotFound,
+                    onFailure);
+        }
 
         public static Task<TResult> BlobDeleteIfExistsAsync<TResult>(this string containerName, string blobName,
             Func<TResult> onSuccess,
