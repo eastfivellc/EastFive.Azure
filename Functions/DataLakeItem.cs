@@ -6,12 +6,12 @@ using EastFive.Serialization;
 
 namespace EastFive.Azure.Functions
 {
-	public class DataLakeItem
+	public class DataLakeItem : IDataLakeItem
     {
         public Guid dataLakeInstance;
-        public string path;
+        public string path { get; set; }
         public DataLakeImportReport.Interval[] lines;
-        public int skip;
+        public int skip { get; set; }
 
         /// <summary>
         /// 

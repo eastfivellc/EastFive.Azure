@@ -365,13 +365,14 @@ namespace EastFive.Azure.Functions
                 constructItem);
         }
 
-        public static async Task<DataLakeImportReport> RunActivityFromDurableFunctionAsync<TImportInstance>(this IDurableOrchestrationContext context,
+        public static async Task<DataLakeImportReport> RunActivityFromDurableFunctionAsync<TImportInstance, TDataLakeItem>(this IDurableOrchestrationContext context,
             string functionName,
             Microsoft.Extensions.Logging.ILogger log)
             where TImportInstance : DataLakeImportInstance
+            where TDataLakeItem : IDataLakeItem
         {
             //log.LogInformation($"[{context.InstanceId}/{context.Name}]...Starting");
-            var (input, dataLakeItem) = context.GetInput<(TImportInstance, DataLakeItem)>();
+            var (input, dataLakeItem) = context.GetInput<(TImportInstance, TDataLakeItem)>();
             while (true)
             {
                 var report = await context.CallActivityAsync<DataLakeImportReport>(

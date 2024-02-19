@@ -11,5 +11,11 @@ namespace EastFive.Azure.Functions
         /// </summary>
         Guid sourceId { get; }
     }
+
+    public interface IDataLakeItem
+    {
+        public int skip { get; set; }
+        public string path { get; }
+    }
 }
 
