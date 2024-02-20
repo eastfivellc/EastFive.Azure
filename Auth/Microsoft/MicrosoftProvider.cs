@@ -54,10 +54,12 @@ namespace EastFive.Azure.Auth.Microsoft
         #endregion
 
         #region Parameter that come back on the redirect
-        public const string responseParamCode = "code id_token";// "code";
+        public const string responseParamCode = "code";
+        public const string responseParamIdToken = "id_token";
         public const string responseParamState = "state";
         public const string responseParamScope = "scope";
         public const string responseParamRedirectUri = "response_uri";
+        public const string responseParamSessionState = "session_state";
         #endregion
 
         #region Parameters from the Claim Token
@@ -141,15 +143,15 @@ namespace EastFive.Azure.Auth.Microsoft
         private OAuth.Keys keys;
         #endregion
 
-        public MicrosoftProvider(string clientId, string clientSecret,
+        public MicrosoftProvider(string tenantId, string clientId, string clientSecret,
             Uri authorizationApiBase, Uri tokenEndpoint, string issuer, OAuth.Keys keys)
         {
-            var nonCommonAuthApiBase = authorizationApiBase.AbsoluteUri.Replace("common", "d17343bb-ebef-4946-a3e5-714e37612b4f");
+            var nonCommonAuthApiBase = authorizationApiBase.AbsoluteUri.Replace("common", tenantId);
             this.clientId = clientId;
             this.clientSecret = clientSecret;
             this.authorizationApiBase = new Uri(nonCommonAuthApiBase); // https://login.microsoftonline.com/66eb38ca-f3b3-47ce-9c62-910dc5970d99/oauth2/authorize
             this.tokenEndpoint = tokenEndpoint;
-            this.issuer = issuer;
+            this.issuer = issuer.Replace("{tenantid}", tenantId);
             this.keys = keys;
         }
 
@@ -362,9 +364,12 @@ namespace EastFive.Azure.Auth.Microsoft
             Func<IProvideLogin, TResult> onProvideAuthorization,
             Func<string, TResult> onNotAvailable)
         {
-            return AppSettings.Auth.Microsoft.ClientId.ConfigurationString(
-                applicationId =>
+            return AppSettings.Auth.Microsoft.TenentId.ConfigurationString(
+                tenantId =>
                 {
+                    return AppSettings.Auth.Microsoft.ClientId.ConfigurationString(
+                        applicationId =>
+                        {
                             return AppSettings.Auth.Microsoft.ClientSecret.ConfigurationString(
                                 async (clientSecret) =>
                                 {
@@ -374,7 +379,7 @@ namespace EastFive.Azure.Auth.Microsoft
                                             return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
                                                 keys =>
                                                 {
-                                                    var provider = new MicrosoftProvider(applicationId, clientSecret,
+                                                    var provider = new MicrosoftProvider(tenantId, applicationId, clientSecret,
                                                         discDoc.authorization_endpoint, discDoc.token_endpoint, discDoc.issuer, keys);
                                                     return onProvideAuthorization(provider);
                                                 },
@@ -383,6 +388,8 @@ namespace EastFive.Azure.Auth.Microsoft
                                         onFailure: (why) => onNotAvailable(why).AsTask());
                                 },
                                 (why) => onNotAvailable(why).AsTask());
+                        },
+                        (why) => onNotAvailable(why).AsTask());
                 },
                 (why) => onNotAvailable(why).AsTask());
         }

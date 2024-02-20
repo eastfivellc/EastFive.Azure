@@ -297,6 +297,13 @@ namespace EastFive.Azure
             [Config]
             public static class Microsoft
             {
+                [ConfigKey("ID used to identify the directory in which the application resides.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > Home > App Registrations > {YOUR APP} > Overview > Directory (tenant) ID",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public const string TenentId = "EastFive.Microsoft.TenantID";
+
                 [ConfigKey("ID used to identify the application to MS.",
                     DeploymentOverrides.Suggested,
                     Location = "Azure Portal > Home > App Registrations > {YOUR APP}",
