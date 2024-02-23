@@ -2271,6 +2271,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobLoadStreamAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+            Func<System.IO.Stream, BlobProperties, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString) =>
+                BlobLoadStreamAsync(abfsUri.path, abfsUri.containerName,
+                    onSuccess: onSuccess,
+                    onNotFound: onNotFound,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout,
+                        connectionStringConfigKey: connectionStringConfigKey);
+
         public static Task<TResult> BlobLoadStreamAsync<TResult>(this string blobName, string containerName,
             Func<System.IO.Stream, BlobProperties, TResult> onSuccess,
             Func<TResult> onNotFound = default,
@@ -2366,6 +2379,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onFailure: onFailure,
                     onTimeout: onTimeout);
         }
+
+        public static AzureBlobFileSystemUri ToAzureBlobFileSystemUri(this BlobItem blobItem, string containerName) =>
+            new AzureBlobFileSystemUri(containerName, blobItem.Name);
 
         #endregion
 
