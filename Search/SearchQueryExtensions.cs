@@ -619,7 +619,7 @@ namespace EastFive.Azure.Search
 
         [SearchOrderByIfSpecified]
         public static IQueryable<TResource> OrderByIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
-            bool isSpecified, bool shouldBeDescending, Expression<Func<TResource, TProperty>> propertySelector)
+            int index, bool shouldBeDescending, Expression<Func<TResource, TProperty>> propertySelector)
         {
             if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
                 throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
@@ -629,7 +629,7 @@ namespace EastFive.Azure.Search
                 typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
                 new Type[] { typeof(TProperty), typeof(TResource) },
                 query.Expression,
-                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(index, typeof(int)),
                 Expression.Constant(shouldBeDescending, typeof(bool)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
 
@@ -649,13 +649,16 @@ namespace EastFive.Azure.Search
                 out IProvideSearchField searchFieldAttr))
                 throw new ArgumentException($"Cannot use `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}` prop for OrderBy expression");
             var key = searchFieldAttr.GetKeyName(memberInfo);
-            var isSpecified = sortItems.NullToEmpty().Contains(key, StringComparison.OrdinalIgnoreCase);
+            var index = sortItems.NullToEmpty().IndexOf(key,
+                (a, b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase),
+                success:index => index,
+                notFound:() => -1);
 
             var condition = Expression.Call(
                 typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
                 new Type[] { typeof(TProperty), typeof(TResource) },
                 query.Expression,
-                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(index, typeof(int)),
                 Expression.Constant(false, typeof(bool)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
 
@@ -675,13 +678,16 @@ namespace EastFive.Azure.Search
                 out IProvideSearchField searchFieldAttr))
                 throw new ArgumentException($"Cannot use `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}` prop for OrderBy expression");
             var key = searchFieldAttr.GetKeyName(memberInfo);
-            var isSpecified = sortItems.NullToEmpty().Contains(key, StringComparison.OrdinalIgnoreCase);
+            var index = sortItems.NullToEmpty().IndexOf(key,
+                (a, b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase),
+                success: index => index,
+                notFound: () => -1);
 
             var condition = Expression.Call(
                 typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
                 new Type[] { typeof(TProperty), typeof(TResource) },
                 query.Expression,
-                Expression.Constant(isSpecified, typeof(bool)),
+                Expression.Constant(index, typeof(int)),
                 Expression.Constant(true, typeof(bool)),
                 Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
 
@@ -694,8 +700,8 @@ namespace EastFive.Azure.Search
         {
             public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
             {
-                var isSpecified = (bool)expressions[0].ResolveExpression();
-                if (!isSpecified)
+                var index = (int)expressions[0].ResolveExpression();
+                if (index < 0)
                     return searchOptions;
 
                 var shouldBeDescending = (bool)expressions[1].ResolveExpression();
@@ -707,7 +713,11 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
 
-                searchOptions.OrderBy.Add(shouldBeDescending? $"{key} desc" : key);
+                while(searchOptions.OrderBy.Count() <= index)
+                {
+                    searchOptions.OrderBy.Add("");
+                }
+                searchOptions.OrderBy[index] = shouldBeDescending ? $"{key} desc" : key;
                 return searchOptions;
             }
         }
