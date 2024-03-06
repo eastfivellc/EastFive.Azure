@@ -56,7 +56,8 @@ namespace EastFive.Azure.Auth.OAuth
         public TResult Parse<TResult>(string jwtEncodedString,
                 string issuer, string[] validAudiences,
             Func<string, JwtSecurityToken, ClaimsPrincipal, TResult> onSuccess,
-            Func<string, TResult> onInvalidToken)
+            Func<string, TResult> onInvalidToken,
+                Func<JwtSecurityToken, TokenValidationParameters, TokenValidationParameters> mutateValidationParameters = default)
         {
             // From: https://developer.apple.com/documentation/signinwithapplerestapi/verifying_a_user
             // To verify the identity token, your app server must:
@@ -80,6 +81,9 @@ namespace EastFive.Azure.Auth.OAuth
                         IssuerSigningKey = new RsaSecurityKey(rsaParams),
                         RequireExpirationTime = true,
                     };
+
+                    if (mutateValidationParameters.IsNotDefaultOrNull())
+                        validationParameters = mutateValidationParameters(token, validationParameters);
 
                     try
                     {

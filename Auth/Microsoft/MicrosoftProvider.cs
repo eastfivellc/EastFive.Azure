@@ -151,7 +151,7 @@ namespace EastFive.Azure.Auth.Microsoft
             this.clientSecret = clientSecret;
             this.authorizationApiBase = authorizationApiBase;
             this.tokenEndpoint = tokenEndpoint;
-            this.issuer = issuer.Replace("{tenantid}", tenantId);
+            this.issuer = issuer; // .Replace("{tenantid}", tenantId);
             this.keys = keys;
         }
 
@@ -186,7 +186,25 @@ namespace EastFive.Azure.Auth.Microsoft
 
                     return onSuccess(subject, state, updatedArgs);
                 },
-                onInvalidToken: onInvalidToken);
+                onInvalidToken: onInvalidToken,
+                    mutateValidationParameters:(token, parameters) =>
+                    {
+                        return token.Claims
+                            .Where(claim => "tid".Equals(claim.Type, StringComparison.OrdinalIgnoreCase))
+                            .First(
+                                (claim, next) =>
+                                {
+                                    var tenantId = claim.Value;
+                                    parameters.ValidIssuer = parameters.ValidIssuer
+                                        .Replace("{tenantid}", tenantId);
+                                    return parameters;
+                                },
+                                () =>
+                                {
+                                    return parameters;
+                                });
+                        
+                    });
         }
 
         #region IProvideLogin
