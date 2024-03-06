@@ -143,7 +143,7 @@ namespace EastFive.Azure.Auth.Microsoft
         private OAuth.Keys keys;
         #endregion
 
-        public MicrosoftProvider(string tenantId, string clientId, string clientSecret,
+        public MicrosoftProvider(string clientId, string clientSecret,
             Uri authorizationApiBase, Uri tokenEndpoint, string issuer, OAuth.Keys keys)
         {
             // var nonCommonAuthApiBase = authorizationApiBase.AbsoluteUri; // .Replace("common", tenantId);
@@ -382,10 +382,7 @@ namespace EastFive.Azure.Auth.Microsoft
             Func<IProvideLogin, TResult> onProvideAuthorization,
             Func<string, TResult> onNotAvailable)
         {
-            return AppSettings.Auth.Microsoft.TenentId.ConfigurationString(
-                tenantId =>
-                {
-                    return AppSettings.Auth.Microsoft.ClientId.ConfigurationString(
+            return AppSettings.Auth.Microsoft.ClientId.ConfigurationString(
                         applicationId =>
                         {
                             return AppSettings.Auth.Microsoft.ClientSecret.ConfigurationString(
@@ -397,7 +394,7 @@ namespace EastFive.Azure.Auth.Microsoft
                                             return OAuth.Keys.LoadTokenKeysAsync(discDoc.jwks_uri,
                                                 keys =>
                                                 {
-                                                    var provider = new MicrosoftProvider(tenantId, applicationId, clientSecret,
+                                                    var provider = new MicrosoftProvider(applicationId, clientSecret,
                                                         discDoc.authorization_endpoint, discDoc.token_endpoint, discDoc.issuer, keys);
                                                     return onProvideAuthorization(provider);
                                                 },
@@ -408,8 +405,6 @@ namespace EastFive.Azure.Auth.Microsoft
                                 (why) => onNotAvailable(why).AsTask());
                         },
                         (why) => onNotAvailable(why).AsTask());
-                },
-                (why) => onNotAvailable(why).AsTask());
         }
 
         public const string discoveryDocumentUrl = "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
