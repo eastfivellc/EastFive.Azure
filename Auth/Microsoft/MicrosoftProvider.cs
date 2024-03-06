@@ -146,10 +146,10 @@ namespace EastFive.Azure.Auth.Microsoft
         public MicrosoftProvider(string tenantId, string clientId, string clientSecret,
             Uri authorizationApiBase, Uri tokenEndpoint, string issuer, OAuth.Keys keys)
         {
-            var nonCommonAuthApiBase = authorizationApiBase.AbsoluteUri.Replace("common", tenantId);
+            // var nonCommonAuthApiBase = authorizationApiBase.AbsoluteUri; // .Replace("common", tenantId);
             this.clientId = clientId;
             this.clientSecret = clientSecret;
-            this.authorizationApiBase = new Uri(nonCommonAuthApiBase); // https://login.microsoftonline.com/66eb38ca-f3b3-47ce-9c62-910dc5970d99/oauth2/authorize
+            this.authorizationApiBase = authorizationApiBase;
             this.tokenEndpoint = tokenEndpoint;
             this.issuer = issuer.Replace("{tenantid}", tenantId);
             this.keys = keys;
