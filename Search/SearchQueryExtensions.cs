@@ -101,6 +101,9 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException($"Search cannot compile Method `{unrecognizedMethod.DeclaringType.FullName}..{unrecognizedMethod.Name}`");
                 });
 
+            if (searchText.HasBlackSpace())
+                searchOptionsPopulated.OrderBy.Insert(0, "search.score() desc");
+
             var allHashesAvailable = ((EastFive.Azure.Search.SearchQuery<T>)query).FullResponseHashes
                 .All(
                     fullResponseHash =>
