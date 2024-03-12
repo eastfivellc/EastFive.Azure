@@ -2380,6 +2380,20 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobDeleteIfExistsAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+            Func<TResult> onSuccess,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(settingKey: connectionStringConfigKey)
+                .BlobDeleteIfExistsAsync(abfsUri.containerName, abfsUri.path,
+                    onSuccess: onSuccess,
+                    onFailure: onFailure,
+                    onTimeout: onTimeout);
+        }
+
         public static AzureBlobFileSystemUri ToAzureBlobFileSystemUri(this BlobItem blobItem, string containerName) =>
             new AzureBlobFileSystemUri(containerName, blobItem.Name);
 

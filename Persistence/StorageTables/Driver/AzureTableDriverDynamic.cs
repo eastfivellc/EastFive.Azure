@@ -3731,6 +3731,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 var blockClient = await GetBlobClientAsync(containerName, blobName);
+                var doesExistsTask = await blockClient.ExistsAsync();
+
                 using (var stream = new MemoryStream())
                 {
                     await writeStreamAsync(stream);
@@ -3738,6 +3740,22 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     stream.Position = 0;
                     var disposition = GetDisposition();
                     var contentTypeToUse = GetContentType();
+                    //var doesExists = await doesExistsTask;
+                    //if(!doesExists)
+                    //{
+                    //    var result = await blockClient.(stream,
+                    //    new global::Azure.Storage.Blobs.Models.BlobUploadOptions
+                    //    {
+                    //        Metadata = metadata,
+                    //        HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
+                    //        {
+                    //            ContentType = contentTypeToUse,
+                    //            ContentDisposition = disposition,
+                    //        }
+                    //    });
+                    //    return onSuccess(result.Value);
+                    //}
+
                     var result = await blockClient.UploadAsync(stream,
                         new global::Azure.Storage.Blobs.Models.BlobUploadOptions
                         {
@@ -4107,17 +4125,75 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 var blockClient = await GetBlobClientAsync(containerName, blobName);
+                return await await BlobInformationAsync(blobName, containerName,
+                    async props =>
+                    {
+                        if(props.Metadata.TryGetValue("hdi_isfolder", out string isFolderStr))
+                        {
+                            if(bool.TryParse(isFolderStr, out bool isFolder))
+                            {
+                                if(isFolder)
+                                {
+                                    var blobContainerClient = this.BlobClient.GetBlobContainerClient(containerName);
+                                    var prefix = blobName.EndsWith('/') ?
+                                        blobName
+                                        :
+                                        blobName + '/';
+                                    var blobItems = blobContainerClient.GetBlobsAsync(prefix: prefix);
+                                    Func<TResult> seed = () => onSuccess();
+                                    var getResult = await await blobItems.AggregateAsync(
+                                        seed.AsTask(),
+                                        async (onResultTask, blobItem) =>
+                                        {
+                                            var onResult = await onResultTask;
+                                            if (blobItem.Name == blobName)
+                                                return onResult;
 
-                var response = await blockClient.DeleteIfExistsAsync(snapshotsOption:DeleteSnapshotsOption.IncludeSnapshots);
-                return onSuccess();
+                                            return await BlobDeleteIfExistsAsync(containerName, blobItem.Name,
+                                                 () => onResult,
+                                                 onFailure: (codes, why) =>
+                                                 {
+                                                     Func<TResult> onFailureClosed = () => onFailure(codes, why);
+                                                     return onFailureClosed;
+                                                 });
+                                        });
+                                    return getResult();
+                                }
+                            }
+                        }
+                        var response = await blockClient.DeleteIfExistsAsync(snapshotsOption: DeleteSnapshotsOption.IncludeSnapshots);
+                        return onSuccess();
+                    },
+                    onNotFound: () => onSuccess().AsTask(),
+                    onFailure: (codes, msg) =>
+                    {
+                        if (onFailure.IsDefaultOrNull())
+                            throw new Exception();
+                        return onFailure(codes, msg).AsTask();
+                    });
             }
             catch (global::Azure.RequestFailedException ex)
             {
-                if (onFailure.IsDefaultOrNull())
-                    throw;
-                return ex.ParseStorageException(
-                    (errorCode, errorMessage) =>
-                        onFailure(errorCode, errorMessage),
+                return await ex.ParseStorageException(
+                    async (errorCode, errorMessage) =>
+                    {
+                        if(errorCode == ExtendedErrorInformationCodes.OperationNotSupportedOnDirectory)
+                        {
+                            var blobContainerClient = this.BlobClient.GetBlobContainerClient(containerName);
+                            var blobItems = blobContainerClient.GetBlobsAsync(prefix: blobName);
+                            await foreach (BlobItem blobItem in blobItems)
+                            {
+                                if (blobItem.Name == blobName)
+                                    continue;
+                                BlobClient blobClient = blobContainerClient.GetBlobClient(blobItem.Name);
+                                await blobClient.DeleteIfExistsAsync();
+                            }
+                            return onSuccess();
+                        }
+                        if (onFailure.IsDefaultOrNull())
+                            throw ex;
+                        return onFailure(errorCode, errorMessage);
+                    },
                     () => throw ex);
             }
         }

@@ -108,5 +108,7 @@ namespace EastFive.Azure.Persistence.StorageTables
         BlobNotFound,
 
         ResourceNotFound,
+
+        OperationNotSupportedOnDirectory,
     }
 }

@@ -50,6 +50,9 @@ namespace EastFive.Azure.Search
                             type = typeof(string);
                         if(type.IsEnum)
                             type = typeof(string);
+                        if (type.TryGetNullableUnderlyingType(out Type nonNullableType))
+                            if(nonNullableType.IsEnum)
+                                type = typeof(string);
 
                         FieldBuilder fbNumber = tb.DefineField(
                             $"_{fieldName}",
@@ -172,6 +175,13 @@ namespace EastFive.Azure.Search
 
                         if (memberType.IsEnum)
                             v = Enum.GetName(memberType, v);
+
+                        if(memberType.TryGetNullableUnderlyingType(out Type nonNullableType))
+                            if(nonNullableType.IsEnum)
+                                v = v.NullableHasValue()?
+                                    Enum.GetName(nonNullableType, v)
+                                    :
+                                    default(string);
 
                         dict.Add(key, v);
                         return dyn;
