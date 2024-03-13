@@ -98,6 +98,13 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
         [JsonProperty(PropertyName = ClaimsPropertyName)]
         public Dictionary<string, string> claims { get; set; }
 
+        [JsonIgnore]
+        public string DescriptionOrOtherLabel => description.HasBlackSpace()
+            ? description
+            : !authId.IsDefault()
+                ? authId.ToString("N").Substring(6)
+                : id.ToString("N").Substring(6);
+
         #endregion
 
         #region Http Methods
