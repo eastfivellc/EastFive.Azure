@@ -434,7 +434,7 @@ namespace EastFive.Azure.Auth
 
         public IEnumerableAsync<TAccount> StorageFindAccountsFromAccountLinks<TAccount>(string accountKey,
                 Expression<Func<TAccount, AccountLinks>> accountLinksProperty)
-            where TAccount : IAccount, IReferenceable
+            where TAccount : IAccount // , IReferenceable
         {
             var accountLinks = new AccountLinks
             {
@@ -458,7 +458,7 @@ namespace EastFive.Azure.Auth
         public Task<TResult> StorageCreateOrUpdateAccountFromAccountLinks<TAccount, TResult>(string accountKey,
                 Expression<Func<TAccount, AccountLinks>> accountLinksProperty,
                 Func<bool, TAccount, Func<TAccount, Task>, Task<TResult>> onReadyForUpdate)
-            where TAccount : IAccount, IReferenceable
+            where TAccount : IAccount //, IReferenceable
         {
             var accountLinks = new AccountLinks
             {

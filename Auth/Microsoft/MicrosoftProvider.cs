@@ -184,6 +184,20 @@ namespace EastFive.Azure.Auth.Microsoft
                         .Distinct(kvp => kvp.Key)
                         .ToDictionary();
 
+                    //var emailAddr = updatedArgs["email"];
+                    //var token = updatedArgs["access_token"];
+                    //var response = new Uri($"https://outlook.office365.com/ews/odata/Users(\"{emailAddr}\")")
+                    //    .HttpClientGetResponseAsync(
+                    //        onSuccess: (response) =>
+                    //        {
+                    //            return response.Content;
+                    //        },
+                    //        mutateRequest: (req) =>
+                    //        {
+                    //            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    //            return req;
+                    //        }).Result;
+
                     return onSuccess(subject, state, updatedArgs);
                 },
                 onInvalidToken: onInvalidToken,
