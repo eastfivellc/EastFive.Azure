@@ -97,6 +97,31 @@ namespace EastFive.Azure.Search
             return response;
         }
 
+        public static async Task<TResult> SearchUpdateAsync<T, TResult>(this T item,
+            Func<IndexDocumentsResult, TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            var documentSerializer = typeof(T)
+                .GetAttributeInterface<IProvideSearchSerialization>();
+
+            var searchClient = GetClient<T>();
+            var serializedItem = documentSerializer.GetSerializedObject(item);
+
+            try
+            {
+                var result = await searchClient.MergeDocumentsAsync(
+                    serializedItem.AsArray());
+                return onSuccess(result.Value);
+            }
+            catch (Exception ex)
+            {
+                // Sometimes when your Search service is under load, indexing will fail for some of the documents in
+                // the batch. Depending on your application, you can take compensating actions like delaying and
+                // retrying. For now, just log the failed document keys and continue.
+                return onFailure(ex.Message);
+            }
+        }
+
         public static async Task<IndexDocumentsResult> SearchUpdateBatchAsync<T>(this IEnumerableAsync<T> items)
         {
             var searchClient = GetClient<T>();

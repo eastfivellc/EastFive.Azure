@@ -166,7 +166,7 @@ namespace EastFive.Azure.Search
                         var key = searchFieldProvider.GetKeyName(memberInfo);
                         if (v.IsDefaultOrNull())
                         {
-                            dict.Add(key, v);
+                            // dict.Add(key, v);
                             return dyn;
                         }
 
