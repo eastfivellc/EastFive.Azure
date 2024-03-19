@@ -194,7 +194,8 @@ namespace EastFive.Azure.Search
                 .GetAttributeInterface<IProvideSearchSerialization>();
 
             return await items
-                .Batch()
+                // .Batch()
+                .Segments(5000)
                 .Select(
                     async items =>
                     {
