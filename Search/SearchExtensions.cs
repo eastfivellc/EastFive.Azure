@@ -185,5 +185,45 @@ namespace EastFive.Azure.Search
                 throw;
             }
         }
+
+        public static async Task<int> SearchDeleteBatchAsync<T>(this IEnumerableAsync<T> items)
+        {
+            var searchClient = GetClient<T>();
+
+            var documentSerializer = typeof(T)
+                .GetAttributeInterface<IProvideSearchSerialization>();
+
+            return await items
+                .Batch()
+                .Select(
+                    async items =>
+                    {
+                        var itemsArray = items
+                            .Select(
+                                item =>
+                                {
+                                    var serializedItem = documentSerializer.GetSerializedObject(item);
+                                    return IndexDocumentsAction.Delete(serializedItem);
+                                })
+                            .ToArray();
+                        var batch = IndexDocumentsBatch.Create(itemsArray);
+                        try
+                        {
+                            var result = await searchClient.IndexDocumentsAsync(batch);
+                            return result.Value;
+                        }
+                        catch (Exception)
+                        {
+                            // Sometimes when your Search service is under load, indexing will fail for some of the documents in
+                            // the batch. Depending on your application, you can take compensating actions like delaying and
+                            // retrying. For now, just log the failed document keys and continue.
+                            Console.WriteLine("Failed to index some of the documents: {0}");
+                            throw;
+                        }
+                    })
+                .Await()
+                .Select(docs => docs.Results.Count)
+                .SumAsync();
+        }
     }
 }

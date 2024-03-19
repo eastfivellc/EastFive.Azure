@@ -230,13 +230,33 @@ namespace EastFive.Azure.Search
             return requestMessageNewQuery;
         }
 
+        [SearchFilterMethod]
+        public static IQueryable<TResource> Filter<TProperty, TResource>(this IQueryable<TResource> query,
+            TProperty propertyValue, Expression<Func<TResource, TProperty>> propertySelector, ComparisonRelationship comparison)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.Filter),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(propertyValue, typeof(TProperty)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)),
+                Expression.Constant(comparison, typeof(ComparisonRelationship)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
         [AttributeUsage(AttributeTargets.Method)]
         public class SearchFilterMethodAttribute : Attribute, ICompileSearchOptions
         {
-
             public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
             {
-                var propertyValue = (IReferenceable)expressions.First().ResolveExpression();
+                var expressionResult = expressions.First().ResolveExpression();
+                var searchValue = GetExpressionValue();
 
                 var propertyExpr = (Expression)expressions[1].ResolveExpression();
                 propertyExpr.TryGetMemberExpression(out var memberInfo);
@@ -244,7 +264,52 @@ namespace EastFive.Azure.Search
                     out IProvideSearchField searchFieldAttr))
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
-                return searchOptions.AppendFilterOption($"{key} eq '{propertyValue.id}'");
+
+                var comparsionStr = GetComparison();
+
+                return searchOptions.AppendFilterOption($"{key} {comparsionStr} '{searchValue}'");
+
+                // https://learn.microsoft.com/en-us/azure/search/search-query-odata-filter
+                string GetComparison()
+                {
+                    if (expressions.Length == 2)
+                        return "eq";
+
+                    var comparison = (ComparisonRelationship)expressions[2].ResolveExpression();
+                    if (comparison == ComparisonRelationship.equals)
+                        return "eq";
+                    if (comparison == ComparisonRelationship.greaterThan)
+                        return "gt";
+                    if (comparison == ComparisonRelationship.greaterThanOrEquals)
+                        return "ge";
+                    if (comparison == ComparisonRelationship.lessThan)
+                        return "lt";
+                    if (comparison == ComparisonRelationship.lessThanOrEquals)
+                        return "le";
+                    if (comparison == ComparisonRelationship.notEquals)
+                        return "ne";
+
+                    throw new ArgumentException($"GetComparison in search filter needs case for {comparison}");
+                }
+
+                string GetExpressionValue()
+                {
+                    if (expressionResult.IsDefaultOrNull())
+                        return null;
+                    var expressionResultType = expressionResult.GetType();
+
+                    if (typeof(IReferenceable).IsAssignableFrom(expressionResultType))
+                    {
+                        var propertyValue = (IReferenceable)expressionResult;
+                        return propertyValue.id.ToString();
+                    }
+
+                    if (typeof(string).IsAssignableFrom(expressionResultType))
+                    {
+                        return (string)expressionResult;
+                    }
+                    return expressionResult.ToString();
+                }
             }
         }
 
