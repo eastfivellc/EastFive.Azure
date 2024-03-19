@@ -6,11 +6,13 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq.Expressions;
+using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public class LastModifiedAttribute : Attribute,
-        IModifyAzureStorageTableLastModified
+        IModifyAzureStorageTableLastModified, IProvideTableQuery
     {
         public DateTimeOffset GenerateLastModified(object value, MemberInfo memberInfo)
         {
@@ -41,6 +43,40 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
             var message = $"`{this.GetType().FullName}` Cannot determine last modified from type `{memberType.FullName}` on `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}`";
             throw new NotImplementedException(message);
+        }
+
+        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo,
+            Expression<Func<TEntity, bool>> filter, out Func<TEntity, bool> postFilter)
+        {
+            var query = filter.ResolveFilter(out postFilter);
+            return query;
+        }
+
+        public string ProvideTableQuery<TEntity>(MemberInfo memberInfo, Assignment[] assignments, out Func<TEntity, bool> postFilter, out string[] assignmentsUsed)
+        {
+            postFilter = (e) => true;
+
+            (assignmentsUsed, Assignment assignment) = StorageQueryAttribute.GetAssignment(memberInfo, assignments);
+            var assignmentName = "Timestamp";
+            var value = assignment.value;
+            if (!assignment.member.TryGetAttributeInterface(out IPersistInEntityProperty serializer))
+            {
+                var assignmentQuery = assignment.type.WhereExpression(assignmentName, value);
+                return assignmentQuery;
+            }
+
+            return serializer
+                .ConvertValue<TEntity>(assignment.member, assignment.value, default)
+                .Aggregate("",
+                    (queryCurrent, kvp) =>
+                    {
+                        var itemValue = kvp.Value.PropertyAsObject;
+                        var newFilter = assignment.type.WhereExpression(kvp.Key, itemValue);
+                        if (queryCurrent.IsNullOrWhiteSpace())
+                            return newFilter;
+
+                        return TableQuery.CombineFilters(queryCurrent, TableOperators.And, newFilter);
+                    });
         }
     }
 }
