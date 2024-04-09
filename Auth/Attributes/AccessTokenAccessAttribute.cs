@@ -1,5 +1,6 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Auth;
+using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
 using System;
@@ -15,31 +16,37 @@ namespace EastFive.Azure.Auth
     {
         public bool ShouldSkipValidationForLocalhost { get; set; }
 
-        public Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
+        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
             if (!request.RequestUri.TryGetQueryParam(
                     AccessTokenAccountExtensions.QueryParameter,
                     out string accessToken))
-                return continueExecution(controllerType, httpApp, request);
+                return await continueExecution(controllerType, httpApp, request);
             
             if (request.GetAuthorization().HasBlackSpace())
-                return continueExecution(controllerType, httpApp, request);
+                return await continueExecution(controllerType, httpApp, request);
 
-            return request.ValidateAccessTokenAccount(this.ShouldSkipValidationForLocalhost,
+            return await request.ValidateAccessTokenAccount(this.ShouldSkipValidationForLocalhost,
                 accessTokenInfo =>
                 {
                     return EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
-                        scope =>
+                        async (scope) =>
                         {
                             var tokenExpiration = TimeSpan.FromMinutes(1.0);
                             request.RequestUri = request.RequestUri.RemoveQueryParameter(
                                 AccessTokenAccountExtensions.QueryParameter);
                             var sessionId = accessTokenInfo.sessionId;
                             var authId = accessTokenInfo.accountId;
+                            var claims = await await sessionId.AsRef<Session>().StorageGetAsync(
+                                (session) => session.authorization.StorageGetAsync(
+                                    (auth) => auth.claims,
+                                    () => new Dictionary<string, string>() { }),
+                                () => ((IDictionary<string, string>)new Dictionary<string, string>() { }).AsTask());
                             var duration = accessTokenInfo.expirationUtc - DateTime.UtcNow;
-                            return JwtTools.CreateToken(sessionId, authId, scope, duration,
+                            return await JwtTools.CreateToken(sessionId, authId, scope, duration,
+                                claims,
                                 tokenCreated:
                                     (tokenNew) =>
                                     {
