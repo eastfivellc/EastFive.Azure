@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using System.Data;
-using EastFive.Serialization;
 using System.Threading.Tasks;
 using System.Reflection.Metadata;
 
@@ -9,11 +8,13 @@ using Parquet;
 
 using Azure.Storage.Blobs.Models;
 
-using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive;
 using EastFive.Extensions;
+using EastFive.Serialization;
+using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.StorageTables;
-
+using EastFive.Serialization.Parquet;
 
 namespace EastFive.Azure.Persistence
 {
@@ -41,39 +42,42 @@ namespace EastFive.Azure.Persistence
                             .BlobCreateOrUpdateAsync(
                                 writeStreamAsync: async (stream) =>
                                 {
-                                    using (var writer = new ParquetWriter(schema, stream))
-                                    {
-                                        var table = segment
-                                            .Aggregate(
-                                                new global::Parquet.Data.Rows.Table(schema),
-                                                (table, row) =>
-                                                {
-                                                    var values = row
-                                                        .Select(
-                                                            col =>
-                                                            {
-                                                                if (col.value.IsNull())
-                                                                    return col.value;
-
-                                                                if (col.value.GetType() == typeof(System.DBNull))
-                                                                    return null;
-
-                                                                if (col.value.GetType() == typeof(DateTime))
-                                                                    return new DateTimeOffset(((DateTime)col.value));
-
-                                                                //if (col.type == typeof(DateTime))
-                                                                //    if (col.value.GetType() == typeof(DateTimeOffset))
-                                                                //        return ((DateTimeOffset)col.value).DateTime;
-
-                                                                return col.value;
-                                                            });
-                                                    var parquetRow = new global::Parquet.Data.Rows.Row(values);
-                                                    table.Add(parquetRow);
-                                                    return table;
-                                                });
-                                        writer.Write(table);
-                                    }
+                                    segment.WriteToParquetStream(schema, stream);
                                     await stream.FlushAsync();
+
+                                    //using (var writer = new ParquetWriter(schema, stream))
+                                    //{
+                                    //    var table = segment
+                                    //        .Aggregate(
+                                    //            new global::Parquet.Data.Rows.Table(schema),
+                                    //            (table, row) =>
+                                    //            {
+                                    //                var values = row
+                                    //                    .Select(
+                                    //                        col =>
+                                    //                        {
+                                    //                            if (col.value.IsNull())
+                                    //                                return col.value;
+
+                                    //                            if (col.value.GetType() == typeof(System.DBNull))
+                                    //                                return null;
+
+                                    //                            if (col.value.GetType() == typeof(DateTime))
+                                    //                                return new DateTimeOffset(((DateTime)col.value));
+
+                                    //                            //if (col.type == typeof(DateTime))
+                                    //                            //    if (col.value.GetType() == typeof(DateTimeOffset))
+                                    //                            //        return ((DateTimeOffset)col.value).DateTime;
+
+                                    //                            return col.value;
+                                    //                        });
+                                    //                var parquetRow = new global::Parquet.Data.Rows.Row(values);
+                                    //                table.Add(parquetRow);
+                                    //                return table;
+                                    //            });
+                                    //    writer.Write(table);
+                                    //}
+                                    //await stream.FlushAsync();
                                 },
                                 (blobContentInfo) => blobContentInfo,
                                     contentTypeString: "application/vnd.apache.parquet",
