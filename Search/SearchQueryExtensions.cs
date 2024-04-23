@@ -211,6 +211,35 @@ namespace EastFive.Azure.Search
                 });
         }
 
+
+        [MutateSearch]
+        public static IQueryable<TResource> MutateSearch<TResource>(this IQueryable<TResource> query,
+            Func<SearchOptions, SearchOptions> mutate)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.MutateSearch),
+                new Type[] { typeof(TResource) },
+                query.Expression,
+                Expression.Constant(mutate, typeof(Func<SearchOptions, SearchOptions>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class MutateSearchAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var mutator = (Func<SearchOptions, SearchOptions>)expressions[0].ResolveExpression();
+                return mutator(searchOptions);
+            }
+        }
+
         [SearchFilterMethod]
         public static IQueryable<TResource> Filter<TProperty, TResource>(this IQueryable<TResource> query,
             TProperty propertyValue, Expression<Func<TResource, TProperty>> propertySelector)
