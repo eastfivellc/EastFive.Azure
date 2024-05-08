@@ -1,15 +1,9 @@
-﻿using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Linq.Async;
-using EastFive.Linq.Expressions;
+﻿using EastFive.Extensions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using Microsoft.Azure.Cosmos.Table;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Persistence.Azure.StorageTables
@@ -33,10 +27,13 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             public IDictionary<string, EntityProperty> properties;
 
-            public TypeWrapper(string rowKey, string partitionKey, IDictionary<string, EntityProperty> properties)
+            public TypeWrapper(string rowKey, string partitionKey, IDictionary<string, EntityProperty> properties,
+                DateTimeOffset timestamp = default)
             {
                 RowKey = rowKey;
                 PartitionKey = partitionKey;
+                Timestamp = timestamp;
+                ETag = "*";
                 this.properties = properties;
             }
 
@@ -70,7 +67,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                 () => onSuccessWithRollback(() => false.AsTask()));
         }
 
-
         public IEnumerable<IBatchModify> GetBatchCreateModifier<TEntity>(MemberInfo member,
             string rowKey, string partitionKey, TEntity entity,
             IDictionary<string, EntityProperty> serializedEntity)
@@ -95,26 +91,35 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<TResult> onFailure)
         {
             var rowKey = updatedEntity.RowKey;
+            var fromPartitionKey = updatedEntity.PartitionKey;
             var valueUpdated = updatedEntity.Entity;
             var dictionaryUpdated = updatedEntity.WriteEntity(null);
             var to = (IModifyAzureStorageTablePartitionKey)Activator.CreateInstance(this.To);
             var toPartitionKey = to.GeneratePartitionKey(rowKey, valueUpdated, memberInfo);
-            var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionaryUpdated);
+            var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionaryUpdated, timestamp: updatedEntity.Timestamp);
             var dictionaryExisting = existingEntity.WriteEntity(null);
+
+            // skip insertOrReplace when partitionKey has not changed, since the update does a replace too
+            if (toPartitionKey == fromPartitionKey)
+                return onSuccessWithRollback(
+                    () => true.AsTask()).AsTask();
+
             return repository.InsertOrReplaceAsync<TEntity, TResult>(typeWrapper,
-                (created, newEntity) => onSuccessWithRollback(
+                (created, discardEntity) => onSuccessWithRollback(
                     () =>
                     {
+                        // this may or may not happen as the create isn't detected accurately
                         if (created)
-                            return repository.DeleteAsync<TEntity, bool>(newEntity,
+                            return repository.DeleteAsync<TEntity, bool>(typeWrapper,
                                 () => true,
                                 () => true,
                                 () => false,
                                 (codes, why) => false);
-                        var typeWrapperExisting = new TypeWrapper(rowKey, toPartitionKey, dictionaryExisting);
+                        var typeWrapperExisting = new TypeWrapper(rowKey, fromPartitionKey, dictionaryExisting, timestamp: existingEntity.Timestamp);
                         return repository.ReplaceAsync<TEntity, bool>(typeWrapperExisting,
-                            () => true);
-                    }));
+                        () => true);
+                    }),
+                    (codes, why) => onFailure());
         }
 
         public Task<TResult> ExecuteDeleteAsync<TEntity, TResult>(MemberInfo memberInfo, 
@@ -124,20 +129,24 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<Func<Task>, TResult> onSuccessWithRollback, 
             Func<TResult> onFailure)
         {
-            var to = (IModifyAzureStorageTablePartitionKey)Activator.CreateInstance(this.To);
-            var toPartitionKey = to.GeneratePartitionKey(rowKey, value, memberInfo);
-            var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionary);
-            return repository.DeleteAsync<TEntity, TResult>(typeWrapper,
-                () => onSuccessWithRollback(
-                    () =>
-                    {
-                        return repository.CreateAsync<TEntity, bool>(typeWrapper,
-                            (createdEntity) => true,
-                            () => true);
-                    }),
-                () => onSuccessWithRollback(
-                    () => 1.AsTask()),
-                () => throw new Exception("Delete with ETAG = * failed due to modification."));
+            // if we want to delete the old partition key, then we can't do anything in this block.
+            return onSuccessWithRollback(
+                () => true.AsTask()).AsTask();
+
+            //var to = (IModifyAzureStorageTablePartitionKey)Activator.CreateInstance(this.To);
+            //var toPartitionKey = to.GeneratePartitionKey(rowKey, value, memberInfo);
+            //var typeWrapper = new TypeWrapper(rowKey, toPartitionKey, dictionary);
+            //return repository.DeleteAsync<TEntity, TResult>(typeWrapper,
+            //    () => onSuccessWithRollback(
+            //        () =>
+            //        {
+            //            return repository.CreateAsync<TEntity, bool>(typeWrapper,
+            //                (createdEntity) => true,
+            //                () => true);
+            //        }),
+            //    () => onSuccessWithRollback(
+            //        () => 1.AsTask()),
+            //    () => throw new Exception("Delete with ETAG = * failed due to modification."));
         }
 
         public IEnumerable<IBatchModify> GetBatchDeleteModifier<TEntity>(MemberInfo member,

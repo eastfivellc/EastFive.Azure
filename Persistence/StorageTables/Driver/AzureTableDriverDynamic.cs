@@ -1664,7 +1664,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 TableResult result = await table.ExecuteAsync(update);
-                var created = result.HttpStatusCode == ((int)HttpStatusCode.Created);
+                var created = result.HttpStatusCode == ((int)HttpStatusCode.Created); // sometimes 204 (No Content) is returned when a row is created
                 return onSuccess(created, result);
             }
             catch (StorageException ex)

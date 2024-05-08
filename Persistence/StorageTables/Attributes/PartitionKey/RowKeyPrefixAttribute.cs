@@ -72,4 +72,28 @@ namespace EastFive.Persistence.Azure.StorageTables
             return GetValue(rowKey, this.Characters);
         }
     }
+
+    public class RowKeyPrefix1Attribute : RowKeyPrefixAttribute
+    {
+        public RowKeyPrefix1Attribute()
+        {
+            Characters = 1;
+        }
+    }
+
+    public class RowKeyPrefix2Attribute : RowKeyPrefixAttribute
+    {
+        public RowKeyPrefix2Attribute()
+        {
+            Characters = 2;
+        }
+    }
+
+    public class RowKeyPrefix3Attribute : RowKeyPrefixAttribute
+    {
+        public RowKeyPrefix3Attribute()
+        {
+            Characters = 3;
+        }
+    }
 }
