@@ -9,6 +9,8 @@ using System.IO;
 using System.Threading;
 
 using Microsoft.Azure.Cosmos.Table;
+using Azure.Storage.Blobs.Models;
+using Microsoft.Azure.Documents;
 
 using EastFive;
 using EastFive.Async;
@@ -18,19 +20,11 @@ using EastFive.Linq.Async;
 using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Persistence.Azure;
-using EastFive.Azure.StorageTables.Driver;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Persistence;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Collections.Generic;
-using Microsoft.Azure.WebJobs.Extensions.DurableTask;
-using Azure.Storage.Blobs.Models;
-using Microsoft.Azure.Documents;
-using System.Collections.Concurrent;
-using System.ComponentModel;
-using EastFive.Azure.Functions;
-using HtmlAgilityPack;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
