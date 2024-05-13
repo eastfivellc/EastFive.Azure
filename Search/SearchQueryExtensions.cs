@@ -12,16 +12,17 @@ using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using Azure.Search.Documents.Models;
 
+using EastFive;
+using EastFive.Linq;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
-using EastFive.Linq;
 using EastFive.Reflection;
 using EastFive.Collections;
 using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
+using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Persistence;
 using EastFive.Serialization.Text;
 
 namespace EastFive.Azure.Search
@@ -407,6 +408,28 @@ namespace EastFive.Azure.Search
 
         [SearchFilterIfSpecified]
         public static IQueryable<TResource> FilterIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            EastFive.Api.Property<TProperty> propertyValue, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!propertyValue.specified)
+                return query;
+
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.Filter),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(propertyValue.value, typeof(TProperty)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [SearchFilterIfSpecified]
+        public static IQueryable<TResource> FilterIfSpecified<TProperty, TResource>(this IQueryable<TResource> query,
             Nullable<TProperty> propertyValue, Expression<Func<TResource, TProperty?>> propertySelector)
             where TProperty : struct
         {
@@ -721,6 +744,41 @@ namespace EastFive.Azure.Search
             if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
                 throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
             var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(index, typeof(int)),
+                Expression.Constant(shouldBeDescending, typeof(bool)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        public static IQueryable<TResource> OrderByIfInListSpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            string[] sortItemsAsc, string[] sortItemsDesc, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            propertySelector.TryGetMemberExpression(out var memberInfo);
+            if (!memberInfo.TryGetAttributeInterface(
+                out IProvideSearchField searchFieldAttr))
+                throw new ArgumentException($"Cannot use `{memberInfo.DeclaringType.FullName}..{memberInfo.Name}` prop for OrderBy expression");
+            var key = searchFieldAttr.GetKeyName(memberInfo);
+            var (index, shouldBeDescending) = sortItemsAsc.NullToEmpty().IndexOf(key,
+                (a, b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase),
+                success: index => (index, false),
+                notFound: () =>
+                {
+                    return sortItemsDesc.NullToEmpty().IndexOf(key,
+                        (a, b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase),
+                        success: index => (index, true),
+                        notFound: () => (-1, false));
+                });
 
             var condition = Expression.Call(
                 typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.OrderByIfSpecified),
