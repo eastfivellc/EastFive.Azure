@@ -29,10 +29,7 @@ using EastFive.Linq.Async;
 using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
-using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Azure.Storage.Blobs.Specialized;
-using System.ComponentModel;
-using Microsoft.Azure.Amqp.Framing;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
