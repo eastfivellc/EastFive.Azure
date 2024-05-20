@@ -15,6 +15,8 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization.Parquet;
+using System.Collections.Generic;
+using EastFive.Reflection;
 
 namespace EastFive.Azure.Persistence
 {
@@ -44,40 +46,6 @@ namespace EastFive.Azure.Persistence
                                 {
                                     segment.WriteToParquetStream(schema, stream);
                                     await stream.FlushAsync();
-
-                                    //using (var writer = new ParquetWriter(schema, stream))
-                                    //{
-                                    //    var table = segment
-                                    //        .Aggregate(
-                                    //            new global::Parquet.Data.Rows.Table(schema),
-                                    //            (table, row) =>
-                                    //            {
-                                    //                var values = row
-                                    //                    .Select(
-                                    //                        col =>
-                                    //                        {
-                                    //                            if (col.value.IsNull())
-                                    //                                return col.value;
-
-                                    //                            if (col.value.GetType() == typeof(System.DBNull))
-                                    //                                return null;
-
-                                    //                            if (col.value.GetType() == typeof(DateTime))
-                                    //                                return new DateTimeOffset(((DateTime)col.value));
-
-                                    //                            //if (col.type == typeof(DateTime))
-                                    //                            //    if (col.value.GetType() == typeof(DateTimeOffset))
-                                    //                            //        return ((DateTimeOffset)col.value).DateTime;
-
-                                    //                            return col.value;
-                                    //                        });
-                                    //                var parquetRow = new global::Parquet.Data.Rows.Row(values);
-                                    //                table.Add(parquetRow);
-                                    //                return table;
-                                    //            });
-                                    //    writer.Write(table);
-                                    //}
-                                    //await stream.FlushAsync();
                                 },
                                 (blobContentInfo) => blobContentInfo,
                                     contentTypeString: "application/vnd.apache.parquet",
@@ -85,6 +53,83 @@ namespace EastFive.Azure.Persistence
                                     connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
                     })
                 .AsyncEnumerable();
+        }
+
+        public static string GetExportStatement(this IDataReader dataReader,
+            string schemaName, string tableName, string dataSourceName, string fileFormat)
+        {
+            var createStatement = GenerateQuery();
+            var withStatement = $"WITH(DATA_SOURCE = [{dataSourceName}],"
+                + $"\n\tLOCATION = N'{schemaName}/{tableName}/**',"
+                + $"\n\tFILE_FORMAT = [{fileFormat}])"
+                // + $" REJECT_TYPE = VALUE,"
+                // + $" REJECT_VALUE = 0)"
+                + "\nGO";
+
+            return createStatement + "\n" + withStatement;
+
+            string GenerateQuery()
+            {
+                var fieldCount = dataReader.FieldCount;
+                var properties = Enumerable
+                    .Range(0, fieldCount)
+                    .Select(
+                        (index) =>
+                        {
+                            var name = dataReader.GetName(index);
+                            var clrType = dataReader.GetFieldType(index);
+                            var sqlType = GetSqlType(clrType);
+                            return $"[{name}] {sqlType} NULL";
+
+                            string GetSqlType(Type clrType)
+                            {
+                                if (clrType == typeof(int))
+                                {
+                                    return "[bigint]";
+                                }
+                                if (clrType == typeof(long))
+                                {
+                                    return "[bigint]";
+                                }
+                                if (clrType == typeof(float))
+                                {
+                                    return "[real]";
+                                }
+                                if (clrType == typeof(decimal))
+                                {
+                                    return "[float] (53)";
+                                }
+                                if (clrType == typeof(double))
+                                {
+                                    return "[float] (53)";
+                                }
+                                if (clrType == typeof(string))
+                                {
+                                    return "[nvarchar] (4000)";
+                                }
+                                if (clrType == typeof(DateTime))
+                                {
+                                    return "[datetime2] (7)";
+                                }
+                                if (clrType == typeof(bool))
+                                {
+                                    return "[BIT]";
+                                }
+                                if (clrType.TryGetNullableUnderlyingType(out Type underlyingType))
+                                    return GetSqlType(underlyingType);
+                                if (clrType.IsArray)
+                                    return "[varchar] (max)";
+
+                                throw new Exception("Type not supported for SQL export");
+                            }
+                        })
+                    .Join(",\n\t\t");
+
+                return $"CREATE EXTERNAL TABLE [{schemaName}].[{tableName}]"
+                    + "\n\t("
+                    + $"\n\t\t{properties}"
+                    + "\n\t)";
+            }
         }
     }
 }
