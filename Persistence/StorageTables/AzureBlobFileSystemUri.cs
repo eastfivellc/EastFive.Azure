@@ -71,31 +71,49 @@ namespace EastFive.Azure.Persistence.StorageTables
                 var storageNameRegexVariable = "storageName";
                 var pathRegexVariable = "path";
                 var fileNameRegexVariable = "filename";
-				if (!value.TryMatchRegex(
+				if (value.TryMatchRegex(
 						$"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
 						out (string, string)[] matches))
-					return;
+                {
+                    this.containerName = matches
+                        .Where(match => containerNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
+                    var path = matches
+                        .Where(match => pathRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
+                    var fileName = matches
+                        .Where(match => fileNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
 
-                this.containerName = matches
-                    .Where(match => containerNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
-                    .First(
-                        (match, next) => match.Item2,
-                        () => string.Empty);
-                var path = matches
-                    .Where(match => pathRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
-                    .First(
-                        (match, next) => match.Item2,
-                        () => string.Empty);
-                var fileName = matches
-                    .Where(match => fileNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
-                    .First(
-                        (match, next) => match.Item2,
-                        () => string.Empty);
+                    this.path = fileName.HasBlackSpace() ?
+                        $"{path}{fileName}"
+                        :
+                        path;
 
-                this.path = fileName.HasBlackSpace() ?
-                    $"{path}{fileName}"
-                    :
-                    path;
+                }
+
+
+                if (value.TryMatchRegex(
+                    $"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>.+)",
+                    out (string, string)[] matchesNoFilename))
+                {
+                    this.containerName = matchesNoFilename
+                        .Where(match => containerNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
+                    this.path = matchesNoFilename
+                        .Where(match => pathRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
+                }
             }
 		}
 	}
