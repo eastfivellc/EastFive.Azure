@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Data;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Reflection.Metadata;
 
@@ -11,12 +12,11 @@ using Azure.Storage.Blobs.Models;
 using EastFive;
 using EastFive.Extensions;
 using EastFive.Serialization;
+using EastFive.Reflection;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization.Parquet;
-using System.Collections.Generic;
-using EastFive.Reflection;
 
 namespace EastFive.Azure.Persistence
 {
