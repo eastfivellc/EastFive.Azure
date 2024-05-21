@@ -170,12 +170,12 @@ namespace EastFive.Azure.Persistence.StorageTables
             }
         }
 
+        private const int Rfc2898KeygenIterations = 100;
+        private const int AesKeySizeInBits = 128;
+
         public static byte[] Encrypt2(string password, byte[] plainText, byte[] salt)
         {
-            int Rfc2898KeygenIterations = 100;
-            int AesKeySizeInBits = 128;
-            byte[] cipherText = null;
-            using (Aes aes = new AesManaged())
+            using (var aes = Aes.Create())
             {
                 aes.Padding = PaddingMode.PKCS7;
                 aes.KeySize = AesKeySizeInBits;
@@ -189,7 +189,7 @@ namespace EastFive.Azure.Persistence.StorageTables
                     {
                         cs.Write(plainText, 0, plainText.Length);
                     }
-                    cipherText = ms.ToArray();
+                    var cipherText = ms.ToArray();
                     return cipherText;
                 }
             }
@@ -197,9 +197,7 @@ namespace EastFive.Azure.Persistence.StorageTables
 
         public static byte[] Decrypt2(string password, byte[] cipherText, byte[] salt)
         {
-            int Rfc2898KeygenIterations = 100;
-            int AesKeySizeInBits = 128;
-            using (Aes aes = new AesManaged())
+            using (var aes = Aes.Create())
             {
                 aes.Padding = PaddingMode.PKCS7;
                 aes.KeySize = AesKeySizeInBits;
