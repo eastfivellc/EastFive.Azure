@@ -37,6 +37,9 @@ namespace EastFive.Azure
                 public const string ConnectionString = "EastFive.Azure.StorageTables.ConnectionString";
 
                 public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
+
+                public const string EncryptionString = "EastFive.Azure.StorageTables.EncryptionString";
+                public const string EncryptionSalt = "EastFive.Azure.StorageTables.EncryptionSalt";
             }
 
             [Config]

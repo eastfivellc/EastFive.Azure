@@ -117,6 +117,19 @@ namespace EastFive.Azure.Persistence
                     () => onNotFound());
         }
 
+        [Api.HttpAction("GenerateCryptoKey")]
+        [SuperAdminClaim]
+        public static async Task<IHttpResponse> GenerateCryptoKey(
+                HttpApplication httpApp,
+            TextResponse onGenerated)
+        {
+            var bytes = Security.SecureGuid.Generate().ToByteArray()
+                .Concat(Security.SecureGuid.Generate().ToByteArray())
+                .ToArray();
+            var byteKey = bytes.ToBase64String();
+            return onGenerated(byteKey);
+        }
+
         [Api.HttpAction("Information")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> Information(
