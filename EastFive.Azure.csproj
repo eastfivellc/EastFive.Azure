@@ -12,7 +12,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Search.Documents" Version="11.4.0" />
+    <PackageReference Include="Azure.Search.Documents" Version="11.5.1" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
     <PackageReference Include="Azure.Storage.Common" Version="12.13.0" />
     <PackageReference Include="Azure.Storage.Queues" Version="12.12.0" />

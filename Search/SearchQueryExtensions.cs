@@ -151,7 +151,13 @@ namespace EastFive.Azure.Search
                     var searchResultsType = searchSerializer.BuildSearchResultsType<T>();
                     var method = typeof(SearchClient).GetMethod(
                         nameof(SearchClient.SearchAsync),
-                        BindingFlags.Public | BindingFlags.Instance);
+                        BindingFlags.Public | BindingFlags.Instance,
+                        new Type[]
+                        {
+                            typeof(string),
+                            typeof(SearchOptions),
+                            typeof(System.Threading.CancellationToken),
+                        });
                     var methodGeneric = method.MakeGenericMethod(searchResultsType.AsArray());
                     var resultsObj = methodGeneric.Invoke(searchClient,
                         new object [] { searchTextComplete, searchOptionsPopulated, default(System.Threading.CancellationToken) });
