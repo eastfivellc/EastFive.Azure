@@ -119,6 +119,8 @@ namespace EastFive.Persistence
     {
         public string Name { get; set; }
 
+        public bool PropertyForDefaultOrNull { get; set; } = false;
+
         public string GetTablePropertyName(MemberInfo member)
         {
             var tablePropertyName = this.Name;
@@ -153,7 +155,12 @@ namespace EastFive.Persistence
         public virtual KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object value, string propertyName)
         {
             if (value.IsDefaultOrNull())
-                return new KeyValuePair<string, EntityProperty>[] { };
+            {
+                if(!PropertyForDefaultOrNull)
+                    return new KeyValuePair<string, EntityProperty>[] { };
+                var emptyValue = CastEntityPropertyEmpty(typeOfValue);
+                return propertyName.PairWithValue(emptyValue).AsArray();
+            }
 
             if (IsMultiProperty(typeOfValue))
             {
@@ -292,10 +299,6 @@ namespace EastFive.Persistence
                 onFailureToBind);
 
         }
-
-        #region Single Value Serialization
-
-        #endregion
 
 
         #region Multi-entity serialization
