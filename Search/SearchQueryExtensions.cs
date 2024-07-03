@@ -554,6 +554,57 @@ namespace EastFive.Azure.Search
             }
         }
 
+        [FilterIfAnySpecified]
+        public static IQueryable<TResource> FilterIfAnySpecified<TProperty, TResource>(this IQueryable<TResource> query,
+            string[] values, Expression<Func<TResource, TProperty>> propertySelector)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.FilterIfAnySpecified),
+                new Type[] { typeof(TProperty), typeof(TResource) },
+                query.Expression,
+                Expression.Constant(values, typeof(string[])),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, TProperty>>)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public class FilterIfAnySpecifiedAttribute : Attribute, ICompileSearchOptions
+        {
+            public SearchOptions GetSearchFilters(SearchOptions searchOptions, MethodInfo methodInfo, Expression[] expressions)
+            {
+                var values = (string[])expressions[0].ResolveExpression();
+                if (values.IsDefaultOrNull())
+                    return searchOptions;
+
+                if (values.Length == 0)
+                    return searchOptions;
+
+                var propertyExpr = (Expression)expressions[1].ResolveExpression();
+                propertyExpr.TryGetMemberExpression(out var memberInfo);
+                if (!memberInfo.TryGetAttributeInterface(
+                    out IProvideSearchField searchFieldAttr))
+                    throw new ArgumentException("Cannot use this prop for search expression");
+                var key = searchFieldAttr.GetKeyName(memberInfo);
+
+                // (room/wallColour eq 1 or room/wallColour eq 2)
+                var filterText = values
+                    .Select(
+                        v =>
+                        {
+                            return $"{key} eq '{v}'";
+                        })
+                    .Join(" or ");
+
+                return searchOptions.AppendFilterOption($"({filterText})");
+            }
+        }
+
         [FilterIfAnyRefs]
         public static IQueryable<TResource> FilterIfAnyRefs<TProperty, TResource>(this IQueryable<TResource> query,
             IRefs<TProperty> refsValues, Expression<Func<TResource, IRef<TProperty>>> propertySelector)
@@ -593,6 +644,7 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException("Cannot use this prop for search expression");
                 var key = searchFieldAttr.GetKeyName(memberInfo);
 
+                // (room/wallColour eq 1 or room/wallColour eq 2)
                 var filterText = refValues.ids
                     .Select(
                         id =>
@@ -601,7 +653,7 @@ namespace EastFive.Azure.Search
                         })
                     .Join(" or ");
 
-                return searchOptions.AppendFilterOption(filterText); // room/wallColour eq 1 or room/wallColour eq 2
+                return searchOptions.AppendFilterOption($"({filterText})"); 
             }
         }
 
