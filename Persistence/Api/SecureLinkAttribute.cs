@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Web;
 using EastFive.Api;
+using EastFive.Azure.Auth;
+using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Reflection;
@@ -15,6 +18,8 @@ namespace EastFive.Azure.Persistence
 	public abstract class SecureLinkAttribute : Attribute, ICastJsonProperty
     {
         public string Method { get; set; }
+
+        public string[] RoleClaims { get; set; }
 
         public SecureLinkAttribute(string method)
         {
@@ -74,7 +79,11 @@ namespace EastFive.Azure.Persistence
                                                 var decodedUrl = HttpUtility.UrlDecode(url.OriginalString);
                                                 await writer.WriteValueAsync(decodedUrl);
                                                 return true;
-                                            });
+                                            },
+                                                RoleClaims
+                                                    .NullToEmpty()
+                                                    .Select(r => ClaimTypes.Role.PairWithValue(r))
+                                                    .ToDictionary());
                                     },
                                     async () =>
                                     {

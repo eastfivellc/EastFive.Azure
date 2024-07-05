@@ -16,36 +16,32 @@ namespace EastFive.Azure.Auth
     {
         public bool ShouldSkipValidationForLocalhost { get; set; }
 
-        public async Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
+        public Task<IHttpResponse> HandleRouteAsync(Type controllerType, IInvokeResource resourceInvoker,
             IApplication httpApp, IHttpRequest request,
             RouteHandlingDelegate continueExecution)
         {
             if (!request.RequestUri.TryGetQueryParam(
                     AccessTokenAccountExtensions.QueryParameter,
                     out string accessToken))
-                return await continueExecution(controllerType, httpApp, request);
+                return continueExecution(controllerType, httpApp, request);
             
             if (request.GetAuthorization().HasBlackSpace())
-                return await continueExecution(controllerType, httpApp, request);
+                return continueExecution(controllerType, httpApp, request);
 
-            return await request.ValidateAccessTokenAccount(this.ShouldSkipValidationForLocalhost,
+            return request.ValidateAccessTokenAccount(this.ShouldSkipValidationForLocalhost,
                 accessTokenInfo =>
                 {
                     return EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
-                        async (scope) =>
+                        (scope) =>
                         {
                             var tokenExpiration = TimeSpan.FromMinutes(1.0);
                             request.RequestUri = request.RequestUri.RemoveQueryParameter(
                                 AccessTokenAccountExtensions.QueryParameter);
                             var sessionId = accessTokenInfo.sessionId;
                             var authId = accessTokenInfo.accountId;
-                            var claims = await await sessionId.AsRef<Session>().StorageGetAsync(
-                                (session) => session.authorization.StorageGetAsync(
-                                    (auth) => auth.claims,
-                                    () => new Dictionary<string, string>() { }),
-                                () => ((IDictionary<string, string>)new Dictionary<string, string>() { }).AsTask());
+                            var claims = accessTokenInfo.claims;
                             var duration = accessTokenInfo.expirationUtc - DateTime.UtcNow;
-                            return await JwtTools.CreateToken(sessionId, authId, scope, duration,
+                            return JwtTools.CreateToken(sessionId, authId, scope, duration,
                                 claims,
                                 tokenCreated:
                                     (tokenNew) =>
