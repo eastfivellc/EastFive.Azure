@@ -35,9 +35,14 @@ namespace EastFive.Azure.Auth
                 {
                     return await await voucherTokenId.AsRef<VoucherToken>()
                         .StorageGetAsync(
-                            voucherToken =>
+                            async voucherToken =>
                             {
-                                return EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
+                                if (voucherToken.expiration > DateTime.UtcNow)
+                                    return request
+                                        .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
+                                        .AddReason("Token has expired.");
+
+                                return await EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
                                     scope =>
                                     {
                                         var tokenExpiration = TimeSpan.FromMinutes(1.0);
