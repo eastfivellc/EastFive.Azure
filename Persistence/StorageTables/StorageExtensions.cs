@@ -858,13 +858,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
-                Expression<Func<TEntity, IRefOptional<TRefEntity>>> idProperty)
+                Expression<Func<TEntity, IRefOptional<TRefEntity>>> idProperty,
+                int readAhead = -1)
             where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy(entityRef, idProperty);
+                .FindBy(entityRef, idProperty, readAhead: readAhead);
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
@@ -889,13 +890,14 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IEnumerableAsync<TEntity> StorageGetByIdsProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
-                Expression<Func<TEntity, IRefs<TRefEntity>>> idsProperty)
+                Expression<Func<TEntity, IRefs<TRefEntity>>> idsProperty,
+                int readAhead = -1)
             where TEntity : IReferenceable
             where TRefEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
-                .FindBy(entityRef, idsProperty);
+                .FindBy(entityRef, idsProperty, readAhead: readAhead);
         }
 
         public static IEnumerableAsync<TEntity> StorageGet<TEntity>(this IRefs<TEntity> entityRefs, int? readAhead = default)
