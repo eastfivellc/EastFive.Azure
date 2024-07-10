@@ -332,7 +332,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{XAuthorization}}", Description = "performingAsActorId")]
                 [PropertyOptional(Name = AuthIdPropertyName)]Guid authorizationId,
 
-                [Api.Meta.Flows.WorkflowParameter(Value = "PFJTQ...1ZT4=", Description = "Found in Appsettings as EastFive.Security.Token.Key")]
+                [Api.Meta.Flows.WorkflowParameter(Value = "PFJTQ...1ZT4=", Description = "Found in Appsettings as EastFive.Security.CredentialProvider.Voucher.Key")]
                 [Property(Name = KeyPropertyName)] string key,
 
                 [Api.Meta.Flows.WorkflowParameter(Value = "{{$randomDateFuture}}")]
@@ -400,24 +400,24 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             Scope = Workflows.AuthorizationFlow.Scopes.Voucher,
             StepName = Workflows.AuthorizationFlow.Steps.UpdateVoucher,
             Step = Workflows.AuthorizationFlow.Ordinals.UpdateVoucher)]
-        [SuperAdminClaim]
+        [SuperAdminClaim()]
         public static async Task<IHttpResponse> UpdateAsync(
                 [WorkflowParameterFromVariable(
                     Value = Workflows.AuthorizationFlow.Variables.VoucherId.Get.Value,
                     Description = Workflows.AuthorizationFlow.Variables.VoucherId.Get.Description)]
-                [Property(Name = IdPropertyName)] IRef<VoucherToken> voucherRef,
+                [UpdateId(Name = IdPropertyName)] IRef<VoucherToken> voucherRef,
 
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.VoucherDescription.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.VoucherDescription.Set.Description)]
-                [Property(Name = DescriptionPropertyName)] string description,
+                [PropertyOptional(Name = DescriptionPropertyName)]Property<string> descriptionMaybe,
 
                 [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.VoucherExpiration.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.VoucherExpiration.Set.Description)]
                 [Property(Name = ExpirationPropertyName)] DateTime? expirationMaybe,
 
-                EastFive.Api.Security security,
+                [Property(Name = KeyPropertyName)] Property<string> keyMaybe,
 
             ContentTypeResponse<VoucherToken> onFound,
             NotFoundResponse onNotFound,
@@ -426,32 +426,41 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             if (expirationMaybe.HasValue && expirationMaybe.Value < AzureStorageHelpers.MinDate)
                 return onBadRequest().AddReason($"The minimum date is {AzureStorageHelpers.MinDate}");
 
-            var voucherTask = FindByAuthId(security.performingAsActorId)
-                .FirstAsync(
-                    (item) => item,
-                    () => default(VoucherToken));
             return await voucherRef.StorageCreateOrUpdateAsync(
                 async (created, item, saveAsync) =>
                 {
                     if (created)
                         return onNotFound();
 
-                    bool modified() => (description.HasBlackSpace() && item.description != description) ||
+                    bool modified() => (descriptionMaybe.specified && item.description != descriptionMaybe.value) ||
                                        (expirationMaybe.HasValue && item.expiration != expirationMaybe.Value);
                     if (modified())
                     {
-                        if (description.HasBlackSpace())
-                            item.description = description;
+                        if (descriptionMaybe.specified)
+                            item.description = descriptionMaybe.value;
 
                         if (expirationMaybe.HasValue)
                             item.expiration = expirationMaybe.Value;
 
-                        var voucher = await voucherTask;
-                        if (voucher == null || string.IsNullOrWhiteSpace(voucher.description))
+                        if (string.IsNullOrWhiteSpace(item.description))
                             return onBadRequest().AddReason($"The user issuing this request has a blank description.");
 
-                        item.lastModifiedBy = $"{voucher.description} (id={voucher.id})";
+                        item.lastModifiedBy = $"{item.description} (id={item.id})";
+
                         await saveAsync(item);
+
+                        if (!keyMaybe.specified)
+                            return onFound(item);
+
+                        return VoucherTools.GenerateUrlToken(voucherRef.id, item.expiration,
+                                keyMaybe.value,
+                            token =>
+                            {
+                                item.token = token;
+                                return onFound(item);
+                            },
+                            (why) => onBadRequest().AddReason(why));
+
                     }
                     return onFound(item);
                 });
