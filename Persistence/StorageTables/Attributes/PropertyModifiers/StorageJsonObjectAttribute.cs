@@ -35,7 +35,8 @@ namespace EastFive.Azure.Persistence.StorageTables
             return entityPropertyValue.StringValue.JsonParseObject(type,
                 (object v) => onBound(v),
                 onFailureToParse: (why) => onFailureToBind(),
-                onException: (ex) => onFailureToBind());
+                onException: (ex) => onFailureToBind(),
+                converters:converter.AsArray());
         }
 
         public override KeyValuePair<string, EntityProperty>[] CastValue(Type typeOfValue, object values, string propertyName)
