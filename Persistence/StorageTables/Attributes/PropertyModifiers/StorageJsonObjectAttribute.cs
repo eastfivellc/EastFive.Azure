@@ -18,7 +18,8 @@ namespace EastFive.Azure.Persistence.StorageTables
             Func<TResult> onFailureToBind)
         {
             if (!allValues.TryGetValue(propertyName, out var entityPropertyValue) ||
-                entityPropertyValue.StringValue.IsNullOrWhiteSpace())
+                entityPropertyValue.StringValue.IsNullOrWhiteSpace() ||
+                entityPropertyValue.StringValue.Equals("null", StringComparison.OrdinalIgnoreCase))
             {
                 if (!type.IsArray)
                 {
