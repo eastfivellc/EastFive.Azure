@@ -37,7 +37,7 @@ namespace EastFive.Azure.Auth
                         .StorageGetAsync(
                             async voucherToken =>
                             {
-                                if (voucherToken.expiration > DateTime.UtcNow)
+                                if (voucherToken.expiration <= DateTime.UtcNow)
                                     return request
                                         .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                                         .AddReason("Token has expired.");
