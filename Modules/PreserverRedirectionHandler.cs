@@ -30,6 +30,9 @@ namespace EastFive.Azure.Auth
 
         [DataMember]
         public long Limit;
+
+        [DataMember]
+        public bool IsDefault;
     }
 
     public class PreserverRedirectionAttribute : System.Attribute, IResolveRedirection
