@@ -9,13 +9,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+using EastFive;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Linq.Async;
+using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
 using EastFive.Api.Meta.Flows;
 using EastFive.Api.Meta.Postman.Resources.Collection;
 using EastFive.Api.Auth;
 using EastFive.Api;
+using EastFive.Azure.Login;
+using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Azure.Auth.CredentialProviders.Voucher;
 
 namespace EastFive.Azure.Auth
 {
@@ -41,6 +47,22 @@ namespace EastFive.Azure.Auth
                     return default(Guid?);
                 },
                 () => default(Guid?));
+        }
+
+        public async Task<string> GetDescriptionOrOtherLabel<TAccount>(
+            Func<TAccount, string> extractDescriptionOrOtherLabel)
+            where TAccount : IReferenceable
+        {
+            var logon = this;
+            return logon.accountIdMaybe.HasValue ?
+                await await logon.accountIdMaybe.Value.AsRef<TAccount>().StorageGetAsync(
+                    (x) => extractDescriptionOrOtherLabel(x).AsTask(),
+                    () => VoucherToken.FindByAuthId(logon.accountIdMaybe.Value)
+                        .FirstAsync(
+                            (item) => item.DescriptionOrOtherLabel,
+                            () => "unknown"))
+                :
+                "unknown";
         }
     }
 
