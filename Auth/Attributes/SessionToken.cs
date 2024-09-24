@@ -22,6 +22,7 @@ using EastFive.Api;
 using EastFive.Azure.Login;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Auth.CredentialProviders.Voucher;
+using static Microsoft.ApplicationInsights.MetricDimensionNames.TelemetryContext;
 
 namespace EastFive.Azure.Auth
 {
@@ -95,10 +96,33 @@ namespace EastFive.Azure.Auth
                                         });
                         });
                 },
-                () => request
-                    .CreateResponse(HttpStatusCode.Unauthorized)
-                    .AddReason("Authorization header not set.")
-                    .AsTask(),
+                () =>
+                {
+                    if (SecurityRoleRequiredAttribute.allowLocalHostGlobal)
+                        if (request.IsLocalHostRequest())
+                        {
+                            return Api.AppSettings.AuthorizationIdSuperAdmin.ConfigurationGuid(
+                                (authorizationIdSuperAdmin) =>
+                                {
+                                    var token = new SessionToken
+                                    {
+                                        accountIdMaybe = authorizationIdSuperAdmin,
+                                        sessionId = default(Guid),
+                                        claims = new System.Security.Claims.Claim[] { },
+                                    };
+                                    return onSuccess(token);
+                                },
+                                why => request
+                                    .CreateResponse(HttpStatusCode.Unauthorized)
+                                    .AddReason("Super Admin ID not set.")
+                                    .AsTask());
+                        }
+
+                    return request
+                        .CreateResponse(HttpStatusCode.Unauthorized)
+                        .AddReason("Authorization header not set.")
+                        .AsTask();
+                },
                 (why) => request
                     .CreateResponse(HttpStatusCode.Unauthorized)
                     .AddReason(why)
