@@ -10,6 +10,7 @@ using EastFive.Linq.Expressions;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = true)]
     public class ScopePrefixAttribute : Attribute, IScopeKeys
     {
         private uint? charactersMaybe;

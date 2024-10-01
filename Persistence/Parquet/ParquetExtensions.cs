@@ -17,6 +17,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization.Parquet;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 
 namespace EastFive.Azure.Persistence
 {
@@ -130,6 +131,78 @@ namespace EastFive.Azure.Persistence
                     + $"\n\t\t{properties}"
                     + "\n\t)";
             }
+        }
+
+        public static IEnumerableAsync<BlobContentInfo> WriteToBlobAsParquet<TEntity>(this IEnumerable<TEntity> data,
+                AzureBlobFileSystemUri exportLocation, int rowsPerfile = 100000)
+            => WriteToBlobAsParquetInternal(data, exportLocation, rowsPerfile: rowsPerfile).FoldTask();
+
+        private static async Task<IEnumerableAsync<BlobContentInfo>> WriteToBlobAsParquetInternal<TEntity>(
+            this IEnumerable<TEntity> data, AzureBlobFileSystemUri exportLocation, int rowsPerfile)
+        {
+            var schema = GetParquetSchema<TEntity>();
+            bool deleted = await exportLocation.BlobDeleteIfExistsAsync(
+                () => true,
+                connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+
+            var mappers = typeof(TEntity)
+                .GetPropertyAndFieldsWithAttributesInterface<IMapParquetProperty>(inherit: true)
+                .ToArray();
+
+            return data
+                .Segment(rowsPerfile)
+                .Select(
+                    (segment, index) =>
+                    {
+                        var fileName = $"{index:00000}.parquet";
+                        return exportLocation
+                            .AppendToPath(fileName)
+                            .BlobCreateOrUpdateAsync(
+                                writeStreamAsync: async (stream) =>
+                                {
+                                    GetRows(segment)
+                                        .WriteToParquetStream(schema, stream);
+                                    await stream.FlushAsync();
+                                },
+                                (blobContentInfo) => blobContentInfo,
+                                    contentTypeString: "application/vnd.apache.parquet",
+                                    fileName: fileName,
+                                    connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                    })
+                .AsyncEnumerable();
+
+            IEnumerable<(string name, Type type, object value)[]> GetRows(IEnumerable<TEntity> entities)
+            {
+                return entities
+                    .Select(
+                        entity =>
+                        {
+                            return mappers
+                                .Select(
+                                    mapper =>
+                                    {
+                                        var value = mapper.Item2.GetParquetDataValue(entity, mapper.Item1);
+                                        return value;
+                                    })
+                                .ToArray();
+                        });
+            }
+        }
+
+        public static global::Parquet.Data.Schema GetParquetSchema<TEntity>()
+        {
+            var fields = typeof(TEntity)
+                .GetPropertyAndFieldsWithAttributesInterface<IMapParquetProperty>(inherit:true)
+                .Select(
+                    (tpl) =>
+                    {
+                        var (memberInfo, mapParquetProperty) = tpl;
+                        var dataField = mapParquetProperty.GetParquetDataField(memberInfo);
+                        return dataField;
+                    })
+                .ToArray();
+
+            return new global::Parquet.Data.Schema(fields);
         }
     }
 }
