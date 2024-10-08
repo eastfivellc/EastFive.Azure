@@ -119,7 +119,9 @@ namespace EastFive.Azure.Persistence.Blobs
                     onTimeout: onTimeout);
         }
 
-        public static async Task<IBlobRef> SaveAsNewAsync(this IBlobRef blobRef,
+        public static async Task<TResult> SaveAsNewAsync<TResult>(this IBlobRef blobRef,
+            Func<IBlobRef, TResult> onSaved,
+            Func<TResult> onAlreadyExist,
             string newBlobId = default,
             Func<string, string> mutateBlobId = default)
         {
@@ -129,7 +131,7 @@ namespace EastFive.Azure.Persistence.Blobs
                     var contentType = mediaType.MediaType;
                     if (newBlobId.IsNullOrWhiteSpace())
                         newBlobId = mutateBlobId.IsNotDefaultOrNull()?
-                            mutateBlobId(newBlobId)
+                            mutateBlobId(currentBlobName)
                             :
                             currentBlobName;
                     return await AzureTableDriverDynamic
@@ -137,13 +139,18 @@ namespace EastFive.Azure.Persistence.Blobs
                         .BlobCreateAsync(bytes, newBlobId, blobRef.ContainerName,
                             () =>
                             {
-                                return (IBlobRef)new BlobRef
+                                var blobRefNew = (IBlobRef)new BlobRef
                                 {
                                     Id = newBlobId,
                                     ContainerName = blobRef.ContainerName,
                                     ContentType = contentType,
                                     FileName = newBlobId,
                                 };
+                                return onSaved(blobRefNew);
+                            },
+                            onAlreadyExists:() =>
+                            {
+                                return onAlreadyExist();
                             },
                             contentType: contentType);
                 },
