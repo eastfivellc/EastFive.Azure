@@ -119,8 +119,7 @@ namespace EastFive.Azure.Persistence
 
         [Api.HttpAction("GenerateCryptoKey")]
         [SuperAdminClaim]
-        public static async Task<IHttpResponse> GenerateCryptoKey(
-                HttpApplication httpApp,
+        public static IHttpResponse GenerateCryptoKey(
             TextResponse onGenerated)
         {
             var bytes = Security.SecureGuid.Generate().ToByteArray()

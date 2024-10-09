@@ -22,6 +22,7 @@ namespace EastFive.Azure.Monitoring
                 },
                 (why) =>
                 {
+#pragma warning disable 0618
                     var configuration = TelemetryConfiguration.Active;
                     return new TelemetryClient(configuration);
                 });
