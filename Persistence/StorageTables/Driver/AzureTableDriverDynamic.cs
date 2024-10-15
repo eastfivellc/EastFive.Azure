@@ -3644,7 +3644,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
         async Task<BlobClient> GetBlobClientAsync(string containerReference, string blobName)
         {
             var blobContainerClient = BlobClient.GetBlobContainerClient(containerReference);
-            var createResponse = await blobContainerClient.CreateIfNotExistsAsync();
+            global::Azure.Response<BlobContainerInfo> createResponse = await blobContainerClient.CreateIfNotExistsAsync();
             return blobContainerClient.GetBlobClient(blobName);
         }
 
