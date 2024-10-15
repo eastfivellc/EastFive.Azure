@@ -9,7 +9,7 @@ using EastFive.Extensions;
 namespace EastFive.Azure.Auth
 {
     //[ApiVoucherQueryDefinition]
-    public class PIIAdminClaimAttribute : Attribute, IValidateHttpRequest
+    public class PIIAdminClaimAttribute : AuthorizationTokenAttribute, IValidateHttpRequest
     {
         private const string ClaimValue = ClaimValues.Roles.PIIAdmin;
         public bool AllowLocalHost { get; set; } = false;

@@ -21,6 +21,11 @@ namespace EastFive.Azure.Auth
     {
         public Header GetHeader(Api.Resources.Method method, ParameterInfo parameter)
         {
+            return GetTokenHeader(method,parameter);
+        }
+
+        public static Header GetTokenHeader(Api.Resources.Method method, ParameterInfo parameter)
+        {
             if (!method.MethodPoco.TryGetAttributeInterface(out IValidateHttpRequest requestValidator))
                 return new Header()
                 {

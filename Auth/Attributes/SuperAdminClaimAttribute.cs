@@ -9,7 +9,7 @@ using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
-    public class SuperAdminClaimAttribute : Attribute, IValidateHttpRequest
+    public class SuperAdminClaimAttribute : AuthorizationTokenAttribute, IValidateHttpRequest
     {
         private const string ClaimType = System.Security.Claims.ClaimTypes.Role;
         private const string ClaimValue = ClaimValues.Roles.SuperAdmin;
