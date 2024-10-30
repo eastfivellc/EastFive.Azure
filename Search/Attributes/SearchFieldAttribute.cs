@@ -28,16 +28,26 @@ namespace EastFive.Azure.Search
         {
             var memberType = member.GetPropertyOrFieldType();
             var name = GetKeyName(member);
+            return GetSearchField(name, memberType);
+        }
+
+        private SearchField GetSearchField(string name, Type memberType)
+        {
             if (typeof(int).IsAssignableFrom(memberType))
             {
                 var field = new SimpleField(name, SearchFieldDataType.Int32);
                 return PopulateFieldKey(field);
             }
+
             if (typeof(DateTime).IsAssignableFrom(memberType))
             {
                 var field = new SimpleField(name, SearchFieldDataType.DateTimeOffset);
                 return PopulateFieldKey(field);
             }
+
+            if (memberType.TryGetNullableUnderlyingType(out var nonNullableType))
+                return GetSearchField(name, nonNullableType);
+
             var searchableField = new SearchableField(name);
             return PopulateFieldKey(searchableField);
         }
