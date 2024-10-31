@@ -678,6 +678,26 @@ namespace EastFive.Azure.Search
             return requestMessageNewQuery;
         }
 
+        [SearchFilterNullIfSpecified]
+        public static IQueryable<TResource> FilterNullIfSpecified<TResource>(this IQueryable<TResource> query,
+            string propertyValue, Expression<Func<TResource, string>> propertySelector, ComparisonRelationship comparison)
+        {
+            if (!typeof(SearchQuery<TResource>).IsAssignableFrom(query.GetType()))
+                throw new ArgumentException($"query must be of type `{typeof(SearchQuery<TResource>).FullName}` not `{query.GetType().FullName}`", "query");
+            var searchQuery = query as SearchQuery<TResource>;
+
+            var condition = Expression.Call(
+                typeof(SearchQueryExtensions), nameof(SearchQueryExtensions.FilterNullIfSpecified),
+                typeof(TResource).AsArray(),
+                query.Expression,
+                Expression.Constant(propertyValue, typeof(string)),
+                Expression.Constant(propertySelector, typeof(Expression<Func<TResource, string>>)),
+                Expression.Constant(comparison, typeof(ComparisonRelationship)));
+
+            var requestMessageNewQuery = searchQuery.SearchQueryFromExpression(condition);
+            return requestMessageNewQuery;
+        }
+
         [AttributeUsage(AttributeTargets.Method)]
         public class SearchFilterNullIfSpecifiedAttribute : Attribute, ICompileSearchOptions
         {
