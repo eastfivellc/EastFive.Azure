@@ -109,8 +109,10 @@ namespace EastFive.Azure.Auth.Instigations
                                 sessionRef.id.ToString("N")
                             }
                         };
+                        var duration = EastFive.Api.AppSettings.AccessTokenExpirationInMinutes.ConfigurationDouble(
+                            (minutes) => TimeSpan.FromMinutes(minutes));
                         return Api.Auth.JwtTools.CreateToken(sessionRef.id,
-                                scope, TimeSpan.FromDays(365), claims,
+                                scope, duration, claims,
                             async (tokenNew) =>
                             {
                                 var session = new Session

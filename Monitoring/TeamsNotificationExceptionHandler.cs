@@ -441,12 +441,15 @@ namespace EastFive.Azure.Monitoring
             var actions = new MessageCard.ActionCard[] { };
             if (monitoringRequest != null)
             {
+                var offset = EastFive.Api.AppSettings.AccessTokenExpirationInMinutes.ConfigurationDouble(
+                    (minutes) => TimeSpan.FromMinutes(minutes));
+                var expiresOn = DateTime.UtcNow + offset;
                 var postmanLink = new QueryableServer<Api.Azure.Monitoring.MonitoringRequest>(request)
                     .Where(mr => mr.monitoringRequestRef == monitoringRequest.monitoringRequestRef)
                     .Where(mr => mr.when == monitoringRequest.when.Date)
                     .HttpAction(MonitoringRequest.PostmanAction)
                     .Location()
-                    .SignWithAccessTokenAccount(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow.AddYears(1),
+                    .SignWithAccessTokenAccount(Guid.NewGuid(), Guid.NewGuid(), expiresOn,
                         url => url);
                 actions = actions
                     .Append(

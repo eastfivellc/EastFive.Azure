@@ -10,7 +10,7 @@ using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Reflection;
-
+using EastFive.Web.Configuration;
 using Newtonsoft.Json;
 
 namespace EastFive.Azure.Persistence
@@ -67,7 +67,10 @@ namespace EastFive.Azure.Persistence
                                 return claims.GetActorId(
                                     (accountId) =>
                                     {
-                                        return url.SignWithAccessTokenAccount(sessionId, accountId, DateTime.UtcNow + TimeSpan.FromHours(1),
+                                        var offset = EastFive.Api.AppSettings.AccessTokenExpirationInMinutes.ConfigurationDouble(
+                                            (minutes) => TimeSpan.FromMinutes(minutes));
+                                        var expiresOn = DateTime.UtcNow + offset;
+                                        return url.SignWithAccessTokenAccount(sessionId, accountId, expiresOn,
                                             async signedUrl =>
                                             {
                                                 var decodedUrl = HttpUtility.UrlDecode(signedUrl.OriginalString);

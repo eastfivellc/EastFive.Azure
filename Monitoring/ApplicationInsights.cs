@@ -14,7 +14,7 @@ namespace EastFive.Azure.Monitoring
 {
     [FunctionViewController(
         Route = "ApplicationInsights",
-        ContentType = "x-application/application-sights-results",
+        ContentType = "x-application/application-insights",
         ContentTypeVersion = "0.1")]
     public class ApplicationInsights
     {

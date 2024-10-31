@@ -94,6 +94,18 @@ namespace EastFive.Azure.Auth
 
         #endregion
 
+        private static TimeSpan CreateExpirationDuration() =>
+            // prefer an absolute time of day setting over a maximum duration setting
+            AppSettings.Auth.TokenExpirationTimeOfDay.ConfigurationString(
+                (timeAndOffset) =>
+                {
+                    if (DateTimeExtensions.GetDisappearingOffset(timeAndOffset, out TimeSpan duration))
+                        return duration;
+                    throw new Exception($"The settings key `{AppSettings.Auth.TokenExpirationTimeOfDay}` could not be parsed");
+                },
+                (unspecifiedMsg) => AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
+                    (minutes) => TimeSpan.FromMinutes(minutes)));
+
         private static async Task<TResult> GetClaimsAsync<TResult>(
             IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
@@ -156,27 +168,23 @@ namespace EastFive.Azure.Auth
                             EastFive.Security.AppSettings.TokenScope,
                         scope =>
                         {
-                            return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
-                                (tokenExpirationInMinutes) =>
+                            return GetClaimsAsync(application, session.authorization,
+                                (claims, accountIdMaybe, authorized) =>
                                 {
-                                    return GetClaimsAsync(application, session.authorization,
-                                        (claims, accountIdMaybe, authorized) =>
+                                    session.account = accountIdMaybe;
+                                    session.authorized = authorized;
+                                    var duration = CreateExpirationDuration();
+                                    return Api.Auth.JwtTools.CreateToken(session.id,
+                                            scope, duration, claims,
+                                        (tokenNew) =>
                                         {
-                                            session.account = accountIdMaybe;
-                                            session.authorized = authorized;
-                                            return Api.Auth.JwtTools.CreateToken(session.id,
-                                                    scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
-                                                (tokenNew) =>
-                                                {
-                                                    session.token = tokenNew;
-                                                    return onFound(session);
-                                                },
-                                                (missingConfig) => onConfigurationFailure("Missing", missingConfig),
-                                                (configName, issue) => onConfigurationFailure(configName, issue));
+                                            session.token = tokenNew;
+                                            return onFound(session);
                                         },
-                                        (why) => onNotFound());
+                                        (missingConfig) => onConfigurationFailure("Missing", missingConfig),
+                                        (configName, issue) => onConfigurationFailure(configName, issue));
                                 },
-                                (why) => onConfigurationFailure("Missing", why).AsTask());
+                                (why) => onNotFound());
                         },
                         (why) => onConfigurationFailure("Missing", why).AsTask());
                 },
@@ -243,46 +251,42 @@ namespace EastFive.Azure.Auth
             session.refreshToken = Security.SecureGuid.Generate().ToString("N");
 
             return await Security.AppSettings.TokenScope.ConfigurationUri(
-                scope =>
+                async (scope) =>
                 {
-                    return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
-                        async (tokenExpirationInMinutes) =>
+                    return await await GetClaimsAsync(application, authorizationRefMaybe,
+                        (claims, accountIdMaybe, authorized) =>
                         {
-                            return await await GetClaimsAsync(application, authorizationRefMaybe,
-                                (claims, accountIdMaybe, authorized) =>
+                            var duration = CreateExpirationDuration();
+                            session.account = accountIdMaybe;
+                            session.authorized = authorized;
+                            return session.StorageCreateAsync(
+                                (sessionIdCreated) =>
                                 {
-                                    session.account = accountIdMaybe;
-                                    session.authorized = authorized;
-                                    return session.StorageCreateAsync(
-                                        (sessionIdCreated) =>
+                                    return Api.Auth.JwtTools.CreateToken(sessionId.id,
+                                        scope, duration, claims,
+                                        (tokenNew) =>
                                         {
-                                            return Api.Auth.JwtTools.CreateToken(sessionId.id,
-                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
-                                                (tokenNew) =>
-                                                {
-                                                    session.token = tokenNew;
-                                                    return onCreated(session);
-                                                },
-                                                (missingConfig) => onConfigurationFailure("Missing", missingConfig),
-                                                (configName, issue) => onConfigurationFailure(configName, issue));
+                                            session.token = tokenNew;
+                                            return onCreated(session);
                                         },
-                                        () =>
-                                        {
-                                            return Api.Auth.JwtTools.CreateToken(sessionId.id,
-                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
-                                                (tokenNew) =>
-                                                {
-                                                    session.token = tokenNew;
-                                                    return onCreated(session);
-                                                },
-                                                (missingConfig) => onConfigurationFailure("Missing", missingConfig),
-                                                (configName, issue) => onConfigurationFailure(configName, issue));
-                                            // onAlreadyExists()
-                                        });
+                                        (missingConfig) => onConfigurationFailure("Missing", missingConfig),
+                                        (configName, issue) => onConfigurationFailure(configName, issue));
                                 },
-                                (why) => onFailure(why).AsTask());
+                                () =>
+                                {
+                                    return Api.Auth.JwtTools.CreateToken(sessionId.id,
+                                        scope, duration, claims,
+                                        (tokenNew) =>
+                                        {
+                                            session.token = tokenNew;
+                                            return onCreated(session);
+                                        },
+                                        (missingConfig) => onConfigurationFailure("Missing", missingConfig),
+                                        (configName, issue) => onConfigurationFailure(configName, issue));
+                                    // onAlreadyExists()
+                                });
                         },
-                        (why) => onConfigurationFailure("Missing", why).AsTask());
+                        (why) => onFailure(why).AsTask());
                 },
                 (why) => onConfigurationFailure("Missing", why).AsTask());
         }
@@ -302,31 +306,27 @@ namespace EastFive.Azure.Auth
                 (sessionStorage, saveSessionAsync) =>
                 {
                     return Security.AppSettings.TokenScope.ConfigurationUri(
-                        scope =>
+                        async (scope) =>
                         {
-                            return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
-                                async (tokenExpirationInMinutes) =>
+                            return await await GetClaimsAsync(application, authorizationRefMaybe,
+                                async (claims, accountIdMaybe, authorized) =>
                                 {
-                                    return await await GetClaimsAsync(application, authorizationRefMaybe,
-                                        async (claims, accountIdMaybe, authorized) =>
+                                    sessionStorage.authorization = authorizationRefMaybe;
+                                    sessionStorage.authorized = authorized;
+                                    sessionStorage.account = accountIdMaybe;
+                                    var duration = CreateExpirationDuration();
+                                    return await Api.Auth.JwtTools.CreateToken(sessionRef.id,
+                                            scope, duration, claims,
+                                        async (tokenNew) =>
                                         {
-                                            sessionStorage.authorization = authorizationRefMaybe;
-                                            sessionStorage.authorized = authorized;
-                                            sessionStorage.account = accountIdMaybe;
-                                            return await Api.Auth.JwtTools.CreateToken(sessionRef.id,
-                                                    scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
-                                                async (tokenNew) =>
-                                                {
-                                                    sessionStorage.token = tokenNew;
-                                                    await saveSessionAsync(sessionStorage);
-                                                    return onUpdated(sessionStorage);
-                                                },
-                                                (missingConfig) => onConfigurationFailure("Missing", missingConfig).AsTask(),
-                                                (configName, issue) => onConfigurationFailure(configName, issue).AsTask());
+                                            sessionStorage.token = tokenNew;
+                                            await saveSessionAsync(sessionStorage);
+                                            return onUpdated(sessionStorage);
                                         },
-                                        why => onFailure(why).AsTask());
+                                        (missingConfig) => onConfigurationFailure("Missing", missingConfig).AsTask(),
+                                        (configName, issue) => onConfigurationFailure(configName, issue).AsTask());
                                 },
-                                why => onConfigurationFailure("Missing", why).AsTask());
+                                why => onFailure(why).AsTask());
                         },
                         (why) => onConfigurationFailure("Missing", why).AsTask());
                 },
@@ -365,51 +365,47 @@ namespace EastFive.Azure.Auth
             };
 
             return await Security.AppSettings.TokenScope.ConfigurationUri(
-                scope =>
+                async (scope) =>
                 {
-                    return AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
-                        async (tokenExpirationInMinutes) =>
+                    return await await GetClaimsAsync(application, authorizationRefMaybe,
+                        async (claims, accountIdMaybe, authorized) =>
                         {
-                            return await await GetClaimsAsync(application, authorizationRefMaybe,
-                                async (claims, accountIdMaybe, authorized) =>
+                            session.account = accountIdMaybe;
+                            session.authorized = authorized;
+                            var duration = CreateExpirationDuration();
+                            return await await session.StorageCreateAsync(
+                                (sessionIdCreated) =>
                                 {
-                                    session.account = accountIdMaybe;
-                                    session.authorized = authorized;
-                                    return await await session.StorageCreateAsync(
-                                        (sessionIdCreated) =>
+                                    return Api.Auth.JwtTools.CreateToken(session.id,
+                                        scope, duration, claims,
+                                        (tokenNew) =>
                                         {
-                                            return Api.Auth.JwtTools.CreateToken(session.id,
-                                                scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
+                                            session.token = tokenNew;
+                                            return session;
+                                        },
+                                        (missingConfig) => throw new Exception(missingConfig),
+                                        (configName, issue) => throw new Exception(issue)).AsTask();
+                                },
+                                onAlreadyExists:() =>
+                                {
+                                    return sessionId.StorageUpdateAsync(
+                                        async (sessionToUpdate, saveAsync) =>
+                                        {
+                                            sessionToUpdate.authorization = authorizationRefMaybe;
+                                            sessionToUpdate.account = accountIdMaybe;
+                                            sessionToUpdate.authorized = authorized;
+                                            await saveAsync(sessionToUpdate);
+                                            return Api.Auth.JwtTools.CreateToken(sessionToUpdate.id,
+                                                scope, duration, claims,
                                                 (tokenNew) =>
                                                 {
-                                                    session.token = tokenNew;
-                                                    return session;
+                                                    sessionToUpdate.token = tokenNew;
+                                                    return sessionToUpdate;
                                                 },
                                                 (missingConfig) => throw new Exception(missingConfig),
-                                                (configName, issue) => throw new Exception(issue)).AsTask();
-                                        },
-                                        onAlreadyExists:() =>
-                                        {
-                                            return sessionId.StorageUpdateAsync(
-                                                async (sessionToUpdate, saveAsync) =>
-                                                {
-                                                    sessionToUpdate.authorization = authorizationRefMaybe;
-                                                    sessionToUpdate.account = accountIdMaybe;
-                                                    sessionToUpdate.authorized = authorized;
-                                                    await saveAsync(sessionToUpdate);
-                                                    return Api.Auth.JwtTools.CreateToken(sessionToUpdate.id,
-                                                        scope, TimeSpan.FromMinutes(tokenExpirationInMinutes), claims,
-                                                        (tokenNew) =>
-                                                        {
-                                                            sessionToUpdate.token = tokenNew;
-                                                            return sessionToUpdate;
-                                                        },
-                                                        (missingConfig) => throw new Exception(missingConfig),
-                                                        (configName, issue) => throw new Exception(issue));
-                                                });
+                                                (configName, issue) => throw new Exception(issue));
                                         });
-                                },
-                                (why) => throw new Exception(why));
+                                });
                         },
                         (why) => throw new Exception(why));
                 },
