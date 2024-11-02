@@ -62,7 +62,7 @@ namespace EastFive.Azure.Auth
                     () =>
                     {
                         return request
-                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                             .AddReason("Access token is invalid")
                             .AsTask();
                     },
@@ -70,7 +70,7 @@ namespace EastFive.Azure.Auth
                     () =>
                     {
                         return request
-                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                             .AddReason("Access token is expired")
                             .AsTask();
                     },
@@ -78,7 +78,7 @@ namespace EastFive.Azure.Auth
                     () =>
                     {
                         return request
-                            .CreateResponse(System.Net.HttpStatusCode.Forbidden)
+                            .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
                             .AddReason("Access token has an invalid signature")
                             .AsTask();
                     },

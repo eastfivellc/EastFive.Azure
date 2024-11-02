@@ -27,7 +27,7 @@ namespace EastFive.Azure.Auth
 
             if (!request.IsAuthorizedForRole(ClaimValue))
                 return request
-                    .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
+                    .CreateResponse(System.Net.HttpStatusCode.Forbidden)
                     .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires roll claim `{ClaimValue}`")
                     .AsTask();
 

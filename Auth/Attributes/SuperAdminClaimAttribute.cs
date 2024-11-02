@@ -37,7 +37,7 @@ namespace EastFive.Azure.Auth
                     return boundCallback(parameterSelection, method, httpApp, request);
 
             return request
-                    .CreateResponse(System.Net.HttpStatusCode.Unauthorized)
+                    .CreateResponse(System.Net.HttpStatusCode.Forbidden)
                     .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires claim `{ClaimType}`=`{ClaimValue}`")
                     .AsTask();
         }
