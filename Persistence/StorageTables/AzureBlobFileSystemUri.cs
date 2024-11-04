@@ -95,7 +95,7 @@ namespace EastFive.Azure.Persistence.StorageTables
                         $"{path}{fileName}"
                         :
                         path;
-
+                    return;
                 }
 
 
@@ -113,7 +113,10 @@ namespace EastFive.Azure.Persistence.StorageTables
                         .First(
                             (match, next) => match.Item2,
                             () => string.Empty);
+                    return;
                 }
+
+                this.path = value;
             }
 		}
 	}
