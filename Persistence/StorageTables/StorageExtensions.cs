@@ -2172,6 +2172,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobLoadBytesAsync<TResult>(this AzureBlobFileSystemUri abfsUri,
+            Func<byte[], BlobProperties, TResult> onSuccess,
+            Func<TResult> onNotFound = default,
+            Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
+            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString) =>
+                abfsUri.IsDefaultOrNull()?
+                    onNotFound().AsTask()
+                    :
+                    BlobLoadBytesAsync(abfsUri.path, abfsUri.containerName,
+                            onSuccess: onSuccess,
+                            onNotFound: onNotFound,
+                            onFailure: onFailure,
+                            onTimeout: onTimeout,
+                                connectionStringConfigKey: connectionStringConfigKey);
+
         public static async Task<TResult> BlobLoadBytesAsync<TResult>(this Guid? blobId, string containerName,
             Func<byte[], string, TResult> onSuccess,
             Func<TResult> onNotFound,
