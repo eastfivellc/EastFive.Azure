@@ -415,46 +415,45 @@ namespace EastFive.Api.Azure
             Func<TResult> onInvalidAccount,
             Func<string, TResult> onFailure)
         {
-            if(!(authorizationProvider is IProvideRedirection))
-                return await ComputeRedirectAsync(accountIdMaybe, authParams, 
+            async Task<TResult> finishUrlAsync(Uri redirect,
+                KeyValuePair<string,string>[] kvps = default,
+                Func<EastFive.Azure.Auth.Authorization, Uri,Uri> authDecorator = default)
+            {
+                var (modifier, fullUri) = await ResolveAbsoluteUrlAsync(redirect,
+                        request, accountIdMaybe, authParams);
+                foreach (var kvp in kvps.NullToEmpty())
+                    fullUri = fullUri.SetQueryParam(kvp.Key, kvp.Value);
+
+                if (authDecorator == default)
+                    return onSuccess(fullUri, x => x);
+
+                var redirectDecorated = authDecorator(authorization, fullUri);
+                return onSuccess(redirectDecorated, modifier);
+            }
+
+            if (!(authorizationProvider is IProvideRedirection))
+                return await await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization, endpoints,
                         authorizationProvider,
-                    (uri) => onSuccess(uri, x => x),
-                    onInvalidParameter,
-                    onFailure);
+                    (uri) => finishUrlAsync(uri),
+                    onInvalidParameter.AsAsyncFunc(),
+                    onFailure.AsAsyncFunc());
 
             var redirectionProvider = authorizationProvider as IProvideRedirection;
             return await await redirectionProvider.GetRedirectUriAsync(accountIdMaybe, 
                     authorizationProvider, authParams,
                     method, authorization,
                     this, request, endpoints, baseUri,
-                async (redirectUri, kvps) =>
-                {
-                    var (modifier, fullUri) = await ResolveAbsoluteUrlAsync(redirectUri,
-                            request, accountIdMaybe, authParams);
-                    foreach (var kvp in kvps.NullToEmpty())
-                        fullUri = fullUri.SetQueryParam(kvp.Key, kvp.Value);
-
-                    var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
-                    return onSuccess(redirectDecorated, modifier);
-
-                    //var fullUri = redirectUri.IsAbsoluteUri?
-                    //        redirectUri
-                    //        :
-                    //        await ResolveAbsoluteUrlAsync(baseUri, redirectUri, accountIdMaybe);
-                    //var redirectDecorated = this.SetRedirectParameters(authorization, fullUri);
-                    //return onSuccess(redirectDecorated);
-                },
-                () => ComputeRedirectAsync(accountIdMaybe, authParams,
-                            method, authorization, endpoints,
-                            authorizationProvider,
-                        (uri) => onSuccess(uri, x => x),
-                        onInvalidParameter,
-                        onFailure),
+                (redirectUri, kvps) => finishUrlAsync(redirectUri, kvps, SetRedirectParameters),
+                async () => await await ComputeRedirectAsync(accountIdMaybe, authParams,
+                        method, authorization, endpoints,
+                        authorizationProvider,
+                    (uri) => finishUrlAsync(uri),
+                    onInvalidParameter.AsAsyncFunc(),
+                    onFailure.AsAsyncFunc()),
                 onInvalidParameter.AsAsyncFunc(),
                 onInvalidAccount.AsAsyncFunc(),
                 onFailure.AsAsyncFunc());
-            
         }
 
         public virtual Task<(Func<IHttpResponse, IHttpResponse>, Uri)> ResolveAbsoluteUrlAsync(Uri relativeUri,
