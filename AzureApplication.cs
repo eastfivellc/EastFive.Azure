@@ -435,7 +435,7 @@ namespace EastFive.Api.Azure
                 return await await ComputeRedirectAsync(accountIdMaybe, authParams, 
                         method, authorization, endpoints,
                         authorizationProvider,
-                    (uri) => finishUrlAsync(uri),
+                    (fullUri) => finishUrlAsync(fullUri),
                     onInvalidParameter.AsAsyncFunc(),
                     onFailure.AsAsyncFunc());
 
@@ -448,7 +448,7 @@ namespace EastFive.Api.Azure
                 async () => await await ComputeRedirectAsync(accountIdMaybe, authParams,
                         method, authorization, endpoints,
                         authorizationProvider,
-                    (uri) => finishUrlAsync(uri),
+                    (fullUri) => finishUrlAsync(fullUri),
                     onInvalidParameter.AsAsyncFunc(),
                     onFailure.AsAsyncFunc()),
                 onInvalidParameter.AsAsyncFunc(),
@@ -495,6 +495,18 @@ namespace EastFive.Api.Azure
                 {
                     var redirectUrl = SetRedirectParameters(authorization, authorization.LocationAuthenticationReturn);
                     return onSuccess(redirectUrl);
+                }
+                else
+                {
+                    var redirectUrl = EastFive.Web.Configuration.Settings.GetUri(
+                        EastFive.Azure.AppSettings.Auth.LandingPage,
+                        (redirectUriLandingPage) => authorization.LocationAuthenticationReturn.ReplaceBase(redirectUriLandingPage),
+                        (why) => default(Uri));
+                    if (default != redirectUrl)
+                    {
+                        redirectUrl = SetRedirectParameters(authorization, redirectUrl);
+                        return onSuccess(redirectUrl);
+                    }
                 }
             }
 
