@@ -500,7 +500,7 @@ namespace EastFive.Api.Azure
                 {
                     var redirectUrl = EastFive.Web.Configuration.Settings.GetUri(
                         EastFive.Azure.AppSettings.Auth.LandingPage,
-                        (redirectUriLandingPage) => authorization.LocationAuthenticationReturn.ReplaceBase(redirectUriLandingPage),
+                        (landingPage) => new Uri(landingPage, authorization.LocationAuthenticationReturn),
                         (why) => default(Uri));
                     if (default != redirectUrl)
                     {
