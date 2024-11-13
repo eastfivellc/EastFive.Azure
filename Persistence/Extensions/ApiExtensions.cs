@@ -77,18 +77,29 @@ namespace EastFive.Azure.Persistence
                 MutateResource<TResource> modifyResource,
             ContentTypeResponse<TResource> onUpdated,
             NotFoundResponse onNotFound,
-                Func<TResource, TResource> additionalMutations = default)
+                Func<TResource, TResource> additionalMutations = default,
+                Func<TResource, Func<Task<IHttpResponse>>, Task<IHttpResponse>> conditional = default)
             where TResource : IReferenceable
         {
             return resourceRef.StorageUpdateAsync(
-                async (resource, saveAsync) =>
+                (resource, saveAsync) =>
                 {
-                    var resourceToSave = modifyResource(resource);
-                    if (additionalMutations.IsNotDefaultOrNull())
-                        resourceToSave = additionalMutations(resourceToSave);
+                    if (conditional.IsDefaultOrNull())
+                        return Mutate();
 
-                    await saveAsync(resource);
-                    return onUpdated(resource);
+                    return conditional(
+                        resource,
+                        () => Mutate());
+
+                    async Task<IHttpResponse> Mutate()
+                    {
+                        var resourceToSave = modifyResource(resource);
+                        if (additionalMutations.IsNotDefaultOrNull())
+                            resourceToSave = additionalMutations(resourceToSave);
+
+                        await saveAsync(resource);
+                        return onUpdated(resource);
+                    }
                 },
                 () => onNotFound());
         }
@@ -96,11 +107,25 @@ namespace EastFive.Azure.Persistence
         public static Task<IHttpResponse> HttpDeleteAsync<TResource>(
                 this IRef<TResource> resourceRef,
             NoContentResponse onDeleted,
-            NotFoundResponse onNotFound)
+            NotFoundResponse onNotFound,
+                Func<TResource, Func<Task<IHttpResponse>>, Task<IHttpResponse>> conditional = default)
             where TResource : IReferenceable
         {
-            return resourceRef.StorageDeleteAsync(
-                onDeleted:(discard) => onDeleted(),
+            return resourceRef.StorageDeleteIfAsync(
+                onFound:async (resource, deleteAsync) =>
+                {
+                    if (conditional.IsDefaultOrNull())
+                    {
+                        await deleteAsync();
+                        return onDeleted();
+                    }
+                    return await conditional(resource,
+                        async () =>
+                        {
+                            await deleteAsync();
+                            return onDeleted();
+                        });
+                },
                 () => onNotFound());
         }
     }
