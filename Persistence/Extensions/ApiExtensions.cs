@@ -97,8 +97,8 @@ namespace EastFive.Azure.Persistence
                         if (additionalMutations.IsNotDefaultOrNull())
                             resourceToSave = additionalMutations(resourceToSave);
 
-                        await saveAsync(resource);
-                        return onUpdated(resource);
+                        await saveAsync(resourceToSave);
+                        return onUpdated(resourceToSave);
                     }
                 },
                 () => onNotFound());
