@@ -3643,6 +3643,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         async Task<BlobClient> GetBlobClientAsync(string containerReference, string blobName)
         {
+            if (containerReference.IsNullOrWhiteSpace())
+                throw new Exception("Empty containerReference");
             var blobContainerClient = BlobClient.GetBlobContainerClient(containerReference);
             global::Azure.Response<BlobContainerInfo> createResponse = await blobContainerClient.CreateIfNotExistsAsync();
             return blobContainerClient.GetBlobClient(blobName);
@@ -4290,6 +4292,12 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             RetryDelegate onTimeout = default)
         {
+            if (containerName.IsNullOrWhiteSpace())
+            {
+                if(onNotFound.IsDefaultOrNull())
+                    throw new Exception("Empty containerReference");
+                return onNotFound();
+            }
             try
             {
                 var blockClient = await GetBlobClientAsync(
