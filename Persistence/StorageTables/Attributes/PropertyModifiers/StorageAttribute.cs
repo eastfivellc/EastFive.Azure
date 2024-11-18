@@ -119,6 +119,8 @@ namespace EastFive.Persistence
     {
         public string Name { get; set; }
 
+        public bool ReadOnly { get; set; } = false;
+
         public bool PropertyForDefaultOrNull { get; set; } = false;
 
         public string GetTablePropertyName(MemberInfo member)
@@ -136,6 +138,8 @@ namespace EastFive.Persistence
         public virtual KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(MemberInfo memberInfo,
             object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
+            if (ReadOnly)
+                return new KeyValuePair<string, EntityProperty>[] { };
             var propertyName = this.GetTablePropertyName(memberInfo);
 
             var valueType = memberInfo.GetPropertyOrFieldType();
