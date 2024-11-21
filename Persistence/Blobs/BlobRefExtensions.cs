@@ -79,7 +79,7 @@ namespace EastFive.Azure.Persistence.Blobs
             return guid.ToString("N");
         }
 
-        public static Task<(byte[], string)> ReadBytesAsync(this IBlobRef blobRef) =>
+        public static Task<(byte[] data, string contentType)> ReadBytesAsync(this IBlobRef blobRef) =>
             blobRef.ReadBytesAsync(
                 onSuccess: (bytes, contentType) => (bytes, contentType));
 
