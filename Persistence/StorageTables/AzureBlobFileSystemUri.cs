@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using EastFive;
 using EastFive.Api;
+using EastFive.Configuration;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Persistence;
@@ -21,16 +23,25 @@ namespace EastFive.Azure.Persistence.StorageTables
 	{
 		public string containerName;
 		public string path;
+        public string storageName;
 
         public AzureBlobFileSystemUri()
         {
 
         }
 
-        public AzureBlobFileSystemUri(string containerName, string path)
+        public AzureBlobFileSystemUri(string containerName, string path, string storageName)
         {
             this.containerName = containerName;
             this.path = path;
+            this.storageName = storageName;
+        }
+
+        public static AzureBlobFileSystemUri FromConnectionString(ConnectionString connectionStringKey,
+            string containerName, string path)
+        {
+            var storageName = connectionStringKey.ConfigurationString(ParseConnectionStringForAccountName);
+            return new AzureBlobFileSystemUri(containerName, path, storageName);
         }
 
         public AzureBlobFileSystemUri AppendToPath(string fileNameOrDirectory)
@@ -39,31 +50,43 @@ namespace EastFive.Azure.Persistence.StorageTables
                 $"{this.path}{fileNameOrDirectory}"
                 :
                 $"{this.path}/{fileNameOrDirectory}";
-            return new AzureBlobFileSystemUri(this.containerName, newPath);
+            return new AzureBlobFileSystemUri(this.containerName, newPath, this.storageName);
+        }
+
+        private static string ParseConnectionStringForAccountName(string connectionString)
+        {
+            var accountNameRegexVariable = "accountName";
+            if (!connectionString.TryMatchRegex($"AccountName=(?<{accountNameRegexVariable}>[^;]+)", out (string, string)[] matches))
+                return string.Empty;
+
+            return matches
+                .Where(match => accountNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                .First(
+                    (match, next) =>
+                    {
+                        var storageName = match.Item2;
+                        return storageName;
+                    },
+                    () => string.Empty);
+        }
+
+        public ConnectionString ConnectionString
+        {
+            get
+            {
+                var dlAccoutnName = ParseConnectionStringForAccountName(EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString.Key);
+                if (String.Equals(dlAccoutnName, this.storageName))
+                    return EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString;
+
+                return EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString;
+            }
         }
 
         public string AbfssUri
 		{
 			get
 			{
-				return EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString.ConfigurationString(
-					dlConnectionString =>
-					{
-						var accountNameRegexVariable = "accountName";
-						if (!dlConnectionString.TryMatchRegex($"AccountName=(?<{accountNameRegexVariable}>[^;]+)", out (string, string)[] matches))
-							return string.Empty;
-
-						return matches
-							.Where(match => accountNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
-							.First(
-								(match, next) =>
-                                {
-                                    var storageName = match.Item2;
-                                    return $"abfss://{containerName}@{storageName}.dfs.core.windows.net/{path}";
-                                },
-								() => string.Empty);
-					},
-					(why) => string.Empty);
+                return $"abfss://{containerName}@{storageName}.dfs.core.windows.net/{path}";
             }
 			set
 			{
@@ -75,6 +98,11 @@ namespace EastFive.Azure.Persistence.StorageTables
 						$"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
 						out (string, string)[] matches))
                 {
+                    this.storageName = matches
+                        .Where(match => storageNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
                     this.containerName = matches
                         .Where(match => containerNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
                         .First(
@@ -110,6 +138,11 @@ namespace EastFive.Azure.Persistence.StorageTables
                             () => string.Empty);
                     this.path = matchesNoFilename
                         .Where(match => pathRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
+                        .First(
+                            (match, next) => match.Item2,
+                            () => string.Empty);
+                    this.storageName = matchesNoFilename
+                        .Where(match => storageNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
                         .First(
                             (match, next) => match.Item2,
                             () => string.Empty);

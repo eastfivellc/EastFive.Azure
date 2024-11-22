@@ -31,8 +31,7 @@ namespace EastFive.Azure.Persistence
         {
             var schema = data.GetParquetSchema();
             bool deleted = await exportLocation.BlobDeleteIfExistsAsync(
-                () => true,
-                connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                () => true);
             return data
                 .ReadAsTuple()
                 .Segment(rowsPerfile)
@@ -50,8 +49,7 @@ namespace EastFive.Azure.Persistence
                                 },
                                 (blobContentInfo) => blobContentInfo,
                                     contentTypeString: "application/vnd.apache.parquet",
-                                    fileName: fileName,
-                                    connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                                    fileName: fileName);
                     })
                 .AsyncEnumerable();
         }
@@ -142,8 +140,7 @@ namespace EastFive.Azure.Persistence
         {
             var schema = GetParquetSchema<TEntity>();
             bool deleted = await exportLocation.BlobDeleteIfExistsAsync(
-                () => true,
-                connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                () => true);
 
             var mappers = typeof(TEntity)
                 .GetPropertyAndFieldsWithAttributesInterface<IMapParquetProperty>(inherit: true)
@@ -166,8 +163,7 @@ namespace EastFive.Azure.Persistence
                                 },
                                 (blobContentInfo) => blobContentInfo,
                                     contentTypeString: "application/vnd.apache.parquet",
-                                    fileName: fileName,
-                                    connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString);
+                                    fileName: fileName);
                     })
                 .AsyncEnumerable();
 

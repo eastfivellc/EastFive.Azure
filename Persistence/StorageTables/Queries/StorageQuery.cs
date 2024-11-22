@@ -19,6 +19,7 @@ using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Api;
 using EastFive.Extensions;
 using EastFive.Reflection;
+using EastFive.Configuration;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables
 {
@@ -44,8 +45,11 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         }
 
         public static IQueryable<TResource> CreateQuery(
-            string storageConnectionKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+            ConnectionString storageConnectionKey = default)
         {
+            if (storageConnectionKey.IsDefaultOrNull())
+                storageConnectionKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString;
+
             var driver = AzureTableDriverDynamic
                 .FromSettings(storageConnectionKey);
             return new StorageQuery<TResource>(driver);

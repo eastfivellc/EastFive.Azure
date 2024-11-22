@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using EastFive.Web.Configuration;
 using EastFive.Azure.StorageTables.Driver;
 
 using Microsoft.Azure.Cosmos.Table;
@@ -25,7 +26,7 @@ namespace EastFive.Api.Azure.Persistence
 
         private static BlobServiceClient BlobStore()
         {
-            return Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString,
+            return EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
                 (connectionString) =>
                 {
                     return new BlobServiceClient(connectionString,

@@ -22,6 +22,7 @@ using EastFive.Linq.Async;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using Azure.Search.Documents.Models;
 using EastFive.Serialization.Text;
+using EastFive.Configuration;
 
 namespace EastFive.Azure.Functions
 {
@@ -259,8 +260,10 @@ namespace EastFive.Azure.Functions
             Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string extension = default,
             AzureTableDriverDynamic.RetryDelegate onTimeout = null,
-            string connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString)
+            ConnectionString connectionStringConfigKey = default)
         {
+            if (connectionStringConfigKey.IsDefaultOrNull())
+                connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString;
             return dataLakeExported.exportContainer.BlobListFilesAsync(
                 files =>
                 {

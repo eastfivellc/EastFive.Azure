@@ -20,6 +20,7 @@ using RestSharp;
 using System.Threading;
 using Azure.Storage.Blobs;
 using Microsoft.Azure.Cosmos.Table;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Persistence.Azure.StorageTables.Caching
 {
@@ -223,8 +224,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Caching
 
         private BlobServiceClient GetBlobClient()
         {
-            var blobClient = Web.Configuration.Settings.GetString(
-                    EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString,
+            var blobClient = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.ConfigurationString(
                 (storageSetting) =>
                 {
                     var cloudStorageAccount = CloudStorageAccount.Parse(storageSetting);

@@ -19,6 +19,7 @@ using Newtonsoft.Json;
 using EastFive;
 using EastFive.Api;
 using EastFive.Extensions;
+using EastFive.Web.Configuration;
 using EastFive.Analytics;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Azure.Persistence.StorageTables;
@@ -30,6 +31,7 @@ using EastFive.Linq.Expressions;
 using EastFive.Reflection;
 using EastFive.Serialization;
 using Azure.Storage.Blobs.Specialized;
+using EastFive.Configuration;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -184,9 +186,18 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             }
         }
 
-        public static AzureTableDriverDynamic FromSettings(string settingKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString)
+        public static AzureTableDriverDynamic FromSettings(string settingKey = default)
         {
+            if (settingKey.IsDefaultOrNull())
+                settingKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString.Key;
             return EastFive.Web.Configuration.Settings.GetString(settingKey,
+                (connectionString) => FromStorageString(connectionString),
+                (why) => throw new Exception(why));
+        }
+
+        public static AzureTableDriverDynamic FromSettings(ConnectionString settingKey)
+        {
+            return settingKey.ConfigurationString(
                 (connectionString) => FromStorageString(connectionString),
                 (why) => throw new Exception(why));
         }

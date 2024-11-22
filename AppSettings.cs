@@ -1,4 +1,5 @@
-﻿using EastFive.Web;
+﻿using EastFive.Configuration;
+using EastFive.Web;
 
 namespace EastFive.Azure
 {
@@ -34,7 +35,7 @@ namespace EastFive.Azure
                     DeploymentSecurityConcern = false,
                     Location = "Azure Portal | Storage | Connection Strings",
                     PrivateRepositoryOnly = true)]
-                public const string ConnectionString = "EastFive.Azure.StorageTables.ConnectionString";
+                public static readonly ConnectionString ConnectionString = new ConnectionString("EastFive.Azure.StorageTables.ConnectionString");
 
                 public const string TableInformationToken = "EastFive.Azure.StorageTables.TableInformationToken";
 
@@ -50,7 +51,7 @@ namespace EastFive.Azure
                     DeploymentSecurityConcern = false,
                     Location = "Azure Portal | Storage | Connection Strings",
                     PrivateRepositoryOnly = true)]
-                public const string ConnectionString = "EastFive.Azure.DataLake.ConnectionString";
+                public static readonly ConnectionString ConnectionString = new ConnectionString("EastFive.Azure.DataLake.ConnectionString");
             }
         }
 
