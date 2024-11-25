@@ -18,6 +18,9 @@ using EastFive.Linq.Async;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Serialization.Parquet;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using EastFive.Linq;
+using System.Reflection;
+using System.IO;
 
 namespace EastFive.Azure.Persistence
 {
@@ -199,6 +202,61 @@ namespace EastFive.Azure.Persistence
                 .ToArray();
 
             return new global::Parquet.Data.Schema(fields);
+        }
+
+        public static IEnumerableAsync<TEntity> ReadParquet<TEntity>(this AzureBlobFileSystemUri data)
+            => data.ReadParquetInternal<TEntity>().FoldTask();
+
+        private static async Task<IEnumerable<TEntity>> ReadParquetInternal<TEntity>(this AzureBlobFileSystemUri data)
+        {
+            var schema = GetParquetSchema<TEntity>();
+
+            var membersAndMappers = typeof(TEntity)
+                .GetPropertyAndFieldsWithAttributesInterface<IMapParquetProperty>(inherit: true)
+                .ToArray();
+
+            var dataBytes = await await data.BlobLoadStreamAsync(
+                (parquetData, props) => parquetData.ToBytesAsync());
+            var parquetData = new MemoryStream(dataBytes);
+
+                    var table = global::Parquet.ParquetReader.ReadTableFromStream(parquetData);
+                    var headers = table.Schema.Fields;
+                    return Iterate();
+
+                    IEnumerable<TEntity> Iterate()
+                    {
+                        foreach (var row in table)
+                        {
+                            TEntity resource;
+                            try
+                            {
+                                var fields = row.Values;
+                                var properties = headers.CollateSimple(fields).ToArray();
+
+                                resource = ParseResource(membersAndMappers, properties);
+
+                                TEntity ParseResource(
+                                    (MemberInfo, IMapParquetProperty)[] membersAndMappers,
+                                    (global::Parquet.Data.Field key, object value)[] rowValues)
+                                {
+                                    var resource = Activator.CreateInstance<TEntity>();
+                                    return membersAndMappers
+                                        .Aggregate(resource,
+                                            (resource, memberAndMapper) =>
+                                            {
+                                                var (member, mapper) = memberAndMapper;
+                                                return mapper.ParseMemberValueFromRow(resource, member, rowValues);
+                                            });
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                ex.GetType();
+                                continue;
+                            }
+                            yield return resource;
+                        }
+                    }
         }
     }
 }
