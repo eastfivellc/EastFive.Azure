@@ -74,7 +74,8 @@ namespace EastFive.Azure.Persistence.StorageTables
         {
             get
             {
-                var dlAccoutnName = ParseConnectionStringForAccountName(EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString.Key);
+                var connectionString = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString.ConfigurationString(x => x);
+                var dlAccoutnName = ParseConnectionStringForAccountName(connectionString);
                 if (String.Equals(dlAccoutnName, this.storageName))
                     return EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString;
 

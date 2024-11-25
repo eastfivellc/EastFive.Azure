@@ -1931,6 +1931,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 onTimeout: onTimeout);
         }
 
+        public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, AzureBlobFileSystemUri abfsUri,
+            Func<TResult> onSuccess,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            string contentType = default,
+            string contentDisposition = default,
+            IDictionary<string, string> metadata = default,
+            AzureTableDriverDynamic.RetryDelegate onTimeout = null)
+        {
+            return AzureTableDriverDynamic
+                .FromSettings(abfsUri.ConnectionString)
+                .BlobCreateOrUpdateAsync(content, abfsUri.path, abfsUri.containerName,
+                    onSuccess,
+                    onFailure,
+                    contentType: contentType,
+                    metadata: metadata,
+                    contentDisposition: contentDisposition,
+                    onTimeout: onTimeout);
+        }
+
         public static Task<TResult> BlobCreateOrUpdateAsync<TResult>(this byte[] content, string blobName, string containerName,
             Func<TResult> onSuccess,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
@@ -2441,6 +2460,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
 
         public static AzureBlobFileSystemUri ToAzureBlobFileSystemUri(this BlobItem blobItem, string containerName, ConnectionString connectionStringKey) =>
             AzureBlobFileSystemUri.FromConnectionString(connectionStringKey, containerName, blobItem.Name);
+
+        public static AzureBlobFileSystemUri ToAzureBlobFileSystemUri(this BlobItem blobItem, AzureBlobFileSystemUri baseUri) =>
+            new AzureBlobFileSystemUri(baseUri.containerName, blobItem.Name, baseUri.storageName);
 
         #endregion
 
