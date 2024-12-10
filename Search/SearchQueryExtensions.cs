@@ -649,7 +649,7 @@ namespace EastFive.Azure.Search
                     .Select(
                         id =>
                         {
-                            return $"{key} eq '{id}'";
+                            return $"{key} eq '{id}' or {key} eq '{id.ToString("N")}'";
                         })
                     .Join(" or ");
 
