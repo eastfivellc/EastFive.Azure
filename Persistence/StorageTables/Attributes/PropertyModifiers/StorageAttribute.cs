@@ -26,6 +26,7 @@ namespace EastFive.Persistence
         string Name { get; }
 
         object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
+            out bool shouldSkip,
             Func<object> getDefaultValue = default);
 
         string GetTablePropertyName(MemberInfo member);
@@ -120,6 +121,7 @@ namespace EastFive.Persistence
         public string Name { get; set; }
 
         public bool ReadOnly { get; set; } = false;
+        public bool WriteToStorageOnly { get; set; } = false;
 
         public bool PropertyForDefaultOrNull { get; set; } = false;
 
@@ -250,8 +252,9 @@ namespace EastFive.Persistence
         }
 
         public virtual object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = default)
         {
+            shouldSkip = this.WriteToStorageOnly;
             var type = memberInfo.GetPropertyOrFieldType();
             var propertyName = this.GetTablePropertyName(memberInfo);
             if (type.TryGetAttributeInterface(
@@ -483,8 +486,9 @@ namespace EastFive.Persistence
                     var entityProperties = allValues[propName].PairWithKey(objPropName)
                         .AsArray()
                         .ToDictionary();
-                    var propertyValue = attr.GetMemberValue(member, entityProperties);
-                    member.SetValue(ref value, propertyValue);
+                    var propertyValue = attr.GetMemberValue(member, entityProperties, out var shouldSkip);
+                    if(!shouldSkip)
+                        member.SetValue(ref value, propertyValue);
                 }
 
                 return onBound(value);

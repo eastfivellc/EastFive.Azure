@@ -92,8 +92,11 @@ namespace EastFive.Azure.Auth
         }
 
         public object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values,
+            out bool shouldSkip,
+            Func<object> getDefaultValue = default)
         {
+            shouldSkip = false;
             var accountLinks = values
                 .TryWhere(
                     (KeyValuePair<string, EntityProperty> kvp, out AccountLink accountLink) =>

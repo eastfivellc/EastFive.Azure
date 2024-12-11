@@ -258,8 +258,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     var propInfo = propInfoAttribute.Key;
                     var attr = propInfoAttribute.Value;
-                    var value = attr.GetMemberValue(propInfo, properties);
-                    propInfo.SetValue(ref entity, value);
+                    var value = attr.GetMemberValue(propInfo, properties, out var shouldSkip);
+                    if(!shouldSkip)
+                        propInfo.SetValue(ref entity, value);
                 }
                 return entity;
             }

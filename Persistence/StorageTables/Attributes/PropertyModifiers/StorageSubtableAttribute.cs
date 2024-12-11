@@ -52,8 +52,10 @@ namespace EastFive.Persistence
         }
 
         public virtual object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values,
+            out bool shouldSkip,
             Func<object> getDefaultValue = default)
         {
+            shouldSkip = false;
             var memberType = memberInfo.GetPropertyOrFieldType();
             if (!memberType.IsSubClassOfGeneric(typeof(Func<>)))
                 throw new ArgumentException($"{memberInfo.Name} is not of type {nameof(Func<Task>)} and therefore cannot be used as a subtable");
@@ -263,6 +265,7 @@ namespace EastFive.Persistence
                                             {
                                                 {propertyName, ep}
                                             },
+                                            out var shouldSkip,
                                             () => memberType.GetDefault());
                                     })
                                 .ToArray();

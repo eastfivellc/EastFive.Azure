@@ -65,8 +65,9 @@ namespace EastFive.Persistence
         }
 
         public override object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = default)
         {
+            shouldSkip = this.WriteToStorageOnly;
             var propertyName = this.GetTablePropertyName(memberInfo);
 
             var type = memberInfo.GetPropertyOrFieldType();
@@ -242,8 +243,9 @@ namespace EastFive.Persistence
                     var entityProperties = allValues[propName].PairWithKey(objPropName)
                         .AsArray()
                         .ToDictionary();
-                    var propertyValue = attr.GetMemberValue(member, entityProperties);
-                    member.SetValue(ref value, propertyValue);
+                    var propertyValue = attr.GetMemberValue(member, entityProperties, out var shouldSkip);
+                    if(!shouldSkip)
+                        member.SetValue(ref value, propertyValue);
                 }
 
                 return onBound(value);

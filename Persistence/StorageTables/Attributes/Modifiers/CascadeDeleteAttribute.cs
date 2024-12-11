@@ -111,8 +111,11 @@ namespace EastFive.Persistence.Azure.StorageTables
         }
 
         public object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values,
+            out bool shouldSkip,
+            Func<object> getDefaultValue = default)
         {
+            shouldSkip = false;
             // TODO: Setup a projection for the StorageCall
             return memberInfo.GetMemberType().GetDefault();
         }

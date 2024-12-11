@@ -45,7 +45,7 @@ namespace EastFive.Persistence
         }
 
         public override object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = default)
         {
             var propertyName = this.GetTablePropertyName(memberInfo);
 
@@ -60,7 +60,7 @@ namespace EastFive.Persistence
                     })
                 .ToDictionary();
 
-            return base.GetMemberValue(memberInfo, compactedValues);
+            return base.GetMemberValue(memberInfo, compactedValues, out shouldSkip, getDefaultValue:getDefaultValue);
         }
 
         public static IEnumerable<KeyValuePair<string, EntityProperty>> ComputeOverflowValues(

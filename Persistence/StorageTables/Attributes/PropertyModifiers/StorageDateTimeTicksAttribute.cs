@@ -58,8 +58,9 @@ namespace EastFive.Persistence
         }
 
         public override object GetMemberValue(MemberInfo memberInfo,
-            IDictionary<string, EntityProperty> values, Func<object> getDefaultValue = default)
+            IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = default)
         {
+            shouldSkip = this.WriteToStorageOnly;
             var propertyName = this.GetTablePropertyName(memberInfo);
             var valueType = memberInfo.GetPropertyOrFieldType();
             if (valueType.IsAssignableFrom(typeof(DateTime)))
@@ -94,7 +95,7 @@ namespace EastFive.Persistence
                 return defaultValue;
             }
 
-            return base.GetMemberValue(memberInfo, values, getDefaultValue:getDefaultValue);
+            return base.GetMemberValue(memberInfo, values, out shouldSkip, getDefaultValue:getDefaultValue);
         }
     }
 
