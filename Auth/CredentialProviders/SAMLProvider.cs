@@ -48,8 +48,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
         {
             return await EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
                 async (certBuffer) =>
-                {
-                    using (var certificate = new X509Certificate2(certBuffer))
+                {   
+                    using (var certificate = X509CertificateLoader.LoadCertificate(certBuffer))
                     {
                         var m = certificate.GetRSAPrivateKey();
                         AsymmetricAlgorithm trustedSigner = m; // AsymmetricAlgorithm.Create(certificate.GetKeyAlgorithm()
