@@ -135,6 +135,33 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             }
         }
 
+        [HttpGet]
+        [SuperAdminClaim()]
+        public static async Task<IHttpResponse> GetAsync(
+                [QueryId(Name = IdPropertyName)] IRef<VoucherToken> voucherRef,
+                [Property(Name = KeyPropertyName)] Property<string> keyMaybe,
+            ContentTypeResponse<VoucherToken> onFound,
+            NotFoundResponse onNotFound,
+            BadRequestResponse onBadRequest)
+        {
+            return await voucherRef.StorageGetAsync(
+                (item) =>
+                {
+                    if (!keyMaybe.specified)
+                        return onFound(item);
+
+                    return VoucherTools.GenerateUrlToken(voucherRef.id, item.expiration,
+                            keyMaybe.value,
+                        token =>
+                        {
+                            item.token = token;
+                            return onFound(item);
+                        },
+                        (why) => onBadRequest().AddReason(why));
+                },
+                () => onNotFound());
+        }
+
         [HttpAction("SecurityLog")]
         [EastFive.Api.Meta.Flows.WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
