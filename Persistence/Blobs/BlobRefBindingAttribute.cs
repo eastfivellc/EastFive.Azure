@@ -360,10 +360,6 @@ namespace EastFive.Azure.Persistence.Blobs
             public void Write(JsonWriter writer, JsonSerializer serializer,
                 IHttpRequest httpRequest, IAzureApplication application)
             {
-                var httpContext = (httpRequest as Api.Core.CoreHttpRequest).request.HttpContext;
-                var coreUrlProvider = new Api.Core.CoreUrlProvider(httpContext);
-                var cdn = (application as IAzureApplication).CDN;
-                var request = new RequestMessage<BlobRefBindingAttribute>(cdn);
                 writer.WriteValue(Id);
             }
         }
