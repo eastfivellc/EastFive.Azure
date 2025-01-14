@@ -113,7 +113,7 @@ namespace EastFive.Azure.Auth.Instigations
                             (minutes) => TimeSpan.FromMinutes(minutes));
                         return Api.Auth.JwtTools.CreateToken(sessionRef.id,
                                 scope, duration, claims,
-                            async (tokenNew) =>
+                            async (tokenNew, whenIssued) =>
                             {
                                 var session = new Session
                                 {

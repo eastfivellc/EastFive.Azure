@@ -39,6 +39,12 @@ namespace EastFive.Azure.Auth
         [ScopeDateTime(CreatedScopeName, SpanUnits = TimeSpanUnits.years, IgnoreNull = true)]
         public DateTime? created;
 
+        public const string ExpiresPropertyName = "expires";
+        [ApiProperty(PropertyName = ExpiresPropertyName)]
+        [JsonProperty(PropertyName = ExpiresPropertyName)]
+        [Storage]
+        public DateTime? expires;
+
         public const string AuthorizationPropertyName = "authorization";
         [ApiProperty(PropertyName = AuthorizationPropertyName)]
         [JsonProperty(PropertyName = AuthorizationPropertyName)]
@@ -176,8 +182,9 @@ namespace EastFive.Azure.Auth
                                     var duration = CreateExpirationDuration();
                                     return Api.Auth.JwtTools.CreateToken(session.id,
                                             scope, duration, claims,
-                                        (tokenNew) =>
+                                        (tokenNew, whenIssued) =>
                                         {
+                                            session.expires = whenIssued + duration;
                                             session.token = tokenNew;
                                             return onFound(session);
                                         },
@@ -264,9 +271,10 @@ namespace EastFive.Azure.Auth
                                 {
                                     return Api.Auth.JwtTools.CreateToken(sessionId.id,
                                         scope, duration, claims,
-                                        (tokenNew) =>
+                                        (tokenNew, whenIssued) =>
                                         {
                                             session.token = tokenNew;
+                                            session.expires = whenIssued + duration;
                                             return onCreated(session);
                                         },
                                         (missingConfig) => onConfigurationFailure("Missing", missingConfig),
@@ -276,9 +284,10 @@ namespace EastFive.Azure.Auth
                                 {
                                     return Api.Auth.JwtTools.CreateToken(sessionId.id,
                                         scope, duration, claims,
-                                        (tokenNew) =>
+                                        (tokenNew, whenIssued) =>
                                         {
                                             session.token = tokenNew;
+                                            session.expires = whenIssued + duration;
                                             return onCreated(session);
                                         },
                                         (missingConfig) => onConfigurationFailure("Missing", missingConfig),
@@ -317,9 +326,10 @@ namespace EastFive.Azure.Auth
                                     var duration = CreateExpirationDuration();
                                     return await Api.Auth.JwtTools.CreateToken(sessionRef.id,
                                             scope, duration, claims,
-                                        async (tokenNew) =>
+                                        async (tokenNew, whenIssued) =>
                                         {
                                             sessionStorage.token = tokenNew;
+                                            sessionStorage.expires = whenIssued + duration;
                                             await saveSessionAsync(sessionStorage);
                                             return onUpdated(sessionStorage);
                                         },
@@ -378,9 +388,10 @@ namespace EastFive.Azure.Auth
                                 {
                                     return Api.Auth.JwtTools.CreateToken(session.id,
                                         scope, duration, claims,
-                                        (tokenNew) =>
+                                        (tokenNew, whenIssued) =>
                                         {
                                             session.token = tokenNew;
+                                            session.expires = whenIssued + duration;
                                             return session;
                                         },
                                         (missingConfig) => throw new Exception(missingConfig),
@@ -397,9 +408,10 @@ namespace EastFive.Azure.Auth
                                             await saveAsync(sessionToUpdate);
                                             return Api.Auth.JwtTools.CreateToken(sessionToUpdate.id,
                                                 scope, duration, claims,
-                                                (tokenNew) =>
+                                                (tokenNew, whenIssued) =>
                                                 {
                                                     sessionToUpdate.token = tokenNew;
+                                                    sessionToUpdate.expires = whenIssued + duration;
                                                     return sessionToUpdate;
                                                 },
                                                 (missingConfig) => throw new Exception(missingConfig),

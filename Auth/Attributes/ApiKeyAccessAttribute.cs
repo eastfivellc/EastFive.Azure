@@ -51,7 +51,7 @@ namespace EastFive.Azure.Auth
                                         var claims = voucherToken.claims;
                                         return JwtTools.CreateToken(sessionId,
                                                 scope, tokenExpiration, claims,
-                                            (tokenNew) =>
+                                            (tokenNew, whenIssued) =>
                                             {
                                                 request.SetAuthorization(tokenNew);
                                                 return continueExecution(controllerType, httpApp, request);
