@@ -268,19 +268,6 @@ namespace EastFive.Azure.Functions
                 (why) => throw new Exception(why));
         }
 
-        public static Task SendToQueueAsync(IRefs<InvocationMessage> invocationMessageRefs,
-            IAzureApplication azureApplication)
-        {
-            var byteContents = invocationMessageRefs.ids.Select(id => id.ToByteArray()).ToArray();
-            return EastFive.Web.Configuration.Settings.GetString(
-                AppSettings.FunctionProcessorServiceBusTriggerName,
-                (serviceBusTriggerName) =>
-                {
-                    return azureApplication.SendServiceBusMessageAsync(serviceBusTriggerName, byteContents);
-                },
-                (why) => throw new Exception(why));
-        }
-
         public static async Task<IHttpResponse> InvokeAsync(IRef<InvocationMessage> invocationMessageRef,
             IInvokeApplication invokeApplication,
             ILoggerWithEvents logging = default,

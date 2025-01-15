@@ -28,6 +28,8 @@ using EastFive.Azure.Monitoring;
 using EastFive.Web.Configuration;
 using EastFive.Api;
 using EastFive.Azure.Auth.CredentialProviders;
+using Azure.Messaging.ServiceBus;
+using System.Collections.Concurrent;
 
 namespace EastFive.Azure
 {
@@ -219,8 +221,18 @@ namespace EastFive.Api.Azure
 
         public virtual Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes)
         {
-            return AzureApplication.SendServiceBusMessageStaticAsync(queueName, listOfBytes);
+            return Task.WhenAll(listOfBytes
+                .Select(bytes => SendServiceBusMessageAsync(queueName, bytes))
+                .ToArray());
         }
+
+        private static readonly Lazy<ServiceBusClient> serviceBusClient = new Lazy<ServiceBusClient>(
+            () =>EastFive.Azure.AppSettings.ServiceBusConnectionString.ConfigurationString(
+                (connectionString) => new ServiceBusClient(connectionString),
+                (why) => throw new Exception(why)),
+            true);
+
+        private static readonly ConcurrentDictionary<string, ServiceBusSender> serviceBusSenders = new ConcurrentDictionary<string, ServiceBusSender>();
 
         public static async Task SendServiceBusMessageStaticAsync(string queueName, IEnumerable<byte[]> listOfBytes, Func<string> getSessionId = default)
         {
@@ -231,12 +243,7 @@ namespace EastFive.Api.Azure
             if (!listOfBytes.Any())
                 return;
 
-            var client = EastFive.Azure.AppSettings.ServiceBusConnectionString.ConfigurationString(
-                (connectionString) =>
-                {
-                    return new Microsoft.Azure.ServiceBus.QueueClient(connectionString, queueName);
-                },
-                (why) => throw new Exception(why));
+            var sender = serviceBusSenders.GetOrAdd(queueName, serviceBusClient.Value.CreateSender);
 
             // The padding was estimated by this:
             //var bodyLen = 131_006;  // (131_006 + 58 + 8) * 2 messages = 262_144
@@ -246,41 +253,34 @@ namespace EastFive.Api.Azure
             //await client.SendAsync(new List<Microsoft.Azure.ServiceBus.Message> { msg1, msg2 });
             // If the send is successful, we haven't exceeded the max payload
 
-            try
-            {
-                var messages = listOfBytes
-                    .Select(bytes => new Microsoft.Azure.ServiceBus.Message(bytes)
-                    {
-                        SessionId = getSessionId != default ? getSessionId() : default(string),
-                        ContentType = "application/octet-stream",
-                    })
-                    .ToArray();
-                var maxMessageSize = messages.Select(x => x.Body.Length + perMessageHeaderSize + perMessageListSize).Max();
-                int numberInBatch = maxPayloadSize / maxMessageSize;
-                do
+            var messages = listOfBytes
+                .Select(bytes => new ServiceBusMessage(bytes)
                 {
-                    var toBeSent = messages.Take(numberInBatch).ToArray();
-                    try
-                    {
-                        await client.SendAsync(toBeSent);
-                        messages = messages.Skip(toBeSent.Length).ToArray();
-                    }
-                    catch (Exception ex)
-                    {
-                        if (ex.Message.Contains("MessageSizeExceededException"))
-                        {
-                            numberInBatch -= 1;
-                            if (numberInBatch > 0)
-                                continue;
-                        }
-                        throw;
-                    }
-                } while (messages.Length > 0);
-            }
-            finally
+                    SessionId = getSessionId != default ? getSessionId() : default(string),
+                    ContentType = "application/octet-stream",
+                })
+                .ToArray();
+            var maxMessageSize = messages.Select(x => x.Body.ToArray().Length + perMessageHeaderSize + perMessageListSize).Max();
+            int numberInBatch = maxPayloadSize / maxMessageSize;
+            do
             {
-                await client.CloseAsync();
-            }
+                var toBeSent = messages.Take(numberInBatch).ToArray();
+                try
+                {
+                    await sender.SendMessagesAsync(toBeSent);
+                    messages = messages.Skip(toBeSent.Length).ToArray();
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.Contains("MessageSizeExceededException"))
+                    {
+                        numberInBatch -= 1;
+                        if (numberInBatch > 0)
+                            continue;
+                    }
+                    throw;
+                }
+            } while (messages.Length > 0);
         }
 
         //public virtual async Task<SendReceipt> SendQueueMessageAsync(string queueName, byte[] byteContent)
