@@ -62,9 +62,9 @@ namespace EastFive.Azure
 
         TelemetryClient Telemetry { get; }
 
-        Task SendServiceBusMessageAsync(string queueName, byte[] bytes);
+        Task SendServiceBusMessageAsync(string queueName, string messageId, byte[] bytes);
 
-        Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes);
+        Task SendServiceBusMessageAsync(string queueName, IEnumerable<KeyValuePair<string, byte[]>> listOfBytes);
     }
 }
 
@@ -214,15 +214,15 @@ namespace EastFive.Api.Azure
             }
         }
 
-        public virtual Task SendServiceBusMessageAsync(string queueName, byte[] bytes)
+        public virtual Task SendServiceBusMessageAsync(string queueName, string messageId, byte[] bytes)
         {
-            return SendServiceBusMessageAsync(queueName, new[] { bytes });
+            return SendServiceBusMessageStaticAsync(queueName, messageId, new[] { bytes });
         }
 
-        public virtual Task SendServiceBusMessageAsync(string queueName, IEnumerable<byte[]> listOfBytes)
+        public virtual Task SendServiceBusMessageAsync(string queueName, IEnumerable<KeyValuePair<string, byte[]>> listOfBytes)
         {
             return Task.WhenAll(listOfBytes
-                .Select(bytes => SendServiceBusMessageAsync(queueName, bytes))
+                .Select(kvp => SendServiceBusMessageAsync(queueName, kvp.Key, kvp.Value))
                 .ToArray());
         }
 
@@ -234,7 +234,8 @@ namespace EastFive.Api.Azure
 
         private static readonly ConcurrentDictionary<string, ServiceBusSender> serviceBusSenders = new ConcurrentDictionary<string, ServiceBusSender>();
 
-        public static async Task SendServiceBusMessageStaticAsync(string queueName, IEnumerable<byte[]> listOfBytes, Func<string> getSessionId = default)
+        // The message id is useful in case duplicate message detection is enabled on the service bus queue
+        public static async Task SendServiceBusMessageStaticAsync(string queueName, string messageId, IEnumerable<byte[]> listOfBytes, Func<string> getSessionId = default)
         {
             const int maxPayloadSize = 262_144;
             const int perMessageHeaderSize = 58;
@@ -256,6 +257,7 @@ namespace EastFive.Api.Azure
             var messages = listOfBytes
                 .Select(bytes => new ServiceBusMessage(bytes)
                 {
+                    MessageId = messageId,
                     SessionId = getSessionId != default ? getSessionId() : default(string),
                     ContentType = "application/octet-stream",
                 })

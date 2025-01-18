@@ -47,7 +47,7 @@ namespace EastFive.Azure.Functions
                 serviceBusTriggerNameOverride :
                 AppSettings.FunctionProcessorServiceBusTriggerName.ConfigurationString(value => value, (why) => throw new Exception(why));
 
-            await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName,
+            await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
                 byteContent.AsEnumerable());
             return invocationMessage;
         }

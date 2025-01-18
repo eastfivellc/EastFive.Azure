@@ -81,7 +81,7 @@ namespace EastFive.Azure.Functions
                 AppSettings.FunctionProcessorServiceBusTriggerName,
                 async (serviceBusTriggerName) =>
                 {
-                    await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName,
+                    await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
                         byteContent.AsEnumerable());
                     return invocationMessage;
                 },

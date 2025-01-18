@@ -263,7 +263,7 @@ namespace EastFive.Azure.Functions
                 AppSettings.FunctionProcessorServiceBusTriggerName,
                 (serviceBusTriggerName) =>
                 {
-                    return azureApplication.SendServiceBusMessageAsync(serviceBusTriggerName, byteContent);
+                    return azureApplication.SendServiceBusMessageAsync(serviceBusTriggerName, invocationMessageRef.id.ToString("N"), byteContent);
                 },
                 (why) => throw new Exception(why));
         }

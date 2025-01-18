@@ -12,6 +12,7 @@ using EastFive.Analytics;
 using EastFive.Api.Azure;
 using EastFive.Web.Configuration;
 using EastFive.Azure.Persistence.Attributes;
+using EastFive.Extensions;
 
 namespace EastFive.Azure.Persistence.StorageTables.Backups
 {
@@ -42,16 +43,17 @@ namespace EastFive.Azure.Persistence.StorageTables.Backups
                             .Select(
                                 (prefix) =>
                                 {
-                                    return new ContainerMessage
+                                    var msg = new ContainerMessage
                                     {
                                         sourceConnectionString = sourceConnectionString,
                                         destConnectionString = destConnectionString,
                                         name = info.name,
                                         prefix = prefix,
                                     };
+                                    return Encoding.UTF8.GetBytes(
+                                        JsonConvert.SerializeObject(msg))
+                                        .PairWithKey($"{msg.name}/{msg.prefix}");
                                 })
-                            .Select(message => JsonConvert.SerializeObject(message))
-                            .Select(message => Encoding.UTF8.GetBytes(message))
                             .ToArray();
                         await application.SendServiceBusMessageAsync(serviceBusQueueName, backupMessages);
                         sw.Stop();
