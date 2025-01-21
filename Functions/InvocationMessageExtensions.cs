@@ -86,7 +86,7 @@ namespace EastFive.Azure.Functions
                         await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
                             byteContent.AsEnumerable());
                         return invocationMessage;
-                    } catch(Exception e)
+                    } catch(Exception)
                     {
                         return default(InvocationMessage?);
                     }

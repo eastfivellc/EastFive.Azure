@@ -1,7 +1,7 @@
 ﻿using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Web.Configuration;
-using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Identity.Client;
 using Newtonsoft.Json;
 using System;
 using System.IO;
@@ -206,9 +206,14 @@ namespace EastFive.AzureADB2C
                 AuthenticationResult result = null;
                 try
                 {
-                    var authContext = new AuthenticationContext(authority, true);
-                    var credential = new ClientCredential(clientId, clientSecret);
-                    result = await authContext.AcquireTokenAsync(tokenResource, credential);
+                    var client = ConfidentialClientApplicationBuilder.Create(clientId)
+                        .WithClientSecret(clientSecret)
+                        .WithLegacyCacheCompatibility(false)
+                        .Build();
+                    result = await client.AcquireTokenForClient(
+                        new [] {$"{tokenResource}/.default"})
+                        .ExecuteAsync()
+                        .ConfigureAwait(false);
                     string accessToken = result.AccessToken;
                     long expiresUtc = result.ExpiresOn.Ticks - expireBuffer.Ticks;
                     Interlocked.Exchange(ref this.accessToken, accessToken);
