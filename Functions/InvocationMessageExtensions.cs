@@ -68,24 +68,30 @@ namespace EastFive.Azure.Functions
                 });
         }
 
-        public static async Task<InvocationMessage> SendAsync(this Task<InvocationMessage> invocationMessageTask)
+        public static async Task<InvocationMessage?> SendAsync(this Task<InvocationMessage> invocationMessageTask)
         {
             var invocationMessage = await invocationMessageTask;
             return await invocationMessage.SendAsync();
         }
 
-        public static async Task<InvocationMessage> SendAsync(this InvocationMessage invocationMessage)
+        public static async Task<InvocationMessage?> SendAsync(this InvocationMessage invocationMessage)
         {
             var byteContent = invocationMessage.invocationRef.id.ToByteArray();
             return await EastFive.Web.Configuration.Settings.GetString(
                 AppSettings.FunctionProcessorServiceBusTriggerName,
                 async (serviceBusTriggerName) =>
                 {
-                    await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
-                        byteContent.AsEnumerable());
-                    return invocationMessage;
+                    try
+                    {
+                        await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
+                            byteContent.AsEnumerable());
+                        return invocationMessage;
+                    } catch(Exception e)
+                    {
+                        return default(InvocationMessage?);
+                    }
                 },
-                (why) => throw new Exception(why));
+                (why) => default(InvocationMessage?).AsTask());
         }
     }
 }
