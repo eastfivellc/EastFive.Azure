@@ -17,14 +17,16 @@ namespace EastFive.Azure.Functions
 {
     public static class ResourceQueryCompilationExtensions
     {
-        public static async Task<InvocationMessage> FunctionAsync(this IHttpRequest request,
+        public static async Task<InvocationMessage?> FunctionAsync(this IHttpRequest request,
             string serviceBusTriggerNameOverride = default)
         {
-            var invocationMessage = await request.CreateInvocationMessageAsync();
-            return await invocationMessage.SendToFunctionsAsync(serviceBusTriggerNameOverride);
+            var invocationMessageMaybe = await request.CreateInvocationMessageAsync();
+            return invocationMessageMaybe.HasValue
+                ? await invocationMessageMaybe.Value.SendToFunctionsAsync(serviceBusTriggerNameOverride)
+                : default(InvocationMessage?);
         }
 
-        public static async Task<InvocationMessage> CreateInvocationMessageAsync(this IHttpRequest request,
+        public static async Task<InvocationMessage?> CreateInvocationMessageAsync(this IHttpRequest request,
             int executionLimit = 1)
         {
             var invocationMessage = await request.InvocationMessageAsync(executionLimit: executionLimit);
@@ -34,10 +36,10 @@ namespace EastFive.Azure.Functions
                 {
                     return invocationMessage;
                 },
-                () => throw new Exception());
+                () => default(InvocationMessage?));
         }
 
-        public static async Task<InvocationMessage> SendToFunctionsAsync(this InvocationMessage invocationMessage, 
+        public static async Task<InvocationMessage?> SendToFunctionsAsync(this InvocationMessage invocationMessage, 
             string serviceBusTriggerNameOverride = default)
         {
             var invocationMessageRef = invocationMessage.invocationRef;
@@ -46,10 +48,15 @@ namespace EastFive.Azure.Functions
             var serviceBusTriggerName = serviceBusTriggerNameOverride.HasBlackSpace() ?
                 serviceBusTriggerNameOverride :
                 AppSettings.FunctionProcessorServiceBusTriggerName.ConfigurationString(value => value, (why) => throw new Exception(why));
-
-            await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
-                byteContent.AsEnumerable());
-            return invocationMessage;
+            try
+            {
+                await AzureApplication.SendServiceBusMessageStaticAsync(serviceBusTriggerName, invocationMessage.id.ToString("N"),
+                    byteContent.AsEnumerable());
+                return invocationMessage;
+            } catch (Exception)
+            {
+                return default;
+            }
         }
     }
 }

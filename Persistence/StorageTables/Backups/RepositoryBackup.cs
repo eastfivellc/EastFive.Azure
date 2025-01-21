@@ -17,6 +17,7 @@ using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Azure.Persistence.StorageTables;
 using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
+using EastFive.Extensions;
 
 namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
 {
@@ -108,15 +109,19 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                     tableName = cloudTable.Name,
                                     when = DateTime.UtcNow,
                                 };
-                                var invocationMessage = await requestQuery
+                                var invocationMessageMaybe = await requestQuery
                                     .HttpPost(tableBackup)
                                     .CompileRequest(request)
                                     .FunctionAsync();
+                                if (invocationMessageMaybe.IsDefault())
+                                    return default(InvocationMessage?);
 
+                                var invocationMessage = invocationMessageMaybe.Value;
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .Await(readAhead:10);
+                        .Await(readAhead:10)
+                        .SelectWhereHasValue();
                     return onQueued(resourceInfoToProcess);
                 },
                 () => onAlreadyExists());
@@ -175,15 +180,20 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                                     tableName = cloudTable.Name,
                                     when = DateTime.UtcNow,
                                 };
-                                var invocationMessage = await requestQuery
+                                var invocationMessageMaybe = await requestQuery
                                     .HttpPost(tableBackup)
                                     .CompileRequest(request)
                                     .FunctionAsync();
 
+                                if (invocationMessageMaybe.IsDefault())
+                                    return default(InvocationMessage?);
+
+                                var invocationMessage = invocationMessageMaybe.Value;
                                 logger.Trace($"Invocation[{invocationMessage.id}] will backup table `{tableBackup.tableName}`.");
                                 return invocationMessage;
                             })
-                        .Await(readAhead:10);
+                        .Await(readAhead:10)
+                        .SelectWhereHasValue();
                     repoBack.when = when;
                     await saveAsync(repoBack);
 

@@ -94,17 +94,22 @@ namespace EastFive.Azure.Persistence.AzureStorageTables.Backups
                 EastFive.Api.Security security,
                 EastFive.Analytics.ILogger logger,
             CreatedBodyResponse<InvocationMessage> onCreated,
-            AlreadyExistsResponse onAlreadyExists)
+            AlreadyExistsResponse onAlreadyExists,
+            GeneralFailureResponse onFailure)
         {
             return await await tableBackup.StorageCreateAsync(
                 async (discard) =>
                 {
-                    var invocationMessage = await requestQuery
+                    var invocationMessageMaybe = await requestQuery
                         .ById(tableBackupOperationRef)
                         .HttpPatch(default)
                         .CompileRequest(request)
                         .FunctionAsync();
 
+                    if (invocationMessageMaybe.IsDefault())
+                        return onFailure("unable to issue action");
+
+                    var invocationMessage = invocationMessageMaybe.Value;
                     logger.Trace($"Invocation[{invocationMessage.id}] will begin backup operation `{operationSet}`.");
                     return onCreated(invocationMessage);
                 },
