@@ -49,6 +49,11 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = TokenPropertyName)]
         public System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken;
 
+        public const string SessionExpiresPropertyName = "session_expires";
+        [JsonProperty(PropertyName = SessionExpiresPropertyName)]
+        [ApiProperty(PropertyName = SessionExpiresPropertyName)]
+        public DateTime? sessionExpires;
+
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
@@ -61,7 +66,8 @@ namespace EastFive.Azure.Auth
 
             [WorkflowVariable("Session", SessionPropertyName)]
             [WorkflowVariable2("Account", AccountPropertyName)]
-            ContentTypeResponse<Whoami> onFound)
+            ContentTypeResponse<Whoami> onFound,
+            NotFoundResponse onNotFound)
         {
             async Task<string> GetName()
             {
@@ -74,15 +80,23 @@ namespace EastFive.Azure.Auth
                     },
                     () => string.Empty);
             }
+            var name = await GetName();
             request.TryParseJwt(out System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken);
-            var whoami = new Whoami()
-            {
-                session = security.sessionId.AsRef<Session>(),
-                account = security.accountIdMaybe,
-                name = await GetName(),
-                securityToken = securityToken,
-            };
-            return onFound(whoami);
+            var sessionRef = security.sessionId.AsRef<Session>();
+            return await sessionRef.StorageGetAsync(
+                session =>
+                {
+                    var whoami = new Whoami()
+                    {
+                        session = sessionRef,
+                        account = security.accountIdMaybe,
+                        name = name,
+                        securityToken = securityToken,
+                        sessionExpires = session.expires,
+                    };
+                    return onFound(whoami);
+                },
+                onDoesNotExists:() => onNotFound());
         }
     }
 }
