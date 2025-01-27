@@ -43,6 +43,21 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
         }
 
+        private string separator;
+        public string Separator
+        {
+            get
+            {
+                if (separator.IsDefault())
+                    return "";
+                return separator;
+            }
+            set
+            {
+                separator = value;
+            }
+        }
+
         public string Scope { get; set; }
 
         public ScopePrefixAttribute(string scope)
@@ -61,7 +76,11 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             ignore = false;
             var prefix = RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
-            return $"{currentKey}{prefix}";
+
+            if(currentKey.HasBlackSpace())
+                return $"{currentKey}{this.Separator}{prefix}";
+
+            return prefix;
         }
 
         internal static string RowKey(Type propertyValueType, object rowKeyValue, Type thisAttributeType)
