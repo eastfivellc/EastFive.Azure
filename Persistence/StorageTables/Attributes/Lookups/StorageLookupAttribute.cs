@@ -170,24 +170,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             };
         }
 
-        [StorageTable]
-        public struct StorageLookupTable
-        {
-            [RowKey]
-            public string rowKey;
-
-            [PartitionKey]
-            public string partitionKey;
-
-            [ETag]
-            public string eTag;
-
-            [LastModified]
-            public DateTime lastModified;
-
-            [StorageOverflow]
-            public KeyValuePair<string, string>[] rowAndPartitionKeys;
-        }
+        
 
         protected virtual TResult GetKeys<TEntity, TResult>(MemberInfo decoratedMember, TEntity value,
             Func<IEnumerable<IRefAst>, TResult> onLookupValuesMatch,
