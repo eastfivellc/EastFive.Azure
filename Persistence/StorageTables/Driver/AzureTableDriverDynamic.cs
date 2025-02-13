@@ -223,7 +223,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         private static CloudTable TableFromEntity(Type tableType, CloudTableClient tableClient)
         {
-            return tableType.GetAttributesInterface<IProvideTable>()
+            return tableType.GetAttributesInterface<IProvideTable>(inherit:true)
                 .First(
                     (attr, next) => attr.GetTable(tableType, tableClient),
                     () =>
@@ -245,17 +245,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
         public static IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
         {
-            return typeof(TEntity)
-                .GetAttributesInterface<IProvideEntity>()
-                .First(
-                    (entityProvider, next) =>
-                    {
-                        return entityProvider.GetEntity(entity);
-                    },
-                    () =>
-                    {
-                        return TableEntity<TEntity>.Create(entity);
-                    });
+            if(!typeof(TEntity).TryGetAttributeInterface<IProvideEntity>(out var attributeInterface, inherit:true))
+                throw new Exception($"No attribute of type {nameof(IProvideEntity)} on {typeof(TEntity).FullName}.");
+            return attributeInterface.GetEntity(entity);
         }
 
         private class DeletableEntity<EntityType> : TableEntity<EntityType>
@@ -525,11 +517,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                                 if (entityProvider.IsNotDefaultOrNull())
                                     return onFound(entityProvider);
 
-                                return typeof(TEntity)
-                                    .GetAttributesInterface<IProvideEntity>()
-                                    .First(
-                                        (entityProvider, next) => onFound(entityProvider),
-                                        () => onNone());
+                                if(typeof(TEntity).TryGetAttributeInterface<IProvideEntity>(out var newEntityProvider, inherit: true))
+                                    return onFound(newEntityProvider);
+                                return onNone();
                             }
                         });
                     if (table.IsDefaultOrNull())
