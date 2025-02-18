@@ -32,6 +32,7 @@ using EastFive.Reflection;
 using EastFive.Serialization;
 using Azure.Storage.Blobs.Specialized;
 using EastFive.Configuration;
+using System.Net.Mime;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
@@ -3733,14 +3734,15 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 var blockClient = await GetBlobClientAsync(containerName, blobName);
-                var doesExistsTask = await blockClient.ExistsAsync();
+                //var doesExistsTask = await blockClient.ExistsAsync();
 
                 using (var stream = new MemoryStream())
                 {
                     await writeStreamAsync(stream);
                     await stream.FlushAsync();
                     stream.Position = 0;
-                    var disposition = GetDisposition();
+                    var disposition = GetDisposition(contentDisposition:contentDisposition,
+                        contentDispositionString:contentDispositionString, fileName:fileName);
                     var contentTypeToUse = GetContentType();
                     //var doesExists = await doesExistsTask;
                     //if(!doesExists)
@@ -3771,21 +3773,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     return onSuccess(result.Value);
                 }
 
-                string GetDisposition()
-                {
-                    if (contentDisposition.IsNotDefaultOrNull())
-                        return contentDisposition.ToString();
-
-                    if (contentDispositionString.HasBlackSpace())
-                        return contentDispositionString;
-
-                    if (fileName.IsNullOrWhiteSpace())
-                        return default;
-                    var dispositionCreated = new System.Net.Mime.ContentDisposition();
-                    dispositionCreated.FileName = fileName;
-                    return dispositionCreated.ToString();
-                }
-
                 string GetContentType()
                 {
                     if (contentType.IsNotDefaultOrNull())
@@ -3801,6 +3788,46 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     (errorCode, errorMessage) =>
                         onFailure(errorCode, errorMessage),
                     () => throw ex);
+            }
+        }
+
+        private static string GetDisposition(
+            System.Net.Mime.ContentDisposition contentDisposition = default,
+            string contentDispositionString = default,
+            string fileName = default)
+        {
+            if (contentDisposition.IsNotDefaultOrNull())
+            {
+                var contentDispositionSerialized = SerializeDisposition(contentDisposition);
+                return contentDispositionSerialized;
+            }
+            
+            if (contentDispositionString.HasBlackSpace())
+                return contentDispositionString;
+
+            if (fileName.IsNullOrWhiteSpace())
+                return default;
+            
+            var dispositionCreated = new System.Net.Mime.ContentDisposition();
+            dispositionCreated.FileName = fileName;
+            var dispositionString = SerializeDisposition(dispositionCreated);
+            return dispositionString;
+            
+            string SerializeDisposition(System.Net.Mime.ContentDisposition contentDisposition)
+            {
+                // There is a bug where if the filename contains 
+                var chars = contentDisposition.FileName.ToCharArray();
+                if(chars.Where(c => !char.IsAscii(c)).Any())
+                {
+                    var bytes = contentDisposition.FileName.GetBytes(Encoding.UTF8);
+                    var cleanFileName = Encoding
+                        .Convert(Encoding.UTF8, Encoding.ASCII, bytes)
+                        .GetString(Encoding.ASCII);
+                    contentDisposition.FileName = cleanFileName;
+                }
+                
+                var contentDispositionString = contentDisposition.ToString();
+                return contentDispositionString;
             }
         }
 
@@ -3851,7 +3878,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                     .Await(readAhead:10)
                     .ToArrayAsync();
 
-                var disposition = GetDisposition();
+                
+                var disposition = GetDisposition(contentDisposition:contentDisposition,
+                        contentDispositionString:contentDispositionString, fileName:fileName);
                 var contentTypeToUse = GetContentType();
                 var result = await blobClient.CommitBlockListAsync(blockIDArray,
                     new global::Azure.Storage.Blobs.Models.CommitBlockListOptions()
@@ -3864,21 +3893,6 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                         }
                     });
                 return onSuccess(result.Value);
-
-                string GetDisposition()
-                {
-                    if (contentDisposition.IsNotDefaultOrNull())
-                        return contentDisposition.ToString();
-
-                    if (contentDispositionString.HasBlackSpace())
-                        return contentDispositionString;
-
-                    if (fileName.IsNullOrWhiteSpace())
-                        return default;
-                    var dispositionCreated = new System.Net.Mime.ContentDisposition();
-                    dispositionCreated.FileName = fileName;
-                    return dispositionCreated.ToString();
-                }
 
                 string GetContentType()
                 {
@@ -3902,14 +3916,20 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onSuccess,
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string contentType = default, string fileName = default,
+            string contentType = default,
+            System.Net.Mime.ContentDisposition disposition = default,
+            string dispositionString = default,
+            string fileName = default,
             IDictionary<string, string> metadata = default,
             RetryDelegate onTimeout = default) =>
                 BlobCreateAsync<TResult>(content, blobId.ToString("N"), containerName,
                     onSuccess, 
                     onAlreadyExists: onAlreadyExists, 
                     onFailure: onFailure,
-                        contentType: contentType, fileName:fileName,
+                        contentType: contentType,
+                        disposition: disposition,
+                        dispositionString: dispositionString,
+                        fileName:fileName,
                         metadata: metadata, onTimeout: onTimeout);
 
         public async Task<TResult> BlobCreateAsync<TResult>(byte[] content, string blobName, string containerName,
@@ -3917,6 +3937,8 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<TResult> onAlreadyExists = default,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             string contentType = default,
+            System.Net.Mime.ContentDisposition disposition = default,
+            string dispositionString = default,
             string fileName = default,
             IDictionary<string, string> metadata = default,
             RetryDelegate onTimeout = default)
@@ -3942,18 +3964,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
-                                ContentDisposition = GetDisposition(),
+                                ContentDisposition = GetDisposition(contentDisposition:disposition,
+                                    contentDispositionString:dispositionString, fileName:fileName),
                             }
                         });
-
-                    string GetDisposition()
-                    {
-                        if (fileName.IsNullOrWhiteSpace())
-                            return default;
-                        var disposition = new System.Net.Mime.ContentDisposition();
-                        disposition.FileName = fileName;
-                        return disposition.ToString();
-                    }
                 }
                 return onSuccess();
             }
@@ -4051,24 +4065,10 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                             HttpHeaders = new global::Azure.Storage.Blobs.Models.BlobHttpHeaders()
                             {
                                 ContentType = contentType,
-                                ContentDisposition = GetDisposition(),
+                                ContentDisposition = GetDisposition(disposition,
+                                    contentDispositionString:dispositionString, fileName:fileName),
                             }
                         });
-
-                    string GetDisposition()
-                    {
-                        if (disposition.IsNotDefaultOrNull())
-                            return disposition.ToString();
-
-                        if (dispositionString.HasBlackSpace())
-                            return dispositionString;
-
-                        if (fileName.IsNullOrWhiteSpace())
-                            return default;
-                        var dispositionCreated = new System.Net.Mime.ContentDisposition();
-                        dispositionCreated.FileName = fileName;
-                        return dispositionCreated.ToString();
-                    }
                 }
                 return onSuccess();
             }
@@ -4103,6 +4103,9 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             try
             {
                 var blockClient = await GetBlobClientAsync(containerName, blobName);
+                var doesExists = await blockClient.ExistsAsync();
+                if(!doesExists.Value)
+                    return onNotFound();
                 var properties = await blockClient.GetPropertiesAsync();
                 return onFound(properties.Value);
             }

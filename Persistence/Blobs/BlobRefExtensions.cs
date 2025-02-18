@@ -370,7 +370,8 @@ namespace EastFive.Azure.Persistence.Blobs
             Expression<Func<TResource, IBlobRef>> selectProperty,
             Func<IBlobRef, TResult> onCreated,
             Func<IBlobRef, TResult> onAlreadyExists = default,
-            string contentType = default, string fileName = default,
+            string contentType = default,
+            string fileName = default,
             Guid? blobId = default, string blobName = default)
         {
             selectProperty.TryParseMemberComparison(out MemberInfo memberInfo);
