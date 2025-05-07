@@ -14,6 +14,7 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Extensions;
 using EastFive.Analytics;
+using EastFive.Azure.Persistence.StorageTables;
 
 namespace EastFive.Azure.Functions
 {
@@ -59,13 +60,11 @@ namespace EastFive.Azure.Functions
 
         [JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]
+
         public abstract IImplementRef<IExportFromDatalake> exportFromDataLake { get; }
 
         [Storage]
-        public string exportContainer;
-
-        [Storage]
-        public string exportFolder;
+        public AzureBlobFileSystemUri exportUri;
 
         [Storage]
         public DateTime? usePriorRunsFromMaybe;
@@ -102,12 +101,13 @@ namespace EastFive.Azure.Functions
             var capturedLog = new EastFive.Analytics.CaptureLog(
                 new Analytics.AnalyticsLogger(log));
             var dateTime = DateTime.UtcNow;
-            return await await item.path.ReadParquetDataFromDataLakeAsync(import.exportContainer,
+            return await await item.path.ReadParquetDataFromDataLakeAsync(import.exportUri.containerName,
                     async (TResource[] resourceLines) =>
                     {
                         capturedLog.Information($"[{item.path}] Loaded--{resourceLines.Length} lines (skipping {item.skip})");
 
                         var indexesToRun = item.lines
+                            .NullToEmpty()
                             .Append(DataLakeImportReport.Interval.Create(item.skip, resourceLines.Length - item.skip))
                             .SelectMany(
                                 interval =>

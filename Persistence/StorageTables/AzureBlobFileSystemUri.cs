@@ -19,10 +19,10 @@ using Newtonsoft.Json;
 namespace EastFive.Azure.Persistence.StorageTables
 {
     [AzureBlobFileSystemUriStorage]
-	public class AzureBlobFileSystemUri
-	{
-		public string containerName;
-		public string path;
+    public class AzureBlobFileSystemUri
+    {
+        public string containerName;
+        public string path;
         public string storageName;
 
         public AzureBlobFileSystemUri()
@@ -84,20 +84,20 @@ namespace EastFive.Azure.Persistence.StorageTables
         }
 
         public string AbfssUri
-		{
-			get
-			{
+        {
+            get
+            {
                 return $"abfss://{containerName}@{storageName}.dfs.core.windows.net/{path}";
             }
-			set
-			{
+            set
+            {
                 var containerNameRegexVariable = "containerName";
                 var storageNameRegexVariable = "storageName";
                 var pathRegexVariable = "path";
                 var fileNameRegexVariable = "filename";
-				if (value.TryMatchRegex(
-						$"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
-						out (string, string)[] matches))
+                if (value.TryMatchRegex(
+                        $"abfss://(?<{containerNameRegexVariable}>[^@]+)@(?<{storageNameRegexVariable}>[^\\.]+).dfs.core.windows.net/(?<{pathRegexVariable}>[^@]+/)(?<{fileNameRegexVariable}>[^/]+)",
+                        out (string, string)[] matches))
                 {
                     this.storageName = matches
                         .Where(match => storageNameRegexVariable.Equals(match.Item1, StringComparison.OrdinalIgnoreCase))
@@ -152,8 +152,13 @@ namespace EastFive.Azure.Persistence.StorageTables
 
                 this.path = value;
             }
-		}
-	}
+        }
+
+        public bool IsValid()
+        {
+            return this.containerName.HasBlackSpace() && this.storageName.HasBlackSpace();
+        }
+    }
 
     public class AzureBlobFileSystemUriStorageAttribute : System.Attribute, ICastEntityProperty, IBindEntityProperty, ICastJson
     {

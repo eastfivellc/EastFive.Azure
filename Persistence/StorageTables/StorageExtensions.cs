@@ -2363,7 +2363,6 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             AzureTableDriverDynamic.RetryDelegate onTimeout = null,
             ConnectionString connectionStringConfigKey = default)
         {
-
             if (connectionStringConfigKey.IsDefaultOrNull())
                 connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString;
 
@@ -2387,6 +2386,9 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             string filePath, string fileSuffix = default,
             ConnectionString connectionStringConfigKey = default)
         {
+            if (containerName.IsNullOrWhiteSpace())
+                return new BlobItem[] { }.AsTask();
+
             if (connectionStringConfigKey.IsDefaultOrNull())
                 connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.StorageTables.ConnectionString;
             return containerName.BlobListFilesAsync(

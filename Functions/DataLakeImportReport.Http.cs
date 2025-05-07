@@ -69,7 +69,7 @@ namespace EastFive.Azure.Functions
                             {
                                 var export = (IExportFromDatalake)exportObj;
                                 var files = await export.GetDatalakeFiles().ToArrayAsync();
-                                var dir = export.exportFolder;
+                                //var dir = export.exportFolder;
                                 var reports = await Enumerable
                                     .Range(0, days)
                                     .SelectAsyncMany(

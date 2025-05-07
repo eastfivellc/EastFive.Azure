@@ -6,8 +6,10 @@ using System.Text;
 using System.IO;
 using System.Collections.Generic;
 
-using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
+using Microsoft.DurableTask.Client;
+using Microsoft.DurableTask;
+
 using Azure.Storage.Blobs.Models;
 
 using EastFive;
@@ -20,71 +22,68 @@ using EastFive.Extensions;
 using EastFive.Analytics;
 using EastFive.Linq.Async;
 using EastFive.Persistence.Azure.StorageTables.Driver;
-using Azure.Search.Documents.Models;
 using EastFive.Serialization.Text;
 using EastFive.Configuration;
+using EastFive.Azure.Persistence.StorageTables;
+using EastFive.Serialization.Json;
 
 namespace EastFive.Azure.Functions
 {
     public static class FunctionExtensions
     {
-        public static IEnumerableAsync<(T, string)> SelectWhereNotAlreadyRunning<T>(this IEnumerableAsync<T> resources,
-            IDurableOrchestrationClient orchestrationClient,
-            Func<T, string> getInstanceId,
-            Microsoft.Extensions.Logging.ILogger log = default,
-            int? readAhead = default(int?))
-        {
-            var tpls = resources
-                .Select(
-                    async resource =>
-                    {
-                        var instanceId = getInstanceId(resource);
-                        var status = await orchestrationClient.GetStatusAsync(instanceId: instanceId);
-                        if (status.IsDefaultOrNull())
-                        {
-                            if (log.IsNotDefaultOrNull())
-                                log.LogInformation($"Provider {instanceId} is Fresh");
-                            return (true, resource, instanceId);
-                        }
-                        if (status.RuntimeStatus == OrchestrationRuntimeStatus.Pending)
-                        {
-                            if (log.IsNotDefaultOrNull())
-                                log.LogInformation($"Provider {instanceId} is Pending");
-                            return (false, resource, instanceId);
-                        }
-                        if (status.RuntimeStatus == OrchestrationRuntimeStatus.Running)
-                        {
-                            if (log.IsNotDefaultOrNull())
-                                log.LogInformation($"Provider {instanceId} is Running");
-                            return (false, resource, instanceId);
-                        }
+        // public static IEnumerableAsync<(T, string)> SelectWhereNotAlreadyRunning<T>(this IEnumerableAsync<T> resources,
+        //     DurableTaskClient orchestrationClient,
+        //     Func<T, string> getInstanceId,
+        //     Microsoft.Extensions.Logging.ILogger log = default,
+        //     int? readAhead = default(int?))
+        // {
+        //     var tpls = resources
+        //         .Select(
+        //             async resource =>
+        //             {
+        //                 var instanceId = getInstanceId(resource);
+        //                 var status = await orchestrationClient.GetStatusAsync(instanceId: instanceId);
+        //                 if (status.IsDefaultOrNull())
+        //                 {
+        //                     if (log.IsNotDefaultOrNull())
+        //                         log.LogInformation($"Provider {instanceId} is Fresh");
+        //                     return (true, resource, instanceId);
+        //                 }
+        //                 if (status.RuntimeStatus == OrchestrationRuntimeStatus.Pending)
+        //                 {
+        //                     if (log.IsNotDefaultOrNull())
+        //                         log.LogInformation($"Provider {instanceId} is Pending");
+        //                     return (false, resource, instanceId);
+        //                 }
+        //                 if (status.RuntimeStatus == OrchestrationRuntimeStatus.Running)
+        //                 {
+        //                     if (log.IsNotDefaultOrNull())
+        //                         log.LogInformation($"Provider {instanceId} is Running");
+        //                     return (false, resource, instanceId);
+        //                 }
 
-                        if (log.IsNotDefaultOrNull())
-                            log.LogInformation($"Provider {instanceId} is `{Enum.GetName(status.RuntimeStatus)}`");
-                        return (true, resource, instanceId);
-                    });
+        //                 if (log.IsNotDefaultOrNull())
+        //                     log.LogInformation($"Provider {instanceId} is `{Enum.GetName(status.RuntimeStatus)}`");
+        //                 return (true, resource, instanceId);
+        //             });
 
-            if (readAhead.HasValue)
-                return tpls
-                    .Await(readAhead: readAhead.Value)
-                    .SelectWhere();
+        //     if (readAhead.HasValue)
+        //         return tpls
+        //             .Await(readAhead: readAhead.Value)
+        //             .SelectWhere();
 
-            return tpls.Await().SelectWhere();
-        }
+        //     return tpls.Await().SelectWhere();
+        // }
 
         public static IEnumerableAsync<BlobItem> GetDatalakeFiles(this IExportFromDatalake import)
         {
-            var practiceFolder = import.exportFolder;
-            if (import.exportContainer.IsNullOrWhiteSpace())
-                return EnumerableAsync.Empty<BlobItem>();
-            return import.exportContainer.BlobFindFilesAsync(
-                    practiceFolder, fileSuffix: ".parquet",
-                    connectionStringConfigKey: EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString)
+            return import.exportUri.BlobFindFilesAsync(
+                    fileSuffix: ".parquet")
                 .FoldTask();
         }
 
         public static async Task<TResult> PopulateInstanceAsync<TInstance, TResult>(this IExportFromDatalake import, TInstance instance,
-                IDurableOrchestrationClient starter, string nameOfFunctionToRun,
+                DurableTaskClient client, string nameOfFunctionToRun,
             Func<TInstance, TResult> onPopulated,
             Func<string, TResult> onFailure)
             where TInstance : DataLakeImportInstance
@@ -92,25 +91,35 @@ namespace EastFive.Azure.Functions
             try
             {
                 var now = DateTime.UtcNow;
-                instance.exportContainer = import.exportContainer;
-                instance.exportFolder = import.exportFolder;
+                instance.exportUri = import.exportUri;
                 instance.when = now;
                 instance.cancelled = false;
                 instance.ignoreFaultedFiles = false;
                 instance.sourceId = import.sourceId;
-                var instanceIdToTry = $"{instance.id}:{now.Year}{now.Month}{now.Day}{now.Hour}{now.Minute}{now.Second}";
-                string instanceId = await starter.StartNewAsync(nameOfFunctionToRun,
-                    instanceIdToTry, instance);
-                instance.instance = instanceId;
+                return await instance.JsonSerialize(
+                    async (instanceJson) =>
+                    {
+                        var instanceIdToTry = $"{instance.id}:{now.Year}{now.Month}{now.Day}{now.Hour}{now.Minute}{now.Second}";
+                        string instanceId = await client.ScheduleNewOrchestrationInstanceAsync(nameOfFunctionToRun,
+                            instanceJson, new Microsoft.DurableTask.StartOrchestrationOptions
+                            {
+                                InstanceId = instanceIdToTry,
+                            });
+                        instance.instance = instanceId;
 
-                return await instance.StorageCreateAsync(
-                    (result) =>
-                    {
-                        return onPopulated(result.Entity);
+                        return await instance.StorageCreateAsync(
+                            (result) =>
+                            {
+                                return onPopulated(result.Entity);
+                            },
+                            onAlreadyExists: () =>
+                            {
+                                return onFailure($"ID is already in use.");
+                            });
                     },
-                    onAlreadyExists: () =>
+                    (why) =>
                     {
-                        return onFailure($"ID is already in use.");
+                        return onFailure($"Could not serialize instance `{instance.GetType().FullName}: {why}`").AsTask();
                     });
             }
             catch (Exception ex)
@@ -120,14 +129,17 @@ namespace EastFive.Azure.Functions
         }
 
         public static async Task<DataLakeImportReport> DataLakeIngestAsync<TResource, TImportInstance, TDataLakeItem>(
-            this IDurableActivityContext context,
-            Func<TImportInstance, TDataLakeItem, TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
+            // this IDurableActivityContext context,
+            this TImportInstance dataLakeImportInstance, TDataLakeItem dataLakeItem,
+            Func<TImportInstance, TDataLakeItem, TResource, AzureBlobFileSystemUri, int, Task<(bool, string)>> processAsync,
             Microsoft.Extensions.Logging.ILogger log)
             where TImportInstance : DataLakeImportInstance
             where TDataLakeItem : DataLakeItem
         {
-            return await await IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, Task<DataLakeImportReport>>(context, processAsync,
-                onProcessed:async (report) =>
+            return await await IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, Task<DataLakeImportReport>>(
+                    dataLakeImportInstance, dataLakeItem,
+                processAsync,
+                onProcessed: async (report) =>
                 {
                     try
                     {
@@ -164,12 +176,13 @@ namespace EastFive.Azure.Functions
                     }.AsTask();
                 },
                 log);
-            
+
         }
 
         private static async Task<TResult> IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, TResult>(
-                IDurableActivityContext context,
-                Func<TImportInstance, TDataLakeItem, TResource, (string path, string container), int, Task<(bool, string)>> processAsync,
+                // IDurableActivityContext context,
+                TImportInstance dataLakeImportInstance, TDataLakeItem dataLakeItem,
+                Func<TImportInstance, TDataLakeItem, TResource, AzureBlobFileSystemUri, int, Task<(bool, string)>> processAsync,
             Func<DataLakeImportReport, TResult> onProcessed,
             Func<TResult> onParsingIssue,
             Func<Exception, TResult> onException,
@@ -179,8 +192,8 @@ namespace EastFive.Azure.Functions
         {
             try
             {
-                var instanceId = context.InstanceId.Replace(':', '_');
-                var (dataLakeImportInstance, dataLakeItem) = context.GetInput<(TImportInstance, TDataLakeItem)>();
+                // var instanceId = context.InstanceId.Replace(':', '_');
+                // var (dataLakeImportInstance, dataLakeItem) = context.GetInput<(TImportInstance, TDataLakeItem)>();
                 if (dataLakeImportInstance.IsDefaultOrNull() || dataLakeItem.IsDefaultOrNull())
                     return onParsingIssue();
 
@@ -190,7 +203,7 @@ namespace EastFive.Azure.Functions
 
                 var isCancelled = await dataLakeImportInstance.id.AsRef<TImportInstance>().StorageGetAsync(
                     onFound: (updatedInstance) => updatedInstance.cancelled,
-                    onDoesNotExists:() => true);
+                    onDoesNotExists: () => true);
                 if (isCancelled)
                 {
                     var report = dataLakeItem
@@ -198,11 +211,8 @@ namespace EastFive.Azure.Functions
                     return onProcessed(report);
                 }
 
-                var containerName = dataLakeImportInstance.exportContainer;
-                var folder = dataLakeImportInstance.exportFolder;
-
                 var intervals = new (int, int)[] { };
-                if (folder.IsNullOrWhiteSpace())
+                if (!dataLakeImportInstance.exportUri.IsValid())
                 {
                     var report = dataLakeItem.GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultyExport, 0);
                     return onProcessed(report);
@@ -212,7 +222,7 @@ namespace EastFive.Azure.Functions
                 try
                 {
                     var ingestedReport = await dataLakeImportInstance.DataLakeIngestFileAsync(dataLakeItem,
-                        processAsync: (TResource res, int index) => processAsync(dataLakeImportInstance, dataLakeItem, res, (path, containerName), index),
+                        processAsync: (TResource res, int index) => processAsync(dataLakeImportInstance, dataLakeItem, res, dataLakeImportInstance.exportUri, index),
                         onFileIngested: (report) =>
                         {
                             return report;
@@ -254,43 +264,26 @@ namespace EastFive.Azure.Functions
             }
         }
 
-        public static Task<TResult> ListExportedFilesAsync<TResult>(this IExportFromDatalake dataLakeExported,
-            Func<BlobItem[], TResult> onSuccess,
-            Func<TResult> onNotFound = default,
-            Func<Persistence.StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = default,
-            string extension = default,
-            AzureTableDriverDynamic.RetryDelegate onTimeout = null,
-            ConnectionString connectionStringConfigKey = default)
+        public static IEnumerableAsync<BlobItem> ListExportedFilesAsync(
+            this IExportFromDatalake dataLakeExported,
+            string extension = default)
         {
-            if (connectionStringConfigKey.IsDefaultOrNull())
-                connectionStringConfigKey = EastFive.Azure.AppSettings.Persistence.DataLake.ConnectionString;
-            return dataLakeExported.exportContainer.BlobListFilesAsync(
-                files =>
-                {
-                    var folderFiles = files
-                        .Where(
-                            file =>
-                            {
-                                if (!file.Name.StartsWith(dataLakeExported.exportFolder))
-                                    return false;
-
-                                if (extension.IsNullOrWhiteSpace())
-                                    return true;
-
-                                if (file.Name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-                                        return true;
-
-                                return false;
-                            })
-                        .ToArray();
-                    return onSuccess(folderFiles);
-                },
-                onNotFound:() => onNotFound(),
-                    connectionStringConfigKey: connectionStringConfigKey);
+            return dataLakeExported.exportUri
+                .BlobFindFilesAsync()
+                .FoldTask()
+                .Where(
+                    file =>
+                    {
+                        if (extension.IsNullOrWhiteSpace())
+                            return true;
+                        if (file.Name.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                        return false;
+                    });
         }
 
         public static TDataLakeItem[] ConvertToDataLakeItems<TDataLakeItem>(this BlobItem[] blobItems,
-            Guid dataLakeInstanceId, DataLakeImportReport [] priorRuns,
+            Guid dataLakeInstanceId, DataLakeImportReport[] priorRuns,
             bool shouldRunErrors,
             Func<Guid, string, int, int[], TDataLakeItem> constructItem)
             where TDataLakeItem : DataLakeItem
@@ -368,28 +361,96 @@ namespace EastFive.Azure.Functions
                 constructItem);
         }
 
-        public static async Task<DataLakeImportReport> RunActivityFromDurableFunctionAsync<TImportInstance, TDataLakeItem>(this IDurableOrchestrationContext context,
+        public static async Task<string> RunActivityFromDurableFunctionAsync<TImportInstance, TDataLakeItem>(
+            this TaskOrchestrationContext context,
             string functionName,
             Microsoft.Extensions.Logging.ILogger log)
             where TImportInstance : DataLakeImportInstance
             where TDataLakeItem : IDataLakeItem
         {
-            //log.LogInformation($"[{context.InstanceId}/{context.Name}]...Starting");
-            var (input, dataLakeItem) = context.GetInput<(TImportInstance, TDataLakeItem)>();
+            var inputTpl = context.ParseDataLakeParameter<(TImportInstance, TDataLakeItem)>(out var inputJson);
+            var input = inputTpl.Item1;
+            var dataLakeItem = inputTpl.Item2;
             while (true)
             {
-                var report = await context.CallActivityAsync<DataLakeImportReport>(
-                    functionName, (input, dataLakeItem));
+                var report = await context
+                    .CallActivityAsync<string>(functionName, inputJson)
+                    .ParseDataLakeJsonAsync<DataLakeImportReport>();
+
                 var status = report.status;
                 dataLakeItem.skip = report.GetLastLineProcessed();
                 var linesProcessed = report.GetTotalLinesProcessed();
-                
+
+                if (linesProcessed == 0)
+                {
+                    log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
+                    report.status = DataLakeImportStatus.FaultedInstance;
+                    return report.SerializeDataLakeJson();
+                }
                 if (status == DataLakeImportStatus.Running || status == DataLakeImportStatus.Partial)
                     continue;
 
                 log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
-                return report;
+                return report.SerializeDataLakeJson();
             }
+        }
+
+        public static T ParseDataLakeParameter<T>(this TaskOrchestrationContext context) =>
+            context.GetInput<string>().ParseDataLakeJson<T>();
+
+        public static T ParseDataLakeParameter<T>(this TaskOrchestrationContext context, out string json)
+        {
+            json = context.GetInput<string>();
+            return json.ParseDataLakeJson<T>();
+        }
+
+        public static async Task<T> ParseDataLakeJsonAsync<T>(this Task<string> inputJsonMaybeTask)
+        {
+            var inputJsonMaybe = await inputJsonMaybeTask;
+            return inputJsonMaybe.ParseDataLakeJson<T>();
+        }
+
+#nullable enable
+
+        public static async Task<T> ParseDataLakeJsonMaybeAsync<T>(this Task<string?> inputJsonMaybeTask)
+        {
+            var inputJsonMaybe = await inputJsonMaybeTask;
+            return inputJsonMaybe.ParseDataLakeJson<T>();
+        }
+
+        public static T ParseDataLakeJson<T>(this string? inputJsonMaybe)
+        {
+            if (string.IsNullOrWhiteSpace(inputJsonMaybe))
+            {
+                var errorMsg = $"Input is null or empty";
+                throw new InvalidOperationException(errorMsg);
+            }
+            var inputJson = inputJsonMaybe;
+            return inputJson.JsonParse(
+                (T input) => input,
+                onFailureToParse: (why) =>
+                {
+                    var errorMsg = $"Could not parse input:`{why}`";
+                    throw new InvalidOperationException(errorMsg);
+                },
+                onException: (ex) =>
+                {
+                    var errorMsg = $"Server error parsing input:`{ex.Message}`";
+                    throw new InvalidOperationException(errorMsg);
+                });
+        }
+
+        public static string SerializeDataLakeJson<T>(this T resourceToPass)
+        {
+            var parameterJson = resourceToPass
+                .JsonSerialize(
+                    (json) => json,
+                    (why) =>
+                    {
+                        var errorMsg = $"Could not serialize input:`{why}`";
+                        throw new InvalidOperationException(errorMsg);
+                    });
+            return parameterJson;
         }
     }
 }
