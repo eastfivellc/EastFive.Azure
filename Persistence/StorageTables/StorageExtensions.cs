@@ -1165,7 +1165,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             Func<bool, TEntity, Func<TEntity, Task>, Task<TResult>> onCreated,
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
             params IHandleFailedModifications<TResult>[] onModificationFailures)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
             var rowKey = entityQuery.StorageComputeRowKey();
             var partitionKey = entityQuery.StorageComputePartitionKey(rowKey);
@@ -1181,7 +1181,7 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
             IHandleFailedModifications<TResult>[] onModificationFailures = default,
             Func<StorageTables.ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             AzureTableDriverDynamic.RetryDelegate onTimeout = null)
-            where TEntity : IReferenceable
+            // where TEntity : IReferenceable
         {
             return AzureTableDriverDynamic
                 .FromSettings()
