@@ -373,20 +373,15 @@ namespace EastFive.Azure.Functions
             var dataLakeItem = inputTpl.Item2;
             while (true)
             {
+                var updatedJson = (input, dataLakeItem).SerializeDataLakeJson();
                 var report = await context
-                    .CallActivityAsync<string>(functionName, inputJson)
+                    .CallActivityAsync<string>(functionName, updatedJson)
                     .ParseDataLakeJsonAsync<DataLakeImportReport>();
 
                 var status = report.status;
                 dataLakeItem.skip = report.GetLastLineProcessed();
                 var linesProcessed = report.GetTotalLinesProcessed();
 
-                if (linesProcessed == 0)
-                {
-                    log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
-                    report.status = DataLakeImportStatus.FaultedInstance;
-                    return report.SerializeDataLakeJson();
-                }
                 if (status == DataLakeImportStatus.Running || status == DataLakeImportStatus.Partial)
                     continue;
 
