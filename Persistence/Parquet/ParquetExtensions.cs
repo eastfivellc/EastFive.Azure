@@ -152,7 +152,13 @@ namespace EastFive.Azure.Persistence
             return data
                 .Segment(rowsPerfile)
                 .Select(
-                    (segment, index) =>
+                    segment =>
+                    {
+                        var rows = GetRows(segment).ToArray();
+                        return rows;
+                    })
+                .Select(
+                    (rows, index) =>
                     {
                         var fileName = $"{index:00000}.parquet";
                         return exportLocation
@@ -160,15 +166,14 @@ namespace EastFive.Azure.Persistence
                             .BlobCreateOrUpdateAsync(
                                 writeStreamAsync: async (stream) =>
                                 {
-                                    GetRows(segment)
-                                        .WriteToParquetStream(schema, stream);
+                                    rows.WriteToParquetStream(schema, stream);
                                     await stream.FlushAsync();
                                 },
                                 (blobContentInfo) => blobContentInfo,
                                     contentTypeString: "application/vnd.apache.parquet",
                                     fileName: fileName);
                     })
-                .AsyncEnumerable();
+                .AsyncEnumerable(readAhead:3);
 
             IEnumerable<(string name, Type type, object value)[]> GetRows(IEnumerable<TEntity> entities)
             {
