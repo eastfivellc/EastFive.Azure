@@ -73,7 +73,7 @@ namespace EastFive.Azure.Functions
         [ScopeId(ScopedPartitionAttribute.Scoping, Order = 1.0)]
         public Guid export;
 
-        [Storage]
+        [StorageOverflow]
         public Interval[] intervalsProcessed;
 
         public struct Interval
@@ -144,7 +144,7 @@ namespace EastFive.Azure.Functions
             }
         }
 
-        [Storage]
+        [StorageOverflow]
         public Error[] errorsProcessed;
 
         public struct Error
