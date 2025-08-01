@@ -1517,6 +1517,53 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onTimeoutAsync: onTimeoutAsync);
         }
 
+        /// <summary>
+        /// Get the entity and optionally update it with the provided modifier function.
+        /// </summary>
+        /// <typeparam name="TEntity"></typeparam>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="entityRef"></param>
+        /// <param name="getModifier">Return null here to abort the modification.</param>
+        /// <param name="onUpdated"></param>
+        /// <param name="onNotFound"></param>
+        /// <param name="modificationFailureEvents"></param>
+        /// <returns></returns>
+        public static Task<TResult> StorageGetAndUpdateAsync<TEntity, TIntermediate, TResult>(this IRef<TEntity> entityRef,
+            Func<TEntity, (TIntermediate, Func<TEntity, TEntity>)> getModifier,
+            Func<TEntity, TIntermediate, TResult> onUpdated,
+            Func<TResult> onNotFound = default,
+            IHandleFailedModifications<TResult>[] modificationFailureEvents = default)
+            where TEntity : IReferenceable
+        {
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .GetAndUpdateAsync<TEntity, TIntermediate, TResult>(
+                        rowKey, partitionKey,
+                    getModification: getModifier,
+                    onUpdated: onUpdated,
+                    onNotFound: onNotFound,
+                    modificationFailureEvents: modificationFailureEvents);
+        }
+
+        public static Task<TResult> StorageGetAndUpdateAsync<TEntity, TIntermediate, TResult>(this IRef<TEntity> entityRef,
+            Func<TEntity, Task<(TIntermediate, Func<TEntity, TEntity>)>> getModifierAsync,
+            Func<TEntity, TIntermediate, TResult> onUpdated,
+            Func<TResult> onNotFound = default,
+            IHandleFailedModifications<TResult>[] modificationFailureEvents = default)
+            where TEntity : IReferenceable
+        {
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .GetAndUpdateAsync<TEntity, TIntermediate, TResult>(
+                        rowKey, partitionKey,
+                    getModificationAsync: getModifierAsync,
+                    onUpdated: onUpdated,
+                    onNotFound: onNotFound,
+                    modificationFailureEvents: modificationFailureEvents);
+        }
+
         #endregion
 
         #region Delete
