@@ -92,6 +92,15 @@ namespace EastFive.Persistence
                         return defaultValue;
                     return ep.DateTime.Value;
                 }
+                if (ep.PropertyType == EdmType.String)
+                {
+                    if (string.IsNullOrWhiteSpace(ep.StringValue))
+                        return defaultValue;
+                    if (long.TryParse(ep.StringValue, out long ticks))
+                        return new DateTime(ticks, DateTimeKind.Utc);
+                    if (DateTime.TryParse(ep.StringValue, out DateTime dateTime))
+                        return dateTime;
+                }
                 return defaultValue;
             }
 
