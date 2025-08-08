@@ -180,7 +180,6 @@ namespace EastFive.Azure.Functions
         }
 
         private static async Task<TResult> IngestAndProduceReportAsync<TDataLakeItem, TResource, TImportInstance, TResult>(
-                // IDurableActivityContext context,
                 TImportInstance dataLakeImportInstance, TDataLakeItem dataLakeItem,
                 Func<TImportInstance, TDataLakeItem, TResource, AzureBlobFileSystemUri, int, Task<(bool, string)>> processAsync,
             Func<DataLakeImportReport, TResult> onProcessed,
@@ -200,62 +199,85 @@ namespace EastFive.Azure.Functions
                 var path = dataLakeItem.path;
                 var skip = dataLakeItem.skip;
 
-
-                var isCancelled = await dataLakeImportInstance.id.AsRef<TImportInstance>().StorageGetAsync(
-                    onFound: (updatedInstance) => updatedInstance.cancelled,
-                    onDoesNotExists: () => true);
-                if (isCancelled)
-                {
-                    var report = dataLakeItem
-                        .GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.Cancelled, 0);
-                    return onProcessed(report);
-                }
-
-                var intervals = new (int, int)[] { };
-                if (!dataLakeImportInstance.exportUri.IsValid())
-                {
-                    var report = dataLakeItem.GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultyExport, 0);
-                    return onProcessed(report);
-                }
-                var startTime = System.Diagnostics.Stopwatch.StartNew();
-                var timeout = TimeSpan.FromMinutes(4);
-                try
-                {
-                    var ingestedReport = await dataLakeImportInstance.DataLakeIngestFileAsync(dataLakeItem,
-                        processAsync: (TResource res, int index) => processAsync(dataLakeImportInstance, dataLakeItem, res, dataLakeImportInstance.exportUri, index),
-                        onFileIngested: (report) =>
+                var currentInstances = await dataLakeImportInstance.export
+                    .StorageGetByIdProperty((TImportInstance instance) => instance.export)
+                    .ToArrayAsync();
+                return await currentInstances
+                    .Where(instance => instance.id == dataLakeImportInstance.id)
+                    .First(
+                        async (updatedInstance, next) =>
                         {
-                            return report;
-                        },
-                        onFileNotFound: () =>
-                        {
-                            var report = dataLakeItem.GenerateReport(
-                                dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
-                            return report;
-                        },
-                        isTimedOut: () =>
-                        {
-                            return startTime.Elapsed > timeout;
-                        },
-                        log: log);
-                    return onProcessed(ingestedReport);
-                }
-                catch (Exception ex)
-                {
-                    log.LogError(ex.Message);
-                    log.LogError(ex.StackTrace);
+                            var isCancelled = updatedInstance.cancelled;
+                            if (isCancelled)
+                            {
+                                var report = dataLakeItem
+                                    .GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.Cancelled, 0);
+                                return onProcessed(report);
+                            }
+                            var isReplaced = currentInstances.Any(instance => instance.when > updatedInstance.when);
+                            if (isReplaced)
+                            {
+                                var report = dataLakeItem
+                                    .GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.Replaced, 0);
+                                return onProcessed(report);
+                            }
 
-                    var report = dataLakeItem.GenerateReport(
-                        dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
-                    return onProcessed(report);
-                }
+                            var intervals = new (int, int)[] { };
+                            if (!dataLakeImportInstance.exportUri.IsValid())
+                            {
+                                var report = dataLakeItem.GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultyExport, 0);
+                                return onProcessed(report);
+                            }
+                            var startTime = System.Diagnostics.Stopwatch.StartNew();
+                            var timeout = TimeSpan.FromMinutes(4);
+                            try
+                            {
+                                var ingestedReport = await dataLakeImportInstance.DataLakeIngestFileAsync(dataLakeItem,
+                                    processAsync: (TResource res, int index) => processAsync(dataLakeImportInstance, dataLakeItem, res, dataLakeImportInstance.exportUri, index),
+                                    onFileIngested: (report) =>
+                                    {
+                                        return report;
+                                    },
+                                    onFileNotFound: () =>
+                                    {
+                                        var report = dataLakeItem.GenerateReport(
+                                            dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
+                                        return report;
+                                    },
+                                    isTimedOut: () =>
+                                    {
+                                        return startTime.Elapsed > timeout;
+                                    },
+                                    log: log);
+                                return onProcessed(ingestedReport);
+                            }
+                            catch (Exception ex)
+                            {
+                                log.LogError(ex.Message);
+                                log.LogError(ex.StackTrace);
+
+                                var report = dataLakeItem.GenerateReport(
+                                    dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.FaultedFile, 0);
+                                return onProcessed(report);
+                            }
+                        },
+                        () =>
+                        {
+                             var report = dataLakeItem
+                                .GenerateReport(dataLakeImportInstance.exportFromDataLake, DataLakeImportStatus.Replaced, 0);
+                            return onProcessed(report).AsTask();
+                        });
+
+                // var isCancelled = await dataLakeImportInstance.id.AsRef<TImportInstance>().StorageGetAsync(
+                //     onFound: (updatedInstance) => updatedInstance.cancelled,
+                //     onDoesNotExists: () => true);
             }
-            catch (Newtonsoft.Json.JsonReaderException parsingException)
-            {
-                log.LogError(parsingException.Message);
-                log.LogError("Bad resource input -- discarding");
-                return onParsingIssue();
-            }
+            // catch (Newtonsoft.Json.JsonReaderException parsingException)
+            // {
+            //     log.LogError(parsingException.Message);
+            //     log.LogError("Bad resource input -- discarding");
+            //     return onParsingIssue();
+            // }
             catch (Exception ex)
             {
                 log.LogError(ex.Message);
@@ -368,25 +390,39 @@ namespace EastFive.Azure.Functions
             where TImportInstance : DataLakeImportInstance
             where TDataLakeItem : IDataLakeItem
         {
-            var inputTpl = context.ParseDataLakeParameter<(TImportInstance, TDataLakeItem)>(out var inputJson);
-            var input = inputTpl.Item1;
-            var dataLakeItem = inputTpl.Item2;
+            var (input, dataLakeItem) = context.ParseDataLakeParameter<(TImportInstance, TDataLakeItem)>();
+            // var input = inputTpl.Item1;
+            // var dataLakeItem = inputTpl.Item2;
             while (true)
             {
                 var updatedJson = (input, dataLakeItem).SerializeDataLakeJson();
-                var report = await context
-                    .CallActivityAsync<string>(functionName, updatedJson)
-                    .ParseDataLakeJsonAsync<DataLakeImportReport>();
+                try
+                {
+                    var report = await context
+                        .CallActivityAsync<string>(functionName, updatedJson)
+                        .ParseDataLakeJsonAsync<DataLakeImportReport>();
 
-                var status = report.status;
-                dataLakeItem.skip = report.GetLastLineProcessed();
-                var linesProcessed = report.GetTotalLinesProcessed();
+                    var status = report.status;
+                    dataLakeItem.skip = report.GetLastLineProcessed();
+                    var linesProcessed = report.GetTotalLinesProcessed();
 
-                if (status == DataLakeImportStatus.Running || status == DataLakeImportStatus.Partial)
-                    continue;
+                    if (status == DataLakeImportStatus.Running || status == DataLakeImportStatus.Partial)
+                        continue;
 
-                log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
-                return report.SerializeDataLakeJson();
+                    log.LogInformation($"[{input.instance}/{dataLakeItem.path}]...Finishing status ({status}) with `{linesProcessed}` records");
+                    return report.SerializeDataLakeJson();
+                }
+                catch (Exception ex)
+                {
+                    log.LogError($"[{input.instance}/{dataLakeItem.path}]...Finishing status (Faulted) with `{ex.Message}`");
+                    return new DataLakeImportReport
+                    {
+                        status = DataLakeImportStatus.FaultedInstance,
+                        export = input.export,
+                        //instanceId = input.instance,
+                        path = dataLakeItem.path,
+                    }.SerializeDataLakeJson();
+                }
             }
         }
 

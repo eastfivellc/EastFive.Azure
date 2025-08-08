@@ -5,6 +5,7 @@ namespace EastFive.Azure.Functions
     {
         Running,
         Cancelled,
+        Replaced,
         Complete,
         Partial,
         FaultedLocal,

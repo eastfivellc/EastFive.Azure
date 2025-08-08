@@ -56,6 +56,7 @@ namespace EastFive.Azure.Functions
         /// </summary>
         [Storage]
         [StorageQuery]
+        [IdHashXX32Lookup(Characters = 2)]
         public Guid export;
 
         [JsonIgnore]
