@@ -740,7 +740,8 @@ namespace EastFive.Api.Azure.Monitoring
         {
 
             return when
-                .StorageGetBy((MonitoringRequest mr) => mr.when)
+                .StorageGetBy((MonitoringRequest mr) => mr.when,
+                    readAhead: 25)
                 .Select(
                     (mr) =>
                     {
