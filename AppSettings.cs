@@ -409,5 +409,30 @@ namespace EastFive.Azure
             public const string MuteEmailToAddress = "EastFive.SendGrid.MuteToAddress";
             public const string BccAllAddresses = "EastFive.SendGrid.BlindCopyAllAddresses";
         }
+
+        [ConfigKey("Azure Tenant ID.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > ",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+        public const string TenantId = "EastFive.Azure.TenantId";
+
+        [ConfigKey("Azure Client ID.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > ",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+        public const string ClientId = "EastFive.Azure.ClientId";
+
+        [Config]
+        public static class AIFoundry
+        {
+            [ConfigKey("Foundry client secret.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > ",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+            public const string FoundryClientSecret = "EastFive.Azure.AIFoundry.ClientSecret";
+        }
     }
 }
