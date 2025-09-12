@@ -174,19 +174,30 @@ namespace EastFive.Azure.Search
                 }
 
                 var result = await searchClient.SearchAsync<T>(searchTextComplete, searchOptionsPopulated);
-                var pageResultAsync = result.Value.GetResultsAsync();
-                var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
-                return afterFilter(EnumerableAsync.Yield<(double?, T)>(
-                    async (yieldReturn, yieldBreak) =>
-                    {
-                        if (!await pageEnumerator.MoveNextAsync())
-                            return yieldBreak;
+                var pageResultAsync = result.Value
+                    .GetResultsAsync()
+                    .ToEnumerableAsync()
+                    .Select(
+                        searchResult =>
+                        {
+                            var doc = searchResult.Document;
+                            var score = searchResult.Score;
+                            return (score, doc);
+                        }
+                    );
+                return afterFilter(pageResultAsync);
+                // var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
+                // return afterFilter(EnumerableAsync.Yield<(double?, T)>(
+                //     async (yieldReturn, yieldBreak) =>
+                //     {
+                //         if (!await pageEnumerator.MoveNextAsync())
+                //             return yieldBreak;
 
-                        var searchResult = pageEnumerator.Current;
-                        var doc = searchResult.Document;
-                        var score = searchResult.Score;
-                        return yieldReturn((score, doc));
-                    }));
+                //         var searchResult = pageEnumerator.Current;
+                //         var doc = searchResult.Document;
+                //         var score = searchResult.Score;
+                //         return yieldReturn((score, doc));
+                //     }));
             }
         }
 
@@ -202,20 +213,30 @@ namespace EastFive.Azure.Search
                         return true;
                     })
                 .ToArray();
-            var pageResultAsync = result.Value.GetResultsAsync();
-            var pageEnumerator = pageResultAsync.GetAsyncEnumerator();
-            return EnumerableAsync.Yield<(double?, TResponse)>(
-                async (yieldReturn, yieldBreak) =>
-                {
-                    if (!await pageEnumerator.MoveNextAsync())
-                        return yieldBreak;
+           return result.Value
+                .GetResultsAsync()
+                .ToEnumerableAsync()
+                .Select(
+                    searchResult =>
+                    {
+                        var doc = searchResult.Document;
+                        var score = searchResult.Score;
+                        var resultCast = searchDeserializer.CastResult<TResponse, TIntermediary>(doc);
+                        return (score, resultCast);
+                    }
+                );
+            // return EnumerableAsync.Yield<(double?, TResponse)>(
+            //     async (yieldReturn, yieldBreak) =>
+            //     {
+            //         if (!await pageEnumerator.MoveNextAsync())
+            //             return yieldBreak;
 
-                    var searchResult = pageEnumerator.Current;
-                    var doc = searchResult.Document;
-                    var score = searchResult.Score;
-                    var result = searchDeserializer.CastResult<TResponse, TIntermediary>(doc);
-                    return yieldReturn((score, result));
-                });
+            //         var searchResult = pageEnumerator.Current;
+            //         var doc = searchResult.Document;
+            //         var score = searchResult.Score;
+            //         var result = searchDeserializer.CastResult<TResponse, TIntermediary>(doc);
+            //         return yieldReturn((score, result));
+            //     });
         }
 
 
