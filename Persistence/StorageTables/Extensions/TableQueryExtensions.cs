@@ -155,6 +155,9 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(string).IsInstanceOfType(assignmentValue))
                 return TableQuery.GenerateFilterCondition(assignmentName, queryComparison, (string)assignmentValue);
 
+            if (assignmentValue == null)
+                return TableQuery.GenerateFilterCondition(assignmentName, queryComparison, "");
+
             throw new NotImplementedException($"No filter condition created for type {assignmentValue.GetType().FullName}");
         }
 

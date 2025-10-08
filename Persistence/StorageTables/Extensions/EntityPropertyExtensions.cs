@@ -355,9 +355,35 @@ namespace EastFive.Persistence.Azure.StorageTables
             if (typeof(IReferenceableOptional).IsAssignableFrom(valueType))
             {
                 var refValue = value as IReferenceableOptional;
-                var guidValueMaybe = refValue.IsDefaultOrNull() ? default(Guid?) : refValue.id;
+                var guidValueMaybe = GetGuidValueMaybe();
                 var ep = new EntityProperty(guidValueMaybe);
                 return onValue(ep);
+                
+                Guid? GetGuidValueMaybe()
+                {
+                    if (!refValue.IsDefaultOrNull())
+                        return refValue.id;
+
+                    if (value == null)
+                        return default(Guid?);
+
+                    if (value is Guid)
+                        return (Guid)value;
+
+                    if (typeof(IReferenceable).IsAssignableFrom(value.GetType()))
+                    {
+                        var refValueNotOptional = (IReferenceable)value;
+                        return refValueNotOptional.id;
+                    }
+                    
+                    if(value is string)
+                    {
+                        if (Guid.TryParse(value as string, out var guidValue))
+                            return guidValue;
+                    }
+                    return default(Guid?);
+                    
+                }
             }
             if (typeof(IReferences).IsAssignableFrom(valueType))
             {
