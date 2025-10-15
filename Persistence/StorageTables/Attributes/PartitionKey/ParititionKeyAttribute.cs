@@ -170,8 +170,11 @@ namespace EastFive.Persistence.Azure.StorageTables
             MemberInfo memberInfo, string rowKey,
             params KeyValuePair<MemberInfo, object>[] extraValues)
         {
-            if(memberValue is string)
+            if (memberValue is string)
                 return memberValue as string;
+            
+            if(memberValue is IReferenceable refValue)
+                return refValue.id.ToString("N");
 
             if (memberValue is Type)
             {
