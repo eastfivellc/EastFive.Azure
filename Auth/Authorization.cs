@@ -157,6 +157,7 @@ namespace EastFive.Azure.Auth
             Version = Workflows.AuthorizationFlow.Version,
             Step = 2.0)]
         [Api.HttpPost]
+        [Unsecured("OAuth authorization flow initialization - creates new authorization request for third-party authentication, no prior authentication required")]
         public async static Task<IHttpResponse> CreateAsync(
                 [Api.Meta.Flows.WorkflowNewId]
                 [Property(Name = AuthorizationIdPropertyName)]
@@ -195,6 +196,7 @@ namespace EastFive.Azure.Auth
         }
 
         [Api.HttpPost]
+        [Unsecured("OAuth callback endpoint - completes authorization with third-party provider parameters, no bearer token used in OAuth callback flows")]
         public async static Task<IHttpResponse> CreateAuthorizedAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
@@ -238,6 +240,7 @@ namespace EastFive.Azure.Auth
             Step = 4.0,
             StepName = "Trade Authorization ID for Session")]
         [Api.HttpPost]
+        [Unsecured("Session creation endpoint - exchanges authorization for session token, no bearer token required before session is created")]
         public async static Task<IHttpResponse> CreateAuthorizedAsync(
                 [WorkflowNewId]
                 [QueryParameter(Name = "session")]
@@ -373,9 +376,9 @@ namespace EastFive.Azure.Auth
                 },
                 () => onNotFound());
         }
-
         
         [Api.HttpPatch]
+        [Unsecured("Session authorization endpoint - authorizes session with authentication parameters, no bearer token required before session is authorized")]
         public async static Task<IHttpResponse> AuthorizeAsync(
                 [QueryParameter(Name = "session")]
                 IRef<Session> sessionRef,
@@ -421,6 +424,7 @@ namespace EastFive.Azure.Auth
         #region DELETE
 
         [HttpDelete]
+        [Unsecured("Logout endpoint - deletes authorization and initiates third-party logout flow, public endpoint for session cleanup")]
         public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 IProvideUrl urlHelper, AzureApplication application,

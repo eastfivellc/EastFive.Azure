@@ -35,7 +35,7 @@ namespace EastFive.Persistence
 
             KeyValuePair<string, EntityProperty>[] GetEps()
             {
-                if (value == null)
+                if (value is null)
                     return new KeyValuePair<string, EntityProperty>[] { };
 
                 if (!value.GetType().IsSubClassOfGeneric(typeof(IImplementRef<>)))

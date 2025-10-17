@@ -724,7 +724,11 @@ namespace EastFive.Api.Azure.Monitoring
                         },
                         () => default(string));
                     }
-                    catch (Exception) { }
+                    catch (Exception ex)
+                    {
+                        // Suppress errors reading log content - log entry will be returned without detailed message
+                        System.Diagnostics.Debug.WriteLine($"Failed to read activity log content: {ex.Message}");
+                    }
                 }
                 return log;
             }

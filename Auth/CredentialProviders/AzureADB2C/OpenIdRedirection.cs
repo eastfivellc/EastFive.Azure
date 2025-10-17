@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Auth;
 
 
 namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
@@ -38,6 +39,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         //public string token;
 
         [HttpGet(MatchAllParameters = false)]
+        [Unsecured("OAuth callback endpoint - receives authorization response from Azure AD B2C OpenID Connect flow, no bearer token available during OAuth callback")]
         public static async Task<IHttpResponse> Get(
                 //[QueryParameter(Name = ProvideLoginMock.extraParamState)]IRefOptional<Authorization> authorizationRef,
                 //[QueryParameter(Name = ProvideLoginMock.extraParamToken)]string token,
@@ -61,6 +63,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.AzureADB2C
         }
 
         [HttpPost(MatchAllParameters = false)]
+        [Unsecured("OAuth callback endpoint - receives authorization response from Azure AD B2C OpenID Connect flow via POST, no bearer token available during OAuth callback")]
         public static async Task<IHttpResponse> PostAsync(
                 [Property(Name = id_token)]string idToken,
                 [Property(Name = state)]IRef<Authorization> authorization,

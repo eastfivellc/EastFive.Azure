@@ -36,7 +36,7 @@ namespace EastFive.Persistence
 
             EntityProperty GetEp()
             {
-                if (value == null)
+                if (value is null)
                     return new EntityProperty(default(long?));
 
                 if (value is long)

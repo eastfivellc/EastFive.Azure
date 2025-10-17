@@ -67,7 +67,7 @@ namespace EastFive.Azure.Persistence.StorageTables
             if (!typeOfValue.IsArray)
                 return base.CastValue(typeOfValue, values, propertyName);
 
-            if (values == null)
+            if (values is null)
                 return new KeyValuePair<string, EntityProperty>[] { };
 
             var elementType = typeOfValue.GetElementType();

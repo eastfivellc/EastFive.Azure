@@ -39,6 +39,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         [JsonProperty(PropertyName = AgentIdPropertyName)]
         public string agentid { get; set; }
 
+        [Unsecured("OAuth callback endpoint - receives token from Ping Identity OAuth flow, no bearer token available during OAuth callback")]
         [HttpGet(MatchAllParameters = false)]
         public static Task<IHttpResponse> Get(
                 [OptionalQueryParameter(CheckFileName = true)]string tag,

@@ -96,9 +96,9 @@ namespace EastFive.Persistence.Azure.StorageTables
                     }
                 case EdmType.String:
                     {
-                        if (null == ep.StringValue)
+                        if (ep.StringValue is null)
                             return new byte[] { 1 };
-                        if (string.Empty == ep.StringValue)
+                        if (ep.StringValue.Length == 0)
                             return new byte[] { 2 };
 
                         return (new byte[] { 0 }).Concat(Encoding.UTF8.GetBytes(ep.StringValue)).ToArray();
@@ -125,7 +125,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var edmType = typeFromByte[typeByte];
                         var valueBytes = typeWithBytes.Skip(1).ToArray();
                         var valueObj = edmType.ToObjectFromEdmTypeByteArray(valueBytes);
-                        if(null == valueObj)
+                        if(valueObj is null)
                         {
                             if (typeForDefaultFromMissingValues.IsClass)
                                 return valueObj;
@@ -157,7 +157,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                         var edmType = typeFromByte[typeByte];
                         var valueBytes = typeWithBytes.Skip(1).ToArray();
                         var valueObj = edmType.ToObjectFromEdmTypeByteArray(valueBytes);
-                        if (null == valueObj)
+                        if (valueObj is null)
                         {
                             return NullValue();
                         }
@@ -364,7 +364,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     if (!refValue.IsDefaultOrNull())
                         return refValue.id;
 
-                    if (value == null)
+                    if (value is null)
                         return default(Guid?);
 
                     if (value is Guid)
@@ -412,7 +412,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     if (typeof(object) == valueType)
                     {
-                        if (null == value)
+                        if (value is null)
                         {
                             var nullGuidKey = new Guid(EDMExtensions.NullGuidKey);
                             var ep = new EntityProperty(nullGuidKey);

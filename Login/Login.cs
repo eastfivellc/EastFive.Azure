@@ -13,6 +13,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {
@@ -46,6 +47,7 @@ namespace EastFive.Azure.Login
         public string password;
 
         [Api.HttpAction("Authenticate")]
+        [Unsecured("Username/password authentication endpoint - validates credentials and creates session, no prior authentication required for login flow")]
         public static async Task<IHttpResponse> AuthenticateAsync(
                 [Property(Name = UserNamePropertyName)]string username,
                 [Property(Name = PasswordPropertyName)] string password,
@@ -63,6 +65,7 @@ namespace EastFive.Azure.Login
         }
 
         [Api.HttpAction("CreateAccount")]
+        [Unsecured("Account creation endpoint - creates new user account with username/password, no prior authentication required for registration flow")]
         public static async Task<IHttpResponse> CreateAccountAsync(
                 [Property(Name = UserNamePropertyName)]string username,
                 [Property(Name = PasswordPropertyName)]string password,

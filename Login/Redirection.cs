@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {
@@ -27,6 +28,7 @@ namespace EastFive.Azure.Login
         public string state;
 
         [HttpGet(MatchAllParameters = false)]
+        [Unsecured("OAuth login redirection endpoint - receives authentication response from credential provider, no bearer token available during OAuth flow")]
         public static async Task<IHttpResponse> Get(
                 IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,
@@ -52,6 +54,7 @@ namespace EastFive.Azure.Login
         }
 
         [HttpPatch(MatchAllParameters = false)]
+        [Unsecured("OAuth login redirection endpoint - receives authentication response from credential provider via PATCH, no bearer token available during OAuth flow")]
         public static async Task<IHttpResponse> PatchAsync(
                 IAzureApplication application, IProvideUrl urlHelper,
                 IHttpRequest request,

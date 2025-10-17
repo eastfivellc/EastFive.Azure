@@ -56,8 +56,8 @@ namespace EastFive.Azure.Login
                     () => onAlreadyExists());
         }
 
-        [Unsecured("OAuth client listing endpoint - returns registered OAuth clients for configuration purposes")]
         [Api.HttpGet]
+        [SuperAdminClaim]
         public static IHttpResponse ListAsync(
             MultipartAsyncResponse<Client> onListed)
         {

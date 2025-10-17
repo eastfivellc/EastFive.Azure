@@ -20,6 +20,7 @@ using EastFive.Web.Configuration;
 using Newtonsoft.Json;
 using EastFive.Api.Auth;
 using System.Security.Claims;
+using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Auth
 {
@@ -56,6 +57,7 @@ namespace EastFive.Azure.Auth
         public string secret;
 
         [Api.HttpGet]
+        [Unsecured("Token configuration endpoint - returns public token issuer and scope configuration for client authentication setup, no sensitive data exposed")]
         public static IHttpResponse Get(
             ContentTypeResponse<Token> onFound)
         {

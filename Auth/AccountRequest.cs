@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 
 using EastFive.Api;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Api.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -61,6 +62,7 @@ namespace EastFive.Azure.Auth
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
             Step = 1.9)]
+        [Unsecured("OAuth launch endpoint - initiates authentication flow, no bearer token available before authentication")]
         [HttpAction(LaunchAction)]
         public static async Task<IHttpResponse> LaunchAsync(
 
@@ -107,6 +109,7 @@ namespace EastFive.Azure.Auth
         #region Actions
 
         public const string ResponseAction = "Response";
+        [Unsecured("Account request endpoint - allows users to request account without existing authentication")]
         [HttpAction(ResponseAction)]
         // [SuperAdminClaim]
         public static Task<IHttpResponse> ResponseAsync(

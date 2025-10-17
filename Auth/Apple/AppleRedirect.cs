@@ -9,6 +9,7 @@ using EastFive;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Collections.Generic;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
@@ -41,6 +42,7 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = UserPropertyName)]
         public string user { get; set; }
 
+        [Unsecured("OAuth callback endpoint - receives authorization code from Apple Sign In OAuth flow, no bearer token available during OAuth callback")]
         [HttpPost(MatchAllParameters = false)]
         public static async Task<IHttpResponse> Post(
                 [PropertyOptional(Name = StatePropertyName)]string state,
