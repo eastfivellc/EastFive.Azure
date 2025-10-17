@@ -61,6 +61,7 @@ namespace EastFive.Azure.Login
             StepName = "Create New Account")]
         [Api.HttpPost]
         [HtmlAction(Label = "Create")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> UpdateAsync(
                 [WorkflowVariable(
                     Workflows.PasswordLoginCreateAccount.Variables.UserId,
