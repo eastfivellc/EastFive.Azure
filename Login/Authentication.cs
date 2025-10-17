@@ -99,6 +99,7 @@ namespace EastFive.Azure.Login
 
         #region HTTP Methods
 
+        [Unsecured("Login form HTML page - must be publicly accessible for users to authenticate")]
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = AuthenticationPropertyName)]IRef<Authentication> authenticationRef,
@@ -123,6 +124,7 @@ namespace EastFive.Azure.Login
             Step = 2.0,
             StepName = "Start Authentication Process",
             FollowRedirects = false)]
+        [Unsecured("Initial authentication endpoint - creates authentication session before credentials are provided")]
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 //[WorkflowNewId]
@@ -186,6 +188,7 @@ namespace EastFive.Azure.Login
             Version = Workflows.PasswordLoginCreateAccount.Version,
             Step = 3.0,
             StepName = "Login")]
+        [Unsecured("Password-based login endpoint - authentication is performed using username/password in request body, not bearer token")]
         [Api.HttpPatch]
         [HtmlAction(Label = "Login")]
         public static async Task<IHttpResponse> UpdateAsync(

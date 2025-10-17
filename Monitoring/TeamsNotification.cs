@@ -15,6 +15,7 @@ using EastFive.Linq;
 using EastFive.Extensions;
 using EastFive.Api;
 using EastFive.Api.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Media;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
@@ -95,6 +96,7 @@ namespace EastFive.Azure.Monitoring
             Version = Workflows.MonitoringFlow.Version,
             Step = 1.0,
             StepName = "List Notifications")]
+        [SuperAdminClaim]
         [HttpGet]
         public static IHttpResponse GetAll(
             RequestMessage<TeamsNotification> teamsNotifications,
@@ -120,6 +122,7 @@ namespace EastFive.Azure.Monitoring
             Step = 2.0,
             StepName = "Create Notification")]
         [HttpPost]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> CreateAsync(
                 [EastFive.Api.Meta.Flows.WorkflowNewId]
                 [WorkflowVariable(Workflows.MonitoringFlow.Variables.CreatedNotification, IdPropertyName)]
@@ -155,6 +158,7 @@ namespace EastFive.Azure.Monitoring
             Step = 3.0,
             StepName = "Modify Notification")]
         [HttpPatch]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> UpdateAsync(
                 [WorkflowParameter(Value = "{{TeamsNotification}}")]
                 [UpdateId] IRef<TeamsNotification> teamsNotificationRef,
@@ -178,6 +182,7 @@ namespace EastFive.Azure.Monitoring
             Version = Workflows.MonitoringFlow.Version,
             Step = 6.0,
             StepName = "Delete Notification")]
+        [SuperAdminClaim]
         [HttpDelete]
         public static Task<IHttpResponse> DeleteByIdAsync(
                 [WorkflowParameter(Value = "{{TeamsNotification_}}")]
@@ -196,6 +201,7 @@ namespace EastFive.Azure.Monitoring
             Step = 7.0,
             StepName = "Clear Notifications")]
         [HttpDelete]
+        [SuperAdminClaim]
         public static IHttpResponse ClearAsync(
                 [WorkflowParameter(Value = "true")]
                 [QueryParameter(Name = "clear")]
@@ -225,6 +231,7 @@ namespace EastFive.Azure.Monitoring
             Step = 4.0,
             StepName = "Load and Activate Notifications")]
         [HttpAction("Load")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> LoadAsync(
             RequestMessage<TeamsNotification> teamsNotificationsStorage,
             ContentTypeResponse<TeamsNotification[]> onFound)
@@ -242,6 +249,7 @@ namespace EastFive.Azure.Monitoring
             Step = 5.0,
             StepName = "List Active Notifications")]
         [HttpAction("Active")]
+        [SuperAdminClaim]
         public static IHttpResponse Active(
             ContentTypeResponse<TeamsNotification[]> onFound)
         {

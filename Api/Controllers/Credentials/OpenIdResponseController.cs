@@ -11,6 +11,7 @@ using EastFive;
 using EastFive.Linq;
 using EastFive.Api;
 using EastFive.Api.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Collections.Generic;
 
 using Newtonsoft.Json;
@@ -49,6 +50,7 @@ namespace EastFive.Azure.Auth
         [JsonProperty(PropertyName = ErrorDescriptionPropertyName)]
         public string errorDescription { get; set; }
 
+        [Unsecured("OpenID Connect OAuth callback endpoint - receives authorization code and ID token from OAuth provider, no bearer token available during OAuth callback")]
         [HttpPost(MatchAllParameters = false)]
         public static async Task<IHttpResponse> Post(
                 [Property(Name = StatePropertyName)]string state,

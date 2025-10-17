@@ -1,6 +1,7 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Auth;
 using EastFive.Collections.Generic;
 using EastFive.Web.Configuration;
 using Newtonsoft.Json;
@@ -20,6 +21,7 @@ namespace EastFive.Apple
         ContentTypeVersion = "0.1")]
     public class AppleDeveloperDomainAssociation
     {
+        [Unsecured("Apple Developer Domain Association file - must be publicly accessible for Apple domain verification")]
         [HttpGet(MatchAllParameters = false)]
         public static IHttpResponse Get(
             TextResponse onResponse,

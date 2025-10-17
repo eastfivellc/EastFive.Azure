@@ -11,6 +11,7 @@ using EastFive;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Collections.Generic;
 
 namespace EastFive.Azure.Auth.Salesforce
@@ -41,6 +42,7 @@ namespace EastFive.Azure.Auth.Salesforce
         public const string PromptPropertyName = "prompt";
         public const string HdPropertyName = "hd";
 
+        [Unsecured("OAuth callback endpoint - receives authorization code from Salesforce OAuth flow, no bearer token available during OAuth callback")]
         [HttpGet]
         public static async Task<IHttpResponse> Redirected(
                 [QueryParameter(Name = StatePropertyName)]string state,

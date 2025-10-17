@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
 
 using EastFive.Api;
+using EastFive.Azure.Auth;
 using EastFive.Api.Auth;
 using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -79,6 +80,7 @@ namespace EastFive.Azure.Auth
         //    return await onFound(claimsForUser);
         //}
 
+        [Unsecured("Admin login audit endpoint - requires SuperAdminClaim attribute for access control, retrieves login history")]
         [Api.HttpGet]
         [SuperAdminClaim]
         public static IHttpResponse AllAsync(

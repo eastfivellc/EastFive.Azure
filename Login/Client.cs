@@ -1,5 +1,6 @@
 ﻿using EastFive.Api;
 using EastFive.Api.Controllers;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Linq.Async;
@@ -38,6 +39,7 @@ namespace EastFive.Azure.Login
         [Storage]
         public string secret;
 
+        [Unsecured("OAuth client registration endpoint - allows external systems to register OAuth client credentials")]
         [Api.HttpPost]
         public static async Task<IHttpResponse> CreateAsync(
                 [Resource]Client client,
@@ -54,6 +56,7 @@ namespace EastFive.Azure.Login
                     () => onAlreadyExists());
         }
 
+        [Unsecured("OAuth client listing endpoint - returns registered OAuth clients for configuration purposes")]
         [Api.HttpGet]
         public static IHttpResponse ListAsync(
             MultipartAsyncResponse<Client> onListed)

@@ -9,6 +9,7 @@ using EastFive;
 using EastFive.Api;
 using EastFive.Api.Azure;
 using EastFive.Azure;
+using EastFive.Azure.Auth;
 using EastFive.Collections.Generic;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Newtonsoft.Json;
@@ -41,6 +42,7 @@ namespace EastFive.Azure.Auth.Google
         public const string PromptPropertyName = "prompt";
         public const string HdPropertyName = "hd";
 
+        [Unsecured("OAuth callback endpoint - receives authorization code from Google OAuth flow, no bearer token available during OAuth callback")]
         [HttpGet]
         public static async Task<IHttpResponse> Redirected(
                 [QueryParameter(Name = StatePropertyName)]string state,

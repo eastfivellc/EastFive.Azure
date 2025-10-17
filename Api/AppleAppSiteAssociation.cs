@@ -7,6 +7,7 @@ using System.Web.Http;
 using Newtonsoft.Json;
 
 using EastFive.Api;
+using EastFive.Azure.Auth;
 using EastFive.Extensions;
 using EastFive.Web.Configuration;
 
@@ -18,6 +19,7 @@ namespace EastFive.Api.Azure.Apple
         Route = "apple-app-site-association")]
     public class AppleAppSiteAssociationController
     {
+        [Unsecured("Apple Universal Links configuration file - must be publicly accessible for iOS app deep linking to function")]
         [EastFive.Api.HttpGet]
         public static IHttpResponse Get(
                 ContentResponse onSuccess,

@@ -126,6 +126,7 @@ namespace EastFive.Azure.OAuth
         /// POST /OAuth/ClientCredentialFlow/{id}/token - Execute OAuth 2.0 Client Credentials Flow
         /// Implements RFC 6749 Section 4.4: Client Credentials Grant
         /// </summary>
+        [Unsecured("OAuth 2.0 Client Credentials token endpoint - authenticates using client_id and client_secret in request body per RFC 6749")]
         [HttpAction("token")]
         public static async Task<IHttpResponse> RequestTokenAsync(
                 [Property(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,

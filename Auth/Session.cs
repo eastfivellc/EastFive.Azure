@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using EastFive.Api;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -152,6 +153,7 @@ namespace EastFive.Azure.Auth
 
         #region GET
 
+        [Unsecured("Session lookup endpoint - validates session tokens for authenticated users, allows anonymous sessions when configured")]
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
@@ -206,6 +208,7 @@ namespace EastFive.Azure.Auth
             }
         }
 
+        [Unsecured("OAuth callback session lookup endpoint - retrieves session by authorization request ID during OAuth flow completion")]
         [Api.HttpGet]
         public static Task<IHttpResponse> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
@@ -233,6 +236,7 @@ namespace EastFive.Azure.Auth
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
             Step = 3.0)]
+        [Unsecured("OAuth callback session creation - completes OAuth flow after external provider authentication, no bearer token available yet")]
         [HttpPost]
         public async static Task<IHttpResponse> CreateAsync(
                 [Api.Meta.Flows.WorkflowNewId]
@@ -300,6 +304,7 @@ namespace EastFive.Azure.Auth
                 (why) => onConfigurationFailure("Missing", why).AsTask());
         }
 
+        [Unsecured("Session update endpoint - allows updating session authorization during authentication flow")]
         [HttpPatch]
         public static Task<IHttpResponse> UpdateBodyAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
@@ -343,6 +348,7 @@ namespace EastFive.Azure.Auth
                 onNotFound: () => onNotFound());
         }
 
+        [Unsecured("Session deletion endpoint - allows users to logout and invalidate their session")]
         [HttpDelete]
         public static Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
