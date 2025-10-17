@@ -61,8 +61,9 @@ namespace EastFive.Api.Azure.Resources
 
         [HttpPost]
         public static async Task<IHttpResponse> CreateContentAsync(
-                [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)]Guid contentId,
-                [QueryParameter(Name = ContentPropertyName)]ByteArrayContent content,
+                [QueryParameter(CheckFileName = true, Name = ContentIdPropertyName)] Guid contentId,
+                [QueryParameter(Name = ContentPropertyName)] ByteArrayContent content,
+                Security security,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists)
         {
@@ -78,6 +79,7 @@ namespace EastFive.Api.Azure.Resources
                 [Property(Name = ContentIdPropertyName)]Guid contentId,
                 [Property(Name = ContentPropertyName)]byte[] contentBytes,
                 [Header(Content = ContentPropertyName)]System.Net.Http.Headers.MediaTypeHeaderValue mediaHeader,
+                Security security,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists)
         {
@@ -94,6 +96,7 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
                 [OptionalQueryParameter]string renderer,
+                Security security,
             BytesResponse onRawResponse,
             ImageRawResponse onImageResponse,
             NotFoundResponse onNotFound,
@@ -151,6 +154,7 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
+                Security security,
             ImageResponse imageResponse,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -187,6 +191,7 @@ namespace EastFive.Api.Azure.Resources
                 [OptionalQueryParameter]int? width,
                 [OptionalQueryParameter]int? height,
                 [OptionalQueryParameter]bool? fill,
+                Security security,
             ImageResponse imageResponse,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -194,6 +199,7 @@ namespace EastFive.Api.Azure.Resources
             return QuerySubImageByContentIdAsync(contentId.resourceRef.id,
                 x, y, w, h,
                 width, height, fill,
+                security,
                 imageResponse, onNotFound, onUnauthorized);
         }
 
