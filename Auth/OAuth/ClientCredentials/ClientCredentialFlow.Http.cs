@@ -17,13 +17,13 @@ namespace EastFive.Azure.OAuth
         ContentType = "application/json",
         ContentTypeVersion = "1.0")]
     public partial struct ClientCredentialFlow
-    {
+    { /*
         /// <summary>
         /// GET /OAuth/ClientCredentialFlow - Get all client credential flows
         /// </summary>
         [HttpGet]
         public static async Task<IHttpResponse> GetAllAsync(
-                Security security,
+                EastFive.Api.Security security,
             MultipartResponseAsync<ClientCredentialFlow> onFound)
         {
             var flows = GetAll();
@@ -148,6 +148,6 @@ namespace EastFive.Azure.OAuth
                         onFailure: why => onBadRequest().AddReason(why));
                 },
                 () => onNotFound());
-        }
+        } */
     }
 }
