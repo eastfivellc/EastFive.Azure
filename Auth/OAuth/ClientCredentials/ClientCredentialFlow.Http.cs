@@ -1,154 +1,119 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using EastFive;
 using EastFive.Api;
 using EastFive.Api.Controllers;
-using EastFive.Azure.Auth;
+using EastFive.Api.Serialization.Json;
+using EastFive.Azure.Persistence;
+using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 
 namespace EastFive.Azure.OAuth
 {
-    /// <summary>
-    /// HTTP API for OAuth 2.0 Client Credentials Flow (RFC 6749 Section 4.4)
-    /// </summary>
     [FunctionViewController(
-        Route = "OAuth/ClientCredentialFlow",
-        ContentType = "application/json",
-        ContentTypeVersion = "1.0")]
+        Namespace = "OAuth",
+        Route = "ClientCredentialFlow",
+        ContentType = "application/x-oauth-authorization+json")]
+    [CastSerialization]
     public partial struct ClientCredentialFlow
-    { /*
-        /// <summary>
-        /// GET /OAuth/ClientCredentialFlow - Get all client credential flows
-        /// </summary>
+    {
         [HttpGet]
-        public static async Task<IHttpResponse> GetAllAsync(
-                EastFive.Api.Security security,
-            MultipartResponseAsync<ClientCredentialFlow> onFound)
+        public static IHttpResponse GetAllAsync(
+                RequestMessage<ClientCredentialFlow> flowsQuery,
+            MultipartAsyncResponse<ClientCredentialFlow> onResults)
         {
-            var flows = GetAll();
-            return await onFound(flows);
+            return flowsQuery
+                .StorageGet()
+                .HttpResponse(onResults);
         }
 
-        /// <summary>
-        /// GET /OAuth/ClientCredentialFlow?is_active=true - Get active flows
-        /// </summary>
-        [HttpGet]
-        public static async Task<IHttpResponse> GetActiveAsync(
-                [QueryParameter(Name = IsActivePropertyName)] bool isActive,
-                Security security,
-            MultipartResponseAsync<ClientCredentialFlow> onFound)
-        {
-            if (!isActive)
-                return await onFound(GetAll());
-
-            var flows = GetActive();
-            return await onFound(flows);
-        }
-
-        /// <summary>
-        /// GET /OAuth/ClientCredentialFlow/{id} - Get specific flow by ID
-        /// </summary>
-        [HttpGet]
-        public static async Task<IHttpResponse> GetByIdAsync(
-                [QueryParameter(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,
-                Security security,
-            ContentTypeResponse<ClientCredentialFlow> onFound,
-            NotFoundResponse onNotFound)
-        {
-            return await GetAsync(flowRef,
-                flow => onFound(flow),
-                () => onNotFound());
-        }
-
-        /// <summary>
-        /// POST /OAuth/ClientCredentialFlow - Create new client credential flow configuration
-        /// </summary>
         [HttpPost]
         public static async Task<IHttpResponse> CreateAsync(
-                [Property(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,
-                [Property(Name = ClientIdPropertyName)] string clientId,
-                [Property(Name = ClientSecretPropertyName)] string clientSecret,
-                [Property(Name = TokenEndpointPropertyName)] Uri tokenEndpoint,
-                [Property(Name = ScopePropertyName)] string scope,
-                [Property(Name = NamePropertyName)] string name,
-                [Property(Name = DescriptionPropertyName)] string description,
-                [PropertyOptional(Name = IsActivePropertyName)] bool isActive = true,
-                Security security,
-            CreatedBodyResponse<ClientCredentialFlow> onCreated,
-            AlreadyExistsResponse onAlreadyExists)
-        {
-            return await CreateAsync(flowRef, clientId, clientSecret, tokenEndpoint, 
-                scope, name, description, isActive,
-                flow => onCreated(flow),
-                () => onAlreadyExists());
-        }
-
-        /// <summary>
-        /// PATCH /OAuth/ClientCredentialFlow/{id} - Update existing flow configuration
-        /// </summary>
-        [HttpPatch]
-        public static async Task<IHttpResponse> UpdateAsync(
-                [Property(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,
-                [PropertyOptional(Name = ClientIdPropertyName)] string clientId,
-                [PropertyOptional(Name = ClientSecretPropertyName)] string clientSecret,
+                [UpdateId] IRef<ClientCredentialFlow> flowRef,
+                [Property(Name = AuthorizationEndpointPropertyName)] Uri authorizationEndpoint,
                 [PropertyOptional(Name = TokenEndpointPropertyName)] Uri tokenEndpoint,
+                [Property(Name = ClientIdPropertyName)] string clientId,
+                [PropertyOptional(Name = ClientSecretPropertyName)] string clientSecret,
+                [Property(Name = RedirectUriPropertyName)] Uri redirectUri,
+                [Property(Name = ResponseTypesPropertyName)] string responseTypes,
                 [PropertyOptional(Name = ScopePropertyName)] string scope,
-                [PropertyOptional(Name = NamePropertyName)] string name,
+                [Property(Name = NamePropertyName)] string name,
                 [PropertyOptional(Name = DescriptionPropertyName)] string description,
                 [PropertyOptional(Name = IsActivePropertyName)] bool? isActive,
-                Security security,
+                [Resource] ClientCredentialFlow flow,
+            CreatedBodyResponse<ClientCredentialFlow> onCreated,
+            AlreadyExistsResponse onAlreadyExists,
+            BadRequestResponse onBadRequest)
+        {
+            if (authorizationEndpoint == null)
+                return onBadRequest().AddReason("authorization_endpoint is required");
+
+            if (string.IsNullOrWhiteSpace(clientId))
+                return onBadRequest().AddReason("client_id is required");
+
+            if (redirectUri == null)
+                return onBadRequest().AddReason("redirect_uri is required per RFC 6749 §3.1.2");
+
+            if (string.IsNullOrWhiteSpace(responseTypes))
+                return onBadRequest().AddReason("response_types is required (comma-separated: code, token)");
+
+            if (!string.IsNullOrEmpty(authorizationEndpoint.Fragment))
+                return onBadRequest().AddReason("authorization_endpoint MUST NOT include fragment per RFC 6749 §3.1");
+
+            if (!string.IsNullOrEmpty(redirectUri.Fragment))
+                return onBadRequest().AddReason("redirect_uri MUST NOT include fragment per RFC 6749 §3.1.2");
+
+            var types = responseTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .ToArray();
+
+            foreach (var type in types)
+            {
+                if (!ResponseTypeValues.IsValid(type))
+                    return onBadRequest().AddReason($"Invalid response_type: {type}");
+            }
+
+            if (types.Contains(ResponseTypeValues.Code, StringComparer.OrdinalIgnoreCase) && tokenEndpoint == null)
+                return onBadRequest().AddReason("token_endpoint required for authorization code grant per RFC 6749 §4.1");
+
+            flow.isActive = isActive ?? true;
+            flow.createdAt = DateTime.UtcNow;
+            flow.updatedAt = DateTime.UtcNow;
+
+            return await flow.StorageCreateAsync(
+                created => onCreated(created.Entity),
+                onAlreadyExists: () => onAlreadyExists());
+        }
+
+        [HttpPatch]
+        public static async Task<IHttpResponse> UpdateAsync(
+                [UpdateId] IRef<ClientCredentialFlow> flowRef,
+                MutateResource<ClientCredentialFlow> mutateResource,
             ContentTypeResponse<ClientCredentialFlow> onUpdated,
             NotFoundResponse onNotFound)
         {
-            return await UpdateAsync(flowRef, clientId, clientSecret, tokenEndpoint, 
-                scope, name, description, isActive,
-                flow => onUpdated(flow),
+            return await flowRef.StorageUpdateAsync2(
+                flow =>
+                {
+                    flow.updatedAt = DateTime.UtcNow;
+                    var updates = mutateResource(flow);
+                    return updates;
+                },
+                (updatedFlow) => onUpdated(updatedFlow),
                 () => onNotFound());
         }
 
-        /// <summary>
-        /// DELETE /OAuth/ClientCredentialFlow/{id} - Delete flow configuration
-        /// </summary>
         [HttpDelete]
         public static async Task<IHttpResponse> DeleteAsync(
-                [Property(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,
-                Security security,
+                [UpdateId] IRef<ClientCredentialFlow> flowRef,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound)
         {
-            return await DeleteAsync(flowRef,
-                () => onDeleted(),
+            return await flowRef.StorageDeleteAsync(
+                deleted => onDeleted(),
                 () => onNotFound());
         }
-
-        /// <summary>
-        /// POST /OAuth/ClientCredentialFlow/{id}/token - Execute OAuth 2.0 Client Credentials Flow
-        /// Implements RFC 6749 Section 4.4: Client Credentials Grant
-        /// </summary>
-        [Unsecured("OAuth 2.0 Client Credentials token endpoint - authenticates using client_id and client_secret in request body per RFC 6749")]
-        [HttpAction("token")]
-        public static async Task<IHttpResponse> RequestTokenAsync(
-                [Property(Name = IdPropertyName)] IRef<ClientCredentialFlow> flowRef,
-                Security security,
-            ContentTypeResponse<AccessTokenResponse> onSuccess,
-            ContentTypeResponse<OAuthErrorResponse> onOAuthError,
-            NotFoundResponse onNotFound,
-            BadRequestResponse onBadRequest)
-        {
-            return await GetAsync(flowRef,
-                async flow =>
-                {
-                    if (!flow.isActive)
-                        return onBadRequest().AddReason("Flow is not active");
-
-                    return await flow.RequestAccessTokenAsync(
-                        httpClient: null,
-                        onSuccess: token => onSuccess(token),
-                        onOAuthError: error => onOAuthError(error),
-                        onFailure: why => onBadRequest().AddReason(why));
-                },
-                () => onNotFound());
-        } */
     }
 }
