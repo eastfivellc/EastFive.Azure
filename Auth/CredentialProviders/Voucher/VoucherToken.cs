@@ -372,9 +372,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [Property(Name = LastModifiedByPropertyName)] string lastModifiedBy,
 
                 [Api.Meta.Flows.WorkflowObjectParameter(
-                    Key0 ="http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                    Key0 = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
                     Value0 = ClaimValues.RoleType + "fb7f557f458c4eadb08652c4a7315fd6",
-                    Key1 = ClaimValues.AccountType,
+                    AppSettingKey1 = EastFive.Api.AppSettings.ActorIdClaimType,
                     Value1 = "{{Account}}")]
                 [Property(Name = ClaimsPropertyName)] Dictionary<string, string> extraClaims,
 
@@ -406,6 +406,9 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                         .NullToEmpty()
                         .Append(Api.AppSettings.ActorIdClaimType.ConfigurationString(
                             (accountIdClaimType) => accountIdClaimType.PairWithValue(authorizationId.ToString("N"))))
+                        .If(Api.AppSettings.ActorIdClaimType.ConfigurationString(
+                            (accountIdClaimType) => accountIdClaimType != ClaimValues.DefaultAccountClaim),
+                            (kvps) => kvps.Append(ClaimValues.DefaultAccountClaim.PairWithValue(authorizationId.ToString("N"))))
                         .Concat(extraClaims.NullToEmpty())
                         .Distinct(kvp => kvp.Key)
                         .ToDictionary();

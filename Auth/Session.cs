@@ -130,6 +130,8 @@ namespace EastFive.Azure.Auth
                         {
                             var claimsWithAccountId = claims
                                 .Append(accountIdClaimType.PairWithValue(accountId.ToString()))
+                                .If(accountIdClaimType != Api.Auth.ClaimValues.DefaultAccountClaim,
+                                    (kvps) => kvps.Append(Api.Auth.ClaimValues.DefaultAccountClaim.PairWithValue(accountId.ToString())))
                                 .ToDictionary();
                             return onClaims(claimsWithAccountId, accountId, authorized);
                         },
