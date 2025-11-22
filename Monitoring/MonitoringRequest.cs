@@ -763,8 +763,8 @@ namespace EastFive.Api.Azure.Monitoring
                         if (string.IsNullOrWhiteSpace(tryAuth))
                             return default(KeyValuePair<Guid, MonitoringRequest>?);
 
-                        var jwtActorIdMaybe = tryAuth.GetClaimsJwtString(
-                            (claims) => claims.GetActorId(x => x, () => default(Guid?)),
+                        var jwtActorIdMaybe = tryAuth.ParseJwtString(
+                            (t) => t.Claims.GetActorId(x => x, () => default(Guid?)),
                             (why) => default(Guid?));
 
                         if (jwtActorIdMaybe.IsDefault())
