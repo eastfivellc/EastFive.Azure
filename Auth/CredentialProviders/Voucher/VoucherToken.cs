@@ -210,6 +210,16 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
                 [OptionalQueryParameter] string method,
 
                 [WorkflowParameter(
+                    Value = Workflows.AuthorizationFlow.Variables.MonitoringStatus.Set.Value,
+                    Description = Workflows.AuthorizationFlow.Variables.MonitoringStatus.Set.Description)]
+                [OptionalQueryParameter] int? status,
+
+                [WorkflowParameter(
+                    Value = Workflows.AuthorizationFlow.Variables.MonitoringSearch.Set.Value,
+                    Description = Workflows.AuthorizationFlow.Variables.MonitoringSearch.Set.Description)]
+                [OptionalQueryParameter] string search,
+
+                [WorkflowParameter(
                     Value = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Value,
                     Description = Workflows.AuthorizationFlow.Variables.MonitoringWhen.Set.Description)]
                 [QueryParameter] DateTime when,
@@ -228,7 +238,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             if (actorIdMaybe.IsDefault() && string.IsNullOrWhiteSpace(route) && string.IsNullOrWhiteSpace(method))
                 return onBadRequest().AddReason("You must have one of id, route, or method");
 
-            var results = await Api.Azure.Monitoring.MonitoringRequest.GetActivityLog(actorIdMaybe, route, method, when)
+            var results = await Api.Azure.Monitoring.MonitoringRequest.GetActivityLog(actorIdMaybe, route, method, status, search, when)
                 .ToArrayAsync();
             var sorted = new List<Api.Azure.Monitoring.MonitoringRequest.ActivityLog>(results);
             sorted.Sort();

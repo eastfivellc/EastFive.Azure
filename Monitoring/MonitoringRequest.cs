@@ -740,9 +740,13 @@ namespace EastFive.Api.Azure.Monitoring
             }
         }
 
-        public static IEnumerableAsync<ActivityLog> GetActivityLog(Guid? actorIdMaybe, string tryRoute, string tryMethod, DateTime when)
+        public static IEnumerableAsync<ActivityLog> GetActivityLog(Guid? actorIdMaybe, string tryRoute, string tryMethod, int? tryStatus, string trySearch, DateTime when)
         {
-
+            bool checkAuth = actorIdMaybe.HasValue && !actorIdMaybe.Value.IsDefault();
+            bool checkRoute = tryRoute.HasBlackSpace();
+            bool checkMethod = tryMethod.HasBlackSpace();
+            bool checkStatus = tryStatus.HasValue;
+            bool checkSearch = trySearch.HasBlackSpace();
             return when
                 .StorageGetBy((MonitoringRequest mr) => mr.when,
                     readAhead: 25)
@@ -761,30 +765,53 @@ namespace EastFive.Api.Azure.Monitoring
                                 },
                                 () => default(string));
                         if (string.IsNullOrWhiteSpace(tryAuth))
-                            return default(KeyValuePair<Guid, MonitoringRequest>?);
+                            return Guid.Empty.PairWithValue(mr);
 
                         var jwtActorIdMaybe = tryAuth.ParseJwtString(
                             (t) => t.Claims.GetActorId(x => x, () => default(Guid?)),
                             (why) => default(Guid?));
 
                         if (jwtActorIdMaybe.IsDefault())
-                            return default(KeyValuePair<Guid, MonitoringRequest>?);
+                            return Guid.Empty.PairWithValue(mr);
 
                         return jwtActorIdMaybe.Value.PairWithValue(mr);
                     })
-                .SelectWhereHasValue()
                 .Where(
                     (kvp) =>
                     {
-                        if (!actorIdMaybe.IsDefault() && actorIdMaybe.Value != kvp.Key)
+                        if (checkAuth && actorIdMaybe.Value != kvp.Key)
                             return false;
 
-                        if (tryRoute.HasBlackSpace() && !kvp.Value.route.Equals(tryRoute, StringComparison.OrdinalIgnoreCase))
+                        var mr = kvp.Value;
+                        if (checkRoute && !mr.route.Equals(tryRoute, StringComparison.OrdinalIgnoreCase))
                             return false;
 
-                        if (tryMethod.HasBlackSpace() && !kvp.Value.method.Equals(tryMethod, StringComparison.OrdinalIgnoreCase))
+                        if (checkMethod && !mr.method.Equals(tryMethod, StringComparison.OrdinalIgnoreCase))
                             return false;
 
+                        if (checkStatus && mr.status != tryStatus.Value)
+                            return false;
+                            
+                        if (checkSearch)
+                        {
+                            bool inHeader() => mr.headers
+                                .NullToEmpty()
+                                .First(
+                                    (x, next) =>
+                                    {
+                                        if (x.key.IndexOf(trySearch, StringComparison.OrdinalIgnoreCase) != -1)
+                                            return true;
+                                        if (x.value.HasBlackSpace() && x.value.IndexOf(trySearch, StringComparison.OrdinalIgnoreCase) != -1)
+                                            return true;
+
+                                        return next();
+                                    },
+                                    () => false);
+                            bool inReason() => mr.reason.HasBlackSpace() && mr.reason.IndexOf(trySearch, StringComparison.OrdinalIgnoreCase) != -1;
+
+                            if (!inHeader() && !inReason())
+                                return false;
+                        }
                         return true;
                     })
                 .Select(ActivityLog.ConvertAsync)

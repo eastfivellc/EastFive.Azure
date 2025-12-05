@@ -108,6 +108,28 @@
                     }
                 }
 
+                public static class MonitoringSearch
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter search text";
+                    }
+                }
+
+                public static class MonitoringStatus
+                {
+                    public static class Set
+                    {
+                        // WorkflowParameter.Value
+                        public const string Value = "";
+                        // WorkflowParameter.Description
+                        public const string Description = "Enter http status code";
+                    }
+                }
+
                 public static class MonitoringRoute
                 {
                     public static class Set
