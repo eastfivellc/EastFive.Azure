@@ -34,7 +34,7 @@ namespace EastFive.Azure.Functions
             return await invocationMessage.StorageCreateAsync(
                 (created) =>
                 {
-                    return invocationMessage;
+                    return created.Entity;
                 },
                 () => default(InvocationMessage?));
         }

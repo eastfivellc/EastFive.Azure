@@ -240,7 +240,7 @@ namespace EastFive.Azure.Functions
             return await invocationMessage.StorageCreateAsync(
                 (created) =>
                 {
-                    var invocationSerialized = JsonConvert.SerializeObject(invocationMessage,
+                    var invocationSerialized = JsonConvert.SerializeObject(created.Entity,
                         new Api.Serialization.Converter(httpRequest));
                     var response = new StringHttpResponse(httpRequest, System.Net.HttpStatusCode.Accepted,
                         default, "x-application/eastfive-invocationmessage", default, 

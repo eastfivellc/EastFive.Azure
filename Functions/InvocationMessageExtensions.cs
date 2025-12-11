@@ -56,7 +56,7 @@ namespace EastFive.Azure.Functions
 
         }
 
-        public static async Task<InvocationMessage> InvocationMessageCreateAsync(
+        public static async Task<InvocationMessage?> InvocationMessageCreateAsync(
             this IHttpRequest requestMessage)
         {
             var invocationMessageRef = Ref<InvocationMessage>.SecureRef();
@@ -64,8 +64,9 @@ namespace EastFive.Azure.Functions
             return await invocationMessage.StorageCreateAsync(
                 (created) =>
                 {
-                    return invocationMessage;
-                });
+                    return created.Entity;
+                },
+                () => default(InvocationMessage?));
         }
 
         public static async Task<InvocationMessage?> SendAsync(this Task<InvocationMessage> invocationMessageTask)
