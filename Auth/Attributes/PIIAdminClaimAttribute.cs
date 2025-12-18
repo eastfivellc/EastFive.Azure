@@ -11,7 +11,7 @@ namespace EastFive.Azure.Auth
     //[ApiVoucherQueryDefinition]
     public class PIIAdminClaimAttribute : AuthorizationTokenAttribute, IValidateHttpRequest
     {
-        private const string ClaimValue = ClaimValues.Roles.PIIAdmin;
+        private const string ClaimValue = ClaimValues.Roles.PIIAdminRole;
         public bool AllowLocalHost { get; set; } = false;
 
         public Task<IHttpResponse> ValidateRequest(
