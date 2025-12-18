@@ -4,7 +4,6 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using EastFive.Api;
-using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
@@ -101,7 +100,7 @@ namespace EastFive.Azure.Auth
 
         #endregion
 
-        private static TimeSpan CreateExpirationDuration() =>
+        public static TimeSpan CreateExpirationDuration() =>
             // prefer an absolute time of day setting over a maximum duration setting
             AppSettings.Auth.TokenExpirationTimeOfDay.ConfigurationString(
                 (timeAndOffset) =>
@@ -155,11 +154,10 @@ namespace EastFive.Azure.Auth
 
         #region GET
 
-        [Unsecured("Session lookup endpoint - validates session tokens for authenticated users, allows anonymous sessions when configured")]
         [Api.HttpGet]
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
-                EastFive.Azure.Auth.SessionTokenMaybe security,
+                EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
                 IAuthApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
@@ -168,7 +166,7 @@ namespace EastFive.Azure.Auth
         {
             if (!IsAnonSessionAllowed())
             {
-                if (security.sessionId != sessionRef.id)
+                if (securityMaybe.sessionId != sessionRef.id)
                     return onUnauthorized();
             }
             return await await sessionRef.StorageGetAsync(
@@ -210,26 +208,25 @@ namespace EastFive.Azure.Auth
             }
         }
 
-        [Unsecured("OAuth callback session lookup endpoint - retrieves session by authorization request ID during OAuth flow completion")]
         [Api.HttpGet]
         public static Task<IHttpResponse> GetByRequestIdAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]IRef<Authorization> authorization,
-                //EastFive.Api.SessionToken security,
+                EastFive.Azure.Auth.SessionToken sessionToken,
                 IAuthApplication application, IProvideUrl urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
-            ForbiddenResponse forbidden,
             ConfigurationFailureResponse onConfigurationFailure,
-            GeneralConflictResponse onFailure)
+            GeneralConflictResponse onFailure,
+            UnauthorizedResponse onUnauthorized)
         {
             return UpdateBodyAsync(sessionRef, authorization.Optional(),
-                    application,
+                    sessionToken, application,
                 onUpdated,
                 onNotFound,
-                forbidden,
                 onConfigurationFailure,
-                onFailure);
+                onFailure,
+                onUnauthorized);
         }
 
         #endregion
@@ -306,19 +303,22 @@ namespace EastFive.Azure.Auth
                 (why) => onConfigurationFailure("Missing", why).AsTask());
         }
 
-        [Unsecured("Session update endpoint - allows updating session authorization during authentication flow")]
         [HttpPatch]
-        public static Task<IHttpResponse> UpdateBodyAsync(
+        public static async Task<IHttpResponse> UpdateBodyAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
+                EastFive.Azure.Auth.SessionToken sessionToken,
                 IAuthApplication application,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
-            ForbiddenResponse forbidden,
             ConfigurationFailureResponse onConfigurationFailure,
-            GeneralConflictResponse onFailure)
+            GeneralConflictResponse onFailure,
+            UnauthorizedResponse onUnauthorized)
         {
-            return sessionRef.StorageUpdateAsync(
+            if (sessionToken.sessionId != sessionRef.id)
+                return onUnauthorized();
+
+            return await sessionRef.StorageUpdateAsync(
                 (sessionStorage, saveSessionAsync) =>
                 {
                     return Security.AppSettings.TokenScope.ConfigurationUri(
@@ -350,14 +350,18 @@ namespace EastFive.Azure.Auth
                 onNotFound: () => onNotFound());
         }
 
-        [Unsecured("Session deletion endpoint - allows users to logout and invalidate their session")]
         [HttpDelete]
-        public static Task<IHttpResponse> DeleteAsync(
+        public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
+                EastFive.Azure.Auth.SessionToken sessionToken,
             NoContentResponse onDeleted,
-            NotFoundResponse onNotFound)
+            NotFoundResponse onNotFound,
+            UnauthorizedResponse onUnauthorized)
         {
-            return sessionRef.StorageDeleteAsync(
+            if (sessionToken.sessionId != sessionRef.id)
+                return onUnauthorized();
+
+            return await sessionRef.StorageDeleteAsync(
                 onDeleted:(discard) =>
                 {
                     return onDeleted();
@@ -442,12 +446,6 @@ namespace EastFive.Azure.Auth
                 {
                     if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
-
-                    if (!authorization.accountIdMaybe.HasValue)
-                        return onFailure("Authorization is not connected to an account.", false);
-
-
-                    // return onSuccess(authorization.accountIdMaybe.Value, authorization.claims, authorization.authorized);
 
                     var methodRef = authorization.Method;
                     return await await Method.ById(methodRef, application,

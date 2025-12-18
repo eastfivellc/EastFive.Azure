@@ -1,13 +1,11 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using EastFive;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Api.Serialization.Json;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Extensions;
 using EastFive.Linq.Async;
 using Newtonsoft.Json;
 
@@ -27,6 +25,7 @@ namespace EastFive.Azure.OAuth
         /// GET /OAuth/ClientCredential - Get all client credentials
         /// </summary>
         [HttpGet]
+        [SuperAdminClaim]
         public static IHttpResponse GetAllAsync(
                 RequestMessage<ClientCredential> clientsQuery,
             MultipartAsyncResponse<ClientCredential> onResults)
@@ -40,6 +39,7 @@ namespace EastFive.Azure.OAuth
         /// GET /OAuth/ClientCredential/{id} - Get specific client by ID
         /// </summary>
         [HttpGet]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> GetByIdAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             ContentTypeResponse<ClientCredential> onFound,
@@ -54,6 +54,7 @@ namespace EastFive.Azure.OAuth
         /// POST /OAuth/ClientCredential - Create new OAuth 2.0 client registration (RFC 6749 Section 2)
         /// </summary>
         [HttpPost]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
                 [Property(Name = ClientIdPropertyName)] string clientId,
@@ -103,6 +104,7 @@ namespace EastFive.Azure.OAuth
         /// PATCH /OAuth/ClientCredential/{id} - Update existing client credential
         /// </summary>
         [HttpPatch]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
                 MutateResource<ClientCredential> mutateResource,
@@ -124,6 +126,7 @@ namespace EastFive.Azure.OAuth
         /// DELETE /OAuth/ClientCredential/{id} - Delete client credential
         /// </summary>
         [HttpDelete]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             NoContentResponse onDeleted,
@@ -140,6 +143,7 @@ namespace EastFive.Azure.OAuth
         /// This endpoint validates client_id and client_secret and returns success/failure
         /// </summary>
         [HttpAction("authenticate")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> AuthenticateAsync(
                 [Property(Name = ClientIdPropertyName)] string clientId,
                 [Property(Name = ClientSecretPropertyName)] string clientSecret,
@@ -200,6 +204,7 @@ namespace EastFive.Azure.OAuth
         /// Generates a new client secret for security purposes
         /// </summary>
         [HttpAction("rotate-secret")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> RotateSecretAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             ContentTypeResponse<ClientSecretResponse> onRotated,
@@ -232,6 +237,7 @@ namespace EastFive.Azure.OAuth
         /// POST /OAuth/ClientCredential/{id}/activate - Activate a client
         /// </summary>
         [HttpAction("activate")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> ActivateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             ContentTypeResponse<ClientCredential> onActivated,
@@ -252,6 +258,7 @@ namespace EastFive.Azure.OAuth
         /// POST /OAuth/ClientCredential/{id}/deactivate - Deactivate a client
         /// </summary>
         [HttpAction("deactivate")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> DeactivateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             ContentTypeResponse<ClientCredential> onDeactivated,

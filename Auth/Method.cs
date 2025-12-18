@@ -79,6 +79,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
+        [Unsecured("Public endpoint to get authentication method by id.")]
         public static Task<IHttpResponse> QueryByIdAsync(
                 [QueryId] IRef<Method> methodRef,
             IAuthApplication application,
@@ -91,6 +92,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
+        [Unsecured("Public endpoint to list all authentication methods.")]
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
@@ -120,6 +122,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
+        [Unsecured("Public endpoint to get authentication method by name.")]
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
@@ -245,6 +248,7 @@ namespace EastFive.Azure.Auth
         }
 
         [HttpGet]
+        [Unsecured("Public endpoint to get authentication methods supporting a session.")]
         public static Task<IHttpResponse> QueryBySessionAsync(
                 [QueryParameter(Name = "session")] IRef<Session> sessionRef,
                 IAuthApplication application,

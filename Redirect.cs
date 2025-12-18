@@ -1,29 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using System.ComponentModel;
 
 using Newtonsoft.Json;
-
-using Microsoft.AspNetCore.Mvc.Routing;
-
-using EastFive;
-using EastFive.Api.Azure;
 using EastFive.Web.Configuration;
-using EastFive.Collections.Generic;
 using EastFive.Api;
-using EastFive.Api.Controllers;
-using EastFive.Async;
-using EastFive.Azure.Auth;
-using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 
@@ -65,13 +45,12 @@ namespace EastFive.Azure
 
         [HttpGet]
         [Description("Looks for the redirect by the resource ID and resource type.")]
+        [Unsecured("Allows unauthenticated access to perform redirects.")]
         public static IHttpResponse QueryByResourceIdAndTypeAsync(
                 [QueryParameter(Name = ResourceTypePropertyName)]Type resourceType,
                 [QueryParameter(Name = ResourcePropertyName)]Guid resourceId,
                 IApiApplication application,
             RedirectResponse onRedirect,
-            UnauthorizedResponse onUnauthorized,
-            NotFoundResponse onRedirectNotFound,
             ConfigurationFailureResponse onConfigurationFailure)
         {
             return AppSettings.SPA.SiteLocation.ConfigurationUri(

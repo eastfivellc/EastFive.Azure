@@ -590,5 +590,24 @@ namespace EastFive.Api.Azure
         {
             return onDisabled().AsTask();
         }
+
+        public override bool IsSecurityAttribute(Attribute attr)
+        {
+            return base.IsSecurityAttribute(attr) ||
+                attr is EastFive.Azure.Meta.ApiKeyClaimAttribute ||
+                attr is SuperAdminClaimAttribute ||
+                attr is PIIAdminClaimAttribute ||
+                attr is ApiKeyAccessAttribute;
+        }
+
+        public override bool IsSecurityParameter(ParameterInfo parameter)
+        {
+            var fullName = parameter.ParameterType.FullName;
+            return base.IsSecurityParameter(parameter) ||
+                fullName == typeof(Security).FullName ||
+                fullName == typeof(EastFive.Azure.Auth.Authorization).FullName ||
+                fullName == typeof(SessionToken).FullName ||
+                fullName == typeof(SessionTokenMaybe).FullName;
+        }
     }
 }

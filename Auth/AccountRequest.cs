@@ -111,7 +111,6 @@ namespace EastFive.Azure.Auth
         public const string ResponseAction = "Response";
         [Unsecured("Account request endpoint - allows users to request account without existing authentication")]
         [HttpAction(ResponseAction)]
-        // [SuperAdminClaim]
         public static Task<IHttpResponse> ResponseAsync(
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]
                     IRef<Authorization> authorizationRef,

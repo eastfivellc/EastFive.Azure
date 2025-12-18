@@ -1,13 +1,11 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using EastFive;
 using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Api.Serialization.Json;
+using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Extensions;
 using EastFive.Linq.Async;
 
 namespace EastFive.Azure.OAuth
@@ -20,6 +18,7 @@ namespace EastFive.Azure.OAuth
     public partial struct ClientCredentialFlow
     {
         [HttpGet]
+        [SuperAdminClaim]
         public static IHttpResponse GetAllAsync(
                 RequestMessage<ClientCredentialFlow> flowsQuery,
             MultipartAsyncResponse<ClientCredentialFlow> onResults)
@@ -30,6 +29,7 @@ namespace EastFive.Azure.OAuth
         }
 
         [HttpPost]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [UpdateId] IRef<ClientCredentialFlow> flowRef,
                 [Property(Name = AuthorizationEndpointPropertyName)] Uri authorizationEndpoint,
@@ -88,6 +88,7 @@ namespace EastFive.Azure.OAuth
         }
 
         [HttpPatch]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> UpdateAsync(
                 [UpdateId] IRef<ClientCredentialFlow> flowRef,
                 MutateResource<ClientCredentialFlow> mutateResource,
@@ -106,6 +107,7 @@ namespace EastFive.Azure.OAuth
         }
 
         [HttpDelete]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId] IRef<ClientCredentialFlow> flowRef,
             NoContentResponse onDeleted,

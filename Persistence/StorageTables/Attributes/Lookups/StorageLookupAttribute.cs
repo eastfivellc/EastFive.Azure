@@ -1,7 +1,6 @@
 ﻿using EastFive.Analytics;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Azure.Persistence.StorageTables.Backups;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -19,7 +18,7 @@ using System.Threading.Tasks;
 namespace EastFive.Persistence.Azure.StorageTables
 {
     public abstract class StorageLookupAttribute : Attribute,
-        IRepairAzureStorageTableSave, IProvideFindBy, IBackupStorageMember, CascadeDeleteAttribute.IDeleteCascaded,
+        IRepairAzureStorageTableSave, IProvideFindBy, CascadeDeleteAttribute.IDeleteCascaded,
         IGenerateLookupKeys
     {
         public string LookupTableName { get; set; }
@@ -677,17 +676,6 @@ namespace EastFive.Persistence.Azure.StorageTables
                     },
                     () => () => 0.AsTask(),
                     tableName: tableName);
-        }
-
-        public IEnumerable<StorageResourceInfo> GetStorageResourceInfos(MemberInfo memberInfo)
-        {
-            var tableName = GetLookupTableName(memberInfo);
-            yield return new StorageResourceInfo
-            {
-                tableName = tableName,
-                message = new [] { new WhereInformation() },
-                sortKey = tableName,
-            };
         }
 
         public virtual IEnumerable<MemberInfo> ProvideLookupMembers(MemberInfo decoratedMember)

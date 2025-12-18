@@ -362,6 +362,7 @@ namespace EastFive.Azure.Auth.CredentialProviders.Voucher
             StepName = Workflows.AuthorizationFlow.Steps.CreateVoucher,
             Step = Workflows.AuthorizationFlow.Ordinals.CreateVoucher)]
         [Api.HttpPost]
+        [Unsecured("Allows creating voucher tokens with provided key")]
         public async static Task<IHttpResponse> CreateAsync(
                 [Api.Meta.Flows.WorkflowNewId]
                 [Property(Name = IdPropertyName)]IRef<VoucherToken> voucherTokenRef,

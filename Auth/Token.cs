@@ -71,7 +71,7 @@ namespace EastFive.Azure.Auth
                     .ConfigurationString(
                         i => i,
                         (why) => string.Empty),
-                expiration = DateTime.UtcNow + TimeSpan.FromDays(365), // TODO: Load from config default
+                expiration = DateTime.UtcNow + Session.CreateExpirationDuration(),
             };
 
             return onFound(token);

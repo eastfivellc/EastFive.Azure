@@ -1,17 +1,12 @@
 ﻿using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Security;
-using EastFive.Serialization;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 using EastFive.Azure.Auth;
 
@@ -55,10 +50,13 @@ namespace EastFive.Azure.Login
             CreatedBodyResponse<Auth.Session> onSuccess,
             GeneralConflictResponse onInvalidUserNameOrPassword)
         {
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
+                CredentialProvider.IntegrationName, application);
+
             return await await Authentication.CheckCredentialsAsync(username, password,
                 async account =>
                 {
-                    var session = await CreateSession(username, application, httpRequest);
+                    var session = await CreateSession(username, method, application, httpRequest);
                     return onSuccess(session);
                 },
                 why => onInvalidUserNameOrPassword(why).AsTask());
@@ -74,6 +72,9 @@ namespace EastFive.Azure.Login
             AlreadyExistsResponse onUsernameAlreadyTaken,
             GeneralConflictResponse onInvalidPassword)
         {
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
+                CredentialProvider.IntegrationName, application);
+
             if (password.IsNullOrWhiteSpace())
                 return onInvalidPassword("Password cannot be empty");
 
@@ -88,12 +89,12 @@ namespace EastFive.Azure.Login
                         account.userIdentification = username;
                         account.password = Account.GeneratePasswordHash(username, password);
                         await saveAsync(account);
-                        var session = await CreateSession(username, application, httpRequest);
+                        var session = await CreateSession(username, method, application, httpRequest);
                         return onCreated(session);
                     });
         }
 
-        private static async Task<Auth.Session> CreateSession(string userIdentification,
+        private static async Task<Auth.Session> CreateSession(string userIdentification, Method method,
             IAzureApplication application, IHttpRequest request)
         {
             var authentication = new Authentication
@@ -107,9 +108,6 @@ namespace EastFive.Azure.Login
                 .StorageCreateAsync(
                     async (authenticationDiscard) =>
                     {
-                        var method = EastFive.Azure.Auth.Method.ByMethodName(
-                            CredentialProvider.IntegrationName, application);
-
                         var parameters = new Dictionary<string, string>()
                         {
                             { "state",  authentication.authenticationRef.id.ToString() },

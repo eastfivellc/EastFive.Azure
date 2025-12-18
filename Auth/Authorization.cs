@@ -114,39 +114,43 @@ namespace EastFive.Azure.Auth
 
         #region GET
 
-        [Api.HttpGet]
-        public static Task<IHttpResponse> GetAsync(
-                [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
-                EastFive.Azure.Auth.SessionToken? securityMaybe,
-            ContentTypeResponse<Authorization> onFound,
-            NotFoundResponse onNotFound,
-            UnauthorizedResponse onUnauthorized,
-            BadRequestResponse onBadRequest)
-        {
-            return authorizationRef.StorageUpdateAsync(
-                async (authorization, saveAsync) =>
-                {
-                    if (authorization.deleted.HasValue)
-                        return onNotFound();
-                    if (authorization.authorized)
-                        authorization.LocationAuthentication = default(Uri);
-                    if (!securityMaybe.HasValue)
-                    {
-                        if (authorization.authorized)
-                        {
-                            if (authorization.expired)
-                                return onBadRequest();
-                            if (authorization.lastModified - DateTime.UtcNow > TimeSpan.FromMinutes(1.0))
-                                return onBadRequest();
-                            authorization.expired = true;
-                            await saveAsync(authorization);
-                            return onFound(authorization);
-                        }
-                    }
-                    return onFound(authorization);
-                },
-                () => onNotFound());
-        }
+        // As written this has vulnerabilities so removing for now.
+        // ex. unauthenticated call can expire a valid authorization
+        // ex. authenticated call for unrelated session can expire a valid authorization
+        //
+        // [Api.HttpGet]
+        // public static Task<IHttpResponse> GetAsync(
+        //         [QueryId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
+        //         EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
+        //     ContentTypeResponse<Authorization> onFound,
+        //     NotFoundResponse onNotFound,
+        //     UnauthorizedResponse onUnauthorized,
+        //     BadRequestResponse onBadRequest)
+        // {
+        //     return authorizationRef.StorageUpdateAsync(
+        //         async (authorization, saveAsync) =>
+        //         {
+        //             if (authorization.deleted.HasValue)
+        //                 return onNotFound();
+        //             if (authorization.authorized)
+        //                 authorization.LocationAuthentication = default(Uri);
+        //             if (!securityMaybe.sessionId.HasValue)
+        //             {
+        //                 if (authorization.authorized)
+        //                 {
+        //                     if (authorization.expired)
+        //                         return onBadRequest();
+        //                     if (authorization.lastModified - DateTime.UtcNow > TimeSpan.FromMinutes(1.0))
+        //                         return onBadRequest();
+        //                     authorization.expired = true;
+        //                     await saveAsync(authorization);
+        //                     return onFound(authorization);
+        //                 }
+        //             }
+        //             return onFound(authorization);
+        //         },
+        //         () => onNotFound());
+        // }
 
         #endregion
 
@@ -183,11 +187,9 @@ namespace EastFive.Azure.Auth
             return await await Auth.Method.ById(method, application,
                 async (method) =>
                 {
-                    //var authorizationIdSecure = authentication.authenticationId;
                     authorization.LocationAuthentication = await method.GetLoginUrlAsync(
                         application, urlHelper, authorizationRef.id);
 
-                    //throw new ArgumentNullException();
                     return await authorization.StorageCreateAsync(
                         createdId => onCreated(authorization),
                         () => onAlreadyExists());
@@ -287,57 +289,6 @@ namespace EastFive.Azure.Auth
                 onServiceUnavailable: (why) => onServiceUnavailable().AddReason(why),
                 onInvalidMethod: (why) => onInvalidMethod().AddReason(why),
                 onAuthorizationFailed: why => onAuthorizationFailed().AddReason(why));
-
-            //return await await Auth.Method.ById(methodRef, application,
-            //    async (method) =>
-            //    {
-            //        var paramsUpdated = parameters
-            //            .Append(
-            //                authorizationRef.id.ToString().PairWithKey("state"))
-            //            .ToDictionary();
-            //        //var authorizationRequestManager = application.AuthorizationRequestManager;
-            //        return await await Redirection.AuthenticationAsync(
-            //                method,
-            //                paramsUpdated,
-            //                application, request,
-            //                endpoints,
-            //                request.RequestUri,
-            //                authorizationRef.Optional(),
-            //            async (redirect, accountIdMaybe, modifier) =>
-            //            {
-            //                var session = new Session()
-            //                {
-            //                    sessionId = sessionRef,
-            //                    account = accountIdMaybe,
-            //                    authorization = authorizationRef.Optional(),
-            //                };
-            //                var responseCreated = await Session.CreateAsync(sessionRef, authorizationRef.Optional(),
-            //                        session,
-            //                        application,
-            //                    (sessionCreated, contentType) =>
-            //                    {
-            //                        var response = onCreated(sessionCreated, contentType: contentType);
-            //                        response.SetLocation(redirect);
-            //                        return response;
-            //                    },
-            //                    onAlreadyExists,
-            //                    onAuthorizationFailed,
-            //                    (why1, why2) => onServericeUnavailable(),
-            //                    onFailure);
-            //                var modifiedResponse = modifier(responseCreated);
-            //                return modifiedResponse;
-            //            },
-            //            () => onAuthorizationFailed()
-            //                .AddReason("Authorization was not found")
-            //                .AsTask(), // Bad credentials
-            //            why => onServericeUnavailable()
-            //                .AddReason(why)
-            //                .AsTask(),
-            //            why => onAuthorizationFailed()
-            //                .AddReason(why)
-            //                .AsTask());
-            //    },
-            //    () => onInvalidMethod().AddReason("The method was not found.").AsTask());
         }
 
         #endregion
@@ -367,7 +318,8 @@ namespace EastFive.Azure.Auth
                             return onUnauthorized();
                         if (!authorization.accountIdMaybe.HasValue)
                             return onInvalidAuthorization("Authorization is not tied to an account.");
-                        if (securityMaybe.accountIdMaybe.Value != authorization.accountIdMaybe.Value)
+                        if (!securityMaybe.accountIdMaybe.HasValue ||
+                            securityMaybe.accountIdMaybe.Value != authorization.accountIdMaybe.Value)
                             return onUnauthorized();
                     }
                     authorization.LocationLogoutReturn = locationLogoutReturn;
@@ -424,14 +376,15 @@ namespace EastFive.Azure.Auth
         #region DELETE
 
         [HttpDelete]
-        [Unsecured("Logout endpoint - deletes authorization and initiates third-party logout flow, public endpoint for session cleanup")]
         public static async Task<IHttpResponse> DeleteAsync(
                 [UpdateId(Name = AuthorizationIdPropertyName)]IRef<Authorization> authorizationRef,
                 IProvideUrl urlHelper, AzureApplication application,
+                EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
             NoContentResponse onLogoutComplete,
             AcceptedBodyResponse onExternalSessionActive,
             NotFoundResponse onNotFound,
-            GeneralFailureResponse onFailure)
+            GeneralConflictResponse onInvalidAuthorization,
+            UnauthorizedResponse onUnauthorized)
         {
             return await authorizationRef.StorageUpdateAsync(
                 async (authorizationToDelete, updateAsync) =>
@@ -439,6 +392,12 @@ namespace EastFive.Azure.Auth
                     authorizationToDelete.deleted = DateTime.UtcNow;
                     if (!authorizationToDelete.authorized)
                         return onLogoutComplete().AddReason("Deleted");
+
+                    if (!authorizationToDelete.accountIdMaybe.HasValue)
+                        return onInvalidAuthorization("Authorization is not tied to an account.");
+                    if (!securityMaybe.accountIdMaybe.HasValue ||
+                        securityMaybe.accountIdMaybe.Value != authorizationToDelete.accountIdMaybe.Value)
+                        return onUnauthorized();
 
                     var locationLogout = await await Auth.Method.ById(authorizationToDelete.Method, application,
                         (authentication) =>
@@ -617,21 +576,6 @@ namespace EastFive.Azure.Auth
                             return onSuccess(userKey, loginProvider);
                         },
                         (why) => onFailure(why));
-
-                    //return application.LoginProviders
-                    //    .SelectValues()
-                    //    .Where(loginProvider => loginProvider.Method == method.name)
-                    //    .FirstAsync(
-                    //        (loginProvider) =>
-                    //        {
-                    //            return loginProvider.ParseCredentailParameters(parameters,
-                    //                (string userKey, Guid? authorizationIdDiscard, Guid? deprecatedId) =>
-                    //                {
-                    //                    return onSuccess(userKey, loginProvider);
-                    //                },
-                    //                (why) => onFailure(why));
-                    //        },
-                    //        () => onFailure("Method does not match any existing authentication."));
                 },
                 () => onFailure("Authentication not found"));
         }

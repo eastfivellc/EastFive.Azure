@@ -1,18 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-
-using Microsoft.AspNetCore.Mvc.Routing;
-
+﻿using System.Threading.Tasks;
 using Newtonsoft.Json;
-
 using EastFive.Api;
-using EastFive.Api.Azure;
-using EastFive.Api.Controllers;
-using EastFive.Azure.Auth;
 
 namespace EastFive.Azure.Login
 {
@@ -40,10 +28,10 @@ namespace EastFive.Azure.Login
         {
             var parameters = request.RequestUri.ParseQuery();
             parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
-            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
                 CredentialProvider.IntegrationName, application);
 
-            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication, 
+            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method, 
                     parameters,
                     application,
                     request, endpoints, urlHelper,
@@ -66,10 +54,10 @@ namespace EastFive.Azure.Login
         {
             var parameters = request.RequestUri.ParseQuery();
             parameters.Add(CredentialProvider.referrerKey, request.RequestUri.AbsoluteUri);
-            var authentication = EastFive.Azure.Auth.Method.ByMethodName(
+            var method = EastFive.Azure.Auth.Method.ByMethodName(
                 CredentialProvider.IntegrationName, application);
 
-            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(authentication,
+            return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method,
                     parameters,
                     application,
                     request, endpoints, urlHelper,

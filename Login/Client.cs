@@ -1,5 +1,4 @@
 ﻿using EastFive.Api;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -8,10 +7,7 @@ using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EastFive.Azure.Login
@@ -39,8 +35,8 @@ namespace EastFive.Azure.Login
         [Storage]
         public string secret;
 
-        [Unsecured("OAuth client registration endpoint - allows external systems to register OAuth client credentials")]
         [Api.HttpPost]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [Resource]Client client,
             CreatedResponse onCreated,

@@ -1,28 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Net.Http;
-using System.Reflection;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System.Security.Claims;
-
-using Microsoft.AspNetCore.Mvc.Routing;
 
 using Newtonsoft.Json;
 
 using EastFive.Api;
 using EastFive.Api.Auth;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Persistence.AzureStorageTables;
-using EastFive.Collections.Generic;
-using EastFive.Extensions;
-using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
-using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
@@ -78,6 +67,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         [Api.HttpOptions]
+        [Unsecured("Public endpoint to get the list of available claims.")]
         public static IHttpResponse OptionsAsync(
                 IApplication application,
             ContentTypeResponse<Claim[]> onFound)
@@ -104,11 +94,10 @@ namespace EastFive.Azure.Auth
         {
             if (!auth.accountIdMaybe.HasValue)
                 return onUnauthorized();
-            Expression<Func<Claim, bool>> allQuery = (claim) => true;
-            var claimsForUser = claims
-                .Where(claim => claim.actorId == auth.accountIdMaybe.Value)
-                .StorageGet();
-            return onFound(claimsForUser);
+
+            var result = auth.accountIdMaybe.Value
+                .StorageGetByIdProperty((Claim claim) => claim.actorId);
+            return onFound(result);
         }
 
         [HttpPost]

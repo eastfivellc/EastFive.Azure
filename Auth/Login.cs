@@ -86,7 +86,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = "end_time")]DateTime endTime,
                 RequestMessage<Authorization> authorizations,
                 IAuthApplication application,
-                EastFive.Azure.Auth.SessionToken? securityMaybe,
+                EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
             MultipartAsyncResponse<Login> onFound)
         {
             var methodLookups = application.LoginProviders
