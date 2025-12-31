@@ -281,7 +281,7 @@ namespace EastFive.Persistence
                         return getDefaultValue();
 
                     var exceptionText = $"Could not deserialize value for {memberInfo.DeclaringType.FullName}..{memberInfo.Name}[{type.FullName}]" +
-                        $"Please override StoragePropertyAttribute's BindEntityProperties for type:{type.FullName}";
+                        $"Please override {nameof(StorageAttribute)}'s {nameof(GetMemberValue)} for type:{type.FullName}";
                     throw new Exception(exceptionText);
                 });
         }
