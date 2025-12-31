@@ -154,11 +154,10 @@ namespace EastFive.Azure.Spa
                 using (var zipArchive = new ZipArchive(blobStream))
                 {
                     var (minimumVersion, aliasPaths, defaultPath, indexFiles) = await zipArchive.Entries
+                        .Where(entry => string.Compare(entry.FullName, buildJsonPath, true) == 0)
                         .First(
                             async (item, next) =>
                             {
-                                if (string.Compare(item.FullName, buildJsonPath, true) != 0)
-                                    return await next();
                                 var buildJsonEntryBytes = await item
                                     .Open()
                                     .ToBytesAsync();
