@@ -1156,6 +1156,17 @@ namespace EastFive.Persistence.Azure.StorageTables
             Func<object, TResult> onBound,
             Func<TResult> onFailedToBind)
         {
+            TResult BindEmptyArray(Type elementType)
+            {
+                var emptyArray = typeof(Array)
+                    .GetMethod(nameof(Array.Empty), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                    .MakeGenericMethod(elementType)
+                    .Invoke(null, new object[] { });
+                return onBound(emptyArray);
+            }
+
+            TResult BindEmptyArrayOf(Type arrayTypeToCreate) => onBound(Array.CreateInstance(arrayTypeToCreate, 0));
+
             #region Refs
 
             object ComposeFromBase<TBase>(Type composedType, Type genericCompositionType,
@@ -1219,6 +1230,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             if (arrayType.IsArray)
             {
+                if (value.PropertyType != EdmType.Binary)
+                    return BindEmptyArrayOf(arrayType);
+
                 var arrayElementType = arrayType.GetElementType();
                 var values = value.BinaryValue
                     .FromByteArray()
@@ -1291,6 +1305,9 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             if (arrayType.IsSubClassOfGeneric(typeof(KeyValuePair<,>)))
             {
+                if (value.PropertyType != EdmType.Binary)
+                    return BindEmptyArrayOf(arrayType);
+
                 var propBindings = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
                 var keyProp = arrayType.GetProperty("Key", propBindings);
                 var valueProp = arrayType.GetProperty("Value", propBindings);
@@ -1316,19 +1333,28 @@ namespace EastFive.Persistence.Azure.StorageTables
                 {
                     if (typeof(Guid) == nulledType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToNullableGuidsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(decimal) == nulledType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToNullableDecimalsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(DateTime) == nulledType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToNullableDateTimesFromByteArray();
                         return onBound(values);
                     }
+                    if (value.PropertyType != EdmType.Binary)
+                        return BindEmptyArray(arrayType);
+                        
                     var arrayOfObj = value.BinaryValue.FromEdmTypedByteArray(arrayType);
                     var arrayOfType = arrayOfObj.CastArray(arrayType);
                     return onBound(arrayOfType);
@@ -1341,15 +1367,21 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                     if (typeof(Guid) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToGuidsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(byte) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         return onBound(value.BinaryValue);
                     }
                     if (typeof(bool) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var boolArray = value.BinaryValue
                             .Select(b => b != 0)
                             .ToArray();
@@ -1357,46 +1389,65 @@ namespace EastFive.Persistence.Azure.StorageTables
                     }
                     if (typeof(DateTime) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToDateTimesFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(double) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToDoublesFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(decimal) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToDecimalsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(int) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToIntsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(long) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToLongsFromByteArray();
                         return onBound(values);
                     }
                     if (typeof(string) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToStringNullOrEmptysFromUTF8ByteArray();
                         return onBound(values);
                     }
                     if (arrayType.IsEnum)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToEnumsFromByteArray(arrayType, repair:true);
                         return onBound(values);
                     }
                     if (typeof(object) == arrayType)
                     {
+                        if(value.PropertyType != EdmType.Binary)
+                            return onBound(Array.CreateInstance(typeof(object), 0));
+                        
                         var values = value.BinaryValue.FromEdmTypedByteArray(arrayType);
                         return onBound(values);
                     }
                     if (typeof(Uri) == arrayType)
                     {
+                        if (value.PropertyType != EdmType.Binary)
+                            return BindEmptyArray(arrayType);
                         var values = value.BinaryValue.ToStringNullOrEmptysFromUTF8ByteArray();
                         var urls = values
                             .Select(
