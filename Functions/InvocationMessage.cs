@@ -367,6 +367,8 @@ namespace EastFive.Azure.Functions
                                         return executionResult.executionResultRef.StorageUpdateAsync(
                                             async (executionResultToUpdate, saveAsync) =>
                                             {
+                                                executionResultToUpdate.statusCode = (int)result.StatusCode;
+                                                executionResultToUpdate.reasonPhrase = result.ReasonPhrase;
                                                 executionResultToUpdate.ended = whenCompleted;
                                                 executionResultToUpdate.contentBlobId = contentBlobId;
                                                 await saveAsync(executionResultToUpdate);

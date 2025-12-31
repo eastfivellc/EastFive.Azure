@@ -69,17 +69,10 @@ namespace EastFive.Azure.Functions
 
         [JsonProperty]
         [Storage]
-        public IDictionary<string, string> headers;
-
-        [JsonProperty]
-        public string trace;
+        public string reasonPhrase;
 
         [Storage]
         public Guid eventMessageId;
-
-        [JsonProperty]
-        [Storage]
-        public byte[] content;
 
         [Storage]
         public Guid? contentBlobId;
