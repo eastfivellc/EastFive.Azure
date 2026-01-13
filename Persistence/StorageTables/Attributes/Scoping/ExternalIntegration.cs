@@ -139,7 +139,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return false;
             }
             var integrationKeyHashInt = integrationKey.GetBytes().HashXX64();
-            var integrationKeyHash = integrationKeyHashInt.ToString("X").Substring(0, (int)this.Characters);
+            var integrationKeyHash = integrationKeyHashInt.ToString($"X{this.Characters}").Substring(0, (int)this.Characters);
             var partitionKey = integrationId + integrationKeyHash;
             astLookup = new RefAst(integrationKey, partitionKey);
             return true;

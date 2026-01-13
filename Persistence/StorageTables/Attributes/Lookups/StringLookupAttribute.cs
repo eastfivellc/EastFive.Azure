@@ -120,7 +120,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             var rowKeyToHash = TrimWhitespace ?
                 rowKey.Trim() : rowKey;
             var hash = rowKeyToHash.GetBytes().HashXX32();
-            var hashStr = hash.ToString("X");
+            var hashStr = hash.ToString($"X{this.Characters}");
             return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
         }
     }
