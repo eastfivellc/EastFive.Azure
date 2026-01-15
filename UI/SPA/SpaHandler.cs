@@ -217,7 +217,7 @@ namespace EastFive.Azure.Spa
                                         var aiInstrumentationKey = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.ConfigurationString(
                                             (value) => value,
                                             (missingKey) => string.Empty);
-                                        var aiConnectionString = "APPLICATIONINSIGHTS_CONNECTION_STRING".ConfigurationString(
+                                        var aiConnectionString = EastFive.Azure.AppSettings.ApplicationInsights.ConnectionString.ConfigurationString(
                                             (value) => value,
                                             (missingKey) => string.Empty);
                                         return fileBytes

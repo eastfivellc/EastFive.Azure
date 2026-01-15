@@ -6,6 +6,7 @@ using EastFive.Api.Serialization.Json;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Extensions;
 using EastFive.Linq.Async;
 using Newtonsoft.Json;
 
@@ -90,14 +91,14 @@ namespace EastFive.Azure.OAuth
             client.lastUsedAt = null;
 
             // Validate registration per RFC 6749 Section 2
-            return client.ValidateRegistration(
+            return await client.ValidateRegistration(
                 () =>
                 {
                     return client.StorageCreateAsync(
                         created => onCreated(created.Entity),
-                        onAlreadyExists: () => onAlreadyExists()).Result;
+                        onAlreadyExists: () => onAlreadyExists());
                 },
-                invalidReason => onBadRequest().AddReason(invalidReason));
+                invalidReason => onBadRequest().AddReason(invalidReason).AsTask());
         }
 
         /// <summary>
