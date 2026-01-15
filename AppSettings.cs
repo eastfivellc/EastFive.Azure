@@ -95,7 +95,7 @@ namespace EastFive.Azure
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false,
                 Location = "Home > Application Insights > {Resource Name} > Dashboard / Connection String")]
-            public const string ConnectionString = "EastFive.Azure.ApplicationInsights.ConnectionString";
+            public const string ConnectionString = "APPLICATIONINSIGHTS_CONNECTION_STRING";
 
             [ConfigKey("Identifies the application insights endpoint to which data is posted.",
                 DeploymentOverrides.Suggested,

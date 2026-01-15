@@ -94,7 +94,7 @@ namespace EastFive.Azure.Monitoring
 
             #endregion
 
-            var telemetryClient = AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
+            var telemetryClient = EastFive.Azure.Monitoring.TelemetryExtensions.LoadTelemetryClient();
             telemetry.Duration = stopwatch.Elapsed;
             telemetryClient.TrackRequest(telemetry);
 
@@ -158,7 +158,7 @@ namespace EastFive.Azure.Monitoring
                 {
                 }
             }
-            var telemetryClient = AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
+            var telemetryClient = EastFive.Azure.Monitoring.TelemetryExtensions.LoadTelemetryClient();
             telemetryClient.TrackException(telemetryEx);
             return await continueExecution(ex, method, queryParameters, httpApp, request);
         }

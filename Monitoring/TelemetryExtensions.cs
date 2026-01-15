@@ -28,7 +28,7 @@ namespace EastFive.Azure.Monitoring
                 });
         }
 
-        public static TelemetryClient LoadTelemetryClient(this string configKeyName)
+        public static TelemetryClient LoadTelemetryClient()
         {
             // sharing this instance so that we don't leak handles/threads from repeated instantiations
             return client;

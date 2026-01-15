@@ -89,7 +89,7 @@ namespace EastFive.Api.Azure
         {
             base.ConfigureCallback(app, env, razorViewEngine);
 
-            Telemetry = EastFive.Azure.AppSettings.ApplicationInsights.InstrumentationKey.LoadTelemetryClient();
+            Telemetry = EastFive.Azure.Monitoring.TelemetryExtensions.LoadTelemetryClient();
 
             this.AddInstigator(typeof(EastFive.Azure.Functions.InvokeFunction),
                 (httpApp, request, parameterInfo, onCreated) =>
