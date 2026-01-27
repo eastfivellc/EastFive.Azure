@@ -7,6 +7,7 @@ using EastFive.Extensions;
 using EastFive.Reflection;
 using EastFive.Linq.Expressions;
 using EastFive.Serialization;
+using EastFive.Azure.Persistence.AzureStorageTables;
 
 namespace EastFive.Persistence.Azure.StorageTables
 {
@@ -28,7 +29,8 @@ namespace EastFive.Persistence.Azure.StorageTables
             var rowKeyValue = lookupValue.Value;
             var propertyValueType = lookupValue.Key.GetMemberType();
 
-            var rowKey = GetStringValue(lookupValue.Key, rowKeyValue, this.GetType());
+            var rowKeyUnsanitized = GetStringValue(lookupValue.Key, rowKeyValue, this.GetType());
+            var rowKey = rowKeyUnsanitized.AsAzureStorageTablesSafeKey();
 
             if (IgnoreNull && rowKey.IsDefaultOrNull())
                 return onLookupValuesMatch(Enumerable.Empty<IRefAst>());

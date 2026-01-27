@@ -44,6 +44,8 @@ namespace EastFive.Persistence
 
         public static string AsAzureStorageTablesSafeKey(this string keyValueRow)
         {
+            if(keyValueRow.IsNullOrEmpty())
+                return keyValueRow;
             string sanitizedKey = DisallowedCharsInTableKeys.Replace(keyValueRow, "_");
             return sanitizedKey;
         }
