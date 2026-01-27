@@ -126,19 +126,19 @@ namespace EastFive.Azure.Communications
                             // Upsert numbers from Azure
                             foreach (var azureNumber in azureNumbers)
                             {
-                                var capabilities = new List<string>();
+                                var capabilities = new List<PhoneNumberCapability>();
                                 if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Inbound ||
                                     azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add("inbound_calling");
+                                    capabilities.Add(PhoneNumberCapability.InboundCalling);
                                 if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Outbound ||
                                     azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add("outbound_calling");
+                                    capabilities.Add(PhoneNumberCapability.OutboundCalling);
                                 if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Inbound ||
                                     azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add("inbound_sms");
+                                    capabilities.Add(PhoneNumberCapability.InboundSms);
                                 if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Outbound ||
                                     azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add("outbound_sms");
+                                    capabilities.Add(PhoneNumberCapability.OutboundSms);
 
                                 if (existingByPhoneNumber.TryGetValue(azureNumber.PhoneNumber, out var existing))
                                 {

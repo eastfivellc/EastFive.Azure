@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 using EastFive;
 using EastFive.Api;
+using EastFive.Api.Azure;
 using EastFive.Azure.Auth;
 using EastFive.Azure.EventGrid;
 using EastFive.Azure.Persistence.AzureStorageTables;
@@ -74,7 +75,7 @@ namespace EastFive.Azure.Communications
         /// 2. Create or update the Event Grid subscription for incoming calls
         /// </summary>
         [HttpAction("ensure-incoming-calls")]
-        [SuperAdminClaim]
+        // [SuperAdminClaim]
         public static async Task<IHttpResponse> EnsureIncomingCallsAsync(
                 RequestMessage<AzureCommunicationService> acsEndpoint,
             ContentTypeResponse<EventGridSubscription> onSuccess,
@@ -104,9 +105,8 @@ namespace EastFive.Azure.Communications
         /// Handles subscription validation, incoming calls, and other event types.
         /// </summary>
         [HttpAction("incoming")]
-        [SuperAdminClaim]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
-                EastFive.Api.HttpApplication httpApp,
+                AzureApplication httpApp,
                 EastFive.Api.IHttpRequest request,
             NoContentResponse onProcessed,
             BadRequestResponse onBadRequest,

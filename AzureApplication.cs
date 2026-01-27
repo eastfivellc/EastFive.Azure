@@ -30,6 +30,7 @@ using EastFive.Api;
 using EastFive.Azure.Auth.CredentialProviders;
 using Azure.Messaging.ServiceBus;
 using System.Collections.Concurrent;
+using EastFive.Azure.Communications;
 
 namespace EastFive.Azure
 {
@@ -72,6 +73,7 @@ namespace EastFive.Api.Azure
 {
 
     [ApiResources(NameSpacePrefixes = "EastFive.Azure,EastFive.Search")]
+    [EventGridSubscriptionValidationHandler]
     public class AzureApplication : EastFive.Api.HttpApplication, EastFive.Azure.IAzureApplication
     {
         public const string QueryRequestIdentfier = "request_id";

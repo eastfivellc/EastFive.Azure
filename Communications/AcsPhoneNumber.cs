@@ -1,7 +1,7 @@
 #nullable enable
 
 using System;
-
+using Azure.Communication.PhoneNumbers;
 using EastFive;
 using EastFive.Api;
 using EastFive.Persistence;
@@ -88,7 +88,7 @@ namespace EastFive.Azure.Communications
         [ApiProperty(PropertyName = CapabilitiesPropertyName)]
         [JsonProperty(PropertyName = CapabilitiesPropertyName)]
         [Storage(Name = CapabilitiesPropertyName)]
-        public string[] capabilities;
+        public PhoneNumberCapability[] capabilities;
 
         /// <summary>
         /// The type of phone number (e.g., "geographic", "tollFree").
