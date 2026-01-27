@@ -21,14 +21,14 @@ namespace EastFive.Communications.Azure
             this.apiKey = apiKey;
         }
 
-        public static TResult Load<TResult>(
-            Func<SendGridMailer,TResult> onSuccess,
-            Func<string,TResult> onFailure)
-        {
-            return EastFive.Azure.AppSettings.Communications.SendGrid.ApiKey.ConfigurationString(
-                key => onSuccess(new SendGridMailer(key)),
-                onFailure);
-        }
+        // public static TResult Load<TResult>(
+        //     Func<SendGridMailer,TResult> onSuccess,
+        //     Func<string,TResult> onFailure)
+        // {
+        //     return EastFive.Azure.AppSettings.Communications.SendGrid.ApiKey.ConfigurationString(
+        //         key => onSuccess(new SendGridMailer(key)),
+        //         onFailure);
+        // }
 
         public async Task<SendMessageTemplate[]> ListTemplatesAsync()
         {

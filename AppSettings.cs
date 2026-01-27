@@ -1,4 +1,6 @@
-﻿using EastFive.Configuration;
+﻿using EastFive.Azure.Communications;
+using EastFive.Azure.ResourceManagement;
+using EastFive.Configuration;
 using EastFive.Web;
 
 namespace EastFive.Azure
@@ -379,35 +381,84 @@ namespace EastFive.Azure
         [Config]
         public static class Communications
         {
-            public static class SendGrid
+            public readonly struct DefaultConfiguration : IProvideCommunicationsSettings
             {
-                [ConfigKey("API Key to access SendGrid", DeploymentOverrides.Suggested,
-                    DeploymentSecurityConcern = false,
-                    Location = "SendGrid admin portal",
-                    PrivateRepositoryOnly = true)]
-                public const string ApiKey = "EastFive.SendGrid.ApiKey";
-            }
-
-            [ConfigKey("Connection string for all comms services.",
+                [ConfigKey("Connection string for all comms services.",
                     DeploymentOverrides.Suggested,
                     Location = "Azure Portal > Communcation Services > Your Service > Settings | Keys",
                     DeploymentSecurityConcern = false,
                     PrivateRepositoryOnly = true)]
-            public const string ConnectionString = "EastFive.Azure.Communications.ConnectionString";
-
-            [Config]
-            public static class Email
-            {
-                [ConfigKey("Domain from which email is sent.",
-                    DeploymentOverrides.Suggested,
-                    Location = "Azure Portal > Email Communication Services > %Your Service% > Settings | Provision domains > %Your Domain% > Properties > Properties|From Sender domain",
-                    DeploymentSecurityConcern = false,
-                    PrivateRepositoryOnly = false)]
-                public const string SenderDomain = "EastFive.Azure.Communications.Email.SenderDomain";
+                public string CommunicationsConnectionString => "EastFive.Azure.Communications.ConnectionString";
             }
+
+            // Static instance for convenience
+            public static DefaultConfiguration Default => default;
 
             public const string MuteEmailToAddress = "EastFive.SendGrid.MuteToAddress";
             public const string BccAllAddresses = "EastFive.SendGrid.BlindCopyAllAddresses";
+        }
+
+        // [Config]
+        // public static class Communications
+        // {
+        //     // public static class SendGrid
+        //     // {
+        //     //     [ConfigKey("API Key to access SendGrid", DeploymentOverrides.Suggested,
+        //     //         DeploymentSecurityConcern = false,
+        //     //         Location = "SendGrid admin portal",
+        //     //         PrivateRepositoryOnly = true)]
+        //     //     public const string ApiKey = "EastFive.SendGrid.ApiKey";
+        //     // }
+
+        //     [ConfigKey("Connection string for all comms services.",
+        //             DeploymentOverrides.Suggested,
+        //             Location = "Azure Portal > Communcation Services > Your Service > Settings | Keys",
+        //             DeploymentSecurityConcern = false,
+        //             PrivateRepositoryOnly = true)]
+        //     public const string ConnectionString = "EastFive.Azure.Communications.ConnectionString";
+
+        //     // [Config]
+        //     // public static class Email
+        //     // {
+        //     //     [ConfigKey("Domain from which email is sent.",
+        //     //         DeploymentOverrides.Suggested,
+        //     //         Location = "Azure Portal > Email Communication Services > %Your Service% > Settings | Provision domains > %Your Domain% > Properties > Properties|From Sender domain",
+        //     //         DeploymentSecurityConcern = false,
+        //     //         PrivateRepositoryOnly = false)]
+        //     //     public const string SenderDomain = "EastFive.Azure.Communications.Email.SenderDomain";
+        //     // }
+
+        // }
+
+        [Config]
+        public static class AzureClientApplications
+        {
+            public readonly struct DefaultConfiguration : IProvideArmClientSettings
+            {
+                [ConfigKey("Azure Tenant ID.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > ",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public string TenantId => "EastFive.Azure.TenantId";
+
+                [ConfigKey("Azure Client ID.",
+                            DeploymentOverrides.Suggested,
+                            Location = "Azure Portal > ",
+                            DeploymentSecurityConcern = false,
+                            PrivateRepositoryOnly = true)]
+                public string ClientId => "EastFive.Azure.ClientId";
+                
+                [ConfigKey("Foundry client secret.",
+                    DeploymentOverrides.Suggested,
+                    Location = "Azure Portal > ",
+                    DeploymentSecurityConcern = false,
+                    PrivateRepositoryOnly = true)]
+                public string ClientSecret => "EastFive.Azure.AIFoundry.ClientSecret";
+            }
+
+            // Static instance for convenience
+            public static DefaultConfiguration Default => default;
         }
 
         [ConfigKey("Azure Tenant ID.",
