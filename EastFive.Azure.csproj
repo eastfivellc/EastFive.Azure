@@ -9,7 +9,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Azure.Communication.CallAutomation" Version="1.3.0" />
+    <PackageReference Include="Azure.Communication.PhoneNumbers" Version="1.3.0" />
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.3" />
+    <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />
+    <PackageReference Include="Azure.ResourceManager.EventGrid" Version="1.1.0" />
     <PackageReference Include="Azure.Search.Documents" Version="11.6.0" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.14.1" />
     <PackageReference Include="Azure.Storage.Common" Version="12.22.0" />
