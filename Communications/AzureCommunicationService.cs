@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 using EastFive;
@@ -12,41 +13,75 @@ using Newtonsoft.Json;
 
 namespace EastFive.Azure.Communications
 {
-    /// <summary>
-    /// Delegate for incoming call handling continuation.
-    /// Used to chain multiple IHandleIncomingCall handlers together.
-    /// </summary>
-    public delegate Task<TResult> IncomingCallHandlingDelegate<TResult>(
-        string incomingCallContext,
-        string toPhoneNumber,
-        string fromPhoneNumber,
-        AcsPhoneNumber? acsPhoneNumber);
+    #region IHandleIncomingEvent Interface
 
     /// <summary>
-    /// Interface for attributes that handle incoming calls from Azure Communication Services.
+    /// Priority constants for event handlers.
+    /// Higher values = earlier execution. Negative values = handler is skipped.
+    /// </summary>
+    public static class EventHandlerPriority
+    {
+        /// <summary>
+        /// Priority for subscription validation handler. Runs first.
+        /// </summary>
+        public const int Validation = int.MaxValue;
+
+        /// <summary>
+        /// Default priority for application handlers.
+        /// </summary>
+        public const int Default = 0;
+
+        /// <summary>
+        /// Return this to indicate the handler should not process this event.
+        /// </summary>
+        public const int DoNotHandle = -1;
+    }
+
+    /// <summary>
+    /// Interface for attributes that handle incoming events from Azure Event Grid.
     /// Apply attributes implementing this interface to the application class (e.g., Startup)
-    /// to receive incoming call events dispatched by AzureCommunicationService.
+    /// to receive incoming events dispatched by webhook endpoints.
     /// 
     /// Follows the Attribute Interface pattern used by IHandleRoutes, IHandleMethods, etc.
     /// </summary>
-    public interface IHandleIncomingCall
+    public interface IHandleIncomingEvent
     {
         /// <summary>
-        /// Handles an incoming call event.
+        /// Determines whether this handler should process the event and at what priority.
         /// </summary>
-        /// <typeparam name="TResult">The result type</typeparam>
-        /// <param name="incomingCallContext">The opaque context string required to answer the call</param>
-        /// <param name="toPhoneNumber">The ACS phone number that was called (E.164 format)</param>
-        /// <param name="fromPhoneNumber">The caller's phone number (E.164 format)</param>
-        /// <param name="acsPhoneNumber">The AcsPhoneNumber entity for the called number, if found</param>
-        /// <param name="continueExecution">Call this delegate to pass to the next handler in the chain</param>
-        Task<TResult> HandleIncomingCallAsync<TResult>(
-            string incomingCallContext,
-            string toPhoneNumber,
-            string fromPhoneNumber,
-            AcsPhoneNumber? acsPhoneNumber,
-            IncomingCallHandlingDelegate<TResult> continueExecution);
+        /// <param name="eventType">The event type string (e.g., "Microsoft.Communication.IncomingCall")</param>
+        /// <param name="eventData">The parsed "data" property from the event</param>
+        /// <param name="fullEvent">The full event JSON element</param>
+        /// <returns>
+        /// Negative value: handler does not handle this event (skipped).
+        /// Zero or positive: handler processes this event. Higher values execute earlier.
+        /// </returns>
+        int DoesHandleEvent(string eventType, JsonElement eventData, JsonElement fullEvent);
+
+        /// <summary>
+        /// Handles an incoming event.
+        /// Return directly to short-circuit (stop processing this and remaining events).
+        /// Call continueExecution() to pass to next handler, then next event in batch.
+        /// </summary>
+        /// <param name="eventType">The event type string</param>
+        /// <param name="eventData">The parsed "data" property from the event</param>
+        /// <param name="fullEvent">The full event JSON element</param>
+        /// <param name="request">The HTTP request, used to create responses via request.CreateResponse()</param>
+        /// <param name="httpApp">The application instance</param>
+        /// <param name="continueExecution">Call to pass to next handler/event; returns final response</param>
+        Task<IHttpResponse> HandleEventAsync(
+                string eventType,
+                JsonElement eventData,
+                JsonElement fullEvent,
+                IHttpRequest request,
+                EastFive.Api.HttpApplication httpApp,
+            NoContentResponse onProcessed,
+            BadRequestResponse onBadRequest,
+            GeneralFailureResponse onFailure,
+            Func<Task<IHttpResponse>> continueExecution);
     }
+
+    #endregion
 
     /// <summary>
     /// Represents an Azure Communication Services resource.

@@ -96,20 +96,19 @@ namespace EastFive.Azure.Communications
                 error => onFailure(error));
         }
 
-        #region Incoming Call Webhook
+        #region Incoming Event Webhook
 
         /// <summary>
-        /// Webhook endpoint for Azure Event Grid incoming call events.
-        /// Configure this URL in Azure Event Grid subscription for "Microsoft.Communication.IncomingCall".
-        /// Dispatches to IHandleIncomingCall implementations based on phone number configuration.
+        /// Webhook endpoint for Azure Event Grid events.
+        /// Dispatches events to IHandleIncomingEvent implementations based on event type and priority.
+        /// Handles subscription validation, incoming calls, and other event types.
         /// </summary>
         [HttpAction("incoming")]
         [SuperAdminClaim]
-        public static async Task<IHttpResponse> HandleIncomingCallAsync(
+        public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 EastFive.Api.HttpApplication httpApp,
                 EastFive.Api.IHttpRequest request,
             NoContentResponse onProcessed,
-            ContentTypeResponse<object> onValidation,
             BadRequestResponse onBadRequest,
             GeneralFailureResponse onFailure)
         {
@@ -120,40 +119,117 @@ namespace EastFive.Azure.Communications
                 if (string.IsNullOrWhiteSpace(body))
                     return onBadRequest().AddReason("Empty request body");
 
-                // Handle Event Grid subscription validation handshake
+                // Parse JSON once
                 using var jsonDoc = JsonDocument.Parse(body);
                 var root = jsonDoc.RootElement;
 
-                // Check for subscription validation event (Event Grid sends this when subscribing)
-                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
-                {
-                    var firstEvent = root[0];
-                    if (firstEvent.TryGetProperty("eventType", out var eventTypeElement))
-                    {
-                        var eventType = eventTypeElement.GetString();
-                        if (eventType == "Microsoft.EventGrid.SubscriptionValidationEvent")
+                if (root.ValueKind != JsonValueKind.Array)
+                    return onBadRequest().AddReason("Expected array of events");
+                
+                var handlers = httpApp.GetType()
+                    .GetAttributesInterface<IHandleIncomingEvent>(inherit: true, multiple: true)
+                    .ToArray();
+                    
+
+                // Build array of events to process
+                return await root
+                    .EnumerateArray()
+                    .SelectMany(
+                        (eventElement) => 
                         {
-                            if (firstEvent.TryGetProperty("data", out var dataElement) &&
-                                dataElement.TryGetProperty("validationCode", out var validationCodeElement))
-                            {
-                                var validationCode = validationCodeElement.GetString();
-                                // Return validation response with the validation code
-                                return onValidation(new { validationResponse = validationCode });
-                            }
-                        }
-                    }
-                }
+                            var noResult = Array.Empty<(int priority, Func<Func<Task<IHttpResponse>>, Task<IHttpResponse>> )>();
+                            if(!eventElement.TryGetProperty("eventType", out var eventType))
+                                return noResult;
+                            var eventTypeString = eventType.GetString();
+                            if(eventTypeString.IsNullOrWhiteSpace())
+                                return noResult;
+                            if(!eventElement.TryGetProperty("data", out var eventData))
+                                return noResult;
 
-                // Parse and dispatch incoming call events
-                await DispatchIncomingCallEventsAsync(body, httpApp);
+                            var handlerPairs = handlers
+                                .Select(
+                                    handler =>
+                                    {
+                                        var priority = handler.DoesHandleEvent(eventTypeString, eventData, eventElement);
+                                        Func<Func<Task<IHttpResponse>>, Task<IHttpResponse>> chain = (onContinueExecution) => handler.HandleEventAsync(
+                                            eventTypeString, eventData, eventElement, request, httpApp,
+                                            onProcessed, onBadRequest, onFailure,
+                                            onContinueExecution);
+                                        return (priority, chain);
+                                    })
+                                .Where(x => x.priority >= 0)
+                                .ToArray();
 
-                return onProcessed();
+                            return handlerPairs;
+                        })
+                    .ToArray()
+                    .OrderByDescending(ev => ev.priority)
+                    .First(
+                        (evPair, next) => evPair.Item2(next),
+                        () => onProcessed().AsTask());
             }
             catch (Exception ex)
             {
-                return onFailure($"Failed to process incoming call: {ex.Message}");
+                return onFailure($"Failed to process event: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Recursively dispatches events through the handler chain.
+        /// Each event is processed by handlers ordered by priority (descending).
+        /// Calling continueExecution moves to the next handler, then the next event.
+        /// Returning directly short-circuits all remaining processing.
+        /// </summary>
+        // private static async Task<IHttpResponse> DispatchEventsAsync(
+        //     JsonElement[] events,
+        //     int eventIndex,
+        //     IHttpRequest request,
+        //     HttpApplication httpApp,
+        //     NoContentResponse onProcessed,
+        //     BadRequestResponse onBadRequest,
+        //     GeneralFailureResponse onFailure)
+        // {
+        //     // Base case: all events processed
+        //     if (eventIndex >= events.Length)
+        //         return onProcessed();
+
+        //     var eventElement = events[eventIndex];
+        //     var eventType = eventElement.GetProperty("eventType").GetString() ?? string.Empty;
+        //     var eventData = eventElement.GetProperty("data");
+
+        //     // Get all handlers that want to process this event (priority >= 0)
+        //     // Order by priority descending (highest first)
+        //     var handlers = httpApp.GetType()
+        //         .GetAttributesInterface<IHandleIncomingEvent>(inherit: true, multiple: true)
+        //         .Select(handler => (handler, priority: handler.DoesHandleEvent(eventType, eventData, eventElement)))
+        //         .Where(x => x.priority >= 0)
+        //         .OrderByDescending(x => x.priority)
+        //         .Select(x => x.handler)
+        //         .ToArray();
+
+        //     // Build handler chain using Aggregate pattern
+        //     // Innermost: log unhandled event, then continue to next event
+        //     Func<Task<IHttpResponse>> chain = async () =>
+        //     {
+        //         // Log that no handler processed this event
+        //         httpApp.Logger.LogTrace($"Unhandled event type: {eventType}");
+                
+        //         // Continue to next event
+        //         return await DispatchEventsAsync(events, eventIndex + 1, request, httpApp, onProcessed);
+        //     };
+
+        //     // Wrap each handler around the chain (in reverse order so highest priority executes first)
+        //     foreach (var handler in handlers.Reverse())
+        //     {
+        //         var capturedHandler = handler;
+        //         var capturedChain = chain;
+        //         chain = () => capturedHandler.HandleEventAsync(
+        //             eventType, eventData, eventElement, request, httpApp, capturedChain);
+        //     }
+
+        //     // Execute the chain
+        //     return await chain();
+        // }
 
         #endregion
     }
