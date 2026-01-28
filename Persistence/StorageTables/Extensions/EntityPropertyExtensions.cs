@@ -1502,7 +1502,16 @@ namespace EastFive.Persistence.Azure.StorageTables
                                                                 (v, memberInfo) =>
                                                                 {
                                                                     if (dict.TryGetValue(memberInfo.Name, out var memberValue))
+                                                                    {
+                                                                        var typeToCastTo = memberInfo.GetPropertyOrFieldType();
+                                                                        if(typeToCastTo.IsEnum)
+                                                                        {
+                                                                            var enumValue = Enum.Parse(typeToCastTo, memberValue.ToString());
+                                                                            memberInfo.SetPropertyOrFieldValue(v, enumValue);
+                                                                            return v;
+                                                                        }
                                                                         memberInfo.SetPropertyOrFieldValue(v, memberValue);
+                                                                    }
                                                                     return v;
                                                                 });
                                                         return onBound(populatedInstance);
