@@ -19,6 +19,13 @@ namespace EastFive.Azure.Persistence
             return responseDelegate(resources);
         }
 
+        public static IHttpResponse HttpResponse<TResource>(
+            this IEnumerableAsync<TResource> resources,
+            ServerSideEventsResponse<TResource> responseDelegate)
+        {
+            return responseDelegate(resources);
+        }
+
         public static Task<IHttpResponse> HttpGetAsync<TResource>(
                 this IRef<TResource> resourceRef,
             ContentTypeResponse<TResource> onFound,
