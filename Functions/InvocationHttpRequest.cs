@@ -3,6 +3,7 @@ using EastFive.Linq;
 using EastFive.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -32,6 +33,7 @@ namespace EastFive.Api
             this.RequestUri = absoluteUri;
             this.CancellationToken = cancellationToken;
             this.Headers = new Dictionary<string, string[]>();
+            this.Properties = new Dictionary<string, object>();
         }
 
         public Uri RequestUri { get; set; }
@@ -103,7 +105,7 @@ namespace EastFive.Api
 
         public IRazorViewEngine RazorViewEngine => throw new NotImplementedException();
 
-        IDictionary<string, object> IHttpRequest.Properties { get; }
+        public IDictionary<string, object> Properties { get; private set;}
 
         public string GetHeader(string headerKey)
         {
@@ -115,7 +117,11 @@ namespace EastFive.Api
             return String.Empty;
         }
 
-        public IRequestHeaders RequestHeaders => throw new NotImplementedException();
+        public IRequestHeaders RequestHeaders => new Core.CoreHttpRequest.CoreRequestHeaders(
+            new HeaderDictionary(
+                Headers
+                    .Select(kvp => kvp.Key.PairWithValue(new StringValues(kvp.Value)))
+                    .ToDictionary()));
 
         public IEnumerable<string> GetHeaders(string headerKey)
         {

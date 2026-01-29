@@ -91,20 +91,27 @@ namespace EastFive.Azure.Monitoring
 
         public async Task<string> SendAsync(Uri teamsHookUrl)
         {
-            using (var client = new HttpClient())
+            try
             {
-                using (var teamsRequest = new HttpRequestMessage(HttpMethod.Post, teamsHookUrl))
+                using (var client = new HttpClient())
                 {
-                    var messageString = JsonConvert.SerializeObject(this);
-                    teamsRequest.Content = new StringContent(messageString);
-                    teamsRequest.Content.Headers.ContentType =
-                        new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
-                    using (var response = await client.SendAsync(teamsRequest))
+                    using (var teamsRequest = new HttpRequestMessage(HttpMethod.Post, teamsHookUrl))
                     {
-                        var responseMessage = await response.Content.ReadAsStringAsync();
-                        return responseMessage;
+                        var messageString = JsonConvert.SerializeObject(this);
+                        teamsRequest.Content = new StringContent(messageString);
+                        teamsRequest.Content.Headers.ContentType =
+                            new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+                        using (var response = await client.SendAsync(teamsRequest))
+                        {
+                            var responseMessage = await response.Content.ReadAsStringAsync();
+                            return responseMessage;
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
             }
         }
     }

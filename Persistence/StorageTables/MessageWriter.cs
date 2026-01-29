@@ -85,7 +85,8 @@ namespace EastFive.Azure.Persistence.StorageTables
                             };
                             order++;
                             bool created = await messageLine.StorageCreateAsync(
-                                discard => true);
+                                discard => true,
+                                () => false);
                         }
                     }
                     finally
