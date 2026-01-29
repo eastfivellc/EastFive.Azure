@@ -2,23 +2,28 @@
 
 using System;
 using System.Text.Json;
+using System.Linq;
 using System.Threading.Tasks;
 
 using EastFive.Api;
+using EastFive.Azure.EventGrid;
 using EastFive.Azure.Persistence.AzureStorageTables;
+using EastFive.Extensions;
 using EastFive.Linq.Async;
 
 namespace EastFive.Azure.Communications
 {
     /// <summary>
     /// Base class for handling incoming call events from Azure Communication Services.
-    /// Implements IHandleIncomingEvent and provides strongly-typed parameters for call handling.
-    /// 
+    /// Implements IHandleIncomingEvent and IRegisterEventSubscription for self-registration.
+    ///
     /// Inherit from this class and override HandleIncomingCallAsync to implement
     /// custom incoming call logic.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public abstract class IncomingCallHandlerAttribute : Attribute, IHandleIncomingEvent
+    public abstract class IncomingCallHandlerAttribute : Attribute,
+        IHandleIncomingEvent,
+        IRegisterEventSubscription
     {
         private const string IncomingCallEventType = "Microsoft.Communication.IncomingCall";
 
@@ -124,5 +129,39 @@ namespace EastFive.Azure.Communications
             }
             return null;
         }
+
+        #region IRegisterEventSubscription Implementation
+
+        /// <summary>
+        /// The type of event source provider this attribute requires.
+        /// Used for reporting purposes only.
+        /// Incoming calls are emitted from Azure Communication Services.
+        /// </summary>
+        public Type EventSourceProviderType => typeof(AzureCommunicationService);
+
+        public async Task<TResult> GetSubscriptionRegistrationsAsync<TRegistration,TResult>(
+            EventGridSubscription.EnsureRegistrationAsyncDelegate<TRegistration> ensureRegistrationAsync,
+            Func<TRegistration[], TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            return await await AzureCommunicationService.DiscoverAsync(
+                async(acss) =>
+                {
+                    var registrations = await acss
+                        .Select(
+                            async acs =>
+                            {
+                                return await ensureRegistrationAsync(acs.resourceId,
+                                    AzureCommunicationService.IncomingCallsSubscriptionName,
+                                    AzureCommunicationService.IncomingCallEventTypes);
+                            })
+                        .AsyncEnumerable()
+                        .ToArrayAsync();
+                    return onSuccess(registrations);
+                },
+                error => onFailure(error).AsTask());
+        }
+
+        #endregion
     }
 }

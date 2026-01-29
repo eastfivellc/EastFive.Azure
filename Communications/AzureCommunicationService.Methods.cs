@@ -28,6 +28,12 @@ namespace EastFive.Azure.Communications
         public const string IncomingCallsSubscriptionName = "incoming-calls-webhook";
         public static readonly string[] IncomingCallEventTypes = new[] { "Microsoft.Communication.IncomingCall" };
 
+        public const string RecordingEventsSubscriptionName = "recording-events-webhook";
+        public static readonly string[] RecordingEventTypes = new[] {
+            "Microsoft.Communication.RecordingFileStatusUpdated",
+            "Microsoft.Communication.RecordingStateChanged"
+        };
+
         #endregion
 
         #region IProvideEventSubscription Implementation
@@ -130,53 +136,44 @@ namespace EastFive.Azure.Communications
         /// <param name="onDiscovered">Called with (acs, isNew) when the resource is found</param>
         /// <param name="onFailure">Called with error reason on failure</param>
         public static async Task<TResult> DiscoverAsync<TResult>(
-            Func<AzureCommunicationService, bool, TResult> onDiscovered,
+            Func<AzureCommunicationService[], TResult> onDiscovered,
             Func<string, TResult> onFailure)
         {
-            // First check if already stored
-            var existing = await GetAllFromStorageAsync().ToArrayAsync();
-            if (existing.Any())
-            {
-                return onDiscovered(existing.First(), false);
-            }
-
             // Parse resource name from connection string
             return await EastFive.Azure.AppSettings.Communications.Default.CreateResourceManager(
                     EastFive.Azure.AppSettings.AzureClientApplications.Default,
                 async (armClient, resourceName) =>
                 {
-                    await foreach (var subscription in armClient.GetSubscriptions())
-                    {
-                        var filter = "resourceType eq 'Microsoft.Communication/CommunicationServices'";
-                        
-                        await foreach (var resource in subscription.GetGenericResourcesAsync(filter: filter))
-                        {
-                            if (string.Equals(resource.Data.Name, resourceName, StringComparison.OrdinalIgnoreCase))
+                    var filter = "resourceType eq 'Microsoft.Communication/CommunicationServices'";
+                    var acss = await armClient.GetSubscriptions()
+                        .SelectMany(sub => sub.GetGenericResourcesAsync(
+                            filter: filter))
+                        .Where(resource => string.Equals(resource.Data.Name, resourceName, StringComparison.OrdinalIgnoreCase))
+                        .ToEnumerableAsync()
+                        .Select(
+                            async resource =>
                             {
                                 var acs = new AzureCommunicationService
-                                {
-                                    azureCommunicationServiceRef = Guid.NewGuid().AsRef<AzureCommunicationService>(),
-                                    resourceId = resource.Id.ToString(),
-                                    resourceName = resource.Data.Name,
-                                    resourceGroupName = resource.Id.ResourceGroupName ?? string.Empty,
-                                    subscriptionId = subscription.Id.SubscriptionId ?? string.Empty,
-                                    location = resource.Data.Location.ToString(),
-                                    provisioningState = resource.Data.ProvisioningState?.ToString(),
-                                    lastSynced = DateTime.UtcNow
-                                };
+                                    {
+                                        azureCommunicationServiceRef = Guid.NewGuid().AsRef<AzureCommunicationService>(),
+                                        resourceId = resource.Id.ToString(),
+                                        resourceName = resource.Data.Name,
+                                        resourceGroupName = resource.Id.ResourceGroupName ?? string.Empty,
+                                        subscriptionId = resource.Id.SubscriptionId ?? string.Empty,
+                                        location = resource.Data.Location.ToString(),
+                                        provisioningState = resource.Data.ProvisioningState?.ToString(),
+                                        lastSynced = DateTime.UtcNow
+                                    };
                                 
-                                await acs.StorageCreateAsync(
-                                    discard => true,
-                                    () => true);
                                 
-                                return onDiscovered(acs, true);
-                            }
-                        }
-                    }
+                                return await await acs.StorageCreateAsync(
+                                    entity => entity.Entity.AsTask(),
+                                    () =>acs.azureCommunicationServiceRef.StorageGetAsync(x => x));
+                            })
+                        .Await()
+                        .ToArrayAsync();
                     
-                    return onFailure(
-                        $"Could not find ACS resource named '{resourceName}' in any accessible subscription. " +
-                        "Ensure the Service Principal has Reader access to the subscription containing the ACS resource.");
+                    return onDiscovered(acss);
                 },
                 why => onFailure(why).AsTask());
         }
@@ -185,11 +182,11 @@ namespace EastFive.Azure.Communications
         /// Discovers the Azure Communication Services resource with async callbacks.
         /// </summary>
         public static async Task<TResult> DiscoverAsync<TResult>(
-            Func<AzureCommunicationService, bool, Task<TResult>> onDiscovered,
+            Func<AzureCommunicationService[], Task<TResult>> onDiscovered,
             Func<string, TResult> onFailure)
         {
             var innerResult = await DiscoverAsync<Task<TResult>>(
-                (acs, isNew) => onDiscovered(acs, isNew),
+                (acs) => onDiscovered(acs),
                 reason => Task.FromResult(onFailure(reason)));
             return await innerResult;
         }
@@ -217,6 +214,30 @@ namespace EastFive.Azure.Communications
                         subscriptionName,
                         cbUri,
                         eventTypes,
+                        subscription => onSuccess(subscription),
+                        error => onFailure(error)),
+                reason => Task.FromResult(onFailure(reason)));
+        }
+
+        /// <summary>
+        /// Ensures the Event Grid subscription for recording events is configured.
+        /// </summary>
+        /// <param name="callbackUri">The webhook endpoint to receive recording events</param>
+        /// <param name="onSuccess">Called with the created/updated subscription</param>
+        /// <param name="onFailure">Called with error reason on failure</param>
+        public async Task<TResult> EnsureRecordingEventsSubscriptionAsync<TResult>(
+            Uri callbackUri,
+            Func<EventGridSubscription, TResult> onSuccess,
+            Func<string, TResult> onFailure)
+        {
+            return await ProvideEventSubscriptionAsync(
+                callbackUri,
+                async (scopeResourceId, subscriptionName, cbUri, eventTypes) =>
+                    await EventGridSubscription.EnsureAsync(
+                        scopeResourceId,
+                        RecordingEventsSubscriptionName,
+                        cbUri,
+                        RecordingEventTypes,
                         subscription => onSuccess(subscription),
                         error => onFailure(error)),
                 reason => Task.FromResult(onFailure(reason)));

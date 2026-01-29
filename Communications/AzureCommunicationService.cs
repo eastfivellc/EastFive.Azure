@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 using EastFive;
 using EastFive.Api;
+using EastFive.Azure.EventGrid;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 

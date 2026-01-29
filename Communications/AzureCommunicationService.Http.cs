@@ -60,40 +60,11 @@ namespace EastFive.Azure.Communications
         [HttpAction("discover")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> DiscoverHttpAsync(
-            ContentTypeResponse<AzureCommunicationService> onDiscovered,
+            ContentTypeResponse<AzureCommunicationService[]> onDiscovered,
             GeneralFailureResponse onFailure)
         {
             return await DiscoverAsync(
-                (acs, isNew) => onDiscovered(acs),
-                error => onFailure(error));
-        }
-
-        /// <summary>
-        /// Ensures the Event Grid subscription for incoming calls is configured.
-        /// This will:
-        /// 1. Discover the ACS resource if not already known
-        /// 2. Create or update the Event Grid subscription for incoming calls
-        /// </summary>
-        [HttpAction("ensure-incoming-calls")]
-        // [SuperAdminClaim]
-        public static async Task<IHttpResponse> EnsureIncomingCallsAsync(
-                RequestMessage<AzureCommunicationService> acsEndpoint,
-            ContentTypeResponse<EventGridSubscription> onSuccess,
-            GeneralFailureResponse onFailure)
-        {
-            var callbackUri = acsEndpoint
-                .HttpAction("incoming")
-                .CompileRequest()
-                .RequestUri;
-
-            return await DiscoverAsync<IHttpResponse>(
-                async (acs, isNew) =>
-                {
-                    return await acs.EnsureIncomingCallSubscriptionAsync(
-                        callbackUri,
-                        subscription => onSuccess(subscription),
-                        error => onFailure(error));
-                },
+                (acs) => onDiscovered(acs),
                 error => onFailure(error));
         }
 
