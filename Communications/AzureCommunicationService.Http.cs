@@ -76,6 +76,7 @@ namespace EastFive.Azure.Communications
         /// Handles subscription validation, incoming calls, and other event types.
         /// </summary>
         [HttpAction("incoming")]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 AzureApplication httpApp,
                 EastFive.Api.IHttpRequest request,
