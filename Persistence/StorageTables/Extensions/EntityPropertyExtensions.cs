@@ -1083,7 +1083,17 @@ namespace EastFive.Persistence.Azure.StorageTables
                     if (arrayType.IsAssignableFrom(typeof(Uri)))
                     {
                         var values = (Uri[])value;
-                        var bytes = values.Select(v => v.OriginalString).ToUTF8ByteArrayOfStringNullOrEmptys();
+                        var bytes = values
+                            .Select(
+                                v =>
+                                {
+                                    if(v.IsDefaultOrNull())
+                                        return string.Empty;
+                                    if (v.OriginalString.IsNullOrWhiteSpace())
+                                        return string.Empty;
+                                    return v.OriginalString;
+                                })
+                                .ToUTF8ByteArrayOfStringNullOrEmptys();
                         var ep = new EntityProperty(bytes);
                         return onValue(ep);
                     }

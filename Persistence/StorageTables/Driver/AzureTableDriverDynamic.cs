@@ -2666,6 +2666,86 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
                 onTimeout: GetRetryDelegate());
         }
 
+        public async Task<TResult> UpdateAsyncAsync2<TData, TResult>(string rowKey, string partitionKey,
+            Func<TData, Func<TData, Task<TResult>>, Task<TResult>> modificationAsync,
+            Func<TData, TResult> onUpdated,
+            Func<TResult> onNotFound = default,
+            IHandleFailedModifications<TResult>[] modificationFailureEvents = default,
+            Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default,
+            CloudTable table = default)
+        {
+            return await await FindByIdAsync(rowKey, partitionKey,
+                async (TData currentStorage, TableResult tableResult) =>
+                {
+                    var modificationFailureTaskEvents = modificationFailureEvents
+                        .NullToEmpty()
+                        .Select(umf => (IHandleFailedModifications<Task<TResult>>)new UpdateModificationFailure2<TResult>(umf))
+                        .ToArray();
+                    
+                    var entity = typeof(TData).IsClass ?
+                        GetEntity((TData)((object)currentStorage).CloneObject())
+                        :
+                        GetEntity(currentStorage);
+                    var eTag = entity.ETag;
+                    return await modificationAsync(currentStorage,
+                        (modifiedDocument) => ContinueAsync(modifiedDocument));
+
+                    async Task<TResult> ContinueAsync(TData modifiedDocument)
+                    {
+                        return await await UpdateIfNotModifiedAsync<TData, Task<TResult>>(modifiedDocument,
+                                entity,
+                            onUpdated: (tableResult) =>
+                            {
+                                var tableEntity = ((IAzureStorageTableEntity<TData>)tableResult.Result).Entity;
+                                return onUpdated(tableEntity).AsTask();
+                            },
+                            onDocumentHasBeenModified: () =>
+                            {
+                                #region Sanity Checks
+
+                                var updatedETag = modifiedDocument.StorageGetETag();
+                                if (eTag != updatedETag)
+                                    throw new ArgumentException($"Cannot change ETag in update. {typeof(TData).FullName}:{eTag} => {updatedETag}");
+
+                                var updatedRowKey = modifiedDocument.StorageGetRowKey();
+                                if (rowKey != updatedRowKey)
+                                    throw new ArgumentException($"Cannot change row key in update. {typeof(TData).FullName}:{rowKey} => {updatedRowKey}");
+
+                                var updatedPartitionKey = modifiedDocument.StorageGetPartitionKey();
+                                if (partitionKey != updatedPartitionKey)
+                                    throw new ArgumentException($"Cannot change partition key in update. {typeof(TData).FullName}:{partitionKey} => {updatedPartitionKey}");
+                                
+                                #endregion
+
+                                return UpdateAsyncAsync2(rowKey, partitionKey,
+                                    modificationAsync: modificationAsync,
+                                    onUpdated: onUpdated,
+                                    onNotFound,
+                                    modificationFailureEvents: modificationFailureEvents,
+                                    table: table);
+                            },
+                            onNotFound: () =>
+                            {
+                                if (onNotFound.IsDefaultOrNull())
+                                    throw new Exception($"Document [{partitionKey}/{rowKey}] of type {modifiedDocument.GetType().FullName} was not found.");
+                                return onNotFound().AsTask();
+                            },
+                            onFailure: (errorCodes, why) =>
+                            {
+                                if (onFailure.IsDefaultOrNull())
+                                    throw new Exception(why);
+                                return onFailure(errorCodes, why).AsTask();
+                            },
+                            onModificationFailures:modificationFailureTaskEvents,
+                            table: table);
+                    }
+                },
+                onNotFound.AsAsyncFunc(),
+                onFailure: onFailure.AsAsyncFunc(),
+                table: table,
+                onTimeout: GetRetryDelegate());
+        }
+
         public Task<TResult> GetAndUpdateAsync<TData, TIntermediate, TResult>(string rowKey, string partitionKey,
             Func<TData, (TIntermediate, Func<TData, TData>)> getModification,
             Func<TData, TIntermediate, TResult> onUpdated,

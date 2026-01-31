@@ -1491,6 +1491,24 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     modificationFailureEvents: modificationFailureEvents);
         }
 
+        public static Task<TResult> StorageUpdateAsyncAsync2<TEntity, TResult>(this IRef<TEntity> entityRef,
+            Func<TEntity, Func<TEntity, Task<TResult>>, Task<TResult>> modifierAsync,
+            Func<TEntity, TResult> onUpdated,
+            Func<TResult> onNotFound = default,
+            IHandleFailedModifications<TResult>[] modificationFailureEvents = default)
+            where TEntity : IReferenceable
+        {
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
+            return AzureTableDriverDynamic
+                .FromSettings()
+                .UpdateAsyncAsync2<TEntity, TResult>(
+                        rowKey, partitionKey,
+                    modificationAsync:modifierAsync,
+                    onUpdated:onUpdated,
+                    onNotFound: onNotFound,
+                    modificationFailureEvents: modificationFailureEvents);
+        }
+
         public static Task<TResult> StorageUpdateAsyncAsync<TEntity, TResult>(this IRef<TEntity> entityRef,
             Func<TEntity, Func<TEntity, Task<ITableResult>>, Task<TResult>> onUpdate,
             Func<Task<TResult>> onNotFound = default,
