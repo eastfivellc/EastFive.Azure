@@ -18,6 +18,7 @@ using EastFive.Linq;
 using EastFive.Linq.Async;
 using EastFive.Collections;
 using EastFive.Collections.Generic;
+using EastFive.Api.Serialization.Json;
 
 namespace EastFive.Azure.Communications
 {
@@ -437,7 +438,7 @@ namespace EastFive.Azure.Communications
                                 if (ex.Status == 400 && ex.ErrorCode == "8523")
                                 {
                                     // Participant already in call
-                                    return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
+                                    return await await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
                                         (current) =>
                                         {
                                             current.participants = current.participants
@@ -452,8 +453,15 @@ namespace EastFive.Azure.Communications
                                                 .ToArray();
                                             return current;
                                         },
-                                        (updatedPhoneCall) => onAdded(updatedPhoneCall),
-                                        onNotFound: () => onFailure("AcsPhoneCall not found."));
+                                        (updatedPhoneCall) =>
+                                        {
+                                            // Since no callback will be sent, process next participant
+                                            return updatedPhoneCall.ProcessCallSequenceAsync(
+                                                    request,
+                                                onProcessed: (finalPhoneCall) => onAdded(finalPhoneCall),
+                                                onFailure: (reason) => onFailure(reason));
+                                        },
+                                        onNotFound: () => onFailure("AcsPhoneCall not found.").AsTask());
                                 }
                                 if (ex.Status == 404 && ex.ErrorCode == "8522")
                                 {
@@ -567,7 +575,7 @@ namespace EastFive.Azure.Communications
                                 correlationId = phoneCall.correlationId
                             };
 
-                            var jsonPayload = JsonSerializer.Serialize(payload);
+                            var jsonPayload = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
                             request.Content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
 
                             using (var response = await client.SendAsync(request))
