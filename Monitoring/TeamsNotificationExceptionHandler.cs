@@ -35,8 +35,8 @@ namespace EastFive.Azure.Monitoring
                 () => true);
         }
 
-        public static string GetCardTitle(IHttpRequest request) => 
-            request.RequestUri.Segments
+        public static string GetCardTitle(Uri requestUri) => 
+            requestUri.Segments
                 .Where(x => !Guid.TryParse(x, out Guid id)) // omit guids to create a shorter title
                 .Join("");
 
@@ -67,7 +67,7 @@ namespace EastFive.Azure.Monitoring
                         httpApp, request);
 
             var message = await CompileCardAsync(
-                GetCardTitle(request), 
+                GetCardTitle(request.RequestUri), 
                 GetCardSummary(ex),
                 httpApp,
                 default(MonitoringRequest), request, default(IHttpResponse), ex);
@@ -95,7 +95,7 @@ namespace EastFive.Azure.Monitoring
                 return response;
 
             var message = await CompileCardAsync(
-                GetCardTitle(request), 
+                GetCardTitle(request.RequestUri), 
                 GetCardSummary(response),
                 httpApp,
                 monitoringRequest, request, response, default(Exception));
