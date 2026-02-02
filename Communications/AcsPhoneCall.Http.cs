@@ -25,6 +25,7 @@ namespace EastFive.Azure.Communications
         /// Get a specific ACS phone call by ID.
         /// </summary>
         [HttpGet]
+        [SuperAdminClaim]
         public static Task<IHttpResponse> GetByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = IdPropertyName)]
                 IRef<AcsPhoneCall> acsPhoneCallRef,
@@ -40,6 +41,7 @@ namespace EastFive.Azure.Communications
         /// Get all ACS phone calls.
         /// </summary>
         [HttpGet]
+        [SuperAdminClaim]
         public static IHttpResponse GetAllAsync(
             MultipartAsyncResponse<AcsPhoneCall> onSuccess,
             GeneralFailureResponse onFailure)
@@ -59,6 +61,7 @@ namespace EastFive.Azure.Communications
         /// Create a new ACS phone call with participants.
         /// </summary>
         [HttpPost]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<AcsPhoneCall> acsPhoneCallRef,
                 [Property(Name = ConferencePhoneNumberPropertyName)]IRef<AcsPhoneNumber> conferencePhoneNumber,
@@ -95,6 +98,7 @@ namespace EastFive.Azure.Communications
         /// Delete an ACS phone call.
         /// </summary>
         [HttpDelete]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> DeleteAsync(
                 [QueryParameter(CheckFileName = true, Name = IdPropertyName)]
                 IRef<AcsPhoneCall> acsPhoneCallRef,
@@ -116,6 +120,7 @@ namespace EastFive.Azure.Communications
         /// This is the webhook endpoint that ACS calls when events occur.
         /// </summary>
         [HttpAction(EventsActionName)]
+        [SuperAdminClaim]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 [QueryId]IRef<AcsPhoneCall> acsPhoneCallRef,
                 EastFive.Api.IHttpRequest request,
