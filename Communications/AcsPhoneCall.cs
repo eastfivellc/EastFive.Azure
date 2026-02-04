@@ -47,6 +47,7 @@ namespace EastFive.Azure.Communications
         public const string ConferencePhoneNumberPropertyName = "conference_phone_number";
         [ApiProperty(PropertyName = ConferencePhoneNumberPropertyName)]
         [JsonProperty(PropertyName = ConferencePhoneNumberPropertyName)]
+        [ScopeId(scope: $"Partition_{nameof(listeningParticipantPhoneNumber)}", IgnoreNullOrDefault = true)]
         [Storage]
         public IRef<AcsPhoneNumber> conferencePhoneNumber;
 
@@ -91,6 +92,19 @@ namespace EastFive.Azure.Communications
         [JsonProperty(PropertyName = ParticipantsPropertyName)]
         [Storage]
         public AcsCallParticipant[] participants;
+
+        /// <summary>
+        /// Listening participant phone numbers for quick lookup.
+        /// </summary>
+        public const string ListeningParticipantPhoneNumberPropertyName = "listening_participant_phone_number";
+        [ApiProperty(PropertyName = ListeningParticipantPhoneNumberPropertyName)]
+        [JsonProperty(PropertyName = ListeningParticipantPhoneNumberPropertyName)]
+        [ScopedLookup(
+            partitionScope:$"Partition_{nameof(listeningParticipantPhoneNumber)}", 
+            rowScope: $"RowKey_{nameof(callConnectionId)}")]
+        [ScopeString(scope: $"RowKey_{nameof(callConnectionId)}", IgnoreScopeIfNull = true, KeyFilter = true)]
+        [Storage]
+        public string listeningParticipantPhoneNumber;
 
         #endregion
 

@@ -70,6 +70,10 @@ namespace EastFive.Azure.Communications
             // Parse phone numbers
             var toPhoneNumber = ExtractPhoneNumber(eventData, "to");
             var fromPhoneNumber = ExtractPhoneNumber(eventData, "from");
+            var correlationId = eventData.TryGetProperty("correlationId", out var correlationIdElement) ?
+                correlationIdElement.GetString() 
+                :
+                string.Empty;
 
             if (string.IsNullOrEmpty(toPhoneNumber) || string.IsNullOrEmpty(fromPhoneNumber))
                 return await continueExecution();
@@ -86,6 +90,7 @@ namespace EastFive.Azure.Communications
                 incomingCallContext,
                 toPhoneNumber,
                 fromPhoneNumber,
+                correlationId,
                 acsPhoneNumber,
                 request,
                 httpApp,
@@ -110,6 +115,7 @@ namespace EastFive.Azure.Communications
             string incomingCallContext,
             string toPhoneNumber,
             string fromPhoneNumber,
+            string correlationId,
             AcsPhoneNumber? acsPhoneNumber,
             IHttpRequest request,
             HttpApplication httpApp,

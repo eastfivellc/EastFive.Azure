@@ -13,13 +13,15 @@ namespace EastFive.Azure.Communications
         /// <summary>Invitation sent, waiting for answer.</summary>
         Inviting = 1,
 
+        BlockedOnNextOutbound = 3,
+
         /// <summary>Participant is connected to the call.</summary>
-        Connected = 2,
+        Connected = 5,
 
         /// <summary>Participant has disconnected.</summary>
-        Disconnected = 3,
+        Disconnected = 7,
 
         /// <summary>Failed to add participant.</summary>
-        Failed = 4,
+        Failed = 100,
     }
 }

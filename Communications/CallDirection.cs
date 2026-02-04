@@ -12,5 +12,8 @@ namespace EastFive.Azure.Communications
 
         /// <summary>Inbound call received by the system (system receives call).</summary>
         Inbound = 1,
+
+        /// <summary>Inbound call that doesn't get answered until the next call picks up.</summary>
+        InboundBlockedOnNextOutbound = 2,
     }
 }

@@ -106,7 +106,6 @@ namespace EastFive.Azure.EventGrid
         /// Generic approach - works with any Azure resource that sends Event Grid events.
         /// </summary>
         [HttpAction("webhook")]
-        [SuperAdminClaim]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 AzureApplication httpApp,
                 EastFive.Api.IHttpRequest request,
@@ -178,7 +177,6 @@ namespace EastFive.Azure.EventGrid
         /// and creates Event Grid subscriptions.
         /// </summary>
         [HttpAction("auto-register")]
-        [SuperAdminClaim]
         public static async Task<IHttpResponse> AutoRegisterEventSubscriptionsAsync(
                 RequestMessage<EventGridSubscription> eventGridEndpoint,
                 AzureApplication httpApp,
