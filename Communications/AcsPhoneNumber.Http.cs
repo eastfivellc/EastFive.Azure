@@ -54,16 +54,14 @@ namespace EastFive.Azure.Communications
         public static async Task<IHttpResponse> GetAllAsync(
                 [QueryParameter(Name = "refresh")] bool refresh,
             MultipartAsyncResponse<AcsPhoneNumber> onSuccess,
+            ContentTypeResponse<AcsPhoneNumber[]> onRefreshed,
             GeneralFailureResponse onFailure)
         {
             if (refresh)
             {
-                var syncResult = await SyncFromAzureAsync(
-                    onSuccess: () => (true, string.Empty),
-                    onFailure: (reason) => (false, reason));
-
-                if (!syncResult.Item1)
-                    return onFailure(syncResult.Item2);
+                return await SyncFromAzureAsync(
+                    onSuccess: (resources) => onRefreshed(resources),
+                    onFailure: (reason) => onFailure(reason));
             }
 
             var phoneNumbers = typeof(AcsPhoneNumber)

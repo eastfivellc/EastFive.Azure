@@ -127,6 +127,17 @@ namespace EastFive.Azure.Communications
         public string resourceId;
 
         /// <summary>
+        /// The immutable resource ID (GUID) assigned when the ACS resource was created.
+        /// Used for validating ACS Call Automation webhook JWT tokens (audience claim).
+        /// </summary>
+        public const string ImmutableResourceIdPropertyName = "immutable_resource_id";
+        [ApiProperty(PropertyName = ImmutableResourceIdPropertyName)]
+        [JsonProperty(PropertyName = ImmutableResourceIdPropertyName)]
+        [Storage(Name = ImmutableResourceIdPropertyName)]
+        [StringLookupHashXX32(Characters = 1)]
+        public string? immutableResourceId;
+
+        /// <summary>
         /// The name of the Communication Services resource.
         /// </summary>
         public const string ResourceNamePropertyName = "resource_name";

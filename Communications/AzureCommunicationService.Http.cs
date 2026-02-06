@@ -101,7 +101,6 @@ namespace EastFive.Azure.Communications
                 var handlers = httpApp.GetType()
                     .GetAttributesInterface<IHandleIncomingEvent>(inherit: true, multiple: true)
                     .ToArray();
-                    
 
                 // Build array of events to process
                 return await root

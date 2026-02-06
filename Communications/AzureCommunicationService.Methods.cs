@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 using Azure.Identity;
 using Azure.ResourceManager;
+using Azure.ResourceManager.Communication;
 
 using EastFive;
 using EastFive.Azure;
@@ -153,10 +154,24 @@ namespace EastFive.Azure.Communications
                         .Select(
                             async resource =>
                             {
+                                // Use CommunicationServiceResource to get the immutableResourceId
+                                string? immutableResourceId = null;
+                                try
+                                {
+                                    var acsResource = armClient.GetCommunicationServiceResource(resource.Id);
+                                    var acsData = await acsResource.GetAsync();
+                                    immutableResourceId = acsData.Value.Data.ImmutableResourceId?.ToString();
+                                }
+                                catch (Exception)
+                                {
+                                    // Fall back to null if we can't get the immutableResourceId
+                                }
+
                                 var acs = new AzureCommunicationService
                                     {
                                         azureCommunicationServiceRef = Guid.NewGuid().AsRef<AzureCommunicationService>(),
                                         resourceId = resource.Id.ToString(),
+                                        immutableResourceId = immutableResourceId,
                                         resourceName = resource.Data.Name,
                                         resourceGroupName = resource.Id.ResourceGroupName ?? string.Empty,
                                         subscriptionId = resource.Id.SubscriptionId ?? string.Empty,

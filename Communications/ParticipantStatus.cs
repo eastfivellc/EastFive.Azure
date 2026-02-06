@@ -8,20 +8,22 @@ namespace EastFive.Azure.Communications
     public enum ParticipantStatus
     {
         /// <summary>Participant not yet processed.</summary>
-        None = 0,
+        None,
 
         /// <summary>Invitation sent, waiting for answer.</summary>
-        Inviting = 1,
+        Inviting,
 
-        BlockedOnNextOutbound = 3,
+        BlockedOnNextOutbound,
+
+        Joining,
 
         /// <summary>Participant is connected to the call.</summary>
-        Connected = 5,
+        Connected,
 
         /// <summary>Participant has disconnected.</summary>
-        Disconnected = 7,
+        Disconnected,
 
         /// <summary>Failed to add participant.</summary>
-        Failed = 100,
+        Failed,
     }
 }

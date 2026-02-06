@@ -75,5 +75,11 @@ namespace EastFive.Azure.Communications
         /// </summary>
         [Storage]
         public System.Net.HttpStatusCode notificationStatusCode;
+
+        /// <summary>
+        /// Store this so that when the incoming call arrives we can use it on pickup
+        /// </summary>
+        [Storage]
+        public string incomingCallContext;
     }
 }

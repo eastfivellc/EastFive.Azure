@@ -84,8 +84,8 @@ namespace EastFive.Azure.Communications
         /// Performs a full sync: adds new numbers, updates existing, and removes deleted numbers.
         /// Also discovers and caches the ACS Resource ID for Event Grid subscription setup.
         /// </summary>
-        private static async Task<TResult> SyncFromAzureAsync<TResult>(
-            Func<TResult> onSuccess,
+        public static async Task<TResult> SyncFromAzureAsync<TResult>(
+            Func<AcsPhoneNumber[], TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
             // Discover the Communication Services Resource ID (needed for Event Grid subscriptions)
@@ -124,60 +124,62 @@ namespace EastFive.Azure.Communications
                                 .ToHashSet();
 
                             // Upsert numbers from Azure
-                            foreach (var azureNumber in azureNumbers)
-                            {
-                                var capabilities = new List<PhoneNumberCapability>();
-                                if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Inbound ||
-                                    azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add(PhoneNumberCapability.InboundCalling);
-                                if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Outbound ||
-                                    azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add(PhoneNumberCapability.OutboundCalling);
-                                if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Inbound ||
-                                    azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add(PhoneNumberCapability.InboundSms);
-                                if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Outbound ||
-                                    azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
-                                    capabilities.Add(PhoneNumberCapability.OutboundSms);
-
-                                if (existingByPhoneNumber.TryGetValue(azureNumber.PhoneNumber, out var existing))
-                                {
-                                    // Update existing record
-                                    await existing.acsPhoneNumberRef.StorageUpdateAsync(
-                                        async (current, saveAsync) =>
-                                        {
-                                            current.displayName = azureNumber.PhoneNumber;
-                                            current.acsResourceId = azureNumber.Id;
-                                            // current.communicationServiceResourceId = discoveryResult.resourceId;
-                                            current.capabilities = capabilities.ToArray();
-                                            current.phoneNumberType = azureNumber.PhoneNumberType.ToString();
-                                            current.countryCode = azureNumber.CountryCode;
-                                            await saveAsync(current);
-                                            return true;
-                                        },
-                                        onNotFound: () => false);
-                                }
-                                else
-                                {
-                                    // Create new record with deterministic ID based on phone number
-                                    var newRef = GenerateDeterministicRef(azureNumber.PhoneNumber);
-                                    var newNumber = new AcsPhoneNumber
+                            var syncedNumbers = await azureNumbers
+                                .Select(
+                                    async azureNumber =>
                                     {
-                                        acsPhoneNumberRef = newRef,
-                                        phoneNumber = azureNumber.PhoneNumber,
-                                        displayName = azureNumber.PhoneNumber,
-                                        acsResourceId = azureNumber.Id,
-                                        // communicationServiceResourceId = discoveryResult.resourceId,
-                                        capabilities = capabilities.ToArray(),
-                                        phoneNumberType = azureNumber.PhoneNumberType.ToString(),
-                                        countryCode = azureNumber.CountryCode,
-                                    };
+                                        var capabilities = new List<PhoneNumberCapability>();
+                                        if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Inbound ||
+                                            azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
+                                            capabilities.Add(PhoneNumberCapability.InboundCalling);
+                                        if (azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.Outbound ||
+                                            azureNumber.Capabilities.Calling == PhoneNumberCapabilityType.InboundOutbound)
+                                            capabilities.Add(PhoneNumberCapability.OutboundCalling);
+                                        if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Inbound ||
+                                            azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
+                                            capabilities.Add(PhoneNumberCapability.InboundSms);
+                                        if (azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.Outbound ||
+                                            azureNumber.Capabilities.Sms == PhoneNumberCapabilityType.InboundOutbound)
+                                            capabilities.Add(PhoneNumberCapability.OutboundSms);
 
-                                    await newNumber.StorageCreateAsync(
-                                        (discard) => true,
-                                        () => true); // Already exists is fine
-                                }
-                            }
+                                        if (existingByPhoneNumber.TryGetValue(azureNumber.PhoneNumber, out var existing))
+                                        {
+                                            // Update existing record
+                                            return await existing.acsPhoneNumberRef.StorageUpdateAsync(
+                                                async (current, saveAsync) =>
+                                                {
+                                                    current.displayName = azureNumber.PhoneNumber;
+                                                    current.acsResourceId = azureNumber.Id;
+                                                    // current.communicationServiceResourceId = discoveryResult.resourceId;
+                                                    current.capabilities = capabilities.ToArray();
+                                                    current.phoneNumberType = azureNumber.PhoneNumberType.ToString();
+                                                    current.countryCode = azureNumber.CountryCode;
+                                                    await saveAsync(current);
+                                                    return current.AsOptional();
+                                                },
+                                                onNotFound: () => default(AcsPhoneNumber?));
+                                        }
+                                        // Create new record with deterministic ID based on phone number
+                                        var newRef = GenerateDeterministicRef(azureNumber.PhoneNumber);
+                                        var newNumber = new AcsPhoneNumber
+                                            {
+                                                acsPhoneNumberRef = newRef,
+                                                phoneNumber = azureNumber.PhoneNumber,
+                                                displayName = azureNumber.PhoneNumber,
+                                                acsResourceId = azureNumber.Id,
+                                                // communicationServiceResourceId = discoveryResult.resourceId,
+                                                capabilities = capabilities.ToArray(),
+                                                phoneNumberType = azureNumber.PhoneNumberType.ToString(),
+                                                countryCode = azureNumber.CountryCode,
+                                            };
+
+                                        return await newNumber.StorageCreateAsync(
+                                                (entity) => entity.Entity,
+                                                () => newNumber); // Already exists is fine
+                                    })
+                                .AsyncEnumerable()
+                                .SelectWhereHasValue()
+                                .ToArrayAsync();
 
                             // Delete numbers that no longer exist in Azure
                             var numbersToDelete = existingNumbers
@@ -190,7 +192,7 @@ namespace EastFive.Azure.Communications
                                     () => true);
                             }
 
-                            return onSuccess();
+                            return onSuccess(syncedNumbers);
                         }
                         catch (Exception ex)
                         {

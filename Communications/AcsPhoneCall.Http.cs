@@ -2,6 +2,8 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -11,6 +13,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq;
 using EastFive.Linq.Async;
+using EastFive.Serialization;
 
 namespace EastFive.Azure.Communications
 {
@@ -25,10 +28,10 @@ namespace EastFive.Azure.Communications
         /// Get a specific ACS phone call by ID.
         /// </summary>
         [HttpGet]
-        [SuperAdminClaim]
         public static Task<IHttpResponse> GetByIdAsync(
                 [QueryParameter(CheckFileName = true, Name = IdPropertyName)]
                 IRef<AcsPhoneCall> acsPhoneCallRef,
+                EastFive.Api.Security security,
             ContentTypeResponse<AcsPhoneCall> onFound,
             NotFoundResponse onNotFound)
         {
@@ -41,8 +44,8 @@ namespace EastFive.Azure.Communications
         /// Get all ACS phone calls.
         /// </summary>
         [HttpGet]
-        [SuperAdminClaim]
         public static IHttpResponse GetAllAsync(
+                EastFive.Api.Security security,
             MultipartAsyncResponse<AcsPhoneCall> onSuccess,
             GeneralFailureResponse onFailure)
         {
@@ -61,7 +64,6 @@ namespace EastFive.Azure.Communications
         /// Create a new ACS phone call with participants.
         /// </summary>
         [HttpPost]
-        [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [Property(Name = IdPropertyName)]IRef<AcsPhoneCall> acsPhoneCallRef,
                 [Property(Name = ConferencePhoneNumberPropertyName)]IRef<AcsPhoneNumber> conferencePhoneNumber,
@@ -69,6 +71,7 @@ namespace EastFive.Azure.Communications
                 [PropertyOptional(Name = CorrelationIdPropertyName)]
                 string? correlationId,
                 [Resource]AcsPhoneCall phoneCall,
+                EastFive.Api.Security security,
             CreatedBodyResponse<AcsPhoneCall> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             GeneralFailureResponse onFailure)
@@ -120,7 +123,7 @@ namespace EastFive.Azure.Communications
         /// This is the webhook endpoint that ACS calls when events occur.
         /// </summary>
         [HttpAction(EventsActionName)]
-        [SuperAdminClaim]
+        [AzureServiceToken]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 [QueryId]IRef<AcsPhoneCall> acsPhoneCallRef,
                 EastFive.Api.IHttpRequest request,
@@ -144,30 +147,89 @@ namespace EastFive.Azure.Communications
             return await await acsPhoneCallRef.StorageGetAsync(
                 async (phoneCall) =>
                 {
-                    // Process each event
-                    foreach (var eventElement in root.EnumerateArray())
-                    {
-                        if (!eventElement.TryGetProperty("type", out var eventType))
-                            continue;
+                    AcsPhoneCall finalPhoneCall = await root
+                        .EnumerateArray()
+                        .TrySelectWith(
+                            (JsonElement eventElement, out EventType eventType) =>
+                            {
+                                if (!eventElement.TryGetProperty("type", out var eventTypeProperty))
+                                {
+                                    eventType = default;
+                                    return false;
+                                }
+                                var eventTypeStringValue = eventTypeProperty.GetString();
+                                return TryParseFromEnumMember(eventTypeStringValue, out eventType);
 
-                        var eventTypeString = eventType.GetString();
-                        if (string.IsNullOrEmpty(eventTypeString))
-                            continue;
+                                bool TryParseFromEnumMember<TEnum>(string? value, out TEnum result) where TEnum : struct, Enum
+                                {
+                                    foreach (var field in typeof(TEnum).GetFields(BindingFlags.Public | BindingFlags.Static))
+                                    {
+                                        var attr = field.GetCustomAttribute<EnumMemberAttribute>();
+                                        if (attr?.Value == value)
+                                        {
+                                            result = (TEnum)field.GetValue(null)!;
+                                            return true;
+                                        }
+                                    }
+                                    result = default;
+                                    return false;
+                                }
+                            })
+                        //.Where((eventType) => eventType.Item2 != EventType.ParticipantsUpdated)
+                        .TrySelect(
+                            ((JsonElement, EventType) eventElementAndTypeTpl, out AcsCallAutomationEvent acsCallAutomationEvent) =>
+                            {
+                                var (eventElement, eventType) = eventElementAndTypeTpl;
+                                if (!eventElement.TryGetProperty("data", out var eventData))
+                                {
+                                    acsCallAutomationEvent = default;
+                                    return false;
+                                }
 
-                        if (!eventElement.TryGetProperty("data", out var eventData))
-                            continue;
+                                var eventDataString = eventData.GetRawText();
+                                acsCallAutomationEvent = Newtonsoft.Json.JsonConvert
+                                    .DeserializeObject<AcsCallAutomationEvent>(eventDataString);
+                                acsCallAutomationEvent.@ref = acsCallAutomationEvent.sequenceNumber.HasValue?
+                                     phoneCall.acsPhoneCallRef.id
+                                    .ComposeGuid(acsCallAutomationEvent.sequenceNumber.Value)
+                                    .AsRef<AcsCallAutomationEvent>()
+                                    :
+                                    Ref<AcsCallAutomationEvent>.NewRef();
+                                acsCallAutomationEvent.acsPhoneCall = phoneCall.acsPhoneCallRef;
+                                acsCallAutomationEvent.eventType = eventType;
 
-                        // Process the event
-                        await phoneCall.ProcessCallEventAsync(
-                                eventTypeString,
-                                eventData,
-                                eventElement,
-                                request,
-                            onProcessed: () => true,
-                            onUnknownEventType: (eventType) => true,
-                            onFailure: (reason) => true);
-                    }
+                                return acsCallAutomationEvent.CheckValid(
+                                        eventType,
+                                    onValid: () =>
+                                    {
+                                        return true;
+                                    },
+                                    onInvalid: (reason) =>
+                                    {
+                                        return false;
+                                    });
+                            })
+                        .Aggregate(
+                            phoneCall.AsTask(),
+                            async (currentPhoneCallTask, callAutomationEvent) =>
+                            {
+                                var currentPhoneCall = await currentPhoneCallTask;
 
+                                var savingTask = callAutomationEvent.StorageCreateOrReplaceAsync(
+                                    (didCreate, resource) =>
+                                    {
+                                        return resource;
+                                    });
+                                // Process the event
+                                var returnValue = await currentPhoneCall.ProcessCallEventAsync(
+                                                callAutomationEvent,
+                                                request,
+                                            onProcessed: (updatedPhoneCall) => updatedPhoneCall,
+                                            onIgnored: () => currentPhoneCall,
+                                            onFailure: (reason) => currentPhoneCall);
+                                AcsCallAutomationEvent _ = await savingTask;
+                                return returnValue;
+                            });
                     return onProcessed();
                 },
                 () => onNotFound().AsTask());
