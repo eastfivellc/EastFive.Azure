@@ -43,10 +43,10 @@ namespace EastFive.Azure.Monitoring
 
             #region User / Session
 
-            var claims = routeData.GetClaims(
+            var claims = routeData.GetUnverifiedClaims(
                 claimsEnumerable => claimsEnumerable.ToArray(),
-                () => new Claim[] { },
-                (why) => new Claim[] { });
+                () => [],
+                (why) => []);
             var sessionIdClaimType = Api.Auth.ClaimEnableSessionAttribute.Type;
             var sessionIdMaybe = EastFive.Azure.Auth.SessionToken.GetClaimIdMaybe(claims, sessionIdClaimType);
             if (sessionIdMaybe.HasValue)

@@ -14,30 +14,78 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq.Async;
 using EastFive.Linq;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Communications
 {
     /// <summary>
-    /// Validates ACS Call Automation Bearer tokens for webhook callbacks.
-    /// Uses cryptographic signature validation against ACS's published JWKS keys
-    /// and validates audience against stored AzureCommunicationService resources.
+    /// Specifies which Azure service issued the token to validate.
+    /// </summary>
+    public enum AzureServiceTokenIssuer
+    {
+        /// <summary>
+        /// Azure Communication Services Call Automation.
+        /// Issuer: https://acscallautomation.communication.azure.com
+        /// Audience: ACS immutableResourceId (GUID)
+        /// </summary>
+        AcsCallAutomation,
+
+        /// <summary>
+        /// Azure Event Grid webhook delivery with Azure AD authentication.
+        /// Issuer: https://login.microsoftonline.com/{tenant-id}/v2.0
+        /// Audience: Application's App ID URI
+        /// App ID: 4962773b-9cdb-44cf-a8bf-237846a00ab7
+        /// </summary>
+        EventGrid,
+    }
+
+    /// <summary>
+    /// Validates Azure service Bearer tokens for webhook callbacks.
+    /// Supports ACS Call Automation and Event Grid Azure AD tokens.
+    /// Uses cryptographic signature validation against published JWKS keys.
     /// </summary>
     public class AzureServiceTokenAttribute : Attribute, IValidateHttpRequest
     {
+        /// <summary>
+        /// The Azure service issuer to validate tokens against.
+        /// </summary>
+        public AzureServiceTokenIssuer Issuer { get; set; } = AzureServiceTokenIssuer.AcsCallAutomation;
+
+        #region ACS Call Automation
+
         private const string AcsIssuer = "https://acscallautomation.communication.azure.com";
         private const string AcsOpenIdConfigUrl = 
             "https://acscallautomation.communication.azure.com/calling/.well-known/acsopenidconfiguration";
 
-        // ConfigurationManager handles automatic key refresh and caching
         private static readonly ConfigurationManager<OpenIdConnectConfiguration> AcsConfigManager = 
             new ConfigurationManager<OpenIdConnectConfiguration>(
                 AcsOpenIdConfigUrl,
                 new OpenIdConnectConfigurationRetriever(),
                 new HttpDocumentRetriever());
 
-        // Cache of valid immutableResourceIds (audience claims) - cleared only on app restart
         private static readonly ConcurrentDictionary<string, bool> ValidAudienceCache = 
             new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        #endregion
+
+        #region Event Grid Azure AD
+
+        /// <summary>
+        /// Event Grid's well-known Azure AD application ID.
+        /// All Event Grid webhook deliveries use this app ID in the token.
+        /// </summary>
+        private const string EventGridAppId = "4962773b-9cdb-44cf-a8bf-237846a00ab7";
+
+        private const string AzureAdOpenIdConfigUrl = 
+            "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration";
+
+        private static readonly ConfigurationManager<OpenIdConnectConfiguration> AzureAdConfigManager = 
+            new ConfigurationManager<OpenIdConnectConfiguration>(
+                AzureAdOpenIdConfigUrl,
+                new OpenIdConnectConfigurationRetriever(),
+                new HttpDocumentRetriever());
+
+        #endregion
 
         public async Task<IHttpResponse> ValidateRequest(
             KeyValuePair<ParameterInfo, object>[] parameterSelection,
@@ -46,19 +94,38 @@ namespace EastFive.Azure.Communications
             IHttpRequest request,
             ValidateHttpDelegate boundCallback)
         {
-            if (!request.Headers.TryGetValue("Authorization", out var authHeaders))
+            // Event Grid subscription validation requests do not include a token.
+            // Allow them through so the validation handler can respond with the validation code.
+            if (Issuer == AzureServiceTokenIssuer.EventGrid)
             {
-                return request.CreateResponse(HttpStatusCode.Unauthorized)
-                    .AddReason("Missing Authorization header");
+                if (!request.Headers.TryGetValue("Authorization", out var authHeadersMaybe) 
+                    || !authHeadersMaybe.Any())
+                {
+                    // Check if this is a subscription validation request by inspecting the body
+                    // Event Grid validation events contain "Microsoft.EventGrid.SubscriptionValidationEvent"
+                    if (request.Headers.TryGetValue("aeg-event-type", out var aegEventType) 
+                        && aegEventType.Any(v => "SubscriptionValidation".Equals(v, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return await boundCallback(parameterSelection, method, httpApp, request);
+                    }
+
+                    return request.CreateResponse(HttpStatusCode.Unauthorized)
+                        .AddReason("Missing Authorization header");
+                }
             }
+
+            request.Headers.TryGetValue("Authorization", out var authHeaders);
 
             return await authHeaders
                 .First(
                     async (authHeader, next) =>
                     {
-                        return await await ValidateAcsTokenAsync(
+                        return await await ValidateTokenAsync(
                                 authHeader,
-                            async () => await boundCallback(parameterSelection, method, httpApp, request),
+                            async () =>
+                            {
+                                return await boundCallback(parameterSelection, method, httpApp, request);
+                            },
                             (why) => next());
                     },
                     () =>
@@ -68,6 +135,22 @@ namespace EastFive.Azure.Communications
                             .AsTask();
                     });
         }
+
+        private Task<TResult> ValidateTokenAsync<TResult>(string authHeader,
+            Func<TResult> onValidated,
+            Func<string, TResult> onInvalidToken)
+        {
+            return Issuer switch
+            {
+                AzureServiceTokenIssuer.AcsCallAutomation => 
+                    ValidateAcsTokenAsync(authHeader, onValidated, onInvalidToken),
+                AzureServiceTokenIssuer.EventGrid => 
+                    ValidateEventGridTokenAsync(authHeader, onValidated, onInvalidToken),
+                _ => Task.FromResult(onInvalidToken($"Unknown issuer: {Issuer}")),
+            };
+        }
+
+        #region ACS Token Validation
 
         private async Task<TResult> ValidateAcsTokenAsync<TResult>(string authHeader,
             Func<TResult> onValidated,
@@ -85,16 +168,14 @@ namespace EastFive.Azure.Communications
                 if (!handler.CanReadToken(token))
                     return onInvalidToken("Token is not a valid JWT");
 
-                // Fetch signing keys from ACS JWKS endpoint (cached by ConfigurationManager)
                 var openIdConfig = await AcsConfigManager.GetConfigurationAsync();
                 var signingKeys = openIdConfig.SigningKeys;
 
-                // Validate signature and issuer, but not audience (we'll validate against storage)
                 var validationParams = new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKeys = signingKeys,
-                    ValidateAudience = false, // We validate audience against storage separately
+                    ValidateAudience = false,
                     ValidateIssuer = true,
                     ValidIssuer = AcsIssuer,
                     ValidateLifetime = true,
@@ -103,7 +184,6 @@ namespace EastFive.Azure.Communications
 
                 handler.ValidateToken(token, validationParams, out var validatedToken);
                 
-                // Now validate audience against our stored ACS resources
                 var jwtToken = validatedToken as JwtSecurityToken;
                 var audience = jwtToken?.Audiences.FirstOrDefault();
                 
@@ -122,9 +202,8 @@ namespace EastFive.Azure.Communications
                             .First(
                                 (acs, next) =>
                                 {
-                                        // Found - add to cache
-                                        ValidAudienceCache.TryAdd(audience, true);
-                                        return onValidated();
+                                    ValidAudienceCache.TryAdd(audience, true);
+                                    return onValidated();
                                 },
                                 () =>
                                 {
@@ -146,27 +225,95 @@ namespace EastFive.Azure.Communications
             }
         }
 
-        /// <summary>
-        /// Validates the audience claim against stored AzureCommunicationService resources.
-        /// Uses in-memory cache (cleared on app restart) for performance.
-        /// </summary>
         private static async Task<bool> ValidateAudienceAgainstStorageAsync(string audience)
         {
-            // Check cache first
             if (ValidAudienceCache.ContainsKey(audience))
                 return true;
 
-            // Query storage for ACS resource with matching immutableResourceId
             return await audience.StorageGetBy(
                     (AzureCommunicationService acs) => acs.immutableResourceId)
                 .FirstAsync(
                     acs =>
                     {
-                        // Found - add to cache for future requests
                         ValidAudienceCache.TryAdd(audience, true);
                         return true;
                     },
                     () => false);
         }
+
+        #endregion
+
+        #region Event Grid Token Validation
+
+        private async Task<TResult> ValidateEventGridTokenAsync<TResult>(string authHeader,
+            Func<TResult> onValidated,
+            Func<string, TResult> onInvalidToken)
+        {
+            try
+            {
+                if (!authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    return onInvalidToken("Authorization header does not contain Bearer token");
+
+                var token = authHeader.Substring("Bearer ".Length).Trim();
+                if (string.IsNullOrWhiteSpace(token))
+                    return onInvalidToken("Bearer token is empty");
+
+                var handler = new JwtSecurityTokenHandler();
+                if (!handler.CanReadToken(token))
+                    return onInvalidToken("Token is not a valid JWT");
+
+                // Build expected issuer from configured tenant ID
+                return await AppSettings.TenantId.ConfigurationString(
+                    async tenantId =>
+                    {
+                        var expectedIssuer = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+
+                        var openIdConfig = await AzureAdConfigManager.GetConfigurationAsync();
+                        var signingKeys = openIdConfig.SigningKeys;
+
+                        // Use the Entra application (client) ID as the expected audience
+                        return AppSettings.ClientId.ConfigurationString(
+                            expectedAudience =>
+                            {
+                                var validationParams = new TokenValidationParameters
+                                {
+                                    ValidateIssuerSigningKey = true,
+                                    IssuerSigningKeys = signingKeys,
+                                    ValidateAudience = true,
+                                    ValidAudience = expectedAudience,
+                                    ValidateIssuer = true,
+                                    ValidIssuer = expectedIssuer,
+                                    ValidateLifetime = true,
+                                    ClockSkew = TimeSpan.FromMinutes(2),
+                                };
+
+                                handler.ValidateToken(token, validationParams, out var validatedToken);
+
+                                // Validate that the token was issued by Event Grid's well-known app ID
+                                var jwtToken = validatedToken as JwtSecurityToken;
+                                var appId = jwtToken?.Claims
+                                    .FirstOrDefault(c => c.Type == "appid" || c.Type == "azp")?.Value;
+
+                                if (!EventGridAppId.Equals(appId, StringComparison.OrdinalIgnoreCase))
+                                    return onInvalidToken(
+                                        $"Token app ID '{appId}' does not match Event Grid app ID '{EventGridAppId}'");
+
+                                return onValidated();
+                            },
+                            why => onInvalidToken($"Event Grid audience not configured: {why}"));
+                    },
+                    why => onInvalidToken($"Azure tenant ID not configured: {why}").AsTask());
+            }
+            catch (SecurityTokenValidationException ex)
+            {
+                return onInvalidToken($"Token validation failed: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return onInvalidToken($"Token validation exception: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }

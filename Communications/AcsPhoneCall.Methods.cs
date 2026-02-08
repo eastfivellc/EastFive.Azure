@@ -84,8 +84,9 @@ namespace EastFive.Azure.Communications
                     return onIgnored();
                 
                 case EventType.ParticipantsUpdated:
-                    // Can be handled for participant updates
-                    return onIgnored();
+                    return await phoneCall.HandleParticipantsUpdatedAsync(callAutomationEvent,
+                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
+                        onFailure: (reason) => onFailure(reason));
 
                 case EventType.MoveParticipantSucceeded:
                     return await phoneCall.HandleMoveParticipantSucceededAsync(
@@ -239,6 +240,81 @@ namespace EastFive.Azure.Communications
                         }
                     },
                     why => onFailure(why).AsTask());
+        }
+
+        private async Task<TResult> HandleParticipantsUpdatedAsync<TResult>(
+                AcsCallAutomationEvent callAutomationEvent,
+
+            Func<AcsPhoneCall, TResult> onProcessed,
+            Func<string, TResult> onFailure)
+        {
+            var currentParticipantIds = callAutomationEvent.participants
+                .Select(p => p.identifier.rawId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var phoneCall = this;
+            var disonnectedParticipants = phoneCall.participants
+                .Where(p => p.status == ParticipantStatus.Connected)
+                .Where(
+                    p =>
+                    {
+                        return callAutomationEvent.participants
+                            .Where(
+                                participant =>
+                                {
+                                    var isMatch = IsParticipantMatch(p, participant);
+                                    return isMatch;
+                                })
+                            .None();
+                    })
+                .ToArray();
+
+            return await disonnectedParticipants
+                .Aggregate(
+                    phoneCall.AsTask(),
+                    async (currentPhoneCallTask, participant) =>
+                    {
+                        var currentPhoneCall = await currentPhoneCallTask;
+                        // Handle the disconnected participant
+                        var nextPhoneCall = await currentPhoneCall.HandleParticipantDisconnectedAsync(participant,
+                            onProcessed: updatedPhoneCall => updatedPhoneCall,
+                            onFailure: why => currentPhoneCall);
+                        return nextPhoneCall;
+                    },
+                    async phoneCallTask => onProcessed(await phoneCallTask));
+
+            bool IsParticipantMatch(AcsCallParticipant callParticipant, AcsEventParticipant eventParticipant)
+            {
+                if (callParticipant.direction == CallDirection.Outbound || callParticipant.direction == CallDirection.Inbound)
+                {
+                    return eventParticipant.identifier.rawId == $"4:{callParticipant.phoneNumber}";
+                }
+                return eventParticipant.identifier.rawId == callParticipant.phoneNumber;
+            }
+        }
+
+        private async Task<TResult> HandleParticipantDisconnectedAsync<TResult>(AcsCallParticipant participant,
+            Func<AcsPhoneCall, TResult> onProcessed,
+            Func<string, TResult> onFailure)
+        {
+            return await this.acsPhoneCallRef.StorageUpdateAsync(
+                async (current, saveAsync) =>
+                {
+                    current.participants = current.participants
+                        .Select(p =>
+                        {
+                            if (p.id == participant.id)
+                            {
+                                p.status = ParticipantStatus.Disconnected;
+                            }
+                            return p;
+                        })
+                        .ToArray();
+
+                    await saveAsync(current);
+                    return onProcessed(current);
+                },
+                onNotFound: () => onFailure("AcsPhoneCall deleted."));
         }
 
         private async Task<TResult> HandleCallDisconnectedAsync<TResult>(AcsCallAutomationEvent eventData,

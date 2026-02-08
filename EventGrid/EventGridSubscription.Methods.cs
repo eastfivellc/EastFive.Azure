@@ -64,12 +64,30 @@ namespace EastFive.Azure.EventGrid
                         var scope = new global::Azure.Core.ResourceIdentifier(scopeResourceId);
                         var eventSubscriptions = armClient.GetEventSubscriptions(scope);
 
+                        var destination = new WebHookEventSubscriptionDestination
+                        {
+                            Endpoint = callbackUri,
+                        };
+
+                        // Both AAD properties must be set together or not at all
+                        var tenantGuid = AppSettings.TenantId.ConfigurationString(
+                            tenantId => Guid.TryParse(tenantId, out var parsed)
+                                ? (Guid?)parsed
+                                : default(Guid?),
+                            (why) => default(Guid?));
+                        var expectedAudience = AppSettings.ClientId.ConfigurationString(
+                            clientId => clientId,
+                            (why) => default(string));
+
+                        if (tenantGuid.HasValue && !String.IsNullOrEmpty(expectedAudience))
+                        {
+                            destination.AzureActiveDirectoryTenantId = tenantGuid;
+                            destination.UriOrAzureActiveDirectoryApplicationId = expectedAudience;
+                        }
+
                         var eventSubscriptionData = new EventGridSubscriptionData
                         {
-                            Destination = new WebHookEventSubscriptionDestination
-                            {
-                                Endpoint = callbackUri
-                            },
+                            Destination = destination,
                             Filter = new EventSubscriptionFilter(),
                             EventDeliverySchema = EventDeliverySchema.EventGridSchema
                         };

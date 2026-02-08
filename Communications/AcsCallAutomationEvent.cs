@@ -10,6 +10,14 @@ using EastFive.Persistence;
 using EastFive.Api;
 using EastFive.Persistence.Azure.StorageTables;
 using DocumentFormat.OpenXml.Features;
+using System.Collections.Generic;
+using Microsoft.Azure.Cosmos.Table;
+using System.Reflection;
+using System.Linq;
+using Parquet.Thrift;
+using DocumentFormat.OpenXml.Office2010.Excel;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using EastFive.Api.Meta.Postman.Resources.Collection;
 
 namespace EastFive.Azure.Communications
 {
@@ -120,7 +128,7 @@ namespace EastFive.Azure.Communications
         /// Only present in: ParticipantsUpdated
         /// </summary>
         [JsonProperty(PropertyName = "participants")]
-        [Storage]
+        [AcsEventParticipantArrayStorage]
         public AcsEventParticipant[]? participants;
 
         /// <summary>
@@ -257,6 +265,146 @@ namespace EastFive.Azure.Communications
         public bool isOnHold;
     }
 
+    public class AcsEventParticipantArrayStorageAttribute : Attribute, IPersistInAzureStorageTables
+    {
+        public string Name { get; set; }
+
+        public KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(
+            MemberInfo memberInfo, object value, IWrapTableEntity<EntityType> tableEntityWrapper)
+        {
+            var participants = (AcsEventParticipant[])value;
+            if(participants == null || participants.Length == 0)
+                return Array.Empty<KeyValuePair<string, EntityProperty>>();
+            return participants
+                .SelectMany(
+                    (participant, index) =>
+                    {
+                        var identifierValues = ConvertParticipantIdentifier(participant.identifier);
+                        var remains = new[]
+                        {
+                            "isMuted".PairWithValue(new EntityProperty(participant.isMuted)),
+                            "isOnHold".PairWithValue(new EntityProperty(participant.isOnHold)),
+                        };
+                        return identifierValues
+                            .Concat(remains)
+                            .Select(
+                                kvp =>
+                                {
+                                    return $"participant_{index}_{kvp.Key}".PairWithValue(kvp.Value);
+                                })
+                            .ToArray();
+                    })
+                .Append("participant_count"
+                    .PairWithValue(new EntityProperty(participants.Length)))
+                .ToArray();
+        }
+
+        private static KeyValuePair<string, EntityProperty>[] ConvertParticipantIdentifier(ParticipantIdentifier identifier)
+        {
+            var communicationsUserValues = ConvertCommunicationUser(identifier.communicationUser);
+            var phoneNumberValues = ConvertPhoneNumber(identifier.phoneNumber);
+            KeyValuePair<string, EntityProperty>[] remainingValues =
+             [ 
+                EntityProperty.GeneratePropertyForString(identifier.kind).PairWithKey("identifier_kind"),
+                EntityProperty.GeneratePropertyForString(identifier.rawId).PairWithKey("identifier_rawId")
+            ];
+
+            return communicationsUserValues.Concat(phoneNumberValues).ToArray();
+
+            KeyValuePair<string, EntityProperty>[] ConvertCommunicationUser(EventCommunicationUserIdentifier? communicationUser)
+            {
+                if (communicationUser.HasValue)
+                {
+                    return new[]
+                    {
+                        "identifier_communicationUser".PairWithValue(new EntityProperty(communicationUser.Value.id)),
+                    };
+                }
+                return [];
+            }
+
+            KeyValuePair<string, EntityProperty>[] ConvertPhoneNumber(EventPhoneNumberIdentifier? phoneNumber)
+            {
+                if (phoneNumber.HasValue)
+                {
+                    return new[]
+                    {
+                        "identifier_phoneNumber".PairWithValue(new EntityProperty(phoneNumber.Value.value)),
+                    };
+                }
+                return [];
+            }
+        }
+
+        public object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = null)
+        {
+            shouldSkip = false;
+            if (!values.TryGetValue("participant_count", out var countProp) ||
+                !countProp.Int32Value.HasValue)
+                return getDefaultValue?.Invoke() ?? Array.Empty<AcsEventParticipant>();
+
+            var count = countProp.Int32Value.Value;
+            return Enumerable.Range(0, count)
+                .Select(
+                    index =>
+                    {
+                        var identifier = DeserializeParticipantIdentifier(index, values);
+                        var isMuted = values.TryGetValue($"participant_{index}_isMuted", out var mutedProp)
+                            && (mutedProp.BooleanValue ?? false);
+                        var isOnHold = values.TryGetValue($"participant_{index}_isOnHold", out var holdProp)
+                            && (holdProp.BooleanValue ?? false);
+
+                        return new AcsEventParticipant
+                        {
+                            identifier = identifier,
+                            isMuted = isMuted,
+                            isOnHold = isOnHold,
+                        };
+                    })
+                .ToArray();
+        }
+
+        private static ParticipantIdentifier DeserializeParticipantIdentifier(
+            int index, IDictionary<string, EntityProperty> values)
+        {
+            var kind = values.TryGetValue($"participant_{index}_identifier_kind", out var kindProp)
+                ? kindProp.StringValue ?? string.Empty
+                : string.Empty;
+
+            var rawId = values.TryGetValue($"participant_{index}_identifier_rawId", out var rawIdProp)
+                ? rawIdProp.StringValue
+                : null;
+
+            EventPhoneNumberIdentifier? phoneNumber = 
+                    values.TryGetValue($"participant_{index}_identifier_phoneNumber", out var phoneProp)
+                    && phoneProp.StringValue.HasBlackSpace()
+                ? new EventPhoneNumberIdentifier { value = phoneProp.StringValue }
+                : default(EventPhoneNumberIdentifier?);
+
+            EventCommunicationUserIdentifier? communicationUser =
+                    values.TryGetValue($"participant_{index}_identifier_communicationUser", out var userProp)
+                    && userProp.StringValue.HasBlackSpace()
+                ? new EventCommunicationUserIdentifier { id = userProp.StringValue }
+                : default(EventCommunicationUserIdentifier?);
+
+            return new ParticipantIdentifier
+            {
+                rawId = rawId,
+                kind = kind,
+                phoneNumber = phoneNumber,
+                communicationUser = communicationUser,
+            };
+        }
+
+        public string GetTablePropertyName(MemberInfo member)
+        {
+            var tablePropertyName = this.Name;
+            if (tablePropertyName.IsNullOrWhiteSpace())
+                return member.Name;
+            return tablePropertyName;
+        }
+    }
+
     /// <summary>
     /// Identifier for a participant in an ACS call.
     /// Can represent different types: phone number, communication user, etc.
@@ -281,14 +429,12 @@ namespace EastFive.Azure.Communications
         /// Phone number details if kind is "phoneNumber".
         /// </summary>
         [JsonProperty(PropertyName = "phoneNumber")]
-        [Storage]
         public EventPhoneNumberIdentifier? phoneNumber;
 
         /// <summary>
         /// Communication user details if kind is "communicationUser".
         /// </summary>
         [JsonProperty(PropertyName = "communicationUser")]
-        [Storage]
         public EventCommunicationUserIdentifier? communicationUser;
     }
 
