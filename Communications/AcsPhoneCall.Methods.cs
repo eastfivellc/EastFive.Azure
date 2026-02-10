@@ -28,8 +28,7 @@ namespace EastFive.Azure.Communications
         #region Event Processing
 
         /// <summary>
-        /// Processes ACS call automation events.
-        /// Generic event handler that updates participants array based on events.
+        /// Processes ACS call automation events by delegating to IProcessCallEvent attributes.
         /// </summary>
         public async Task<TResult> ProcessCallEventAsync<TResult>(
                 AcsCallAutomationEvent callAutomationEvent,
@@ -40,386 +39,23 @@ namespace EastFive.Azure.Communications
             Func<string, TResult> onFailure)
         {
             var phoneCall = this;
-            switch (callAutomationEvent.eventType)
-            {
-                case EventType.CallConnected:
-                    return await phoneCall.CallConnectedAsync<TResult>(
-                            callAutomationEvent.OperationContextGuid, 
-                            callAutomationEvent.callConnectionId,
-                            callAutomationEvent.serverCallId, 
-                            request, httpApp,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case  EventType.CallDisconnected:
-                    return await phoneCall.HandleCallDisconnectedAsync(callAutomationEvent,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case EventType.AddParticipantSucceeded:
-                    return await phoneCall.HandleParticipantAddedAsync(
-                            callAutomationEvent.OperationContextGuid, request, httpApp,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case EventType.AddParticipantFailed:
-                        return await phoneCall.HandleAddParticipantFailedAsync(callAutomationEvent,
-                            (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                            onFailure: (reason) => onFailure(reason));
-                            
-                case EventType.CallTransferAccepted:
-                case EventType.CallTransferFailed:
-                                // Can be handled if transfer functionality is needed
-                                return onIgnored();
-
-                case EventType.RecognizeCompleted:
-                case EventType.RecognizeFailed:
-                case EventType.RecognizeCanceled:
-                                // Can be handled for DTMF/speech recognition
-                                return onIgnored();
-
-                case EventType.PlayCompleted:
-                case EventType.PlayFailed:
-                case EventType.PlayCanceled:
-                    // Can be handled for media playback
-                    return onIgnored();
-                
-                case EventType.ParticipantsUpdated:
-                    return await phoneCall.HandleParticipantsUpdatedAsync(callAutomationEvent,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case EventType.MoveParticipantSucceeded:
-                    return await phoneCall.HandleMoveParticipantSucceededAsync(
-                            callAutomationEvent.OperationContextGuid, request, httpApp,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case EventType.MoveParticipantFailed:
-                    return await phoneCall.HandleMoveParticipantFailedAsync(callAutomationEvent,
-                        onProcessed: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-
-                case EventType.AnswerFailed:
-                    return await phoneCall.HandleAddParticipantFailedAsync(callAutomationEvent,
-                            (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                            onFailure: (reason) => onFailure(reason));
-            }
-            return onIgnored();
+            return await httpApp.GetType()
+                .GetAttributesInterface<IProcessCallEvent>(inherit: true, multiple: true)
+                .First(
+                    async (handler, next) => await handler.ProcessCallEventAsync(
+                        phoneCall, callAutomationEvent, request, httpApp,
+                        onProcessed, onIgnored, onFailure),
+                    () => onIgnored().AsTask());
         }
 
         #endregion
 
         #region Event Handlers
 
-        private async Task<TResult> CallConnectedAsync<TResult>(
-                Guid operationContextGuid, 
-                string eventCallConnectionId,
-                string? serverCallIdStringMaybe,
-                IHttpRequest request,
-                HttpApplication httpApp,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            
-            // Check if this is an inbound call joining an existing conference
-            // If so, we need to move the participant from their answered call to the conference
-            var isInboundJoiningConference = phoneCall.callConnectionId.HasBlackSpace() && 
-                                              eventCallConnectionId != phoneCall.callConnectionId;
-            
-            if (isInboundJoiningConference)
-            {
-                return await phoneCall.MoveParticipantToConferenceAsync(
-                        operationContextGuid, eventCallConnectionId,
-                    onMoved: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                    onFailure: (reason) => onFailure(reason));
-            }
-            
-            return await await this.acsPhoneCallRef.StorageUpdateAsyncAsync2(
-                async (current, saveAsync) =>
-                {
-                    if(serverCallIdStringMaybe is not null)
-                        current.serverCallId = serverCallIdStringMaybe;
-
-                    current.TryUpdatingParticipant(operationContextGuid,
-                        participantToUpdate =>
-                        {
-                            participantToUpdate.status = ParticipantStatus.Connected;
-                            return participantToUpdate;
-                        },
-                        out var participant);
-
-                    return await saveAsync(current);
-                },
-                async (updatedPhoneCall) =>
-                {
-                    // Start recording
-                    return await await updatedPhoneCall.StartRecordingAsync(
-                        onRecordingStarted: (phoneCallWithRecording) =>
-                        {
-                            return phoneCallWithRecording.ProcessCallSequenceAsync(
-                                    request, httpApp,
-                                onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                                onFailure: (reason) => onFailure(reason));
-                        },
-                        onRecordingFailure: (reason, phoneCallWithFailedRecordingInfo) =>
-                        {
-                            return phoneCallWithFailedRecordingInfo.ProcessCallSequenceAsync(
-                                    request, httpApp,
-                                onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                                onFailure: (reason) => onFailure(reason));
-                        },
-                        onFailure: (reason) =>
-                        {
-                            return updatedPhoneCall.ProcessCallSequenceAsync(
-                                    request, httpApp,
-                                onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                                onFailure: (reason) => onFailure(reason));
-                        });
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted.").AsTask());
-        }
-
         /// <summary>
-        /// Moves a participant from their answered inbound call to the existing conference.
-        /// Called when CallConnected fires for an inbound call while a conference is active.
+        /// Handles an incoming call from a participant expected to join the conference.
+        /// Delegates to IProcessCallEvent attribute discovered on the application class.
         /// </summary>
-        private async Task<TResult> MoveParticipantToConferenceAsync<TResult>(
-                Guid operationContextGuid, string fromCallConnectionId,
-            Func<AcsPhoneCall, TResult> onMoved,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            
-            // Find the participant by operationContext (participant.id)
-            var participantMaybe = phoneCall.participants
-                .Where(p => p.id == operationContextGuid)
-                .FirstOrDefault();
-            
-            if (participantMaybe.phoneNumber.IsNullOrWhiteSpace())
-                return onFailure($"Participant {operationContextGuid} not found for move operation.");
-            
-            return await EastFive.Azure.AppSettings.Communications.Default
-                .CreateAutomationClient(
-                    async client =>
-                    {
-                        try
-                        {
-                            var conferenceCallConnection = client.GetCallConnection(phoneCall.callConnectionId);
-                            var participantToMove = new PhoneNumberIdentifier(participantMaybe.phoneNumber);
-                            
-                            var moveOptions = new MoveParticipantsOptions(
-                                targetParticipants: new CommunicationIdentifier[] { participantToMove },
-                                fromCall: fromCallConnectionId)
-                            {
-                                OperationContext = operationContextGuid.ToString(),
-                            };
-                            
-                            // Move participant from the answered call to the conference
-                            // This will generate MoveParticipantSucceeded/Failed events
-                            await conferenceCallConnection.MoveParticipantsAsync(moveOptions);
-                            
-                            // Update status to indicate move is in progress
-                            return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
-                                (current) =>
-                                {
-                                    current.TryUpdatingParticipant(operationContextGuid,
-                                        participantToUpdate =>
-                                        {
-                                            participantToUpdate.status = ParticipantStatus.Joining;
-                                            return participantToUpdate;
-                                        },
-                                        out var participant);
-                                    return current;
-                                },
-                                (updatedPhoneCall) => onMoved(updatedPhoneCall),
-                                onNotFound: () => onFailure("AcsPhoneCall deleted."));
-                        }
-                        catch (Exception ex)
-                        {
-                            return onFailure($"Failed to move participant: {ex.Message}");
-                        }
-                    },
-                    why => onFailure(why).AsTask());
-        }
-
-        private async Task<TResult> HandleParticipantsUpdatedAsync<TResult>(
-                AcsCallAutomationEvent callAutomationEvent,
-
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var currentParticipantIds = callAutomationEvent.participants
-                .Select(p => p.identifier.rawId)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            var phoneCall = this;
-            var disonnectedParticipants = phoneCall.participants
-                .Where(p => p.status == ParticipantStatus.Connected)
-                .Where(
-                    p =>
-                    {
-                        return callAutomationEvent.participants
-                            .Where(
-                                participant =>
-                                {
-                                    var isMatch = IsParticipantMatch(p, participant);
-                                    return isMatch;
-                                })
-                            .None();
-                    })
-                .ToArray();
-
-            return await disonnectedParticipants
-                .Aggregate(
-                    phoneCall.AsTask(),
-                    async (currentPhoneCallTask, participant) =>
-                    {
-                        var currentPhoneCall = await currentPhoneCallTask;
-                        // Handle the disconnected participant
-                        var nextPhoneCall = await currentPhoneCall.HandleParticipantDisconnectedAsync(participant,
-                            onProcessed: updatedPhoneCall => updatedPhoneCall,
-                            onFailure: why => currentPhoneCall);
-                        return nextPhoneCall;
-                    },
-                    async phoneCallTask => onProcessed(await phoneCallTask));
-
-            bool IsParticipantMatch(AcsCallParticipant callParticipant, AcsEventParticipant eventParticipant)
-            {
-                if (callParticipant.direction == CallDirection.Outbound || callParticipant.direction == CallDirection.Inbound)
-                {
-                    return eventParticipant.identifier.rawId == $"4:{callParticipant.phoneNumber}";
-                }
-                return eventParticipant.identifier.rawId == callParticipant.phoneNumber;
-            }
-        }
-
-        private async Task<TResult> HandleParticipantDisconnectedAsync<TResult>(AcsCallParticipant participant,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            return await this.acsPhoneCallRef.StorageUpdateAsync(
-                async (current, saveAsync) =>
-                {
-                    current.participants = current.participants
-                        .Select(p =>
-                        {
-                            if (p.id == participant.id)
-                            {
-                                p.status = ParticipantStatus.Disconnected;
-                            }
-                            return p;
-                        })
-                        .ToArray();
-
-                    await saveAsync(current);
-                    return onProcessed(current);
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted."));
-        }
-
-        private async Task<TResult> HandleCallDisconnectedAsync<TResult>(AcsCallAutomationEvent eventData,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            return await this.acsPhoneCallRef.StorageUpdateAsync(
-                async (current, saveAsync) =>
-                {
-                    if(eventData.callConnectionId != current.callConnectionId)
-                    {
-                        // This is a disconnection from an inbound call that was merged into  the conference call
-                        return onProcessed(current);
-                    }
-
-                    current.participants = current.participants
-                        .Select(
-                            (participant) =>
-                            {
-                                participant.status = ParticipantStatus.Disconnected;
-                                return participant;
-                            })
-                        .ToArray();
-
-                    await saveAsync(current);
-                    return onProcessed(current);
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted."));
-        }
-
-        private async Task<TResult> HandleParticipantAddedAsync<TResult>(Guid operationContextGuid,
-                IHttpRequest request,
-                HttpApplication httpApp,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            return await await this.acsPhoneCallRef.StorageUpdateAsync2(
-                (current) =>
-                {
-                    current.TryUpdatingParticipant(operationContextGuid,
-                        participantToUpdate =>
-                        {
-                            participantToUpdate.status = ParticipantStatus.Connected;
-                            return participantToUpdate;
-                        },
-                        out var participantUpdated);
-                    return current;
-                },
-                async (updatedPhoneCall) =>
-                {
-                    var mutedParticipants = await updatedPhoneCall.participants
-                        .Where(participant => participant.id == operationContextGuid)
-                        .Where(participant => participant.muteOnConnect)
-                        .Select(
-                            async participant => 
-                            {
-                                await updatedPhoneCall.MuteParticipantAsync(participant.phoneNumber);
-                                return participant;
-                            })
-                        .AsyncEnumerable()
-                        .ToArrayAsync();
-
-                    
-                    return await await phoneCall.conferencePhoneNumber
-                        .StorageGetAsync(
-                            async (conferencePhoneNumber) =>
-                            {
-                                return await updatedPhoneCall.participants
-                                    .Where(participant => participant.status == ParticipantStatus.BlockedOnNextOutbound)
-                                    .Aggregate(
-                                        updatedPhoneCall.AsTask(),
-                                        async (phoneCallCurrentTask, participantToUnblock) =>
-                                        {
-                                            var phoneCallCurrent = await phoneCallCurrentTask;
-                                            return await phoneCall.AnswerAndUpdateCall(participantToUnblock,
-                                                            participantToUnblock.incomingCallContext,  participantToUnblock.phoneNumber,
-                                                            conferencePhoneNumber,
-                                                            request,
-                                                        onAnswered:(updatedPhoneCall) =>
-                                                        {
-                                                            return updatedPhoneCall;
-                                                        },
-                                                        (reason) =>
-                                                        {
-                                                            return phoneCallCurrent;
-                                                        });
-                                        },
-                                        async (phoneCallPostUnblockingTask) =>
-                                        {
-                                            var phoneCallPostUnblocking = await phoneCallPostUnblockingTask;
-                                            return await phoneCallPostUnblocking.ProcessCallSequenceAsync(
-                                                    request, httpApp,
-                                                onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                                                onFailure: (reason) => onFailure(reason));
-
-                                        });
-                            },
-                            () => onFailure("Conference phone number not found.").AsTask());
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted.").AsTask());
-        }
-
         public async Task<TResult> HandleParticipantCallingAsync<TResult>(
                 string incomingCallContext, string toPhoneNumber, string fromPhoneNumber, string correlationId,
                 AcsPhoneNumber acsPhoneNumber,
@@ -428,57 +64,15 @@ namespace EastFive.Azure.Communications
             Func<AcsPhoneCall, TResult> onProcessed,
             Func<string, TResult> onFailure)
         {
-            if (string.IsNullOrEmpty(incomingCallContext))
-                return onFailure("Missing context for incoming call.");
-            
             var phoneCall = this;
-            return await phoneCall.participants
-                .Where((participant) =>participant.phoneNumber == fromPhoneNumber)
+            return await httpApp.GetType()
+                .GetAttributesInterface<IProcessCallEvent>(inherit: true, multiple: true)
                 .First(
-                    async (participant, next) =>
-                    {
-                        if(participant.direction == CallDirection.InboundBlockedOnNextOutbound)
-                        {
-                            return await await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
-                                (current) =>
-                                {
-                                    current.participants = current.participants
-                                        .UpdateWhere(
-                                            (p) => p.id == participant.id,
-                                            (p) =>
-                                            {
-                                                p.status = ParticipantStatus.BlockedOnNextOutbound;
-                                                p.incomingCallContext = incomingCallContext;
-                                                return p;
-                                            })
-                                        .ToArray();
-                                    return current;
-                                },
-                                async (current) =>
-                                {
-                                    // Since we are not answering the call until the next item is processed,
-                                    // there will not be a next event to move the processing forward
-                                    // so go ahead and process the next call item
-                                    return await current.ProcessCallSequenceAsync(
-                                            request, httpApp,
-                                        onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                                        onFailure: (reason) => onFailure(reason));
-                                },
-                                onNotFound:() => onFailure("AcsPhoneCall deleted.").AsTask());
-                        }
-
-                        return await phoneCall.AnswerAndUpdateCall<TResult>(
-                                participant,
-                                incomingCallContext, fromPhoneNumber,
-                                acsPhoneNumber,
-                                request,
-                            onAnswered: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                            onFailure: (reason) => onFailure(reason));
-                    },
-                    () =>
-                    {
-                        return onFailure("Participant not found for ParticipantCalling event.").AsTask();
-                    });
+                    async (handler, next) => await handler.HandleParticipantCallingAsync(
+                        phoneCall, incomingCallContext, toPhoneNumber, fromPhoneNumber, correlationId,
+                        acsPhoneNumber, request, httpApp,
+                        onProcessed, onFailure),
+                    () => onFailure("No IProcessCallEvent handler found.").AsTask());
         }
 
         internal async Task<TResult> AnswerAndUpdateCall<TResult>(AcsCallParticipant participant,
@@ -567,117 +161,12 @@ namespace EastFive.Azure.Communications
                     why => onAnswerFailed(why).AsTask());
         }
 
-        private async Task<TResult> HandleAddParticipantFailedAsync<TResult>(AcsCallAutomationEvent eventData,
-            Func<AcsPhoneCall, TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            var participantId = eventData.OperationContextGuid;
-            return await this.acsPhoneCallRef.StorageUpdateAsync(
-                async (current, saveAsync) =>
-                {
-                    if (eventData.resultInformation.HasValue)
-                        current.errorMessage =  eventData.resultInformation.Value.message;
-                    if (!current.TryUpdatingParticipant(participantId,
-                        participantToUpdate =>
-                        {
-                            participantToUpdate.status = ParticipantStatus.Failed;
-                            return participantToUpdate;
-                        },
-                        out var participant))
-                    {
-                        await saveAsync(current);
-                        return onFailure("Missing invitationId in AddParticipantFailed event.");
-                    }
-                    await saveAsync(current);
-                    return onSuccess(current);
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted."));
-        }
-
-        /// <summary>
-        /// Handles the MoveParticipantSucceeded event when a participant is successfully
-        /// moved from an answered inbound call to the existing conference.
-        /// </summary>
-        private async Task<TResult> HandleMoveParticipantSucceededAsync<TResult>(
-                Guid operationContextGuid,
-                IHttpRequest request,
-                HttpApplication httpApp,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            return await await this.acsPhoneCallRef.StorageUpdateAsync2(
-                (current) =>
-                {
-                    current.TryUpdatingParticipant(operationContextGuid,
-                        participantToUpdate =>
-                        {
-                            participantToUpdate.status = ParticipantStatus.Connected;
-                            return participantToUpdate;
-                        },
-                        out var participantUpdated);
-                    return current;
-                },
-                async (updatedPhoneCall) =>
-                {
-                    // Mute participant if configured
-                    var mutedParticipants = await updatedPhoneCall.participants
-                        .Where(participant => participant.id == operationContextGuid)
-                        .Where(participant => participant.muteOnConnect)
-                        .Select(
-                            async participant =>
-                            {
-                                await updatedPhoneCall.MuteParticipantAsync(participant.phoneNumber);
-                                return participant;
-                            })
-                        .AsyncEnumerable()
-                        .ToArrayAsync();
-
-                    // Continue processing the call sequence
-                    return await updatedPhoneCall.ProcessCallSequenceAsync(
-                            request, httpApp,
-                        onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
-                        onFailure: (reason) => onFailure(reason));
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted.").AsTask());
-        }
-
-        /// <summary>
-        /// Handles the MoveParticipantFailed event when moving a participant to the conference fails.
-        /// </summary>
-        private async Task<TResult> HandleMoveParticipantFailedAsync<TResult>(
-                AcsCallAutomationEvent eventData,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var participantId = eventData.OperationContextGuid;
-            return await this.acsPhoneCallRef.StorageUpdateAsync(
-                async (current, saveAsync) =>
-                {
-                    if (eventData.resultInformation.HasValue)
-                        current.errorMessage = eventData.resultInformation.Value.message;
-                    
-                    current.TryUpdatingParticipant(participantId,
-                        participantToUpdate =>
-                        {
-                            participantToUpdate.status = ParticipantStatus.Failed;
-                            return participantToUpdate;
-                        },
-                        out var participant);
-                    
-                    await saveAsync(current);
-                    return onProcessed(current);
-                },
-                onNotFound: () => onFailure("AcsPhoneCall deleted."));
-        }
-
         #endregion
 
         #region Call Orchestration
 
         /// <summary>
-        /// Processes the call sequence by discovering IProcessParticipant attributes,
-        /// asking each which participant it wants to handle, and invoking the first match.
+        /// Processes the call sequence by delegating to IProcessCallEvent attributes.
         /// </summary>
         public async Task<TResult> ProcessCallSequenceAsync<TResult>(
                 IHttpRequest request,
@@ -686,39 +175,13 @@ namespace EastFive.Azure.Communications
             Func<string, TResult> onFailure)
         {
             var phoneCall = this;
-
-            var handlers = httpApp.GetType()
-                .GetAttributesInterface<IProcessParticipant>(inherit: true, multiple: true);
-
-            return await await phoneCall.conferencePhoneNumber.StorageGetAsync(
-                async conferencePhoneNumber =>
-                {
-                    return await handlers
-                        .Select(handler =>
-                        {
-                            var participant = handler.IdentifyParticipantToProcess(phoneCall);
-                            return (handler, participant);
-                        })
-                        .Where(x => x.participant.HasValue)
-                        .First(
-                            async (match, next) =>
-                            {
-                                return await match.handler.ProcessParticipantAsync(
-                                        phoneCall,
-                                        match.participant!.Value,
-                                        conferencePhoneNumber,
-                                        request,
-                                        httpApp,
-                                    onProcessed: onProcessed,
-                                    onFailure: onFailure);
-                            },
-                            () =>
-                            {
-                                // No handler identified a participant to process
-                                return onProcessed(phoneCall).AsTask();
-                            });
-                },
-                () => onFailure("Conference phone number not found.").AsTask());
+            return await httpApp.GetType()
+                .GetAttributesInterface<IProcessCallEvent>(inherit: true, multiple: true)
+                .First(
+                    async (handler, next) => await handler.ProcessCallSequenceAsync(
+                        phoneCall, request, httpApp,
+                        onProcessed, onFailure),
+                    () => onProcessed(phoneCall).AsTask());
         }
 
         #endregion
@@ -865,17 +328,17 @@ namespace EastFive.Azure.Communications
                                         },
                                         (updatedPhoneCall) =>
                                         {
-                                            // Fake Callback
-                                            return updatedPhoneCall.HandleParticipantAddedAsync(
-                                                participant.id,
+                                            // Simulate AddParticipantSucceeded since participant is already in call
+                                            return updatedPhoneCall.ProcessCallEventAsync(
+                                                new AcsCallAutomationEvent
+                                                {
+                                                    eventType = EventType.AddParticipantSucceeded,
+                                                    operationContext = participant.id.ToString(),
+                                                },
                                                 request, httpApp,
                                                 onProcessed: (finalPhoneCall) => onAdded(finalPhoneCall),
+                                                onIgnored: () => onAdded(updatedPhoneCall),
                                                 onFailure: (reason) => onFailure(reason));
-                                            // Since no callback will be sent, process next participant
-                                            // return updatedPhoneCall.ProcessCallSequenceAsync(
-                                            //         request,
-                                            //     onProcessed: (finalPhoneCall) => onAdded(finalPhoneCall),
-                                            //     onFailure: (reason) => onFailure(reason));
                                         },
                                         onNotFound: () => onFailure("AcsPhoneCall not found.").AsTask());
                                 }
@@ -906,7 +369,7 @@ namespace EastFive.Azure.Communications
                     why => onFailure(why).AsTask());
         }
 
-        private async Task MuteParticipantAsync(string phoneNumber)
+        internal async Task MuteParticipantAsync(string phoneNumber)
         {
             var phoneCall = this;
             await EastFive.Azure.AppSettings.Communications.Default
@@ -925,7 +388,7 @@ namespace EastFive.Azure.Communications
 
         #region Recording
 
-        private  async Task<TResult> StartRecordingAsync<TResult>(
+        internal async Task<TResult> StartRecordingAsync<TResult>(
             Func<AcsPhoneCall, TResult> onRecordingStarted,
             Func<string, AcsPhoneCall, TResult> onRecordingFailure,
             Func<string, TResult> onFailure)
@@ -997,7 +460,7 @@ namespace EastFive.Azure.Communications
                     participant.direction == CallDirection.InboundBlockedOnNextOutbound);
         }
 
-        private bool TryUpdatingParticipant(Guid participantId, 
+        internal bool TryUpdatingParticipant(Guid participantId, 
             Func<AcsCallParticipant, AcsCallParticipant> updateParticipant,
             out AcsCallParticipant updatedParticipant)
         {
