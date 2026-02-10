@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 
 using EastFive.Api;
+using EastFive.Api.Azure;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
@@ -84,7 +85,6 @@ namespace EastFive.Azure.Communications
                         participant.id = Guid.NewGuid();
                         participant.status = ParticipantStatus.None;
                         participant.invitationId = string.Empty;
-                        participant.callbackUrl = default;
                         return participant;
                     })
                 .ToArray();
@@ -126,6 +126,7 @@ namespace EastFive.Azure.Communications
         [AzureServiceToken]
         public static async Task<IHttpResponse> HandleIncomingEventAsync(
                 [QueryId]IRef<AcsPhoneCall> acsPhoneCallRef,
+                AzureApplication httpApp,
                 EastFive.Api.IHttpRequest request,
             NoContentResponse onProcessed,
             NotFoundResponse onNotFound,
@@ -224,6 +225,7 @@ namespace EastFive.Azure.Communications
                                 var returnValue = await currentPhoneCall.ProcessCallEventAsync(
                                                 callAutomationEvent,
                                                 request,
+                                                httpApp,
                                             onProcessed: (updatedPhoneCall) => updatedPhoneCall,
                                             onIgnored: () => currentPhoneCall,
                                             onFailure: (reason) => currentPhoneCall);

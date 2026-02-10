@@ -63,20 +63,6 @@ namespace EastFive.Azure.Communications
         public bool isRequired;
 
         /// <summary>
-        /// Optional callback URL to notify when system is waiting for this inbound participant to call.
-        /// Only applicable for Inbound direction participants.
-        /// </summary>
-        [Storage]
-        public Uri callbackUrl;
-
-        /// <summary>
-        /// HTTP status code from the callback notification (0 = not sent, >0 = HTTP status returned).
-        /// Prevents duplicate notifications and provides debugging information.
-        /// </summary>
-        [Storage]
-        public System.Net.HttpStatusCode notificationStatusCode;
-
-        /// <summary>
         /// Store this so that when the incoming call arrives we can use it on pickup
         /// </summary>
         [Storage]
