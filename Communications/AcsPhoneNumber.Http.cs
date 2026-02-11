@@ -44,6 +44,20 @@ namespace EastFive.Azure.Communications
                 () => onNotFound());
         }
 
+        [HttpGet]
+        public static async Task<IHttpResponse> GetAllAsync(
+                EastFive.Api.Security security,
+            MultipartAsyncResponse<AcsPhoneNumber> onSuccess,
+            ContentTypeResponse<AcsPhoneNumber[]> onRefreshed,
+            GeneralFailureResponse onFailure)
+        {
+            var phoneNumbers = typeof(AcsPhoneNumber)
+                .StorageGetAll()
+                .CastObjsAs<AcsPhoneNumber>();
+
+            return onSuccess(phoneNumbers);
+        }
+
         /// <summary>
         /// Get all ACS phone numbers. When refresh=true, performs a full sync
         /// with Azure Communication Services, adding new numbers and removing

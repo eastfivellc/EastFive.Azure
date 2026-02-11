@@ -22,76 +22,85 @@ public class AcsPhoneCallHandlerAttribute : IncomingCallHandlerAttribute
             // Get the forwarding number for this ACS phone number
             if (!acsPhoneNumberMaybe.TryGetValue(out var acsPhoneNumber))
                 return await continueExecution();
-
-            return await await fromPhoneNumber
-                .StorageGetBy(
-                    (AcsPhoneCall acsPhoneCall) => acsPhoneCall.listeningParticipantPhoneNumber,
-                    query1 => query1.conferencePhoneNumber == acsPhoneNumber.acsPhoneNumberRef)
-                .SingleAsync(
-                    async (phoneCall) =>
+            
+            return await httpApp.GetType()
+                .GetAttributesInterface<IProcessCallEvent>(inherit: true, multiple: true)
+                .First(
+                    async (handler, next) =>
                     {
-                        // Answer the call and forward it
-                        return await await phoneCall.HandleParticipantCallingAsync(
-                                incomingCallContext,
-                                toPhoneNumber,
-                                fromPhoneNumber,
-                                correlationId,
-                                acsPhoneNumber,
-                                request, httpApp,
-                            phoneCall => continueExecution(),
-                            errorMsg =>
-                            {
-                                return continueExecution();
-                            });
-                    },
-                    async (phoneCalls) =>
-                    {
-                        return await phoneCalls
-                            .OrderByDescending(pc => pc.lastModified)
-                            .First(
-                                async (phoneCall, next) =>
+                        return await await fromPhoneNumber
+                            .StorageGetBy(
+                                (AcsPhoneCall acsPhoneCall) => acsPhoneCall.listeningParticipantPhoneNumber,
+                                query1 => query1.conferencePhoneNumber == acsPhoneNumber.acsPhoneNumberRef)
+                            .SingleAsync(
+                                async (phoneCall) =>
                                 {
-                                    var cleanupTask = phoneCalls
-                                        .Where(pc => pc.id != phoneCall.id)
-                                        .Select(
-                                            async pc =>
-                                            {
-                                                var pcUpdated = await pc.acsPhoneCallRef.StorageUpdateAsync(
-                                                    async (current, saveAsync) =>
-                                                    {
-                                                        current.listeningParticipantPhoneNumber = null;
-                                                        await saveAsync(current);
-                                                        return current;
-                                                    },
-                                                    () => pc);
-                                                return pcUpdated;
-                                            })
-                                        .WhenAllAsync();
+                                    // Answer the call and forward it
 
-                                    return await await phoneCall.HandleParticipantCallingAsync(
+                                    return await await handler.HandleParticipantCallingAsync(
+                                            phoneCall,
                                             incomingCallContext,
                                             toPhoneNumber,
                                             fromPhoneNumber,
                                             correlationId,
                                             acsPhoneNumber,
                                             request, httpApp,
-                                        async phoneCall =>
+                                        phoneCall => continueExecution(),
+                                        errorMsg =>
                                         {
-                                            await cleanupTask;
-                                            return await continueExecution();
-                                        },
-                                        async errorMsg =>
-                                        {
-                                            await cleanupTask;
-                                            return await continueExecution();
+                                            return continueExecution();
                                         });
                                 },
-                                () => continueExecution());
+                                async (phoneCalls) =>
+                                {
+                                    return await phoneCalls
+                                        .OrderByDescending(pc => pc.lastModified)
+                                        .First(
+                                            async (phoneCall, next) =>
+                                            {
+                                                var cleanupTask = phoneCalls
+                                                    .Where(pc => pc.id != phoneCall.id)
+                                                    .Select(
+                                                        async pc =>
+                                                        {
+                                                            var pcUpdated = await pc.acsPhoneCallRef.StorageUpdateAsync(
+                                                                async (current, saveAsync) =>
+                                                                {
+                                                                    current.listeningParticipantPhoneNumber = null;
+                                                                    await saveAsync(current);
+                                                                    return current;
+                                                                },
+                                                                () => pc);
+                                                            return pcUpdated;
+                                                        })
+                                                    .WhenAllAsync();
+
+                                                return await await handler.HandleParticipantCallingAsync(
+                                                        phoneCall,
+                                                        incomingCallContext,
+                                                        toPhoneNumber,
+                                                        fromPhoneNumber,
+                                                        correlationId,
+                                                        acsPhoneNumber,
+                                                        request, httpApp,
+                                                    phoneCall => continueExecution(),
+                                                    errorMsg =>
+                                                    {
+                                                        return continueExecution();
+                                                    });
+                                            },
+                                            () => continueExecution());
+                                },
+                                async () =>
+                                {
+                                    // No queued call found - pass to next handler in chain
+                                    return await continueExecution();
+                                });
+
                     },
-                    async () =>
-                    {
-                        // No queued call found - pass to next handler in chain
-                        return await continueExecution();
-                    });
+                    () => request
+                        .CreateResponse(System.Net.HttpStatusCode.NotFound)
+                        .AddReason("No IProcessCallEvent handler found. Please add an attribute implementing IProcessCallEvent to the HttpApplication.")
+                        .AsTask());
         }
 }

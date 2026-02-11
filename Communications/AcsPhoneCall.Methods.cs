@@ -52,28 +52,6 @@ namespace EastFive.Azure.Communications
 
         #region Event Handlers
 
-        /// <summary>
-        /// Handles an incoming call from a participant expected to join the conference.
-        /// Delegates to IProcessCallEvent attribute discovered on the application class.
-        /// </summary>
-        public async Task<TResult> HandleParticipantCallingAsync<TResult>(
-                string incomingCallContext, string toPhoneNumber, string fromPhoneNumber, string correlationId,
-                AcsPhoneNumber acsPhoneNumber,
-                IHttpRequest request,
-                HttpApplication httpApp,
-            Func<AcsPhoneCall, TResult> onProcessed,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            return await httpApp.GetType()
-                .GetAttributesInterface<IProcessCallEvent>(inherit: true, multiple: true)
-                .First(
-                    async (handler, next) => await handler.HandleParticipantCallingAsync(
-                        phoneCall, incomingCallContext, toPhoneNumber, fromPhoneNumber, correlationId,
-                        acsPhoneNumber, request, httpApp,
-                        onProcessed, onFailure),
-                    () => onFailure("No IProcessCallEvent handler found.").AsTask());
-        }
 
         internal async Task<TResult> AnswerAndUpdateCall<TResult>(AcsCallParticipant participant,
                 string incomingCallContext, string fromPhoneNumber,
