@@ -11,6 +11,7 @@ using EastFive;
 using EastFive.Api;
 using EastFive.Azure.Auth;
 using EastFive.Azure.Communications;
+using EastFive.Azure.Persistence;
 using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Extensions;
 using EastFive.Linq;
@@ -51,11 +52,10 @@ namespace EastFive.Azure.Communications
             ContentTypeResponse<AcsPhoneNumber[]> onRefreshed,
             GeneralFailureResponse onFailure)
         {
-            var phoneNumbers = typeof(AcsPhoneNumber)
+            return typeof(AcsPhoneNumber)
                 .StorageGetAll()
-                .CastObjsAs<AcsPhoneNumber>();
-
-            return onSuccess(phoneNumbers);
+                .CastObjsAs<AcsPhoneNumber>()
+                .HttpResponse(onSuccess);
         }
 
         /// <summary>
