@@ -599,7 +599,8 @@ namespace EastFive.Api.Azure
                 attr is EastFive.Azure.Meta.ApiKeyClaimAttribute ||
                 attr is SuperAdminClaimAttribute ||
                 attr is PIIAdminClaimAttribute ||
-                attr is ApiKeyAccessAttribute;
+                attr is ApiKeyAccessAttribute ||
+                attr is AzureServiceTokenAttribute;
         }
 
         public override bool IsSecurityParameter(ParameterInfo parameter)
