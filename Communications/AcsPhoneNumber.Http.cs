@@ -46,7 +46,7 @@ namespace EastFive.Azure.Communications
         }
 
         [HttpGet]
-        public static async Task<IHttpResponse> GetAllAsync(
+        public static IHttpResponse GetAllAsync(
                 EastFive.Api.Security security,
             MultipartAsyncResponse<AcsPhoneNumber> onSuccess,
             ContentTypeResponse<AcsPhoneNumber[]> onRefreshed,
