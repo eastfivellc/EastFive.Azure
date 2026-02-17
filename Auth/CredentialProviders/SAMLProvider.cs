@@ -22,6 +22,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
     public class SAMLProvider : IProvideLogin
     {
         public const string IntegrationName = "SAML";
+        
+        // TODO: Undo this SAML to Ping shim
         public string Method => IntegrationName;
         //public Guid Id => System.Text.Encoding.UTF8.GetBytes(Method).MD5HashGuid();
         public Guid Id => System.Text.Encoding.UTF8.GetBytes(PingProvider.IntegrationName).MD5HashGuid();
@@ -165,8 +167,11 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     // Build result parameters with extracted assertion data
                     var resultParams = new Dictionary<string, string>(tokens);
                     if (nameId.HasBlackSpace())
+                    {
                         resultParams[SamlNameIDKey] = nameId;
-
+                        // TODO: Undo this SAML to Ping shim
+                        resultParams[PingProvider.Subject] = nameId;
+                    }
                     // Extract all attributes from AttributeStatement
                     var attributeNodes = assertionNode.SelectNodes(
                         "saml:AttributeStatement/saml:Attribute", nsMgr);
