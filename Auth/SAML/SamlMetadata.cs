@@ -53,19 +53,19 @@ namespace EastFive.Azure.Auth
                             .CompileRequest()
                             .RequestUri
                             .AbsoluteUri;
-                    var acsUri = samlRedirectQuery
+            var acsUri = samlRedirectQuery
                             .ById(tag)
                             .CompileRequest()
                             .RequestUri;
-                    var sloUri = samlRedirectQuery
+            var sloUri = samlRedirectQuery
                             .HttpAction("logout")
                             .ById(tag)
                             .CompileRequest()
                             .RequestUri;
-                    var nameIdFormat = GetOptionalString(AppSettings.SAML.NameIdFormat, DefaultNameIdFormat);
-                    var signingCertBase64 = GetOptionalCertificateBase64(AppSettings.SAML.ServiceProviderCertificate);
-                    var xml = BuildMetadataDocument(entityId, acsUri, sloUri, nameIdFormat, signingCertBase64);
-                    return onSuccess(xml);
+            var nameIdFormat = GetOptionalString(AppSettings.SAML.NameIdFormat, DefaultNameIdFormat);
+            var signingCertBase64 = GetOptionalCertificateBase64(AppSettings.SAML.ServiceProviderCertificate);
+            var xml = BuildMetadataDocument(entityId, acsUri, sloUri, nameIdFormat, signingCertBase64);
+            return onSuccess(xml);
         }
 
         private static string BuildMetadataDocument(string entityId, Uri acsUri, Uri sloUri,
