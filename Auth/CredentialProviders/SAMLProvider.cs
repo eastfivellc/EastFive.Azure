@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
 
 using Newtonsoft.Json;
 
@@ -28,6 +30,11 @@ namespace EastFive.Azure.Auth.CredentialProviders
         internal const string SamlSubjectKey = "saml:Subject";
         internal const string SamlNameIDKey = "saml:NameID";
 
+        private const string SamlpNamespace = "urn:oasis:names:tc:SAML:2.0:protocol";
+        private const string SamlNamespace = "urn:oasis:names:tc:SAML:2.0:assertion";
+        private const string DsigNamespace = "http://www.w3.org/2000/09/xmldsig#";
+        private const string StatusSuccess = "urn:oasis:names:tc:SAML:2.0:status:Success";
+
         [IntegrationName(IntegrationName)]
         public static Task<TResult> InitializeAsync<TResult>(
             Func<IProvideLogin, TResult> onProvideLogin,
@@ -38,7 +45,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             return onProvideAuthorization(new SAMLProvider()).AsTask();
         }
         
-        public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
+        public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
             Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
@@ -46,36 +53,150 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<string, TResult> onUnspecifiedConfiguration,
             Func<string, TResult> onFailure)
         {
-            return await EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
-                async (certBuffer) =>
-                {   
-                    using (var certificate = X509CertificateLoader.LoadCertificate(certBuffer))
-                    {
-                        var m = certificate.GetRSAPrivateKey();
-                        AsymmetricAlgorithm trustedSigner = m; // AsymmetricAlgorithm.Create(certificate.GetKeyAlgorithm()
-                        var trustedSigners = default(AsymmetricAlgorithm) == trustedSigner ? null : trustedSigner.AsEnumerable();
-                    }
-                    try
-                    {
-                        return EastFive.Web.Configuration.Settings.GetString(EastFive.Azure.AppSettings.SAML.SAMLLoginIdAttributeName,
-                            (attributeName) =>
-                            {
-                                //var attributes = assertion.Attributes
-                                //    .Where(attribute => attribute.Name.CompareTo(attributeName) == 0)
-                                //    .ToArray();
-                                //if (attributes.Length == 0)
-                                //    return invalidCredentials($"SAML assertion does not contain an attribute with name [{attributeName}] which is necessary to operate with this system");
-                                //Guid authId;
-                                //if (!Guid.TryParse(attributes[0].AttributeValue.First(), out authId))
-                                //    return invalidCredentials("User's auth identifier is not a guid.");
+            if (!tokens.TryGetValue(SAMLRedirect.SamlResponseParameter, out var samlResponseBase64))
+                return onInvalidCredentials("SAMLResponse parameter was not provided").AsTask();
 
-                                return onSuccess(tokens);
-                            },
-                            (why) => onUnspecifiedConfiguration(why));
-                    } catch(Exception)
+            if (samlResponseBase64.IsNullOrWhiteSpace())
+                return onInvalidCredentials("SAMLResponse parameter is empty").AsTask();
+
+            byte[] responseBytes;
+            try
+            {
+                responseBytes = Convert.FromBase64String(samlResponseBase64);
+            }
+            catch (FormatException)
+            {
+                return onInvalidCredentials("SAMLResponse is not valid Base64").AsTask();
+            }
+
+            var responseXml = Encoding.UTF8.GetString(responseBytes);
+
+            var xmlDoc = new XmlDocument();
+            xmlDoc.PreserveWhitespace = true;
+            try
+            {
+                xmlDoc.LoadXml(responseXml);
+            }
+            catch (XmlException ex)
+            {
+                return onInvalidCredentials($"SAMLResponse XML is malformed: {ex.Message}").AsTask();
+            }
+
+            var nsMgr = new XmlNamespaceManager(xmlDoc.NameTable);
+            nsMgr.AddNamespace("samlp", SamlpNamespace);
+            nsMgr.AddNamespace("saml", SamlNamespace);
+            nsMgr.AddNamespace("ds", DsigNamespace);
+
+            // Verify the response status is Success
+            var statusCodeNode = xmlDoc.SelectSingleNode("//samlp:StatusCode", nsMgr);
+            if (statusCodeNode is not null)
+            {
+                var statusValue = statusCodeNode.Attributes?["Value"]?.Value ?? string.Empty;
+                if (!statusValue.Equals(StatusSuccess, StringComparison.OrdinalIgnoreCase))
+                    return onUnauthenticated(default, tokens).AsTask();
+            }
+
+            return EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
+                (certBuffer) =>
+                {
+                    // Validate the XML signature against the IdP certificate
+                    using var certificate = X509CertificateLoader.LoadCertificate(certBuffer);
+                    var rsaPublicKey = certificate.GetRSAPublicKey();
+                    if (rsaPublicKey is null)
+                        return onInvalidCredentials(
+                            "IdP certificate does not contain an RSA public key").AsTask();
+
+                    var signatureNodes = xmlDoc.GetElementsByTagName(
+                        "Signature", DsigNamespace);
+
+                    if (signatureNodes.Count == 0)
+                        return onInvalidCredentials(
+                            "SAMLResponse does not contain a digital signature").AsTask();
+
+                    var signedXml = new SignedXml(xmlDoc);
+                    signedXml.LoadXml((XmlElement)signatureNodes[0]);
+
+                    if (!signedXml.CheckSignature(rsaPublicKey))
+                        return onInvalidCredentials(
+                            "SAMLResponse signature validation failed").AsTask();
+
+                    // Extract the assertion
+                    var assertionNode = xmlDoc.SelectSingleNode("//saml:Assertion", nsMgr);
+                    if (assertionNode is null)
+                        return onInvalidCredentials(
+                            "SAMLResponse does not contain an Assertion").AsTask();
+
+                    // Validate time-based conditions
+                    var conditionsNode = assertionNode.SelectSingleNode("saml:Conditions", nsMgr);
+                    if (conditionsNode is not null)
                     {
-                        return await onInvalidCredentials("SAML Assertion parse and validate failed").AsTask();
+                        var now = DateTime.UtcNow;
+                        var notBefore = conditionsNode.Attributes?["NotBefore"]?.Value;
+                        if (notBefore.HasBlackSpace()
+                            && DateTime.TryParse(notBefore, out var notBeforeDate)
+                            && now < notBeforeDate.ToUniversalTime())
+                        {
+                            return onInvalidCredentials(
+                                "SAML assertion is not yet valid (NotBefore)").AsTask();
+                        }
+
+                        var notOnOrAfter = conditionsNode.Attributes?["NotOnOrAfter"]?.Value;
+                        if (notOnOrAfter.HasBlackSpace()
+                            && DateTime.TryParse(notOnOrAfter, out var notOnOrAfterDate)
+                            && now >= notOnOrAfterDate.ToUniversalTime())
+                        {
+                            return onInvalidCredentials(
+                                "SAML assertion has expired (NotOnOrAfter)").AsTask();
+                        }
                     }
+
+                    // Extract NameID
+                    var nameIdNode = assertionNode.SelectSingleNode(
+                        "saml:Subject/saml:NameID", nsMgr);
+                    var nameId = nameIdNode?.InnerText ?? string.Empty;
+
+                    // Build result parameters with extracted assertion data
+                    var resultParams = new Dictionary<string, string>(tokens);
+                    if (nameId.HasBlackSpace())
+                        resultParams[SamlNameIDKey] = nameId;
+
+                    // Extract all attributes from AttributeStatement
+                    var attributeNodes = assertionNode.SelectNodes(
+                        "saml:AttributeStatement/saml:Attribute", nsMgr);
+                    if (attributeNodes is not null)
+                    {
+                        foreach (XmlNode attrNode in attributeNodes)
+                        {
+                            var attrName = attrNode.Attributes?["Name"]?.Value;
+                            if (attrName.IsNullOrWhiteSpace())
+                                continue;
+
+                            var attrValueNode = attrNode.SelectSingleNode(
+                                "saml:AttributeValue", nsMgr);
+                            resultParams[attrName] = attrValueNode?.InnerText ?? string.Empty;
+                        }
+                    }
+
+                    return Settings.GetString(
+                        EastFive.Azure.AppSettings.SAML.SAMLLoginIdAttributeName,
+                        (attributeName) =>
+                        {
+                            if (!resultParams.ContainsKey(attributeName) && nameId.IsNullOrWhiteSpace())
+                                return onInvalidCredentials(
+                                    $"SAML assertion does not contain attribute [{attributeName}] " +
+                                    $"and NameID is empty").AsTask();
+
+                            return onSuccess(resultParams).AsTask();
+                        },
+                        (why) =>
+                        {
+                            // No login ID attribute configured — NameID is sufficient
+                            if (nameId.IsNullOrWhiteSpace())
+                                return onInvalidCredentials(
+                                    "SAML assertion NameID is empty and no login ID attribute is configured").AsTask();
+
+                            return onSuccess(resultParams).AsTask();
+                        });
                 },
                 (why) => onUnspecifiedConfiguration(why).AsTask());
         }
@@ -100,7 +221,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
         #region IProvideLogin
 
-        public Type CallbackController => typeof(SAMLProvider); // typeof(Controllers.SAMLRedirectController);
+        public Type CallbackController => typeof(global::EastFive.Azure.Auth.SAMLRedirect);
 
         public Uri GetSignupUrl(Guid state, Uri responseControllerLocation, Func<Type, Uri> controllerToLocation)
         {

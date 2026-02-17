@@ -1,0 +1,24 @@
+<EntityDescriptor entityID="https://dev.affirmhealth.com/.well-known/saml-metadata/HuddleSpotlight"
+		xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+		xmlns="urn:oasis:names:tc:SAML:2.0:metadata">
+	<SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"
+			AuthnRequestsSigned="false"
+			WantAssertionsSigned="true">
+		<KeyDescriptor use="signing">
+			<ds:KeyInfo>
+				<ds:X509Data>
+					<ds:X509Certificate>MIIDHzCCAgegAwIBAgIUJy6wWWR0bcbReI+IPeZaLE0bdOgwDQYJKoZIhvcNAQELBQAwHzEdMBsGA1UEAwwUQWZmaXJtSGVhbHRoIFNBTUwgU1AwHhcNMjYwMjE2MTgyNDA3WhcNMjcwMjE2MTgyNDA3WjAfMR0wGwYDVQQDDBRBZmZpcm1IZWFsdGggU0FNTCBTUDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANvA4MK2+QN6vSB4LTzeDlee3Q6ZovK+RDl1Y9AhIpjkivmxYqagBYUYQH5zQKSFcNP2wQHIOJ+C5d4l95lAbLXbHoMV8boVGJ6aW/keuyDlKhq0vXHjtXfWoRAWw87Pg/kk539NYHJZSkQ5wkQ0fZtcDMNNigNzRE3y90CDAEdLg2aDnSeDJpIEHR3UukxaLWwCjx3PnGl3/TwkPSMVn0CjGIrOXEbiVaER9ogd8JZbVowCFcoyULoKdU4ndYYWkmD2hVC6dxtlICR5d4veGc/q2e92D7rEyGfK6yrxLL7DDBxvOrTpJ0y4oCfA0ZSFpX/hMSRDIGLqyrxBUnWLak0CAwEAAaNTMFEwHQYDVR0OBBYEFK914md81GkCgrk2srgQR4YepAc2MB8GA1UdIwQYMBaAFK914md81GkCgrk2srgQR4YepAc2MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBALY7zp8sn/gQKdqZGjAJbsa2DduJnvtNf6G5T7myelE/o/YL5ThE71ub/BJqRmUoLfYhOy7VJTP88CyHJp13nR1UOlxuX3ikRlEopmMpMK98DSJeFUeiv+VbaFHNItwJzZvilIrjX1zv78Yu7V1wvKHiRUYhjXc6XNyQIlpxmcDwP+lKZHTQS6NUwKOWQq4I34hkCUS8GYo6o5gtHbKxVCsxUeGRpqvW/tG/cIqcmwVVfVOvYcRSlsgvm+4MNK7c3qFSYxTLNKpylSfi4QJ2CgCNi8HadfzyWL8vAg6mp6avX/bkrhhL4+/VUHi+Dzh1HTwGlGJRWvHIkGE8FS125N4=</ds:X509Certificate>
+				</ds:X509Data>
+			</ds:KeyInfo>
+		</KeyDescriptor>
+		<SingleLogoutService
+				Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+				Location="https://dev.affirmhealth.com/auth/SAMLRedirect/logout/HuddleSpotlight" />
+		<NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</NameIDFormat>
+		<AssertionConsumerService
+				Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+				Location="https://dev.affirmhealth.com/auth/SAMLRedirect/HuddleSpotlight"
+				index="0"
+				isDefault="true" />
+	</SPSSODescriptor>
+</EntityDescriptor>
