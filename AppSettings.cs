@@ -185,6 +185,16 @@ namespace EastFive.Azure
                 DeploymentOverrides.Optional,
                 DeploymentSecurityConcern = false)]
             public const string SAMLLoginIdAttributeName = "EastFive.Security.CredentialProvider.SAML.LoginIdAttributeName";
+
+            [ConfigKey("NameID format for SAML metadata.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false)]
+            public const string NameIdFormat = "EastFive.Security.CredentialProvider.SAML.NameIdFormat";
+
+            [ConfigKey("Service provider signing certificate in base64 format (public cert only).",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false)]
+            public const string ServiceProviderCertificate = "EastFive.Security.CredentialProvider.SAML.ServiceProviderCertificate";
         }
 
         [Config]
