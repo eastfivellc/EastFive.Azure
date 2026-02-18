@@ -102,7 +102,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     return onUnauthenticated(default, tokens).AsTask();
             }
 
-            return EastFive.Azure.AppSettings.SAML.SAMLCertificate.ConfigurationBase64Bytes(
+            return EastFive.Azure.AppSettings.SAML.IdPCertificate.ConfigurationBase64Bytes(
                 (certBuffer) =>
                 {
                     // Validate the XML signature against the IdP certificate
@@ -119,15 +119,15 @@ namespace EastFive.Azure.Auth.CredentialProviders
                         return onInvalidCredentials(
                             "SAMLResponse does not contain a digital signature").AsTask();
 
-                    var signedXml = new SignedXml(xmlDoc);
+                    // Register ID attributes so SignedXml can resolve
+                    // the Reference URI (SAML uses "ID" which is not
+                    // recognised by XmlDocument.GetElementById without this).
+                    var signedXml = new SamlSignedXml(xmlDoc);
                     signedXml.LoadXml((XmlElement)signatureNodes[0]);
 
                     if (!signedXml.CheckSignature(rsaPublicKey))
-                    {
-                        signedXml.ToString();
-                        // return onInvalidCredentials(
-                        //     "SAMLResponse signature validation failed").AsTask();
-                    }
+                        return onInvalidCredentials(
+                            "SAMLResponse signature validation failed").AsTask();
 
                     // Extract the assertion
                     var assertionNode = xmlDoc.SelectSingleNode("//saml:Assertion", nsMgr);
@@ -154,8 +154,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             && DateTime.TryParse(notOnOrAfter, out var notOnOrAfterDate)
                             && now >= notOnOrAfterDate.ToUniversalTime())
                         {
-                            // return onInvalidCredentials(
-                            //     "SAML assertion has expired (NotOnOrAfter)").AsTask();
+                            return onInvalidCredentials(
+                                "SAML assertion has expired (NotOnOrAfter)").AsTask();
                         }
                     }
 
@@ -254,6 +254,48 @@ namespace EastFive.Azure.Auth.CredentialProviders
         }
 
         #endregion
+
+        /// <summary>
+        /// SignedXml subclass that resolves SAML's "ID" attribute for
+        /// Reference URI lookups. The base class only recognises "id",
+        /// "Id", or DTD-declared ID attributes, so SAML signatures
+        /// that reference elements by their "ID" attribute fail without this.
+        /// </summary>
+        private sealed class SamlSignedXml : SignedXml
+        {
+            public SamlSignedXml(XmlDocument doc) : base(doc) { }
+
+            public override XmlElement GetIdElement(XmlDocument document, string idValue)
+            {
+                var element = base.GetIdElement(document, idValue);
+                if (element is not null)
+                    return element;
+
+                // Fall back to searching for elements whose "ID" attribute
+                // matches the reference value (case-sensitive).
+                return FindById(document.DocumentElement, idValue);
+            }
+
+            private static XmlElement FindById(XmlElement root, string idValue)
+            {
+                if (root is null)
+                    return null;
+
+                if (root.GetAttribute("ID") == idValue)
+                    return root;
+
+                foreach (XmlNode child in root.ChildNodes)
+                {
+                    if (child is XmlElement childElement)
+                    {
+                        var found = FindById(childElement, idValue);
+                        if (found is not null)
+                            return found;
+                    }
+                }
+                return null;
+            }
+        }
     }
 
     public class SAMLProviderAttribute : Attribute, IProvideLoginProvider

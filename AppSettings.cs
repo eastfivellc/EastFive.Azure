@@ -174,11 +174,16 @@ namespace EastFive.Azure
         [Config]
         public static class SAML
         {
-            [ConfigKey("The certificate the SAML provider offers. It is in base64 format. Only the public key is availble. " +
-                "It is used to verfiy the signature of the SAML assurtion.",
+            [ConfigKey("The SP certificate in base64 format. Used for signing SP metadata and requests.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false)]
             public const string SAMLCertificate = "EastFive.Security.CredentialProvider.SAML.Certificate";
+
+            [ConfigKey("The IdP certificate in base64 format (public key only). " +
+                "Used to verify the signature on SAML responses from the Identity Provider.",
+                DeploymentOverrides.Suggested,
+                DeploymentSecurityConcern = false)]
+            public const string IdPCertificate = "EastFive.Security.CredentialProvider.SAML.IdPCertificate";
 
             [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " +
                 "This value is used to lookup the user in the local system.",
