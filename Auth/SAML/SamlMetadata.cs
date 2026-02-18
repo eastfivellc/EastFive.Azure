@@ -29,7 +29,7 @@ namespace EastFive.Azure.Auth
                     tag,
                     samlRedirectQuery,
                     samlMetadataQuery,
-                (xml) => onResponse(xml, System.Text.Encoding.UTF8),
+                (xml) => onResponse(xml, System.Text.Encoding.UTF8, filename: $"saml-metadata-affirmhealth-{tag}.xml", contentType: "application/samlmetadata+xml"),
                 (why) => onConfigurationFailure(why, why));
         }
     }
