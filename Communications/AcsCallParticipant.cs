@@ -1,8 +1,10 @@
 #nullable enable
 
 using System;
+using System.Text.Json.Serialization;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
+using Newtonsoft.Json;
 
 namespace EastFive.Azure.Communications
 {
@@ -18,6 +20,7 @@ namespace EastFive.Azure.Communications
         /// <summary>
         /// Phone number in E.164 format (e.g., +15551234567).
         /// </summary>
+        [JsonProperty("phone_number")]
         [Storage]
         public string phoneNumber;
 
@@ -59,6 +62,7 @@ namespace EastFive.Azure.Communications
         [Storage]
         public bool muteOnConnect;
 
+        [JsonProperty("is_required")]
         [Storage]
         public bool isRequired;
 
