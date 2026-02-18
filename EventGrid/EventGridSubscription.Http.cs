@@ -178,10 +178,10 @@ namespace EastFive.Azure.EventGrid
         /// and creates Event Grid subscriptions.
         /// </summary>
         [HttpAction("auto-register")]
-        [SuperAdminClaim]
         public static async Task<IHttpResponse> AutoRegisterEventSubscriptionsAsync(
                 RequestMessage<EventGridSubscription> eventGridEndpoint,
                 AzureApplication httpApp,
+                EastFive.Api.Security security,
             MultipartAsyncResponse<EventGridSubscription> onSuccess,
             GeneralFailureResponse onFailure)
         {
