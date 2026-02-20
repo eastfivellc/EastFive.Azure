@@ -117,18 +117,18 @@ namespace EastFive.Azure.EventGrid
             var body = await request.ReadContentAsStringAsync();
 
             if (string.IsNullOrWhiteSpace(body))
-                    return onBadRequest().AddReason("Empty request body");
+                return onBadRequest().AddReason("Empty request body");
 
             // Parse JSON once
             using var jsonDoc = JsonDocument.Parse(body);
             var root = jsonDoc.RootElement;
 
             if (root.ValueKind != JsonValueKind.Array)
-                    return onBadRequest().AddReason("Expected array of events");
+                return onBadRequest().AddReason("Expected array of events");
 
             var handlers = httpApp.GetType()
-                    .GetAttributesInterface<IHandleIncomingEvent>(inherit: true, multiple: true)
-                    .ToArray();
+                .GetAttributesInterface<IHandleIncomingEvent>(inherit: true, multiple: true)
+                .ToArray();
 
             // Build array of events to process
             return await root

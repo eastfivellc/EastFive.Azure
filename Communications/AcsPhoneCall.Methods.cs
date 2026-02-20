@@ -362,6 +362,45 @@ namespace EastFive.Azure.Communications
                     _ => Task.FromResult(false));
         }
 
+        public async Task<TResult> KickoutParticipantAsync<TResult>(AcsCallParticipant acsCallParticipant,
+            Func<TResult> onKickedOut,
+            Func<string, TResult> onFailure)
+        {
+            var phoneCall = this;
+            return await EastFive.Azure.AppSettings.Communications.Default
+                .CreateAutomationClient(
+                    async client =>
+                    {
+                        var callConnection = client.GetCallConnection(phoneCall.callConnectionId);
+                        var particpantsAvailable = await callConnection.GetParticipantsAsync();
+                        return await particpantsAvailable.Value
+                            .Where(p => p.Identifier is PhoneNumberIdentifier pn && pn.PhoneNumber == acsCallParticipant.phoneNumber)
+                            .First(
+                                async (participant, next) =>
+                                {
+                                    try
+                                    {
+                                        await callConnection.RemoveParticipantAsync(participant.Identifier);
+                                    }
+                                    catch (RequestFailedException ex)
+                                    {
+                                        if (ex.Status == 404 && ex.ErrorCode == "8522")
+                                        {
+                                            // Participant is already removed
+                                            return onKickedOut();
+                                        }
+                                        return onFailure(ex.Message);
+                                    }
+                                    return onKickedOut();
+                                },
+                                () =>
+                                {
+                                    return onFailure($"Participant with phone number {acsCallParticipant.phoneNumber} not found in call.").AsTask();
+                                });
+                    },
+                    why => onFailure(why).AsTask());
+        }
+
         #endregion
 
         #region Recording
