@@ -32,7 +32,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
         internal const string SamlAssertionKey = "saml:Assertion";
         internal const string SamlSubjectKey = "saml:Subject";
         internal const string SamlNameIDKey = "saml:NameID";
-        internal const string PracticeId = "practiceID";
+        public const string PracticeId = "practiceID";
+        public const string EncounterId = "Encounter id";
         public const string DepartmentId = "departmentID";
         public const string PatientId = "patientID";
 
@@ -195,6 +196,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                                     $"and NameID is empty").AsTask();
 
                     ShimKey(PracticeId);
+                    ShimKey(EncounterId);
                     ShimKey(DepartmentId);
                     ShimKey(PatientId);
                     ShimKey(SamlNameIDKey);
