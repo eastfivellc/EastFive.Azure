@@ -39,6 +39,8 @@ namespace EastFive.Azure.Communications
 
         #endregion
 
+        public bool IsConnected => callConnectionId.HasBlackSpace();
+
         #region Call Properties
 
         /// <summary>

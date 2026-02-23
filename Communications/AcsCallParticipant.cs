@@ -36,6 +36,12 @@ namespace EastFive.Azure.Communications
         [Storage]
         public ParticipantStatus status;
 
+        public bool IsProcessed => 
+            status != ParticipantStatus.None 
+            && status != ParticipantStatus.BlockedOnNextParticipantAdded
+            && status != ParticipantStatus.Inviting
+            && status != ParticipantStatus.Notified;
+
         /// <summary>
         /// ACS invitation ID for matching events to participants.
         /// Populated when AddParticipantAsync is called.

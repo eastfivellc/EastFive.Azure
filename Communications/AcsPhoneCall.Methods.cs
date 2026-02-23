@@ -144,9 +144,9 @@ namespace EastFive.Azure.Communications
         #region Call Orchestration
 
         /// <summary>
-        /// Processes the call sequence by delegating to IProcessCallEvent attributes.
+        /// Initiates the call sequence by delegating to IProcessCallEvent attributes.
         /// </summary>
-        public async Task<TResult> ProcessCallSequenceAsync<TResult>(
+        public async Task<TResult> InitiateCallSequenceAsync<TResult>(
                 IHttpRequest request,
                 HttpApplication httpApp,
             Func<AcsPhoneCall, TResult> onProcessed,
@@ -166,22 +166,20 @@ namespace EastFive.Azure.Communications
 
         #region Participant Operations
 
-        /// <summary>
-        /// Adds a participant to the call.
-        /// </summary>
-        internal async Task<TResult> CallParticipantToAddThemToCallAsync<TResult>(
+        internal async Task<TResult> CallParticipantAsync<TResult>(
                 AcsPhoneNumber conferencePhoneNumber,
                 AcsCallParticipant participant,
                 IHttpRequest request,
-                HttpApplication httpApp,
             Func<AcsPhoneCall, TResult> onAdded,
             Func<string, TResult> onFailure)
         {
-            // Call connection ID is null if call not yet connected
-            // In that case, we cannot add participants
-            // Look to AIPhoneCall POST for example of creating the call
-
             var phoneCall = this;
+            if(phoneCall.IsConnected)
+            {
+                // Call connection ID is null if call not yet connected
+                // In that case, we cannot add participants
+                throw new InvalidOperationException("Call in progress, participant should be added, not called.");
+            }
             return await EastFive.Azure.AppSettings.Communications.Default
                 .CreateAutomationClient(
                     async client =>
@@ -190,9 +188,7 @@ namespace EastFive.Azure.Communications
                         var participantToAdd = new PhoneNumberIdentifier(participant.phoneNumber);
                         var callInvite = new CallInvite(participantToAdd, callerIdNumber);
 
-                        if(phoneCall.callConnectionId.IsNullOrWhiteSpace())
-                        {
-                            var aiPhoneCallApiResources = new RequestQuery<AcsPhoneCall>(request);
+                        var aiPhoneCallApiResources = new RequestQuery<AcsPhoneCall>(request);
                             var callbackUri = aiPhoneCallApiResources
                                 .HttpAction(EventsActionName)
                                 .ById(phoneCall.acsPhoneCallRef)
@@ -227,16 +223,37 @@ namespace EastFive.Azure.Communications
                                     current.recordingState = RecordingState.None;
                                     await saveAsync(current);
 
-                                    if(!current.HasBlockedOnNextOutboundParticipant())
-                                        return onAdded(current);
-                                    
-                                    return await current.ProcessCallSequenceAsync(
-                                            request, httpApp,
-                                            onAdded,
-                                            onFailure);
+                                    return onAdded(current);
                                 },
                                 onNotFound: () => onFailure("AcsPhoneCall deleted."));
-                        }
+                    },
+                    why => onFailure(why).AsTask());
+        }
+
+        /// <summary>
+        /// Adds a participant to the call.
+        /// </summary>
+        public async Task<TResult> AddParticipantAsync<TResult>(
+                AcsPhoneNumber conferencePhoneNumber,
+                AcsCallParticipant participant,
+            Func<AcsPhoneCall, TResult> onAdded,
+            Func<string, TResult> onFailure)
+        {
+            var phoneCall = this;
+            if(!phoneCall.IsConnected)
+            {
+                // Call connection ID is null if call not yet connected
+                // In that case, we cannot add participants
+                throw new InvalidOperationException("Cannot add participant to call that has not been created.");
+            }
+
+            return await EastFive.Azure.AppSettings.Communications.Default
+                .CreateAutomationClient(
+                    async client =>
+                    {
+                        var callerIdNumber = new PhoneNumberIdentifier(conferencePhoneNumber.phoneNumber);
+                        var participantToAdd = new PhoneNumberIdentifier(participant.phoneNumber);
+                        var callInvite = new CallInvite(participantToAdd, callerIdNumber);
 
                         var callConnection = client.GetCallConnection(phoneCall.callConnectionId);
                         var addParticipantOptions = new AddParticipantOptions(callInvite)
@@ -268,13 +285,7 @@ namespace EastFive.Azure.Communications
                                     },
                                     async (updatedPhoneCall) =>
                                     {
-                                        if(!updatedPhoneCall.HasBlockedOnNextOutboundParticipant())
-                                            return onAdded(updatedPhoneCall);
-                                        
-                                        return await updatedPhoneCall.ProcessCallSequenceAsync(
-                                                request, httpApp,
-                                                onAdded,
-                                                onFailure);
+                                        return onAdded(updatedPhoneCall);
                                     },
                                     onNotFound: () => onFailure("AcsPhoneCall not found.").AsTask());
                             }
@@ -289,7 +300,7 @@ namespace EastFive.Azure.Communications
                                 if (ex.Status == 400 && ex.ErrorCode == "8523")
                                 {
                                     // Participant already in call
-                                    return await await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
+                                    return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
                                         (current) =>
                                         {
                                             current.participants = current.participants
@@ -297,7 +308,6 @@ namespace EastFive.Azure.Communications
                                                     (p) => p.id == participant.id,
                                                     (p) =>
                                                     {
-                                                        p.invitationId = string.Empty; // Will be set when added
                                                         p.status = ParticipantStatus.Connected;
                                                         return p;
                                                     })
@@ -306,19 +316,9 @@ namespace EastFive.Azure.Communications
                                         },
                                         (updatedPhoneCall) =>
                                         {
-                                            // Simulate AddParticipantSucceeded since participant is already in call
-                                            return updatedPhoneCall.ProcessCallEventAsync(
-                                                new AcsCallAutomationEvent
-                                                {
-                                                    eventType = EventType.AddParticipantSucceeded,
-                                                    operationContext = participant.id.ToString(),
-                                                },
-                                                request, httpApp,
-                                                onProcessed: (finalPhoneCall) => onAdded(finalPhoneCall),
-                                                onIgnored: () => onAdded(updatedPhoneCall),
-                                                onFailure: (reason) => onFailure(reason));
+                                            return onAdded(updatedPhoneCall);
                                         },
-                                        onNotFound: () => onFailure("AcsPhoneCall not found.").AsTask());
+                                        onNotFound: () => onFailure("AcsPhoneCall not found."));
                                 }
                                 if (ex.Status == 404 && ex.ErrorCode == "8522")
                                 {
@@ -363,7 +363,7 @@ namespace EastFive.Azure.Communications
         }
 
         public async Task<TResult> KickoutParticipantAsync<TResult>(AcsCallParticipant acsCallParticipant,
-            Func<TResult> onKickedOut,
+            Func<AcsPhoneCall, TResult> onKickedOut,
             Func<string, TResult> onFailure)
         {
             var phoneCall = this;
@@ -380,18 +380,40 @@ namespace EastFive.Azure.Communications
                                 {
                                     try
                                     {
-                                        await callConnection.RemoveParticipantAsync(participant.Identifier);
+                                        var removalResponseMaybe = await callConnection.RemoveParticipantAsync(participant.Identifier);
+                                        if(!removalResponseMaybe.HasValue)
+                                            return onFailure("Failed to remove participant: No response from service.");
+                                        
+                                        var removalResponse = removalResponseMaybe.Value;
+                                        return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
+                                            (current) =>
+                                            {
+                                                current.participants = current.participants
+                                                    .UpdateWhere(
+                                                        (p) => p.id == acsCallParticipant.id,
+                                                        (p) =>
+                                                        {
+                                                            p.status = ParticipantStatus.Removed;
+                                                            return p;
+                                                        })
+                                                    .ToArray();
+                                                return current;
+                                            },
+                                            (updatedPhoneCall) =>
+                                            {
+                                                return onKickedOut(updatedPhoneCall);
+                                            },
+                                            onNotFound: () => onFailure("AcsPhoneCall wasl deleted."));
                                     }
                                     catch (RequestFailedException ex)
                                     {
                                         if (ex.Status == 404 && ex.ErrorCode == "8522")
                                         {
                                             // Participant is already removed
-                                            return onKickedOut();
+                                            return onKickedOut(phoneCall);
                                         }
                                         return onFailure(ex.Message);
                                     }
-                                    return onKickedOut();
                                 },
                                 () =>
                                 {

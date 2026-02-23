@@ -66,25 +66,25 @@ namespace EastFive.Azure.Communications
         /// <summary>
         /// Provides the Event Grid subscription configuration with async callback.
         /// </summary>
-        public async Task<TResult> ProvideEventSubscriptionAsync<TResult>(
-            Uri callbackUri,
-            Func<string, string, Uri, string[], Task<TResult>> onSubscriptionToEnsure,
-            Func<string, Task<TResult>> onFailure)
-        {
-            // Copy instance member to local variable for lambda capture
-            var currentResourceId = this.resourceId;
+        // public async Task<TResult> ProvideEventSubscriptionAsync<TResult>(
+        //     Uri callbackUri,
+        //     Func<string, string, Uri, string[], Task<TResult>> onSubscriptionToEnsure,
+        //     Func<string, Task<TResult>> onFailure)
+        // {
+        //     // Copy instance member to local variable for lambda capture
+        //     var currentResourceId = this.resourceId;
             
-            if (string.IsNullOrEmpty(currentResourceId))
-            {
-                return await onFailure("AzureCommunicationService has no resource ID. Call discover first.");
-            }
+        //     if (string.IsNullOrEmpty(currentResourceId))
+        //     {
+        //         return await onFailure("AzureCommunicationService has no resource ID. Call discover first.");
+        //     }
 
-            return await onSubscriptionToEnsure(
-                currentResourceId,
-                IncomingCallsSubscriptionName,
-                callbackUri,
-                IncomingCallEventTypes);
-        }
+        //     return await onSubscriptionToEnsure(
+        //         currentResourceId,
+        //         IncomingCallsSubscriptionName,
+        //         callbackUri,
+        //         IncomingCallEventTypes);
+        // }
 
         /// <summary>
         /// IProvideEventSubscription implementation - throws because callback URI is required.
@@ -193,19 +193,6 @@ namespace EastFive.Azure.Communications
                 why => onFailure(why).AsTask());
         }
 
-        /// <summary>
-        /// Discovers the Azure Communication Services resource with async callbacks.
-        /// </summary>
-        public static async Task<TResult> DiscoverAsync<TResult>(
-            Func<AzureCommunicationService[], Task<TResult>> onDiscovered,
-            Func<string, TResult> onFailure)
-        {
-            var innerResult = await DiscoverAsync<Task<TResult>>(
-                (acs) => onDiscovered(acs),
-                reason => Task.FromResult(onFailure(reason)));
-            return await innerResult;
-        }
-
         #endregion
 
         #region Event Grid Integration
@@ -221,7 +208,7 @@ namespace EastFive.Azure.Communications
             Func<EventGridSubscription, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-            return await ProvideEventSubscriptionAsync(
+            return await await ProvideEventSubscriptionAsync(
                 callbackUri,
                 (scopeResourceId, subscriptionName, cbUri, eventTypes) =>
                     EventGridSubscription.EnsureAsync(
@@ -245,7 +232,7 @@ namespace EastFive.Azure.Communications
             Func<EventGridSubscription, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
-            return await ProvideEventSubscriptionAsync(
+            return await await ProvideEventSubscriptionAsync(
                 callbackUri,
                 async (scopeResourceId, subscriptionName, cbUri, eventTypes) =>
                     await EventGridSubscription.EnsureAsync(
