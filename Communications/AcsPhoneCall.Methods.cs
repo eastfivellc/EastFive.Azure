@@ -50,97 +50,6 @@ namespace EastFive.Azure.Communications
 
         #endregion
 
-        #region Event Handlers
-
-
-        internal async Task<TResult> AnswerAndUpdateCall<TResult>(AcsCallParticipant participant,
-                string incomingCallContext, string fromPhoneNumber,
-                AcsPhoneNumber acsPhoneNumber,
-                IHttpRequest request,
-            Func<AcsPhoneCall, TResult> onAnswered,
-            Func<string, TResult> onFailure)
-        {
-            var phoneCall = this;
-            return await await phoneCall.AnswerCallAsync(
-                    participant, acsPhoneNumber,
-                    incomingCallContext, fromPhoneNumber,
-                    request,
-                onAnswered: async (answerResult) =>
-                {
-                    return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
-                        (current) =>
-                        {
-                            current.participants = current.participants
-                                .UpdateWhere(
-                                    (p) => p.id == participant.id,
-                                    (p) =>
-                                    {
-                                        // Mark as Inviting - will be Connected after move completes
-                                        // or directly Connected if this is the anchor call
-                                        p.status = ParticipantStatus.Inviting;
-                                        return p;
-                                    })
-                                .ToArray();
-                            return current;
-                        },
-                        (current) =>
-                        {
-                            return onAnswered(current);
-                        },
-                        onNotFound:() => onFailure("AcsPhoneCall deleted."));
-                },
-                onAnswerFailed: (reason) =>
-                {
-                    return onFailure(reason).AsTask();
-                });
-        }
-
-        private async Task<TResultAnswerCall> AnswerCallAsync<TResultAnswerCall>(
-                AcsCallParticipant participant, AcsPhoneNumber acsPhoneNumber,
-                string incomingCallContext, string fromPhoneNumber,
-                IHttpRequest request,
-            Func<AnswerCallResult?, TResultAnswerCall> onAnswered,
-            Func<string, TResultAnswerCall> onAnswerFailed)
-        {
-            var phoneCall = this;
-            var aiPhoneCallApiResources = new RequestQuery<AcsPhoneCall>(request);
-            return await EastFive.Azure.AppSettings.Communications.Default
-                .CreateAutomationClient(
-                    async client =>
-                    {
-                        var callbackUri = aiPhoneCallApiResources
-                            .HttpAction(EventsActionName)
-                            .ById(phoneCall.acsPhoneCallRef)
-                            .CompileRequest()
-                            .RequestUri;
-
-                        try
-                        {
-                            // Answer the incoming call - this creates a new CallConnection
-                            // If a conference exists, the CallConnected event handler will
-                            // detect the different callConnectionId and move the participant
-                            var answerResult = await client.AnswerCallAsync(
-                                new AnswerCallOptions(incomingCallContext, callbackUri)
-                                {
-                                    OperationContext = participant.id.ToString(),
-                                });
-                            
-                            if (!answerResult.TryGetValue(out var answerResultValue))
-                                return onAnswerFailed("Failed to answer the incoming call.");
-                            
-                            return onAnswered(answerResultValue);
-                        }
-                        catch (Exception ex)
-                        {
-                            // Log error - call will be missed
-                            return onAnswerFailed(ex.Message);
-                        }
-                    },
-                    why => onAnswerFailed(why).AsTask());
-        }
-
-        #endregion
-
         #region Call Orchestration
 
         /// <summary>
@@ -166,7 +75,7 @@ namespace EastFive.Azure.Communications
 
         #region Participant Operations
 
-        internal async Task<TResult> CallParticipantAsync<TResult>(
+        public async Task<TResult> CallParticipantAsync<TResult>(
                 AcsPhoneNumber conferencePhoneNumber,
                 AcsCallParticipant participant,
                 IHttpRequest request,
@@ -347,7 +256,7 @@ namespace EastFive.Azure.Communications
                     why => onFailure(why).AsTask());
         }
 
-        internal async Task MuteParticipantAsync(string phoneNumber)
+        public async Task MuteParticipantAsync(string phoneNumber)
         {
             var phoneCall = this;
             await EastFive.Azure.AppSettings.Communications.Default
@@ -423,6 +332,92 @@ namespace EastFive.Azure.Communications
                     why => onFailure(why).AsTask());
         }
 
+        public async Task<TResult> AnswerAndUpdateCall<TResult>(AcsCallParticipant participant,
+                string incomingCallContext, string fromPhoneNumber,
+                AcsPhoneNumber acsPhoneNumber,
+                IHttpRequest request,
+            Func<AcsPhoneCall, TResult> onAnswered,
+            Func<string, TResult> onFailure)
+        {
+            var phoneCall = this;
+            return await await phoneCall.AnswerCallAsync(
+                    participant, acsPhoneNumber,
+                    incomingCallContext, fromPhoneNumber,
+                    request,
+                onAnswered: async (answerResult) =>
+                {
+                    return await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
+                        (current) =>
+                        {
+                            current.participants = current.participants
+                                .UpdateWhere(
+                                    (p) => p.id == participant.id,
+                                    (p) =>
+                                    {
+                                        // Mark as Inviting - will be Connected after move completes
+                                        // or directly Connected if this is the anchor call
+                                        p.status = ParticipantStatus.Inviting;
+                                        return p;
+                                    })
+                                .ToArray();
+                            return current;
+                        },
+                        (current) =>
+                        {
+                            return onAnswered(current);
+                        },
+                        onNotFound:() => onFailure("AcsPhoneCall deleted."));
+                },
+                onAnswerFailed: (reason) =>
+                {
+                    return onFailure(reason).AsTask();
+                });
+        }
+
+        private async Task<TResultAnswerCall> AnswerCallAsync<TResultAnswerCall>(
+                AcsCallParticipant participant, AcsPhoneNumber acsPhoneNumber,
+                string incomingCallContext, string fromPhoneNumber,
+                IHttpRequest request,
+            Func<AnswerCallResult?, TResultAnswerCall> onAnswered,
+            Func<string, TResultAnswerCall> onAnswerFailed)
+        {
+            var phoneCall = this;
+            var aiPhoneCallApiResources = new RequestQuery<AcsPhoneCall>(request);
+            return await EastFive.Azure.AppSettings.Communications.Default
+                .CreateAutomationClient(
+                    async client =>
+                    {
+                        var callbackUri = aiPhoneCallApiResources
+                            .HttpAction(EventsActionName)
+                            .ById(phoneCall.acsPhoneCallRef)
+                            .CompileRequest()
+                            .RequestUri;
+
+                        try
+                        {
+                            // Answer the incoming call - this creates a new CallConnection
+                            // If a conference exists, the CallConnected event handler will
+                            // detect the different callConnectionId and move the participant
+                            var answerResult = await client.AnswerCallAsync(
+                                new AnswerCallOptions(incomingCallContext, callbackUri)
+                                {
+                                    OperationContext = participant.id.ToString(),
+                                });
+                            
+                            if (!answerResult.TryGetValue(out var answerResultValue))
+                                return onAnswerFailed("Failed to answer the incoming call.");
+                            
+                            return onAnswered(answerResultValue);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log error - call will be missed
+                            return onAnswerFailed(ex.Message);
+                        }
+                    },
+                    why => onAnswerFailed(why).AsTask());
+        }
+
         #endregion
 
         #region Recording
@@ -490,13 +485,6 @@ namespace EastFive.Azure.Communications
             if (eventRoot.TryGetProperty("invitationId", out var invIdElement))
                 return invIdElement.GetString();
             return null;
-        }
-
-        private bool HasBlockedOnNextOutboundParticipant()
-        {
-            return this.participants
-                .Any(participant => participant.status == ParticipantStatus.Inviting &&
-                    participant.direction == CallDirection.InboundBlockedOnNextOutbound);
         }
 
         internal bool TryUpdatingParticipant(Guid participantId, 

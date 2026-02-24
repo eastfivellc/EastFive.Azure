@@ -63,6 +63,12 @@ namespace EastFive.Azure.Communications
         public string label;
 
         /// <summary>
+        /// Caller ID name for outbound calls.
+        /// </summary>
+        [Storage]
+        public string callingUserName;
+
+        /// <summary>
         /// If true, participant will be muted when they connect.
         /// </summary>
         [Storage]
@@ -71,6 +77,10 @@ namespace EastFive.Azure.Communications
         [JsonProperty("is_required")]
         [Storage]
         public bool isRequired;
+
+        [JsonProperty("dont_answer_until_next_outbound")]
+        [Storage]
+        public bool dontAnswerUntilNextOutbound;
 
         /// <summary>
         /// Store this so that when the incoming call arrives we can use it on pickup

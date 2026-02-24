@@ -85,6 +85,14 @@ namespace EastFive.Azure.Communications
                         participant.id = Guid.NewGuid();
                         participant.status = ParticipantStatus.None;
                         participant.invitationId = string.Empty;
+
+                        var unformattedNumber = participant.phoneNumber;
+                        var digitsOnly = new string(unformattedNumber.Where(char.IsDigit).ToArray());
+                        var formattedNumber = digitsOnly.Length == 10
+                                                        ? $"+1{digitsOnly}"
+                                                        : $"+{digitsOnly}";
+
+                        participant.phoneNumber = formattedNumber;
                         return participant;
                     })
                 .ToArray();

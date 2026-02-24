@@ -600,19 +600,11 @@ namespace EastFive.Azure.Communications
                 .First(
                     async (participant, next) =>
                     {
-                        if(participant.direction == CallDirection.Inbound)
-                            return await phoneCall.AnswerAndUpdateCall<TResult>(
-                                    participant,
-                                    incomingCallContext, fromPhoneNumber,
-                                    acsPhoneNumber,
-                                    request,
-                                onAnswered: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
-                                onFailure: (reason) => onFailure(reason));
-                        
-                        return await await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
-                            (current) =>
-                            {
-                                current.participants = current.participants
+                        if(participant.dontAnswerUntilNextOutbound)
+                            return await await phoneCall.acsPhoneCallRef.StorageUpdateAsync2(
+                                (current) =>
+                                {
+                                    current.participants = current.participants
                                         .UpdateWhere(
                                             (p) => p.id == participant.id,
                                             (p) =>
@@ -622,19 +614,27 @@ namespace EastFive.Azure.Communications
                                                 return p;
                                             })
                                         .ToArray();
-                                return current;
-                            },
-                            async (current) =>
-                            {
+                                    return current;
+                                },
+                                async (current) =>
+                                {
                                     // Since we are not answering the call until the next item is processed,
                                     // there will not be a next event to move the processing forward
                                     // so go ahead and process the next call item
-                                return await ProcessCallSequenceAsync(current,
+                                    return await ProcessCallSequenceAsync(current,
                                             request, httpApp,
                                         onProcessed: (finalPhoneCall) => onProcessed(finalPhoneCall),
                                         onFailure: (reason) => onFailure(reason));
-                            },
-                            onNotFound:() => onFailure("AcsPhoneCall deleted.").AsTask());
+                                },
+                                onNotFound:() => onFailure("AcsPhoneCall deleted.").AsTask());
+                        
+                        return await phoneCall.AnswerAndUpdateCall(
+                                participant,
+                                incomingCallContext, fromPhoneNumber,
+                                acsPhoneNumber,
+                                request,
+                            onAnswered: (updatedPhoneCall) => onProcessed(updatedPhoneCall),
+                            onFailure: (reason) => onFailure(reason));
                     },
                     () =>
                     {
