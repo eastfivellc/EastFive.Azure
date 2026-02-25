@@ -57,6 +57,12 @@ namespace EastFive.Azure.Auth
             BadRequestResponse onBadCredentials,
             GeneralConflictResponse onFailure)
         {
+            if("logout".Equals(tag, StringComparison.OrdinalIgnoreCase))
+            {
+                var pathSegments = request.RequestUri.ParsePath();
+                if(pathSegments.Length > 3)
+                    tag = pathSegments.Last().TrimEnd('/');
+            }
             
             if (tag.IsNullOrWhiteSpace())
                 tag = "ACPTool";
@@ -106,6 +112,7 @@ namespace EastFive.Azure.Auth
         [HttpAction("logout")]
         [Unsecured("SAML logout endpoint - receives logout requests/responses, no bearer token available during callback")]
         public static async Task<IHttpResponse> LogoutAsync(
+                [QueryParameter(Name = "tag", CheckFileName = true)]string tag,
                 [Property(Name = SamlResponseParameter)]Property<string> samlResponseMaybe,
                 [Property(Name = RelayStateParameter)]Property<string> relayStateMaybe,
                 IAzureApplication application, IProvideUrl urlHelper,
