@@ -212,6 +212,14 @@ namespace EastFive.Azure.Auth.Google
                 return onInvalidCredentials($"`{GoogleProvider.responseParamRedirectUri}` code was not provided");
             var redirectUri = responseParams[GoogleProvider.responseParamRedirectUri];
 
+            if (responseParams.ContainsKey(GoogleRedirect.IssuerPropertyName))
+            {
+                var issuer = responseParams[GoogleRedirect.IssuerPropertyName];
+                if (!issuer.Equals("https://accounts.google.com", StringComparison.OrdinalIgnoreCase))
+                    return onInvalidCredentials($"Invalid issuer: {issuer}");
+            }
+
+
             return await OAuth.TokenResponse.LoadAsync(this.tokenEndpoint,
                 code, this.clientId, this.clientSecret, redirectUri,
                 (tokenResponse) =>

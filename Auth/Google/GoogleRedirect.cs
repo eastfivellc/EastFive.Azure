@@ -41,9 +41,10 @@ namespace EastFive.Azure.Auth.Google
         public const string AuthUserPropertyName = "authuser";
         public const string PromptPropertyName = "prompt";
         public const string HdPropertyName = "hd";
+        public const string IssuerPropertyName = "iss";
 
         [Unsecured("OAuth callback endpoint - receives authorization code from Google OAuth flow, no bearer token available during OAuth callback")]
-        [HttpGet]
+        [HttpGet(MatchAllQueryParameters = false)]
         public static async Task<IHttpResponse> Redirected(
                 [QueryParameter(Name = StatePropertyName)]string state,
                 [QueryParameter(Name = CodePropertyName)]string code,
@@ -51,6 +52,7 @@ namespace EastFive.Azure.Auth.Google
                 [OptionalQueryParameter(Name = AuthUserPropertyName)] string authUser,
                 [OptionalQueryParameter(Name = PromptPropertyName)] string prompt,
                 [OptionalQueryParameter(Name = HdPropertyName)] string hd,
+                [OptionalQueryParameter(Name = IssuerPropertyName, CheckFileName = true)]string issuer,
                 IAzureApplication application,
                 IHttpRequest request,
                 IProvideUrl urlHelper,
@@ -75,6 +77,12 @@ namespace EastFive.Azure.Auth.Google
                 requestParams.Add(PromptPropertyName, prompt);
             if(hd.HasBlackSpace())
                 requestParams.Add(HdPropertyName, hd);
+            if(issuer.HasBlackSpace())
+            {
+                if(!issuer.Equals("https://accounts.google.com", StringComparison.OrdinalIgnoreCase))
+                    return onBadCredentials().AddReason($"Invalid issuer: {issuer}");
+                requestParams.Add(IssuerPropertyName, issuer);
+            }
 
             var builder = new UriBuilder(request.RequestUri);
             builder.Query = string.Empty;
