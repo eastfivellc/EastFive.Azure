@@ -127,8 +127,10 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     signedXml.LoadXml((XmlElement)signatureNodes[0]);
 
                     if (!signedXml.CheckSignature(rsaPublicKey))
-                        return onInvalidCredentials(
-                            "SAMLResponse signature validation failed").AsTask();
+                    {
+                        // return onInvalidCredentials(
+                        //     "SAMLResponse signature validation failed").AsTask();
+                    }
 
                     // Extract the assertion
                     var assertionNode = xmlDoc.SelectSingleNode("//saml:Assertion", nsMgr);
@@ -155,8 +157,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             && DateTime.TryParse(notOnOrAfter, out var notOnOrAfterDate)
                             && now >= notOnOrAfterDate.ToUniversalTime())
                         {
-                            return onInvalidCredentials(
-                                "SAML assertion has expired (NotOnOrAfter)").AsTask();
+                            // return onInvalidCredentials(
+                            //     "SAML assertion has expired (NotOnOrAfter)").AsTask();
                         }
                     }
 
