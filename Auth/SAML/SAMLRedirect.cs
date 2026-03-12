@@ -4,10 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 
 using EastFive.Api;
-using EastFive.Api.Azure;
-using EastFive.Api.Controllers;
 using EastFive.Azure.Auth.CredentialProviders;
 using EastFive.Extensions;
+using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
@@ -20,6 +19,7 @@ namespace EastFive.Azure.Auth
     {
         public const string SamlResponseParameter = "SAMLResponse";
         public const string RelayStateParameter = "RelayState";
+        public const string MetadataLocationParameter = "MetadataLocation";
 
         [HttpGet(MatchAllParameters = false)]
         [Unsecured("SAML callback endpoint - receives SAML response via query string, no bearer token available during callback")]
@@ -75,37 +75,35 @@ namespace EastFive.Azure.Auth
             return await EastFive.Web.Configuration.Settings.GetString($"AffirmHealth.PDMS.PingRedirect.{tag}.PingAuthName",
                 async pingAuthName =>
                 {
-                        return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
-                            async reportSetId =>
-                            {
-                                var queryParameters = request.RequestUri.ParseQuery();
-                                var formParameters = request.Form
-                                    .Select(kvp => new KeyValuePair<string, string>(kvp.Key, kvp.Value))
-                                    .ToDictionary();
-                                var parameters = queryParameters.Concat(formParameters)
-                                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-                                    .Append("PingAuthName".PairWithValue(pingAuthName))
-                                    .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
-                                    .ToDictionary();
+                    return await EastFive.Web.Configuration.Settings.GetGuid($"AffirmHealth.PDMS.PingRedirect.{tag}.PingReportSetId",
+                        async reportSetId =>
+                        {
+                            return await EastFive.Azure.AppSettings.SAML.GetMetadataLocation(tag).ConfigurationUri(
+                                async metadataLocation =>
+                                {
+                                    var queryParameters = request.RequestUri.ParseQuery();
+                                    var formParameters = request.Form
+                                        .Select(kvp => new KeyValuePair<string, string>(kvp.Key, kvp.Value))
+                                        .ToDictionary();
+                                    var parameters = queryParameters.Concat(formParameters)
+                                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                                        .Append("PingAuthName".PairWithValue(pingAuthName))
+                                        .Append("ReportSetId".PairWithValue(reportSetId.ToString()))
+                                        .Append(MetadataLocationParameter.PairWithValue(metadataLocation.AbsoluteUri))
+                                        .ToDictionary();
 
-                                return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method, parameters,
-                                        application, request, endpoints, urlHelper,
-                                    (redirect, accountIdMaybe) => onRedirectResponse(redirect),
-                                    (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
-                                    (why) => onNoServiceResponse().AddReason(why),
-                                    (why) => onFailure(why));
-                            },
-                            why =>
-                            {
-                                return onFailure(why).AsTask();
-                            });
-                    },
-                    why =>
-                    {
-                        return onFailure(why).AsTask();
-                    });
-
-            
+                                    return await EastFive.Azure.Auth.Redirection.ProcessRequestAsync(method, parameters,
+                                            application, request, endpoints, urlHelper,
+                                        (redirect, accountIdMaybe) => onRedirectResponse(redirect),
+                                        (why) => onBadCredentials().AddReason($"Bad credentials:{why}"),
+                                        (why) => onNoServiceResponse().AddReason(why),
+                                        (why) => onFailure(why));
+                                },
+                                (why) => onFailure(why).AsTask());
+                        },
+                        (why) => onFailure(why).AsTask());
+                },
+                (why) =>onFailure(why).AsTask());
         }
 
         [HttpPost(MatchAllParameters = false)]

@@ -1,20 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
-
-using Newtonsoft.Json;
-
-using EastFive.Api.Services;
 using EastFive.Serialization;
-using EastFive.Web.Configuration;
-using EastFive.Azure.Auth;
 using EastFive.Extensions;
+using System.Net.Http;
 
 namespace EastFive.Azure.Auth.CredentialProviders
 {
@@ -52,7 +45,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             return onProvideAuthorization(new SAMLProvider()).AsTask();
         }
         
-        public Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
+        public async Task<TResult> RedeemTokenAsync<TResult>(IDictionary<string, string> tokens,
             Func<IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onUnauthenticated,
             Func<string, TResult> onInvalidCredentials,
@@ -61,10 +54,13 @@ namespace EastFive.Azure.Auth.CredentialProviders
             Func<string, TResult> onFailure)
         {
             if (!tokens.TryGetValue(SAMLRedirect.SamlResponseParameter, out var samlResponseBase64))
-                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} parameter was not provided").AsTask();
+                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} parameter was not provided");
 
             if (samlResponseBase64.IsNullOrWhiteSpace())
-                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} parameter is empty").AsTask();
+                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} parameter is empty");
+
+            if (!tokens.TryGetValue(SAMLRedirect.MetadataLocationParameter, out var metadataLocationStr) || !Uri.TryCreate(metadataLocationStr, UriKind.Absolute, out var metadataLocation))
+                return onUnspecifiedConfiguration($"{SAMLRedirect.MetadataLocationParameter} was not configured");
 
             byte[] responseBytes;
             try
@@ -73,7 +69,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             }
             catch (FormatException)
             {
-                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} is not valid Base64").AsTask();
+                return onInvalidCredentials($"{SAMLRedirect.SamlResponseParameter} is not valid Base64");
             }
 
             var responseXml = Encoding.UTF8.GetString(responseBytes);
@@ -86,7 +82,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
             }
             catch (XmlException ex)
             {
-                return onInvalidCredentials($"SAMLResponse XML is malformed: {ex.Message}").AsTask();
+                return onInvalidCredentials($"SAMLResponse XML is malformed: {ex.Message}");
             }
 
             var nsMgr = new XmlNamespaceManager(xmlDoc.NameTable);
@@ -100,10 +96,10 @@ namespace EastFive.Azure.Auth.CredentialProviders
             {
                 var statusValue = statusCodeNode.Attributes?["Value"]?.Value ?? string.Empty;
                 if (!statusValue.Equals(StatusSuccess, StringComparison.OrdinalIgnoreCase))
-                    return onUnauthenticated(default, tokens).AsTask();
+                    return onUnauthenticated(default, tokens);
             }
 
-            return EastFive.Azure.AppSettings.SAML.IdPCertificate.ConfigurationBase64Bytes(
+            return await FetchIdPCertificateFromMetadataAsync(metadataLocation,
                 (certBuffer) =>
                 {
                     // Validate the XML signature against the IdP certificate
@@ -111,14 +107,14 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     var rsaPublicKey = certificate.GetRSAPublicKey();
                     if (rsaPublicKey is null)
                         return onInvalidCredentials(
-                            "IdP certificate does not contain an RSA public key").AsTask();
+                            "IdP certificate does not contain an RSA public key");
 
                     var signatureNodes = xmlDoc.GetElementsByTagName(
                         "Signature", DsigNamespace);
 
                     if (signatureNodes.Count == 0)
                         return onInvalidCredentials(
-                            "SAMLResponse does not contain a digital signature").AsTask();
+                            "SAMLResponse does not contain a digital signature");
 
                     // Register ID attributes so SignedXml can resolve
                     // the Reference URI (SAML uses "ID" which is not
@@ -128,15 +124,15 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
                     if (!signedXml.CheckSignature(rsaPublicKey))
                     {
-                        // return onInvalidCredentials(
-                        //     "SAMLResponse signature validation failed").AsTask();
+                        return onInvalidCredentials(
+                            "SAMLResponse signature validation failed");
                     }
 
                     // Extract the assertion
                     var assertionNode = xmlDoc.SelectSingleNode("//saml:Assertion", nsMgr);
                     if (assertionNode is null)
                         return onInvalidCredentials(
-                            "SAMLResponse does not contain an Assertion").AsTask();
+                            "SAMLResponse does not contain an Assertion");
 
                     // Validate time-based conditions
                     var conditionsNode = assertionNode.SelectSingleNode("saml:Conditions", nsMgr);
@@ -149,7 +145,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             && now < notBeforeDate.ToUniversalTime())
                         {
                             return onInvalidCredentials(
-                                "SAML assertion is not yet valid (NotBefore)").AsTask();
+                                "SAML assertion is not yet valid (NotBefore)");
                         }
 
                         var notOnOrAfter = conditionsNode.Attributes?["NotOnOrAfter"]?.Value;
@@ -157,8 +153,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             && DateTime.TryParse(notOnOrAfter, out var notOnOrAfterDate)
                             && now >= notOnOrAfterDate.ToUniversalTime())
                         {
-                            // return onInvalidCredentials(
-                            //     "SAML assertion has expired (NotOnOrAfter)").AsTask();
+                            return onInvalidCredentials(
+                                "SAML assertion has expired (NotOnOrAfter)");
                         }
                     }
 
@@ -188,14 +184,19 @@ namespace EastFive.Azure.Auth.CredentialProviders
 
                             var attrValueNode = attrNode.SelectSingleNode(
                                 "saml:AttributeValue", nsMgr);
-                            resultParams[attrName] = attrValueNode?.InnerText ?? string.Empty;
+
+                            var attrValue = attrValueNode?.InnerText ?? string.Empty;
+                            // filter out invalid values
+                            if (attrValue.HasBlackSpace() && attrValue.Equals(attrName, StringComparison.OrdinalIgnoreCase))
+                                attrValue = string.Empty;
+                            resultParams[attrName] = attrValue;
                         }
                     }
 
                     if (!resultParams.ContainsKey(SamlNameIDKey) && nameId.IsNullOrWhiteSpace())
-                                return onInvalidCredentials(
-                                    $"SAML assertion does not contain attribute [{SamlNameIDKey}] " +
-                                    $"and NameID is empty").AsTask();
+                        return onInvalidCredentials(
+                            $"SAML assertion does not contain attribute [{SamlNameIDKey}] " +
+                            $"and NameID is empty");
 
                     ShimKey(PracticeId);
                     ShimKey(EncounterId);
@@ -203,19 +204,79 @@ namespace EastFive.Azure.Auth.CredentialProviders
                     ShimKey(PatientId);
                     ShimKey(SamlNameIDKey);
 
-                    return onSuccess(resultParams).AsTask();
+                    return onSuccess(resultParams);
 
                     void ShimKey(string expectedName)
                     {
-                                var alternateName = expectedName.ToLower();
-                                if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(alternateName.ToLower(), out string value))
-                                {
-                                    resultParams.Add(expectedName, value);
-                                    resultParams.Remove(alternateName);
-                                }
+                        var alternateName = expectedName.ToLower();
+                        if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(alternateName.ToLower(), out string value))
+                        {
+                            resultParams.Add(expectedName, value);
+                            resultParams.Remove(alternateName);
+                        }
                     }
                 },
-                (why) => onUnspecifiedConfiguration(why).AsTask());
+                (why) => onFailure(why));
+        }
+
+        private static async Task<TResult> FetchIdPCertificateFromMetadataAsync<TResult>(
+            Uri metadataUri,
+            Func<byte[], TResult> onFound,
+            Func<string, TResult> onFailure)
+        {
+            string metadataXml;
+            try
+            {
+                using var httpClient = new HttpClient();
+                metadataXml = await httpClient.GetStringAsync(metadataUri);
+            }
+            catch (Exception ex)
+            {
+                return onFailure($"Failed to fetch IdP metadata from {metadataUri.AbsoluteUri}: {ex.Message}");
+            }
+
+            var metadataDoc = new XmlDocument();
+            try
+            {
+                metadataDoc.LoadXml(metadataXml);
+            }
+            catch (XmlException ex)
+            {
+                return onFailure($"IdP metadata XML is malformed: {ex.Message}");
+            }
+
+            var metadataNsMgr = new XmlNamespaceManager(metadataDoc.NameTable);
+            metadataNsMgr.AddNamespace("md", "urn:oasis:names:tc:SAML:2.0:metadata");
+            metadataNsMgr.AddNamespace("ds", "http://www.w3.org/2000/09/xmldsig#");
+
+            // Extract the signing certificate from the metadata
+            // Look for KeyDescriptor with use="signing" first, fall back to any X509Certificate
+            var certNode = metadataDoc.SelectSingleNode(
+                "//md:KeyDescriptor[@use='signing']/ds:KeyInfo/ds:X509Data/ds:X509Certificate",
+                metadataNsMgr);
+
+            certNode ??= metadataDoc.SelectSingleNode(
+                "//ds:X509Data/ds:X509Certificate",
+                metadataNsMgr);
+
+            if (certNode is null)
+                return onFailure("IdP metadata does not contain a ds:X509Certificate element");
+
+            var certBase64 = certNode.InnerText.Trim().Replace("\n", string.Empty);
+            if (certBase64.IsNullOrWhiteSpace())
+                return onFailure("ds:X509Certificate element in IdP metadata is empty");
+
+            byte[] certBytes;
+            try
+            {
+                certBytes = Convert.FromBase64String(certBase64);
+            }
+            catch (FormatException)
+            {
+                return onFailure("ds:X509Certificate in IdP metadata is not valid Base64");
+            }
+
+            return onFound(certBytes);
         }
 
         public TResult ParseCredentailParameters<TResult>(IDictionary<string, string> responseParams,

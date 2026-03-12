@@ -183,7 +183,7 @@ namespace EastFive.Azure
                 "Used to verify the signature on SAML responses from the Identity Provider.",
                 DeploymentOverrides.Suggested,
                 DeploymentSecurityConcern = false)]
-            public const string IdPCertificate = "EastFive.Security.CredentialProvider.SAML.IdPCertificate";
+            public static string GetMetadataLocation(string tag) => $"EastFive.Security.CredentialProvider.SAML.{tag}.MetadataLocation";
 
             [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " +
                 "This value is used to lookup the user in the local system.",
