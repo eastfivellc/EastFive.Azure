@@ -27,6 +27,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         internal const string SamlNameIDKey = "saml:NameID";
         public const string PracticeId = "practiceID";
         public const string EncounterId = "Encounter id";
+        public const string EncounterIdAlt = "ENCOUNTERID";
         public const string DepartmentId = "departmentID";
         public const string PatientId = "patientID";
 
@@ -199,20 +200,34 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             $"and NameID is empty");
 
                     ShimKey(PracticeId);
-                    ShimKey(EncounterId);
+                    ShimKey(EncounterId, EncounterIdAlt);
                     ShimKey(DepartmentId);
                     ShimKey(PatientId);
                     ShimKey(SamlNameIDKey);
 
                     return onSuccess(resultParams);
 
-                    void ShimKey(string expectedName)
+                    void ShimKey(string expectedName, string alternateName = default)
                     {
-                        var alternateName = expectedName.ToLower();
-                        if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(alternateName.ToLower(), out string value))
+                        var expectedNameAlt = expectedName.ToLower();
+                        if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(expectedNameAlt, out string expectedNameAltValue))
                         {
-                            resultParams.Add(expectedName, value);
-                            resultParams.Remove(alternateName);
+                            resultParams.Add(expectedName, expectedNameAltValue);
+                            resultParams.Remove(expectedNameAlt);
+                        }
+                        if (alternateName.HasBlackSpace())
+                        {
+                            var alternateNameAlt = alternateName.ToLower();
+                            if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(alternateName, out string alternateNameValue))
+                            {
+                                resultParams.Add(expectedName, alternateNameValue);
+                                resultParams.Remove(alternateName);
+                            }
+                            if (!resultParams.ContainsKey(expectedName) && resultParams.TryGetValue(alternateNameAlt, out string alternateNameAltValue))
+                            {
+                                resultParams.Add(expectedName, alternateNameAltValue);
+                                resultParams.Remove(alternateNameAlt);
+                            }
                         }
                     }
                 },
