@@ -190,6 +190,8 @@ namespace EastFive.Azure.Auth.CredentialProviders
                             // filter out invalid values
                             if (attrValue.HasBlackSpace() && attrValue.Equals(attrName, StringComparison.OrdinalIgnoreCase))
                                 attrValue = string.Empty;
+                            if (attrValue.HasBlackSpace() && attrValue.Equals("extraidentifier", StringComparison.OrdinalIgnoreCase))
+                                attrValue = string.Empty;
                             resultParams[attrName] = attrValue;
                         }
                     }
