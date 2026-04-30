@@ -358,9 +358,6 @@ namespace EastFive.Azure.Synchronization
 
     public interface IIntegrate
     {
-        TResult IsResourceTypeSupported<TResult>(string resourceType, string key,
-            Func<EastFive.Api.Resources.WebId, TResult> onSupportedByController,
-            Func<TResult> onNotSupported);
     }
 
     public abstract class Connections
