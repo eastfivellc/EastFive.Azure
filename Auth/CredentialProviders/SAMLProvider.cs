@@ -24,7 +24,10 @@ namespace EastFive.Azure.Auth.CredentialProviders
         internal const string SamlpResponseKey = "samlp:Response";
         internal const string SamlAssertionKey = "saml:Assertion";
         internal const string SamlSubjectKey = "saml:Subject";
-        internal const string SamlNameIDKey = "saml:NameID";
+        public const string SamlNameIDKey = "saml:NameID";
+        public const string LastName = "lastName";
+        public const string FirstName = "firstName";
+        public const string Email = "email";
         public const string PracticeId = "practiceID";
         public const string EncounterId = "Encounter id";
         public const string EncounterIdAlt = "ENCOUNTERID";
