@@ -29,7 +29,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     ///     =&gt; chatsInStorage.StorageInsertAsync(chat, _ =&gt; onCreated(), () =&gt; onAlreadyExists());
     /// </code>
     ///
-    /// MIXING CONCERN: this attribute is v3-only. The legacy
+    /// MIXING CONCERN: this attribute is for the current routing path only. The legacy
     /// <c>StorageQueryInvocationAttribute</c> on <see cref="StorageQuery{T}"/> still
     /// claims bare (un-decorated) <see cref="IQueryable{T}"/> parameters for back-compat;
     /// the two paths coexist until legacy controllers are migrated. New controllers
@@ -77,12 +77,12 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
 
         public SelectParameterResult TryCast(BindingData bindingData)
         {
-            // v2 path is intentionally unsupported. [StorageEntities] only makes
+            // The legacy path is intentionally unsupported. [StorageEntities] only makes
             // sense in v3's BindAndInvokeAsync, which honors IProvideBindingRequirements
             // ahead of legacy IInstigatable* hooks.
             throw new NotSupportedException(
                 $"{nameof(StorageEntitiesAttribute)} requires the v3 binding pipeline " +
-                $"(FunctionViewControllerAttribute.BindAndInvokeAsync).");
+                $"(MethodDispatcher.BindAndInvokeAsync).");
         }
 
         public Parameter GetParameter(ParameterInfo paramInfo, HttpApplication httpApp)

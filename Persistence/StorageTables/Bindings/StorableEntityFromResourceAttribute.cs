@@ -41,7 +41,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     /// Body parsing supports the same three converters as
     /// <see cref="ResourceAttribute"/> (JSON, form-data, plain-text).
     ///
-    /// MIXING CONCERN: this attribute is v3-only.
+    /// MIXING CONCERN: this attribute is for the current routing path only.
     /// </summary>
     [AttributeUsage(AttributeTargets.Parameter)]
     public sealed class StorableEntityFromResourceAttribute : Attribute,
@@ -88,19 +88,18 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
                 });
 
             // assemble: converter returned the deserialized entity (T as object);
-            // wrap it in a StorableEntity<T> together with the scoped driver.
+            // wrap it in a StorableEntity<T> together with the scoped driver
+            // via the type's public factory (open-generic reified per call).
             AssembleParameter assemble = boundValues =>
             {
                 var entity = boundValues[0];
                 var provider = StorageDriverScope.Resolve(parameter);
                 var driver = provider.GetDriver();
                 var storableType = typeof(StorableEntity<>).MakeGenericType(entityType);
-                var ctor = storableType.GetConstructor(
-                    BindingFlags.Instance | BindingFlags.NonPublic,
-                    binder: null,
-                    types: new[] { entityType, typeof(EastFive.Persistence.Azure.StorageTables.Driver.AzureTableDriverDynamic) },
-                    modifiers: null);
-                var storable = ctor.Invoke(new[] { entity, driver });
+                var factory = storableType.GetMethod(
+                    nameof(StorableEntity<IReferenceable>.FromDeserialized),
+                    BindingFlags.Public | BindingFlags.Static);
+                var storable = factory.Invoke(null, new object[] { entity, driver });
                 return (storable, null);
             };
 
@@ -109,12 +108,12 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
 
         public SelectParameterResult TryCast(BindingData bindingData)
         {
-            // v2 path is intentionally unsupported. [StorableEntityFromResource] only
+            // The legacy path is intentionally unsupported. [StorableEntityFromResource] only
             // makes sense in v3's BindAndInvokeAsync, which honors
             // IProvideBindingRequirements ahead of legacy IInstigatable* hooks.
             throw new NotSupportedException(
                 $"{nameof(StorableEntityFromResourceAttribute)} requires the v3 binding pipeline " +
-                $"(FunctionViewControllerAttribute.BindAndInvokeAsync).");
+                $"(MethodDispatcher.BindAndInvokeAsync).");
         }
 
         public Parameter GetParameter(ParameterInfo paramInfo, HttpApplication httpApp)

@@ -76,6 +76,11 @@ namespace EastFive.Azure.Persistence.StorageTables
             IHandleFailedModifications<TResult>[] onModificationFailures = default)
             where T : IReferenceable
         {
+            if (stored.TestBackend != null)
+                return stored.TestBackend.UpdateAsync<TResult>(
+                    stored.Entity,
+                    onUpdate,
+                    onNotFound ?? (() => default(TResult)));
             var key = (AzureStorageTableStorageKey<T>)stored.Key;
             return stored.Driver.UpdateAsync<T, TResult>(key.RowKey, key.PartitionKey,
                 onUpdate: (entity, callback) =>
@@ -101,6 +106,11 @@ namespace EastFive.Azure.Persistence.StorageTables
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = default)
             where T : IReferenceable
         {
+            if (stored.TestBackend != null)
+                return stored.TestBackend.DeleteAsync<TResult>(
+                    stored.Entity,
+                    onDeleted,
+                    onNotFound ?? (() => default(TResult)));
             var key = (AzureStorageTableStorageKey<T>)stored.Key;
             return stored.Driver.DeleteAsync<T, TResult>(key.RowKey, key.PartitionKey,
                 onSuccess: onDeleted,

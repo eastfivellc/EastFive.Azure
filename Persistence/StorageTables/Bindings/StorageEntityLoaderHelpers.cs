@@ -136,6 +136,12 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
         /// that hands the chain a parameter list with this owner's slot
         /// replaced by the full <see cref="StorageEntity{T}"/>. On miss /
         /// failure the closure short-circuits with the appropriate response.
+        ///
+        /// Thin trampoline: resolves the per-parameter driver scope and
+        /// dispatches to <c>StorageEntity&lt;T&gt;.LoadByKeyAsync</c> via
+        /// reflection (open generic over the entity type). The load body
+        /// lives on the entity wrapper so it is discoverable on the type
+        /// that represents the loaded record.
         /// </summary>
         public static Task<ParameterMutation> LoadEntityAsync(
             ParameterInfo ownerParameter,
@@ -167,12 +173,12 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             var driverProvider = StorageDriverScope.Resolve(ownerParameter);
             var driver = driverProvider.GetDriver();
 
-            var shim = typeof(LoaderReflectionShim)
-                .GetMethod(nameof(LoaderReflectionShim.LoadEntityAsyncCore),
-                    BindingFlags.Static | BindingFlags.NonPublic)
-                .MakeGenericMethod(entityType);
+            var storageEntityType = typeof(StorageEntity<>).MakeGenericType(entityType);
+            var loader = storageEntityType.GetMethod(
+                nameof(StorageEntity<IReferenceable>.LoadByKeyAsync),
+                BindingFlags.Public | BindingFlags.Static);
 
-            return (Task<ParameterMutation>)shim.Invoke(null,
+            return (Task<ParameterMutation>)loader.Invoke(null,
                 new object[] { driver, slotValue, ownerParameter, bindings ?? Array.Empty<KeyValuePair<string, object>>(), routeData, cancellationToken });
         }
 
@@ -184,68 +190,6 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             if (t.GetGenericTypeDefinition() != typeof(StorageEntity<>))
                 return null;
             return t.GenericTypeArguments[0];
-        }
-    }
-
-    /// <summary>
-    /// Reflection shim — must be a separate class so the open generic
-    /// <c>LoadEntityAsyncCore&lt;TEntity&gt;</c> can be reified per entity.
-    /// </summary>
-    internal static class LoaderReflectionShim
-    {
-        internal static async Task<ParameterMutation> LoadEntityAsyncCore<TEntity>(
-            AzureTableDriverDynamic driver,
-            object partialSlotValue,
-            ParameterInfo ownerParameter,
-            IReadOnlyList<KeyValuePair<string, object>> bindings,
-            IHttpRequest routeData,
-            CancellationToken cancellationToken)
-            where TEntity : IReferenceable
-        {
-            // cancellationToken: no driver overload accepts it today. A
-            // sibling short-circuit lets this load complete; the orchestrator
-            // observes the orphan in finally.
-            _ = cancellationToken;
-
-            var partial = (StorageEntity<TEntity>)partialSlotValue;
-            var key = (AzureStorageTableStorageKey<TEntity>)partial.Key;
-
-            // Identifier shown to clients on 404 / 500. Prefer wire-level
-            // bindings (e.g. "id=<guid>"); fall back to the storage-shaped
-            // key when no bindings were captured.
-            string Describe() => bindings.Count > 0
-                ? string.Join(", ", bindings.Select(kvp => $"{kvp.Key}={kvp.Value}"))
-                : (string.Equals(key.RowKey, key.PartitionKey, StringComparison.Ordinal)
-                    ? key.RowKey
-                    : $"row='{key.RowKey}', partition='{key.PartitionKey}'");
-
-            // Run the load now (parallel pre-work). The continuation captures
-            // the eventual response factory — driver returns Task<TResult>
-            // where TResult is itself the response factory, so we await once
-            // and the factory yields the per-outcome mutation closure.
-            return await driver.LoadStorageEntityAsync<TEntity, ParameterMutation>(
-                key,
-                onFound: full => (req, parms, @continue) =>
-                {
-                    // Replace this owner's slot with the loaded full entity
-                    // and hand the next link the new list.
-                    var updated = parms
-                        .Select(kvp => kvp.Key == ownerParameter
-                            ? new KeyValuePair<ParameterInfo, object>(ownerParameter, full)
-                            : kvp)
-                        .ToArray();
-                    return @continue(req, updated);
-                },
-                onNotFound: () => (req, parms, @continue) =>
-                    routeData
-                        .CreateResponse(HttpStatusCode.NotFound)
-                        .AddReason($"{typeof(TEntity).Name} not found ({Describe()})")
-                        .AsTask(),
-                onFailure: (code, msg) => (req, parms, @continue) =>
-                    routeData
-                        .CreateResponse(HttpStatusCode.InternalServerError)
-                        .AddReason($"storage failure loading {typeof(TEntity).Name} ({Describe()}): [{code}] {msg}")
-                        .AsTask());
         }
     }
 }
