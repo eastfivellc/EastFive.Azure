@@ -46,5 +46,15 @@ namespace EastFive.Azure.Persistence.StorageTables
         /// <see cref="StorableEntityExtensions.MutateEntity{T}"/>.
         /// </summary>
         internal StorableEntity<T> WithEntity(T entity) => new StorableEntity<T>(entity, this.Driver);
+
+        /// <summary>
+        /// Loader pipeline factory: wrap a body-deserialized entity together
+        /// with its scoped driver into a <see cref="StorableEntity{T}"/>.
+        /// Called by <c>[StorableEntityFromResource]</c>'s assemble closure
+        /// (via generic dispatch over <typeparamref name="T"/>); not part of
+        /// the surface controller bodies use.
+        /// </summary>
+        public static StorableEntity<T> FromDeserialized(T entity, AzureTableDriverDynamic driver)
+            => new StorableEntity<T>(entity, driver);
     }
 }

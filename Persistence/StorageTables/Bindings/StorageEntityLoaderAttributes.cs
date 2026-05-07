@@ -35,7 +35,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     ///      <see cref="ParameterMutation"/> hands the chain a parameter list
     ///      with this owner's slot replaced by the fully-loaded entity.
     ///
-    /// MIXING CONCERN: this attribute is v3-only today.
+    /// MIXING CONCERN: this attribute is for the current routing path only.
     /// </summary>
     [AttributeUsage(AttributeTargets.Parameter)]
     public abstract class StorageEntityLoaderAttributeBase : Attribute,
@@ -180,14 +180,14 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
                 owner, bindings, parameterSelection, routeData, cancellationToken);
         }
 
-        // v2 path (IBindApiValue.TryCast): not supported. Loader attributes only
+        // The legacy path (IBindApiValue.TryCast): not supported. Loader attributes only
         // make sense with v3's BindAndInvokeAsync where a post-bind validator
         // chain can swap a partial slot for the loaded entity.
         public virtual SelectParameterResult TryCast(BindingData bindingData)
         {
             throw new NotSupportedException(
                 $"{GetType().Name} requires the v3 binding pipeline " +
-                $"(FunctionViewControllerAttribute.BindAndInvokeAsync). " +
+                $"(MethodDispatcher.BindAndInvokeAsync). " +
                 $"Mark the controller's [FunctionViewController] route to use v3 dispatch.");
         }
 
