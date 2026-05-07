@@ -26,7 +26,7 @@ namespace EastFive.Azure.Auth
 
         public static Header GetTokenHeader(Api.Resources.Method method, ParameterInfo parameter)
         {
-            if (!method.MethodPoco.TryGetAttributeInterface(out IValidateHttpRequest requestValidator))
+            if (!method.MethodPoco.TryGetAttributeInterface(out IHandleMethodInvocation requestValidator))
                 return new Header()
                 {
                     key = $"{{{{{EastFive.Azure.Workflows.AuthorizationFlow.Variables.AuthHeaderName}}}}}",
