@@ -36,7 +36,7 @@ using System.Net.Mime;
 
 namespace EastFive.Persistence.Azure.StorageTables.Driver
 {
-    public class AzureTableDriverDynamic
+    public partial class AzureTableDriverDynamic
     {
         public const int DefaultNumberOfTimesToRetry = 10;
         protected static readonly TimeSpan DefaultBackoffForRetry = TimeSpan.FromSeconds(4);

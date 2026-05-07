@@ -20,7 +20,7 @@ using EastFive.Linq;
 
 namespace EastFive.Azure.Monitoring
 {
-    public class ApplicationInsightsRouteHandlerAttribute : Attribute, IHandleRoutes, IHandleMethods, IHandleExceptions
+    public class ApplicationInsightsRouteHandlerAttribute : Attribute, IHandleRoutes, IHandleMethodInvocation, IHandleExceptions
     {
         public const string TelemetryStatusType = "StatusType";
         public const string TelemetryStatusName = "StatusName";
@@ -101,14 +101,16 @@ namespace EastFive.Azure.Monitoring
             return response;
         }
  
-        public async Task<IHttpResponse> HandleMethodAsync(MethodInfo method,
-            KeyValuePair<ParameterInfo, object>[] queryParameters, 
+        public async Task<IHttpResponse> HandleMethodInvocationAsync(
+            KeyValuePair<ParameterInfo, object>[] parameters,
+            IReadOnlyDictionary<ParameterInfo, object> bindingContexts,
+            MethodInfo method,
             IApplication httpApp, IHttpRequest request, 
-            MethodHandlingDelegate continueExecution)
+            InvokeMethodDelegate continueInvocation)
         {
             var telemetry = request.GetRequestTelemetry();
             telemetry.Name = $"{request.Method} - {method.DeclaringType.FullName}..{method.Name}";
-            var response = await continueExecution(method, queryParameters, httpApp, request);
+            var response = await continueInvocation(parameters, bindingContexts, method, httpApp, request);
 
             return response;
 

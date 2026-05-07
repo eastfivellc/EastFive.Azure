@@ -43,7 +43,7 @@ namespace EastFive.Azure.Communications
     /// Apply attributes implementing this interface to the application class (e.g., Startup)
     /// to receive incoming events dispatched by webhook endpoints.
     /// 
-    /// Follows the Attribute Interface pattern used by IHandleRoutes, IHandleMethods, etc.
+    /// Follows the Attribute Interface pattern used by IHandleRoutes, IHandleMethodInvocation, etc.
     /// </summary>
     public interface IHandleIncomingEvent
     {

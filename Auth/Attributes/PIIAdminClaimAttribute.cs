@@ -9,21 +9,22 @@ using EastFive.Extensions;
 namespace EastFive.Azure.Auth
 {
     //[ApiVoucherQueryDefinition]
-    public class PIIAdminClaimAttribute : AuthorizationTokenAttribute, IValidateHttpRequest
+    public class PIIAdminClaimAttribute : AuthorizationTokenAttribute, IHandleMethodInvocation
     {
         private const string ClaimValue = ClaimValues.Roles.PIIAdminRole;
         public bool AllowLocalHost { get; set; } = false;
 
-        public Task<IHttpResponse> ValidateRequest(
-            KeyValuePair<ParameterInfo, object>[] parameterSelection,
+        public Task<IHttpResponse> HandleMethodInvocationAsync(
+            KeyValuePair<ParameterInfo, object>[] parameters,
+            IReadOnlyDictionary<ParameterInfo, object> bindingContexts,
             MethodInfo method,
             IApplication httpApp,
             IHttpRequest request,
-            ValidateHttpDelegate boundCallback)
+            InvokeMethodDelegate continueInvocation)
         {
             if (AllowLocalHost)
                 if (request.IsLocalHostRequest())
-                    return boundCallback(parameterSelection, method, httpApp, request);
+                    return continueInvocation(parameters, bindingContexts, method, httpApp, request);
 
             if (!request.IsAuthorizedForRole(ClaimValue))
                 return request
@@ -31,7 +32,7 @@ namespace EastFive.Azure.Auth
                     .AddReason($"{method.DeclaringType.FullName}..{method.Name} requires roll claim `{ClaimValue}`")
                     .AsTask();
 
-            return boundCallback(parameterSelection, method, httpApp, request);
+            return continueInvocation(parameters, bindingContexts, method, httpApp, request);
         }
     }
 }

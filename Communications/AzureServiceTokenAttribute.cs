@@ -44,7 +44,7 @@ namespace EastFive.Azure.Communications
     /// Supports ACS Call Automation and Event Grid Azure AD tokens.
     /// Uses cryptographic signature validation against published JWKS keys.
     /// </summary>
-    public class AzureServiceTokenAttribute : Attribute, IValidateHttpRequest
+    public class AzureServiceTokenAttribute : Attribute, IHandleMethodInvocation
     {
         /// <summary>
         /// The Azure service issuer to validate tokens against.
@@ -87,12 +87,13 @@ namespace EastFive.Azure.Communications
 
         #endregion
 
-        public async Task<IHttpResponse> ValidateRequest(
-            KeyValuePair<ParameterInfo, object>[] parameterSelection,
+        public async Task<IHttpResponse> HandleMethodInvocationAsync(
+            KeyValuePair<ParameterInfo, object>[] parameters,
+            IReadOnlyDictionary<ParameterInfo, object> bindingContexts,
             MethodInfo method,
             IApplication httpApp,
             IHttpRequest request,
-            ValidateHttpDelegate boundCallback)
+            InvokeMethodDelegate continueInvocation)
         {
             // Event Grid subscription validation requests do not include a token.
             // Allow them through so the validation handler can respond with the validation code.
@@ -106,7 +107,7 @@ namespace EastFive.Azure.Communications
                     if (request.Headers.TryGetValue("aeg-event-type", out var aegEventType) 
                         && aegEventType.Any(v => "SubscriptionValidation".Equals(v, StringComparison.OrdinalIgnoreCase)))
                     {
-                        return await boundCallback(parameterSelection, method, httpApp, request);
+                        return await continueInvocation(parameters, bindingContexts, method, httpApp, request);
                     }
 
                     return request.CreateResponse(HttpStatusCode.Unauthorized)
@@ -124,7 +125,7 @@ namespace EastFive.Azure.Communications
                                 authHeader,
                             async () =>
                             {
-                                return await boundCallback(parameterSelection, method, httpApp, request);
+                                return await continueInvocation(parameters, bindingContexts, method, httpApp, request);
                             },
                             (why) => next());
                     },

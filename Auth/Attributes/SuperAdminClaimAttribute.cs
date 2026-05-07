@@ -9,7 +9,7 @@ using EastFive.Web.Configuration;
 
 namespace EastFive.Azure.Auth
 {
-    public class SuperAdminClaimAttribute : AuthorizationTokenAttribute, IValidateHttpRequest
+    public class SuperAdminClaimAttribute : AuthorizationTokenAttribute, IHandleMethodInvocation
     {
         private const string ClaimType = System.Security.Claims.ClaimTypes.Role;
         private const string ClaimValue = ClaimValues.Roles.SuperAdmin;
@@ -22,19 +22,20 @@ namespace EastFive.Azure.Auth
                 onFailure: (why) => false,
                 onNotSpecified: () => false);
 
-        public Task<IHttpResponse> ValidateRequest(
-            KeyValuePair<ParameterInfo, object>[] parameterSelection,
+        public Task<IHttpResponse> HandleMethodInvocationAsync(
+            KeyValuePair<ParameterInfo, object>[] parameters,
+            IReadOnlyDictionary<ParameterInfo, object> bindingContexts,
             MethodInfo method,
             IApplication httpApp,
             IHttpRequest request,
-            ValidateHttpDelegate boundCallback)
+            InvokeMethodDelegate continueInvocation)
         {
             if (request.IsAuthorizedFor(new Uri(ClaimType), ClaimValue))
-                return boundCallback(parameterSelection, method, httpApp, request);
+                return continueInvocation(parameters, bindingContexts, method, httpApp, request);
 
             if(AllowLocalHost || allowLocalHostGlobal)
                 if(request.IsLocalHostRequest())
-                    return boundCallback(parameterSelection, method, httpApp, request);
+                    return continueInvocation(parameters, bindingContexts, method, httpApp, request);
 
             return request
                     .CreateResponse(System.Net.HttpStatusCode.Forbidden)

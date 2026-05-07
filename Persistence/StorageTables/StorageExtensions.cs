@@ -1051,6 +1051,40 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     onModificationFailures: onModificationFailures);
         }
 
+        /// <summary>
+        /// Inserts <paramref name="entity"/> into the datastore that backs
+        /// <paramref name="source"/>. The queryable must originate from the storage
+        /// instigation pipeline (e.g. a <c>[StorageEntities]</c>-decorated parameter
+        /// or the legacy <see cref="EastFive.Azure.Persistence.AzureStorageTables.StorageQueryInvocationAttribute"/>);
+        /// the underlying <see cref="StorageQuery{TEntity}.StorageDriver"/> is what
+        /// receives the create call.
+        /// </summary>
+        /// <remarks>
+        /// MIXING CONCERN: queryable-bound writes deliberately bypass
+        /// <c>FromSettings()</c> so per-parameter datastore overrides
+        /// (e.g. <c>[RosemaryDataLake][StorageEntities]</c>) actually take effect for
+        /// inserts. Pairs with the read-side <c>StorageEntity{T}</c> pipeline.
+        /// </remarks>
+        public static Task<TResult> StorageInsertAsync<TEntity, TResult>(
+            this IQueryable<TEntity> source,
+            TEntity entity,
+            Func<EastFive.Persistence.Azure.StorageTables.IAzureStorageTableEntity<TEntity>, TResult> onCreated,
+            Func<TResult> onAlreadyExists = default,
+            params IHandleFailedModifications<TResult>[] onModificationFailures)
+        {
+            if (!(source is StorageQuery<TEntity> sq))
+                throw new InvalidOperationException(
+                    $"StorageInsertAsync requires an IQueryable<{typeof(TEntity).Name}> produced by " +
+                    $"the storage pipeline (e.g. a [StorageEntities] parameter); got " +
+                    $"'{source?.GetType().FullName ?? "<null>"}'.");
+
+            return sq.StorageDriver
+                .CreateAsync(entity,
+                    onSuccess: (e, tr) => onCreated(e),
+                    onAlreadyExists: onAlreadyExists,
+                    onModificationFailures: onModificationFailures);
+        }
+
 
 
         #endregion
