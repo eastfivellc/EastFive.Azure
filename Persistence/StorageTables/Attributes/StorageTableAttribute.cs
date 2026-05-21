@@ -20,21 +20,31 @@ namespace EastFive.Persistence.Azure.StorageTables
     {
         public string TableName { get; set; }
 
-        public IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
+        public virtual IAzureStorageTableEntity<TEntity> GetEntity<TEntity>(TEntity entity)
         {
-            var creatableEntity = new TableEntity<TEntity>();
+            var creatableEntity = CreateWrapper<TEntity>();
             creatableEntity.Entity = entity;
             return creatableEntity;
         }
 
-        public TEntity CreateEntityInstance<TEntity>(string rowKey, string partitionKey,
+        public virtual TEntity CreateEntityInstance<TEntity>(string rowKey, string partitionKey,
             IDictionary<string, EntityProperty> properties,
             string etag, DateTimeOffset lastUpdated)
         {
-            return TableEntity<TEntity>.CreateEntityInstance(rowKey, partitionKey,
-                lastUpdated, etag,
-                properties);
+            var wrapper = CreateWrapper<TEntity>();
+            wrapper.PartitionKey = partitionKey;
+            wrapper.RowKey = rowKey;
+            wrapper.Timestamp = lastUpdated;
+            wrapper.ETag = etag;
+            wrapper.ReadEntity(properties, null);
+            return wrapper.Entity;
         }
+
+        /// <summary>
+        /// Factory hook for subclassed attributes (see <see cref="StorageTable2Attribute"/>)
+        /// that need to substitute a custom entity wrapper.
+        /// </summary>
+        protected virtual TableEntity<TEntity> CreateWrapper<TEntity>() => new TableEntity<TEntity>();
 
         public string GetTableName(Type tableType)
         {
@@ -68,7 +78,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             return query.Where(whereExpression);
         }
 
-        private class TableEntity<EntityType> : 
+        protected internal class TableEntity<EntityType> :
             IWrapTableEntity<EntityType>,
             IAzureStorageTableEntity<EntityType>,
             IAzureStorageTableEntityBatchable
@@ -231,7 +241,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                     });
             }
 
-            public void ReadEntity(
+            public virtual void ReadEntity(
                 IDictionary<string, EntityProperty> properties, OperationContext operationContext)
             {
                 this.rawProperties = properties;
@@ -265,7 +275,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 return entity;
             }
 
-            public IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
+            public virtual IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
             {
                 var type = typeof(EntityType);
                 var valuesToStore = type
