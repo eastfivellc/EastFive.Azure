@@ -1,46 +1,48 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 
 using EastFive.Api;
+using EastFive.Api.Binding;
 using EastFive.Api.Bindings;
-using EastFive.Api.Resources;
 using EastFive.Extensions;
-using EastFive.Linq;
 using EastFive.Reflection;
 
 namespace EastFive.Azure.Persistence.StorageTables.Bindings
 {
     /// <summary>
-    /// Base for the loader attributes
-    /// (<c>[StorageEntityFromQueryId]</c>, <c>[StorageEntityFromQueryParam]</c>,
+    /// Base for the V3 loader attributes
+    /// (<c>[StorageEntityFromQueryId]</c>,
+    /// <c>[StorageEntityFromQueryParam]</c>,
     /// <c>[StorageEntityFromRoute]</c>) that pre-load a record into a
     /// <see cref="StorageEntity{T}"/> parameter slot.
-    ///
-    /// Two-step pipeline (see <see cref="StorageEntityLoaderHelpers"/>):
-    ///   1. <see cref="IProvideBindingRequirements.GetParameterBinding"/>
-    ///      returns one <see cref="BindingRequirement"/> per key member of
-    ///      the entity type plus an <see cref="AssembleParameter"/> closure.
-    ///      The closure (a) builds a partial <see cref="StorageEntity{T}"/>
-    ///      (key only, entity = default) for the parameter slot and
-    ///      (b) publishes the wire-level (name, value) bindings as the
-    ///      per-parameter binding context for diagnostic 404 messages.
-    ///   2. <see cref="IValidateHttpRequestForBoundParameters.ValidateBoundParametersForRequest"/>
-    ///      performs the async load via the driver resolved through
-    ///      <see cref="StorageDriverScope"/>; its returned
-    ///      <see cref="ParameterMutation"/> hands the chain a parameter list
-    ///      with this owner's slot replaced by the fully-loaded entity.
-    ///
-    /// MIXING CONCERN: this attribute is for the current routing path only.
+    /// <para>
+    /// <b>Selection</b> (sync, in <see cref="TrySelectSource"/>): the attribute
+    /// discovers the entity's key members, resolves each one's wire name,
+    /// reads each raw string from <see cref="IRequestEnvelopeV3.Query"/> and/or
+    /// <see cref="IRequestEnvelopeV3.Route"/> per <see cref="Source"/>. If any
+    /// key part is missing the method does not apply. On a hit it resolves
+    /// the driver eagerly via <see cref="StorageDriverScope"/>, packs the raw
+    /// wire-name → string map onto a <see cref="StorageBoundSource"/>, and
+    /// emits a <see cref="BindCall"/> that dispatches the wrapper via
+    /// <c>onObject</c>.
+    /// </para>
+    /// <para>
+    /// <b>Bind</b> (async, in <see cref="StorageEntityBinder"/>): the binder
+    /// parses each raw key part via the application binder, builds the
+    /// partial entity, runs the async load, and surfaces the loaded full
+    /// <see cref="StorageEntity{T}"/> (or a 404-coded <see cref="BindFailure"/>).
+    /// </para>
+    /// <para>
+    /// <see cref="IModifyRoutePattern"/> is kept here because route-pattern
+    /// shaping is orthogonal to dispatch — it runs at route-registration
+    /// time and lets path-sourced loaders append the trailing capture group.
+    /// </para>
     /// </summary>
     [AttributeUsage(AttributeTargets.Parameter)]
     public abstract class StorageEntityLoaderAttributeBase : Attribute,
-        IBindApiValue, IDocumentParameter, IProvideBindingRequirements,
-        IValidateHttpRequestForBoundParameters, IModifyRoutePattern
+        IBindFromRequest, IModifyRoutePattern
     {
         /// <summary>
         /// Single-key shortcut: when the entity has exactly one key member and
@@ -60,63 +62,59 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
 
         protected abstract BindingSource Source { get; }
 
-        public virtual string GetKey(ParameterInfo paramInfo)
+        public bool TrySelectSource(IRequestEnvelopeV3 envelope, ParameterInfo parameter,
+            out BindCall call)
         {
-            if (this.Name.HasBlackSpace())
-                return this.Name;
-            return paramInfo.Name;
+            call = null;
+            var entityType = ExtractEntityType(parameter);
+            if (entityType == null) return false;
+
+            var keyMembers = KeyMemberDiscovery.DiscoverKeyMembers(entityType);
+            if (keyMembers.Length == 0) return false;
+
+            var wireNames = ResolveWireNames(keyMembers);
+            var rawKeys = new KeyValuePair<string, string>[wireNames.Length];
+
+            var allowPath = (this.Source & BindingSource.Path) != 0;
+            var allowQuery = (this.Source & BindingSource.Query) != 0;
+
+            for (var i = 0; i < wireNames.Length; i++)
+            {
+                if (!TryReadRaw(envelope, wireNames[i], allowQuery, allowPath, out var raw))
+                    return false;
+                rawKeys[i] = new KeyValuePair<string, string>(wireNames[i], raw);
+            }
+
+            var provider = StorageDriverScope.Resolve(parameter);
+            var driver = provider.GetDriver();
+            var storageSrc = new StorageBoundSource(inner: null, driver: driver, rawBody: rawKeys);
+            call = StorableEntityFromResourceAttribute.MakeStorageObjectCall(storageSrc);
+            return true;
         }
 
-        public (IReadOnlyList<BindingRequirement> requirements, AssembleParameter assemble)
-            GetParameterBinding(ParameterInfo parameter)
+        private static bool TryReadRaw(IRequestEnvelopeV3 envelope, string wireName,
+            bool allowQuery, bool allowPath, out string raw)
         {
-            var entityType = StorageEntityLoaderHelpers.ExtractEntityType(parameter);
-            if (entityType == null)
-                throw new InvalidOperationException(
-                    $"parameter '{parameter.Name}' must be StorageEntity<T> where T : IReferenceable");
-
-            // Per-parameter precomputation closed over by the requirements'
-            // converters and the assemble closure: discover key members once,
-            // resolve wire names once, capture the binding source.
-            var keyMembers = KeyMemberDiscovery.DiscoverKeyMembers(entityType);
-            var wireNames = ResolveWireNames(keyMembers);
-            var source = this.Source;
-
-            var requirements = keyMembers
-                .Select((km, idx) =>
-                {
-                    var memberType = km.Member.GetPropertyOrFieldType();
-                    return new BindingRequirement(
-                            path: wireNames[idx],
-                            source: source,
-                            parameter: parameter,
-                            isOptional: false)
-                        .AddConverter<string>((raw, param, app, req, onParsed, onFailure) =>
-                        {
-                            return StorageEntityLoaderHelpers.BindKeyMemberFromString(
-                                raw, km, memberType, app, req,
-                                onSuccess: value => onParsed(value),
-                                onFailure: msg => onFailure(msg));
-                        });
-                })
-                .ToList();
-
-            // Assemble produces:
-            //  - value:   partial StorageEntity<T> (key only). Validator's
-            //             mutation replaces it with the loaded full form
-            //             before continuing the chain.
-            //  - context: wire-level (name, value) bindings, used by the
-            //             post-bind validator for diagnostic 404 messages.
-            AssembleParameter assemble = boundValues =>
+            // Path captures take precedence when both are allowed — matches the
+            // V2 loader's BindingSource.Query|Path semantics where a route value
+            // outranks a query value when both are present.
+            if (allowPath && envelope.Route != null
+                && envelope.Route.TryGetValue(wireName, out var routeVal)
+                && routeVal.HasBlackSpace())
             {
-                var partial = StorageEntityLoaderHelpers.BuildPartialStorageEntity(
-                    entityType, boundValues);
-                var bindings = StorageEntityLoaderHelpers.BuildBindings(
-                    wireNames, boundValues);
-                return (partial, bindings);
-            };
-
-            return (requirements, assemble);
+                raw = routeVal;
+                return true;
+            }
+            if (allowQuery && envelope.Query != null
+                && envelope.Query.TryGetValue(wireName, out var values)
+                && values is { Length: > 0 }
+                && values[0].HasBlackSpace())
+            {
+                raw = values[0];
+                return true;
+            }
+            raw = null;
+            return false;
         }
 
         private string[] ResolveWireNames(KeyMemberDiscovery.KeyMember[] keyMembers)
@@ -140,17 +138,16 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
         }
 
         /// <summary>
-        /// Append a trailing capture group for the first key member when
-        /// this loader sources from the URL path. Composite-key URLs
-        /// (multiple path captures) are out of scope today — the framework
-        /// will only emit one capture to preserve the legacy
-        /// <c>/api/Resource/{id}</c> shape.
+        /// Append a trailing capture group for the first key member when this
+        /// loader sources from the URL path. Composite-key URLs (multiple path
+        /// captures) are out of scope today — the framework only emits one
+        /// capture to preserve the legacy <c>/api/Resource/{id}</c> shape.
         /// </summary>
         public string ModifyRoutePattern(MethodInfo method, ParameterInfo parameter, string currentPattern)
         {
             if ((this.Source & BindingSource.Path) == 0)
                 return currentPattern;
-            var entityType = StorageEntityLoaderHelpers.ExtractEntityType(parameter);
+            var entityType = ExtractEntityType(parameter);
             if (entityType == null)
                 return currentPattern;
             var keyMembers = KeyMemberDiscovery.DiscoverKeyMembers(entityType);
@@ -160,47 +157,12 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             return RoutePattern.AppendTrailingCapture(currentPattern, wireNames[0]);
         }
 
-        public Task<ParameterMutation> ValidateBoundParametersForRequest(
-            ParameterInfo owner,
-            IReadOnlyDictionary<ParameterInfo, object> bindingContexts,
-            IReadOnlyList<KeyValuePair<ParameterInfo, object>> parameterSelection,
-            MethodInfo method,
-            IApplication httpApp,
-            IHttpRequest routeData,
-            CancellationToken cancellationToken)
+        private static Type ExtractEntityType(ParameterInfo parameter)
         {
-            IReadOnlyList<KeyValuePair<string, object>> bindings = Array.Empty<KeyValuePair<string, object>>();
-            if (bindingContexts != null
-                && bindingContexts.TryGetValue(owner, out var ctx)
-                && ctx is IReadOnlyList<KeyValuePair<string, object>> bs)
-            {
-                bindings = bs;
-            }
-            return StorageEntityLoaderHelpers.LoadEntityAsync(
-                owner, bindings, parameterSelection, routeData, cancellationToken);
-        }
-
-        // The legacy path (IBindApiValue.TryCast): not supported. Loader attributes only
-        // make sense with v3's BindAndInvokeAsync where a post-bind validator
-        // chain can swap a partial slot for the loaded entity.
-        public virtual SelectParameterResult TryCast(BindingData bindingData)
-        {
-            throw new NotSupportedException(
-                $"{GetType().Name} requires the v3 binding pipeline " +
-                $"(MethodDispatcher.BindAndInvokeAsync). " +
-                $"Mark the controller's [FunctionViewController] route to use v3 dispatch.");
-        }
-
-        public virtual Parameter GetParameter(ParameterInfo paramInfo, HttpApplication httpApp)
-        {
-            return new Parameter(paramInfo)
-            {
-                Name = GetKey(paramInfo),
-                Required = true,
-                Where = (Source & BindingSource.Path) != 0 ? "PATH" : "QUERY",
-                Type = Parameter.GetTypeName(paramInfo.ParameterType, httpApp),
-                OpenApiType = Parameter.GetOpenApiTypeName(paramInfo.ParameterType, httpApp),
-            };
+            var t = parameter.ParameterType;
+            if (!t.IsGenericType) return null;
+            if (t.GetGenericTypeDefinition() != typeof(StorageEntity<>)) return null;
+            return t.GenericTypeArguments[0];
         }
     }
 

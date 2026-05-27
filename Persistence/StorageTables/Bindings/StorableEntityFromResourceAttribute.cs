@@ -1,29 +1,26 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Http;
-
 using Newtonsoft.Json.Linq;
 
-using EastFive.Api;
-using EastFive.Api.Bindings;
-using EastFive.Api.Resources;
-using EastFive.Api.Serialization;
+using EastFive.Api.Binding;
 using EastFive.Extensions;
-using EastFive.Linq;
-using EastFive.Reflection;
+using EastFive.Persistence.Azure.StorageTables.Driver;
+using EastFive.Serialization.Binding;
+using EastFive.Api.Serialization.Binding.Sources;
 
 namespace EastFive.Azure.Persistence.StorageTables.Bindings
 {
     /// <summary>
-    /// Write-side counterpart of <see cref="StorageEntityFromQueryIdAttribute"/>:
-    /// deserializes the request body into <typeparamref name="T"/> and pairs it
-    /// with the <see cref="EastFive.Persistence.Azure.StorageTables.Driver.AzureTableDriverDynamic"/>
-    /// resolved through <see cref="StorageDriverScope"/> (parameter → method →
-    /// declaring type → assembly), producing a fully-populated
-    /// <see cref="StorableEntity{T}"/> in the parameter slot.
+    /// V3 selection attribute that materializes a <c>StorableEntity&lt;T&gt;</c>
+    /// parameter from the request body. The body's raw shape (JSON
+    /// <see cref="JToken"/>, <see cref="IFormCollection"/>, or string) is
+    /// stashed on a <see cref="StorageBoundSource"/> alongside the eagerly-
+    /// resolved <see cref="AzureTableDriverDynamic"/>; the
+    /// <see cref="StorableEntityBinder"/> downcasts and deserializes via
+    /// <see cref="StorageBindingHelpers"/>.
     ///
     /// Pair with the write extensions on <see cref="StorableEntityExtensions"/>
     /// (<c>MutateEntity</c>, <c>StorageInsertAsync</c>) to make controllers
@@ -37,182 +34,58 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     ///         .MutateEntity(p =&gt; { /* normalize */ return p; })
     ///         .StorageInsertAsync(() =&gt; onCreated(), () =&gt; onAlreadyExists());
     /// </code>
-    ///
-    /// Body parsing supports the same three converters as
-    /// <see cref="ResourceAttribute"/> (JSON, form-data, plain-text).
-    ///
-    /// MIXING CONCERN: this attribute is for the current routing path only.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Parameter)]
-    public sealed class StorableEntityFromResourceAttribute : Attribute,
-        IBindApiValue, IDocumentParameter, IProvideBindingRequirements
+    [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+    public sealed class StorableEntityFromResourceAttribute : Attribute, IBindFromRequest
     {
-        public string GetKey(ParameterInfo paramInfo) => default;
-
-        public (IReadOnlyList<BindingRequirement> requirements, AssembleParameter assemble)
-            GetParameterBinding(ParameterInfo parameter)
+        public bool TrySelectSource(IRequestEnvelopeV3 envelope, ParameterInfo parameter,
+            out BindCall call)
         {
-            var entityType = ExtractEntityType(parameter);
-            if (entityType == null)
-                throw new InvalidOperationException(
-                    $"parameter '{parameter.Name}' must be StorableEntity<T> where T : IReferenceable");
-
-            var requirement = new BindingRequirement(
-                    path: string.Empty,
-                    source: BindingSource.Body,
-                    parameter: parameter,
-                    isOptional: false)
-                .AddConverter<JContainer>((raw, param, httpApp, request, onParsed, onFailure) =>
-                {
-                    var contentString = raw?.ToString(Newtonsoft.Json.Formatting.None);
-                    if (contentString.IsNullOrWhiteSpace())
-                        return onFailure("Empty request body.");
-
-                    var bindConvert = new BindConvert(request, httpApp as HttpApplication);
-                    return DeserializeJsonToEntity(contentString, entityType, bindConvert,
-                        onParsed, onFailure);
-                })
-                .AddConverter<IFormCollection>((raw, param, httpApp, request, onParsed, onFailure) =>
-                {
-                    return DeserializeFormToEntity(raw, entityType, param, httpApp,
-                        onParsed, onFailure);
-                })
-                .AddConverter<string>((raw, param, httpApp, request, onParsed, onFailure) =>
-                {
-                    if (raw.IsNullOrWhiteSpace())
-                        return onFailure("Empty request body.");
-
-                    var bindConvert = new BindConvert(request, httpApp as HttpApplication);
-                    return DeserializeJsonToEntity(raw, entityType, bindConvert,
-                        onParsed, onFailure);
-                });
-
-            // assemble: converter returned the deserialized entity (T as object);
-            // wrap it in a StorableEntity<T> together with the scoped driver
-            // via the type's public factory (open-generic reified per call).
-            AssembleParameter assemble = boundValues =>
+            // Probe the body in the order the legacy converter ladder used:
+            // JToken (any JSON) → IFormCollection → raw string. First match wins.
+            object rawBody = null;
+            IBindingSource innerSource = null;
+            if(EnvelopeBodyAccessor.TryGetBodyRoot(envelope, out innerSource, out rawBody))
             {
-                var entity = boundValues[0];
-                var provider = StorageDriverScope.Resolve(parameter);
-                var driver = provider.GetDriver();
-                var storableType = typeof(StorableEntity<>).MakeGenericType(entityType);
-                var factory = storableType.GetMethod(
-                    nameof(StorableEntity<IReferenceable>.FromDeserialized),
-                    BindingFlags.Public | BindingFlags.Static);
-                var storable = factory.Invoke(null, new object[] { entity, driver });
-                return (storable, null);
-            };
-
-            return (new[] { requirement }, assemble);
-        }
-
-        public SelectParameterResult TryCast(BindingData bindingData)
-        {
-            // The legacy path is intentionally unsupported. [StorableEntityFromResource] only
-            // makes sense in v3's BindAndInvokeAsync, which honors
-            // IProvideBindingRequirements ahead of legacy IInstigatable* hooks.
-            throw new NotSupportedException(
-                $"{nameof(StorableEntityFromResourceAttribute)} requires the v3 binding pipeline " +
-                $"(MethodDispatcher.BindAndInvokeAsync).");
-        }
-
-        public Parameter GetParameter(ParameterInfo paramInfo, HttpApplication httpApp)
-        {
-            var entityType = ExtractEntityType(paramInfo);
-            var typeName = entityType != null
-                ? $"StorableEntity<{Parameter.GetTypeName(entityType, httpApp)}>"
-                : Parameter.GetTypeName(paramInfo.ParameterType, httpApp);
-            return new Parameter(paramInfo)
-            {
-                Name = paramInfo.Name,
-                Required = true,
-                Where = "BODY",
-                Type = typeName,
-                OpenApiType = Parameter.GetOpenApiTypeName(paramInfo.ParameterType, httpApp),
-            };
-        }
-
-        private static Type ExtractEntityType(ParameterInfo parameter)
-        {
-            var t = parameter.ParameterType;
-            if (!t.IsGenericType)
-                return null;
-            var def = t.GetGenericTypeDefinition();
-            if (def != typeof(StorableEntity<>))
-                return null;
-            return t.GenericTypeArguments[0];
-        }
-
-        private static TResult DeserializeJsonToEntity<TResult>(
-                string contentString, Type entityType, BindConvert bindConvert,
-            Func<object, TResult> onParsed,
-            Func<string, TResult> onFailure)
-        {
-            try
-            {
-                if (!IsObjectNotArray(contentString))
-                    return onFailure("Content is not a valid JSON object.");
-
-                var entity = Newtonsoft.Json.JsonConvert.DeserializeObject(
-                    contentString, entityType, bindConvert);
-                return onParsed(entity);
+                
             }
-            catch (Exception ex)
+            else if (envelope.TryGetBody<string>(out var raw) && !raw.IsNullOrWhiteSpace())
             {
-                return onFailure(ex.Message);
+                rawBody = raw;
             }
 
-            static bool IsObjectNotArray(string content)
+            if (rawBody is null)
             {
-                foreach (var ch in content)
-                {
-                    if (ch == '{')
-                        return true;
-                    if (ch == '[')
-                        return false;
-                }
+                call = null;
                 return false;
             }
+
+            var provider = StorageDriverScope.Resolve(parameter);
+            var driver = provider.GetDriver();
+            var storageSrc = new StorageBoundSource(innerSource, driver, rawBody);
+
+            // Build a BindCall that dispatches onObject(storageSrc) directly so
+            // StorableEntityBinder receives the wrapper (and not whatever shape
+            // the inner body source would emit on its own onObject).
+            call = MakeStorageObjectCall(storageSrc);
+            return true;
         }
 
-        // Mirror of ResourceAttribute.ParseContentDelegate(IFormCollection,...)
-        // but assigning members on `entityType` instead of the wrapping
-        // StorableEntity<T> parameter type.
-        private static TResult DeserializeFormToEntity<TResult>(
-                IFormCollection formData, Type entityType, ParameterInfo parameterInfo,
-                IApplication httpApp,
-            Func<object, TResult> onParsed,
-            Func<string, TResult> onFailure)
-        {
-            var obj = entityType
-                .GetPropertyAndFieldsWithAttributesInterface<IProvideApiValue>(true)
-                .Aggregate(Activator.CreateInstance(entityType),
-                    (param, memberProvideApiValueTpl) =>
-                    {
-                        var (member, provideApiValue) = memberProvideApiValueTpl;
-                        if (!member.IsSettable())
-                            return param;
-
-                        return ResourceAttribute.ParseFormContentDelegate(
-                                provideApiValue.GetPropertyName(member), formData,
-                                member, parameterInfo, httpApp,
-                            paramValue =>
-                            {
-                                member.SetValue(ref param, paramValue);
-                                return param;
-                            },
-                            why =>
-                            {
-                                return httpApp.Bind<string, object>(default(string), member,
-                                    defaultValue =>
-                                    {
-                                        member.SetValue(ref param, defaultValue);
-                                        return param;
-                                    },
-                                    _ => param);
-                            });
-                    });
-            return onParsed(obj);
-        }
+        internal static BindCall MakeStorageObjectCall(StorageBoundSource storageSrc) =>
+            (path, onNull, onString, onGuid, onBool, onInt64, onDouble, onDateTime,
+                onBytes, onObject, onArray, elementTypeHint, onFailure) =>
+            {
+                if (!string.IsNullOrEmpty(path))
+                    return BindingSourceDispatch.FailTask<object>(
+                        new BindFailure(new NotPresent(), typeof(object), path), onFailure);
+                if (onObject is null)
+                    return BindingSourceDispatch.FailTask<object>(
+                        new BindFailure(
+                            new WrongSourceType("object", "object"),
+                            typeof(object),
+                            path ?? string.Empty),
+                        onFailure);
+                return new ValueTask<object>(onObject(storageSrc));
+            };
     }
 }

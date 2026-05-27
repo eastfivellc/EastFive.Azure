@@ -2,20 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using EastFive.Serialization.Binding;
+using EastFive.Serialization.Binding.Sources;
 using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Azure.Persistence.StorageTables.Binding
 {
     /// <summary>
     /// Composite <see cref="IBindingSource"/> over an Azure Table row — a flat
-    /// <see cref="IDictionary{TKey, TValue}"/> of column-name → <see cref="EntityProperty"/>.
-    /// <para>
-    /// Scalar accessors fail with <see cref="WrongSourceType"/> (a row isn't a
-    /// scalar). <see cref="GetScoped"/> looks up the column by name and returns
-    /// a <see cref="EntityPropertyBindingSource"/> wrapper; a missing column
-    /// surfaces as <see cref="NotPresent"/>, distinct from a column whose value
-    /// is null.
-    /// </para>
+    /// column-name → <see cref="EntityProperty"/> dictionary. Empty <c>path</c>
+    /// reports as an object via <c>onObject</c>; non-empty paths resolve the head
+    /// segment to a column and forward the rest to that column's
+    /// <see cref="EntityPropertyBindingSource"/>.
     /// </summary>
     public sealed class EntityPropertyRowBindingSource : IBindingSource
     {
@@ -26,45 +23,53 @@ namespace EastFive.Azure.Persistence.StorageTables.Binding
             this.row = row ?? new Dictionary<string, EntityProperty>();
         }
 
-        private static ValueTask<TResult> Wrong<TResult>(string expected, Type target, Func<BindFailure, TResult> onFailure) =>
-            new(onFailure(new BindFailure(new WrongSourceType(expected, "row"), target)));
-
-        public ValueTask<TResult> GetString<TResult>(Func<string, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("string", typeof(string), onFailure);
-        public ValueTask<TResult> GetGuid<TResult>(Func<Guid, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("guid", typeof(Guid), onFailure);
-        public ValueTask<TResult> GetBool<TResult>(Func<bool, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("bool", typeof(bool), onFailure);
-        public ValueTask<TResult> GetInt64<TResult>(Func<long, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("integer", typeof(long), onFailure);
-        public ValueTask<TResult> GetDouble<TResult>(Func<double, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("number", typeof(double), onFailure);
-        public ValueTask<TResult> GetDateTime<TResult>(Func<DateTime, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("datetime", typeof(DateTime), onFailure);
-        public ValueTask<TResult> GetBytes<TResult>(Func<byte[], TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("binary", typeof(byte[]), onFailure);
-
-        public ValueTask<TResult> GetScoped<TResult>(string key, Func<IBindingSource, TResult> onChild, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
+        public ValueTask<TResult> GetValue<TResult>(
+            string path = null,
+            Func<TResult> onNull = null,
+            Func<string, TResult> onString = null,
+            Func<Guid, TResult> onGuid = null,
+            Func<bool, TResult> onBool = null,
+            Func<long, TResult> onInt64 = null,
+            Func<double, TResult> onDouble = null,
+            Func<DateTime, TResult> onDateTime = null,
+            Func<byte[], TResult> onBytes = null,
+            Func<IBindingSource, TResult> onObject = null,
+            Func<IEnumerableBindingSource, TResult> onArray = null,
+            Type elementTypeHint = null,
+            Func<BindFailure, TResult> onFailure = null)
         {
-            if (!row.TryGetValue(key, out var ep))
-                return new ValueTask<TResult>(onFailure(new BindFailure(new NotPresent(), typeof(object))));
-            return new ValueTask<TResult>(onChild(new EntityPropertyBindingSource(ep)));
+            if (string.IsNullOrEmpty(path))
+            {
+                if (onObject is not null) return new ValueTask<TResult>(onObject(this));
+                return BindingSourceDispatch.WrongType<TResult>("object", "row", typeof(object), path, onFailure);
+            }
+
+            if (!PathParser.TryConsumeName(path, out var columnName, out var rest))
+                return BindingSourceDispatch.FailTask(
+                    new BindFailure(new ParseError($"Cannot parse path '{path}'"), typeof(object), path), onFailure);
+
+            if (!TryGetColumn(columnName, out var ep))
+                return BindingSourceDispatch.FailTask(
+                    new BindFailure(new NotPresent(), typeof(object), path), onFailure);
+
+            var cellSource = new EntityPropertyBindingSource(ep);
+            return cellSource.GetValue(rest, onNull, onString, onGuid, onBool, onInt64, onDouble,
+                onDateTime, onBytes, onObject, onArray, elementTypeHint, onFailure);
         }
 
-        public ValueTask<TResult> GetIndexed<TResult>(int index, Func<IBindingSource, TResult> onChild, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("array", typeof(object), onFailure);
-
-        public ValueTask<TResult> GetArray<TResult>(Func<IEnumerable<IBindingSource>, TResult> onItems, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-            => Wrong("array", typeof(object), onFailure);
-
-        public ValueTask<TResult> GetMembers<TResult>(Func<IEnumerable<KeyValuePair<string, IBindingSource>>, TResult> onMembers, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
+        private bool TryGetColumn(string name, out EntityProperty ep)
         {
-            IEnumerable<KeyValuePair<string, IBindingSource>> Project()
+            if (row.TryGetValue(name, out ep)) return true;
+            foreach (var kv in row)
             {
-                foreach (var kvp in row)
-                    yield return new KeyValuePair<string, IBindingSource>(kvp.Key, new EntityPropertyBindingSource(kvp.Value));
+                if (string.Equals(kv.Key, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    ep = kv.Value;
+                    return true;
+                }
             }
-            return new ValueTask<TResult>(onMembers(Project()));
+            ep = null;
+            return false;
         }
     }
 }

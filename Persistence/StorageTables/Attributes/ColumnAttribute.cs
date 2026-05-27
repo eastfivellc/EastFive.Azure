@@ -59,24 +59,21 @@ namespace EastFive.Persistence.Azure.StorageTables
 
             object resolved = null;
             var skip = false;
-            source.GetScoped<bool>(column,
-                child => TypeBindings.Default.Bind<bool>(memberType, child, ctx,
-                    v => { resolved = v; return true; },
-                    f =>
-                    {
-                        Trace.TraceWarning(
-                            $"[Column] {memberInfo.DeclaringType?.Name}.{memberInfo.Name} " +
-                            $"(column '{column}') failed to bind: {f.Reason.Describe()}. Defaulting.");
-                        resolved = getDefaultValue != null
-                            ? getDefaultValue()
-                            : memberType.GetDefault();
-                        return true;
-                    }).GetAwaiter().GetResult(),
+            TypeBindings.Default.Bind<bool>(memberType, source, ctx.WithKeyPath(column),
+                v => { resolved = v; return true; },
                 f =>
                 {
-                    // Column missing — skip so the legacy walker leaves the
-                    // slot at its CLR default. (Graceful schema migration.)
-                    skip = true;
+                    if (f.Reason is NotPresent)
+                    {
+                        skip = true;
+                        return true;
+                    }
+                    Trace.TraceWarning(
+                        $"[Column] {memberInfo.DeclaringType?.Name}.{memberInfo.Name} " +
+                        $"(column '{column}') failed to bind: {f.Reason.Describe()}. Defaulting.");
+                    resolved = getDefaultValue != null
+                        ? getDefaultValue()
+                        : memberType.GetDefault();
                     return true;
                 }).GetAwaiter().GetResult();
 

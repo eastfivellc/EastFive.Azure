@@ -1,29 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using EastFive.Persistence.Azure.StorageTables;
+using EastFive.Serialization;
 using EastFive.Serialization.Binding;
+using EastFive.Serialization.Binding.Sources;
 using Microsoft.Azure.Cosmos.Table;
 
 namespace EastFive.Azure.Persistence.StorageTables.Binding
 {
     /// <summary>
     /// <see cref="IBindingSource"/> over a single Azure Table <see cref="EntityProperty"/>.
-    /// Scalar only — composite row scoping (member-by-member access against a row of
-    /// <c>IDictionary&lt;string,EntityProperty&gt;</c>) is the responsibility of a future
-    /// <c>EntityPropertyRowBindingSource</c>.
-    ///
-    /// <para>Null is recognized when:
-    /// <list type="bullet">
-    ///   <item>The <see cref="EntityProperty"/> reference itself is <c>null</c>.</item>
-    ///   <item>The strongly-typed value is absent (e.g., <c>BooleanValue.HasValue == false</c>).</item>
-    ///   <item>The value is a Guid equal to <see cref="EDMExtensions.NullGuidKey"/> (the
-    ///     historical EDM sentinel for stored nulls).</item>
-    ///   <item>The value is a binary array that is <c>null</c> or empty.</item>
-    /// </list>
-    /// Cross-EdmType coercion (e.g., <c>Guid</c> target from <c>EdmType.String</c>) is
-    /// preserved from the legacy <c>EntityPropertyExtensions.ParseCoreTypes</c> behavior.
-    /// </para>
+    /// Dispatches on <see cref="EdmType"/> — no source-side coercion. A
+    /// <see cref="EdmType.Binary"/> cell calls <c>onBytes</c>, or <c>onArray</c> when
+    /// the caller provides an <c>elementTypeHint</c> matching the packed primitive
+    /// element (legacy <c>ByteArrayExtensions</c> convention).
     /// </summary>
     public sealed class EntityPropertyBindingSource : IBindingSource
     {
@@ -47,150 +39,112 @@ namespace EastFive.Azure.Persistence.StorageTables.Binding
             (value.PropertyType == EdmType.Binary && (value.BinaryValue is null || value.BinaryValue.Length == 0)) ||
             (value.PropertyType == EdmType.String && value.StringValue is null);
 
-        private static ValueTask<TResult> Null<TResult>(Type expected, Func<BindFailure, TResult> onFailure, Func<TResult> onNull)
+        public ValueTask<TResult> GetValue<TResult>(
+            string path = null,
+            Func<TResult> onNull = null,
+            Func<string, TResult> onString = null,
+            Func<Guid, TResult> onGuid = null,
+            Func<bool, TResult> onBool = null,
+            Func<long, TResult> onInt64 = null,
+            Func<double, TResult> onDouble = null,
+            Func<DateTime, TResult> onDateTime = null,
+            Func<byte[], TResult> onBytes = null,
+            Func<IBindingSource, TResult> onObject = null,
+            Func<IEnumerableBindingSource, TResult> onArray = null,
+            Type elementTypeHint = null,
+            Func<BindFailure, TResult> onFailure = null)
         {
-            if (onNull is not null)
-                return new ValueTask<TResult>(onNull());
-            return new ValueTask<TResult>(onFailure(new BindFailure(new NullValue(), expected)));
-        }
+            if (!string.IsNullOrEmpty(path))
+                return BindingSourceDispatch.WrongType<TResult>(
+                    "scalar", "navigation into EDM cell", typeof(object), path, onFailure);
 
-        private static ValueTask<TResult> Wrong<TResult>(string expected, EdmType got, Type targetType, Func<BindFailure, TResult> onFailure) =>
-            new(onFailure(new BindFailure(new WrongSourceType(expected, got.ToString()), targetType)));
+            if (IsNullScalar)
+                return BindingSourceDispatch.Null(typeof(object), path, onNull, onFailure);
 
-        private static ValueTask<TResult> Parse<TResult>(string detail, Type targetType, Func<BindFailure, TResult> onFailure) =>
-            new(onFailure(new BindFailure(new ParseError(detail), targetType)));
+            var expected = BindingSourceDispatch.InferExpected(
+                hasString: onString is not null, hasGuid: onGuid is not null, hasBool: onBool is not null,
+                hasInt64: onInt64 is not null, hasDouble: onDouble is not null, hasDateTime: onDateTime is not null,
+                hasBytes: onBytes is not null, hasObject: onObject is not null, hasArray: onArray is not null);
 
-        public ValueTask<TResult> GetString<TResult>(Func<string, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(string), onFailure, onNull);
-            if (value.PropertyType == EdmType.String)
-                return new ValueTask<TResult>(onValue(value.StringValue));
-            return Wrong("string", value.PropertyType, typeof(string), onFailure);
-        }
-
-        public ValueTask<TResult> GetGuid<TResult>(Func<Guid, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(Guid), onFailure, onNull);
             switch (value.PropertyType)
             {
+                case EdmType.String:
+                    if (onString is not null) return new ValueTask<TResult>(onString(value.StringValue));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "String", typeof(object), path, onFailure);
+
                 case EdmType.Guid:
-                    return new ValueTask<TResult>(onValue(value.GuidValue.Value));
-                case EdmType.String:
-                    if (Guid.TryParse(value.StringValue, out var g))
-                        return new ValueTask<TResult>(onValue(g));
-                    return Parse($"'{value.StringValue}' is not a Guid", typeof(Guid), onFailure);
-                default:
-                    return Wrong("guid", value.PropertyType, typeof(Guid), onFailure);
-            }
-        }
+                    if (onGuid is not null) return new ValueTask<TResult>(onGuid(value.GuidValue.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Guid", typeof(object), path, onFailure);
 
-        public ValueTask<TResult> GetBool<TResult>(Func<bool, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(bool), onFailure, onNull);
-            switch (value.PropertyType)
-            {
                 case EdmType.Boolean:
-                    return new ValueTask<TResult>(onValue(value.BooleanValue.Value));
-                case EdmType.String:
-                    if (bool.TryParse(value.StringValue, out var b))
-                        return new ValueTask<TResult>(onValue(b));
-                    return Parse($"'{value.StringValue}' is not a Boolean", typeof(bool), onFailure);
-                default:
-                    return Wrong("bool", value.PropertyType, typeof(bool), onFailure);
-            }
-        }
+                    if (onBool is not null) return new ValueTask<TResult>(onBool(value.BooleanValue.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Boolean", typeof(object), path, onFailure);
 
-        public ValueTask<TResult> GetInt64<TResult>(Func<long, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(long), onFailure, onNull);
-            switch (value.PropertyType)
-            {
-                case EdmType.Int64:
-                    return new ValueTask<TResult>(onValue(value.Int64Value.Value));
                 case EdmType.Int32:
-                    return new ValueTask<TResult>(onValue(value.Int32Value.Value));
-                case EdmType.String:
-                    if (long.TryParse(value.StringValue, out var v))
-                        return new ValueTask<TResult>(onValue(v));
-                    return Parse($"'{value.StringValue}' is not an integer", typeof(long), onFailure);
-                default:
-                    return Wrong("integer", value.PropertyType, typeof(long), onFailure);
-            }
-        }
+                    if (onInt64 is not null) return new ValueTask<TResult>(onInt64(value.Int32Value.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Int32", typeof(object), path, onFailure);
 
-        public ValueTask<TResult> GetDouble<TResult>(Func<double, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(double), onFailure, onNull);
-            switch (value.PropertyType)
-            {
+                case EdmType.Int64:
+                    if (onInt64 is not null) return new ValueTask<TResult>(onInt64(value.Int64Value.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Int64", typeof(object), path, onFailure);
+
                 case EdmType.Double:
-                    return new ValueTask<TResult>(onValue(value.DoubleValue.Value));
-                case EdmType.Int32:
-                    return new ValueTask<TResult>(onValue(value.Int32Value.Value));
-                case EdmType.Int64:
-                    return new ValueTask<TResult>(onValue(value.Int64Value.Value));
-                case EdmType.String:
-                    if (double.TryParse(value.StringValue, out var v))
-                        return new ValueTask<TResult>(onValue(v));
-                    return Parse($"'{value.StringValue}' is not a number", typeof(double), onFailure);
-                default:
-                    return Wrong("number", value.PropertyType, typeof(double), onFailure);
-            }
-        }
+                    if (onDouble is not null) return new ValueTask<TResult>(onDouble(value.DoubleValue.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Double", typeof(object), path, onFailure);
 
-        public ValueTask<TResult> GetDateTime<TResult>(Func<DateTime, TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(DateTime), onFailure, onNull);
-            switch (value.PropertyType)
-            {
                 case EdmType.DateTime:
-                    return new ValueTask<TResult>(onValue(value.DateTime.Value));
-                case EdmType.Int64:
-                    // Legacy: ticks-encoded DateTime fallback.
-                    return new ValueTask<TResult>(onValue(new DateTime(value.Int64Value.Value)));
-                case EdmType.String:
-                    if (DateTime.TryParse(value.StringValue, out var dt))
-                        return new ValueTask<TResult>(onValue(dt));
-                    return Parse($"'{value.StringValue}' is not a DateTime", typeof(DateTime), onFailure);
+                    if (onDateTime is not null) return new ValueTask<TResult>(onDateTime(value.DateTime.Value));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "DateTime", typeof(object), path, onFailure);
+
+                case EdmType.Binary:
+                    if (onArray is not null && elementTypeHint is not null)
+                    {
+                        var unpacked = TryUnpack(value.BinaryValue, elementTypeHint);
+                        if (unpacked is not null)
+                            return new ValueTask<TResult>(onArray(new EnumerableBindingSource(unpacked, elementTypeHint)));
+                    }
+                    if (onBytes is not null) return new ValueTask<TResult>(onBytes(value.BinaryValue));
+                    return BindingSourceDispatch.WrongType<TResult>(expected, "Binary", typeof(object), path, onFailure);
+
                 default:
-                    return Wrong("datetime", value.PropertyType, typeof(DateTime), onFailure);
+                    return BindingSourceDispatch.WrongType<TResult>(expected, value.PropertyType.ToString(), typeof(object), path, onFailure);
             }
         }
 
-        public ValueTask<TResult> GetBytes<TResult>(Func<byte[], TResult> onValue, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
+        private static IEnumerable<IBindingSource> TryUnpack(byte[] bytes, Type elementType)
         {
-            if (IsNullScalar) return Null(typeof(byte[]), onFailure, onNull);
-            if (value.PropertyType == EdmType.Binary)
-                return new ValueTask<TResult>(onValue(value.BinaryValue));
-            return Wrong("binary", value.PropertyType, typeof(byte[]), onFailure);
-        }
+            if (bytes is null) return null;
 
-        public ValueTask<TResult> GetScoped<TResult>(string key, Func<IBindingSource, TResult> onChild, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(object), onFailure, onNull);
-            return new ValueTask<TResult>(onFailure(new BindFailure(
-                new WrongSourceType("object", value.PropertyType.ToString()), typeof(object))));
-        }
+            if (elementType == typeof(Guid) && bytes.Length % 16 == 0)
+            {
+                IEnumerable<IBindingSource> Items()
+                {
+                    for (var i = 0; i < bytes.Length; i += 16)
+                    {
+                        var chunk = new byte[16];
+                        Buffer.BlockCopy(bytes, i, chunk, 0, 16);
+                        yield return new EntityPropertyBindingSource(new EntityProperty(new Guid(chunk)));
+                    }
+                }
+                return Items();
+            }
 
-        public ValueTask<TResult> GetIndexed<TResult>(int index, Func<IBindingSource, TResult> onChild, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(object), onFailure, onNull);
-            return new ValueTask<TResult>(onFailure(new BindFailure(
-                new WrongSourceType("array", value.PropertyType.ToString()), typeof(object))));
-        }
+            if (elementType == typeof(int))
+                return bytes.ToIntsFromByteArray().Select(v => (IBindingSource)new EntityPropertyBindingSource(new EntityProperty(v)));
 
-        public ValueTask<TResult> GetArray<TResult>(Func<IEnumerable<IBindingSource>, TResult> onItems, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(object), onFailure, onNull);
-            return new ValueTask<TResult>(onFailure(new BindFailure(
-                new WrongSourceType("array", value.PropertyType.ToString()), typeof(object))));
-        }
+            if (elementType == typeof(long))
+                return bytes.ToLongsFromByteArray().Select(v => (IBindingSource)new EntityPropertyBindingSource(new EntityProperty(v)));
 
-        public ValueTask<TResult> GetMembers<TResult>(Func<IEnumerable<KeyValuePair<string, IBindingSource>>, TResult> onMembers, Func<BindFailure, TResult> onFailure, Func<TResult> onNull = null)
-        {
-            if (IsNullScalar) return Null(typeof(object), onFailure, onNull);
-            return new ValueTask<TResult>(onFailure(new BindFailure(
-                new WrongSourceType("object", value.PropertyType.ToString()), typeof(object))));
+            if (elementType == typeof(double))
+                return bytes.ToDoublesFromByteArray().Select(v => (IBindingSource)new EntityPropertyBindingSource(new EntityProperty(v)));
+
+            if (elementType == typeof(DateTime))
+                return bytes.ToDateTimesFromByteArray().Select(v => (IBindingSource)new EntityPropertyBindingSource(new EntityProperty(v)));
+
+            if (elementType == typeof(string))
+                return bytes.ToStringsFromUTF8ByteArray().Select(v => (IBindingSource)new EntityPropertyBindingSource(new EntityProperty(v)));
+
+            return null;
         }
     }
 }
