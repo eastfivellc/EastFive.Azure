@@ -70,20 +70,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                 foreach (var (member, type, column) in columns)
                 {
                     object resolved = null;
-                    var matched = source.GetScoped<bool>(column,
-                        child => TypeBindings.Default.Bind<bool>(type, child, ctx,
-                            v => { resolved = v; return true; },
-                            f =>
-                            {
-                                Trace.TraceWarning(
-                                    $"[StorageTable2] {typeof(EntityType).Name}.{member.Name} (column '{column}') " +
-                                    $"failed to bind: {f.Reason.Describe()}. Defaulting.");
-                                resolved = type.GetDefault();
-                                return true;
-                            }).GetAwaiter().GetResult(),
+                    TypeBindings.Default.Bind<bool>(type, source, ctx.WithKeyPath(column),
+                        v => { resolved = v; return true; },
                         f =>
                         {
-                            // Column missing — leave slot at default (graceful schema migration).
+                            if (f.Reason is NotPresent)
+                            {
+                                resolved = type.GetDefault();
+                                return true;
+                            }
+                            Trace.TraceWarning(
+                                $"[StorageTable2] {typeof(EntityType).Name}.{member.Name} (column '{column}') " +
+                                $"failed to bind: {f.Reason.Describe()}. Defaulting.");
                             resolved = type.GetDefault();
                             return true;
                         }).GetAwaiter().GetResult();

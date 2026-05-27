@@ -1,63 +1,23 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 
-using EastFive.Api;
-using EastFive.Api.Bindings;
-using EastFive.Extensions;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Reflection;
 
 namespace EastFive.Azure.Persistence.StorageTables.Bindings
 {
     /// <summary>
-    /// Shared two-step pipeline for loader attributes that produce a
-    /// <see cref="StorageEntity{T}"/> parameter.
-    ///
-    /// Step 1 (binding, sync, runs during route selection):
-    ///   <see cref="IProvideBindingRequirements.GetParameterBinding"/> returns
-    ///   one requirement per key member plus an <see cref="AssembleParameter"/>
-    ///   closure. After the envelope binds every requirement, the closure
-    ///   produces (a) a partial <see cref="StorageEntity{T}"/> (key only,
-    ///   entity = default) for the parameter slot and (b) the wire-level
-    ///   (name, value) bindings for the per-parameter binding-context
-    ///   dictionary — used solely for diagnostic 404 messages.
-    ///
-    /// Step 2 (validation, async, runs after method match):
-    ///   <see cref="IValidateHttpRequestForBoundParameters.ValidateBoundParametersForRequest"/>
-    ///   resolves the driver, loads the record, and returns a
-    ///   <see cref="ParameterMutation"/> that hands the chain a parameter list
-    ///   with the partial slot replaced by a fully-loaded
-    ///   <see cref="StorageEntity{T}"/>. On miss the mutation short-circuits
-    ///   with 404 (using the captured bindings to identify the missing row).
+    /// Shared helpers for V3 storage-loader attributes: build a partial
+    /// <see cref="StorageEntity{T}"/> (key-only) from already-bound key-member
+    /// values. The async load is performed by <c>StorageEntityBinder</c> via
+    /// <c>driver.LoadStorageEntityAsync</c> directly — this class no longer
+    /// owns any orchestration.
     /// </summary>
     internal static class StorageEntityLoaderHelpers
     {
         /// <summary>
-        /// Step 1a: parse a single key member's raw string value into its
-        /// declared member type via the application's binder.
-        /// </summary>
-        public static TResult BindKeyMemberFromString<TResult>(
-            string raw,
-            KeyMemberDiscovery.KeyMember keyMember,
-            Type memberType,
-            IApplication httpApp,
-            IHttpRequest request,
-            Func<object, TResult> onSuccess,
-            Func<string, TResult> onFailure)
-        {
-            return httpApp.Bind(raw, memberType,
-                value => onSuccess(value),
-                why => onFailure(why));
-        }
-
-        /// <summary>
-        /// Step 1b: assemble the bound key-member values into a partial
+        /// Assemble the bound key-member values into a partial
         /// <see cref="StorageEntity{T}"/>. Creates a stub of the entity (via
         /// <see cref="RuntimeHelpers.GetUninitializedObject(Type)"/> so we
         /// don't depend on a parameterless ctor), assigns each key member,
@@ -89,22 +49,6 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
                 culture: null);
         }
 
-        /// <summary>
-        /// Step 1c: build the wire-level (name, value) pairs that will ride in
-        /// the binding-context dictionary so the validator can produce a
-        /// client-friendly 404 echoing what was actually sent.
-        /// </summary>
-        public static IReadOnlyList<KeyValuePair<string, object>> BuildBindings(
-            IReadOnlyList<string> wireNames, object[] boundValues)
-        {
-            if (wireNames == null || wireNames.Count == 0)
-                return Array.Empty<KeyValuePair<string, object>>();
-            var pairs = new KeyValuePair<string, object>[wireNames.Count];
-            for (var i = 0; i < wireNames.Count; i++)
-                pairs[i] = new KeyValuePair<string, object>(wireNames[i], boundValues[i]);
-            return pairs;
-        }
-
         private static object InvokeComputeStorageKey(Type entityType, object populated)
         {
             // AzureTableDriverDynamic.ComputeStorageKey<T>(T populated) — static, partial class.
@@ -129,67 +73,6 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
                     throw new InvalidOperationException(
                         $"unsupported member kind {member.MemberType} on {member.DeclaringType?.FullName}.{member.Name}");
             }
-        }
-
-        /// <summary>
-        /// Step 2: launch the async load and return a <see cref="ParameterMutation"/>
-        /// that hands the chain a parameter list with this owner's slot
-        /// replaced by the full <see cref="StorageEntity{T}"/>. On miss /
-        /// failure the closure short-circuits with the appropriate response.
-        ///
-        /// Thin trampoline: resolves the per-parameter driver scope and
-        /// dispatches to <c>StorageEntity&lt;T&gt;.LoadByKeyAsync</c> via
-        /// reflection (open generic over the entity type). The load body
-        /// lives on the entity wrapper so it is discoverable on the type
-        /// that represents the loaded record.
-        /// </summary>
-        public static Task<ParameterMutation> LoadEntityAsync(
-            ParameterInfo ownerParameter,
-            IReadOnlyList<KeyValuePair<string, object>> bindings,
-            IReadOnlyList<KeyValuePair<ParameterInfo, object>> parameterSelection,
-            IHttpRequest routeData,
-            CancellationToken cancellationToken)
-        {
-            var entityType = ExtractEntityType(ownerParameter);
-            if (entityType == null)
-                return Task.FromResult<ParameterMutation>((req, parms, @continue) =>
-                    routeData
-                        .CreateResponse(HttpStatusCode.InternalServerError)
-                        .AddReason($"parameter '{ownerParameter.Name}' is not StorageEntity<T>")
-                        .AsTask());
-
-            // Slot must already be a partial StorageEntity<T> from Combine.
-            var slotValue = parameterSelection
-                .Where(kvp => kvp.Key == ownerParameter)
-                .Select(kvp => kvp.Value)
-                .FirstOrDefault();
-            if (slotValue == null)
-                return Task.FromResult<ParameterMutation>((req, parms, @continue) =>
-                    routeData
-                        .CreateResponse(HttpStatusCode.BadRequest)
-                        .AddReason($"loader produced no slot value for '{ownerParameter.Name}'")
-                        .AsTask());
-
-            var driverProvider = StorageDriverScope.Resolve(ownerParameter);
-            var driver = driverProvider.GetDriver();
-
-            var storageEntityType = typeof(StorageEntity<>).MakeGenericType(entityType);
-            var loader = storageEntityType.GetMethod(
-                nameof(StorageEntity<IReferenceable>.LoadByKeyAsync),
-                BindingFlags.Public | BindingFlags.Static);
-
-            return (Task<ParameterMutation>)loader.Invoke(null,
-                new object[] { driver, slotValue, ownerParameter, bindings ?? Array.Empty<KeyValuePair<string, object>>(), routeData, cancellationToken });
-        }
-
-        public static Type ExtractEntityType(ParameterInfo parameter)
-        {
-            var t = parameter.ParameterType;
-            if (!t.IsGenericType)
-                return null;
-            if (t.GetGenericTypeDefinition() != typeof(StorageEntity<>))
-                return null;
-            return t.GenericTypeArguments[0];
         }
     }
 }
