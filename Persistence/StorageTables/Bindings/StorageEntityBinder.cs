@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 
-using EastFive.Api;
 using EastFive.Api.Binding;
 using EastFive.Api.Bindings;
 using EastFive.Persistence.Azure.StorageTables.Driver;
@@ -20,19 +20,20 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     /// <see cref="StorageEntityFromQueryParamAttribute"/>,
     /// <see cref="StorageEntityFromRouteAttribute"/>).
     /// <para>
-    /// The selection attribute resolves the driver eagerly and stashes each
-    /// key wire-name's raw string value on a
-    /// <see cref="StorageBoundSource"/> (via
-    /// <see cref="StorageBoundSource.RawBody"/> as a
-    /// <see cref="IReadOnlyList{KeyValuePair}"/>). This binder
-    /// probes the source, parses each key part via the application's binder,
-    /// builds a partial <see cref="StorageEntity{T}"/>, runs the async load,
-    /// and surfaces:
+    /// The selection attribute hands the binder a
+    /// <see cref="EastFive.Api.Serialization.Binding.Sources.LookupBindingSource"/>
+    /// keyed by each key member's wire-name. This binder unwraps it via
+    /// <c>onObject</c>, parses each key part through its registered
+    /// <c>ITypeBinder</c> (<see cref="IBindingContext.TypeBindings"/>), builds
+    /// a partial <see cref="StorageEntity{T}"/>, resolves the per-parameter
+    /// <see cref="AzureTableDriverDynamic"/> lazily via the
+    /// <see cref="ParameterSlot"/> on the context, runs the async load, and
+    /// surfaces:
     /// <list type="bullet">
     ///   <item>200 path → loaded full <see cref="StorageEntity{T}"/> via <c>onBound</c>.</item>
     ///   <item>not-found → <see cref="BindFailure"/> carrying a
     ///   <see cref="StorageEntityNotFoundReason"/> so the dispatcher emits 404.</item>
-    ///   <item>driver failure → <see cref="ParseError"/> → 400.</item>
+    ///   <item>driver / parse failure → <see cref="ParseError"/> → 400.</item>
     /// </list>
     /// </para>
     /// </summary>
@@ -49,118 +50,92 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             Func<BindFailure, TResult> onFailure,
             Func<TResult> onNull = null)
         {
+            // TODO: Completely refactor this state riddled mess.
             var entityType = StorageBindingHelpers.ExtractEntityType(targetType, typeof(StorageEntity<>));
             if (entityType is null)
                 return onFailure(new BindFailure(
                     new UnsupportedTargetType(targetType), targetType, context?.KeyPath ?? string.Empty));
 
-            if (context is not ApiBindingContext apiContext)
+            var keyPath = context?.KeyPath ?? string.Empty;
+
+            var parameter = (context?.Slot as ParameterSlot)?.Parameter;
+            if (parameter is null)
                 return onFailure(new BindFailure(
-                    new ParseError($"{nameof(StorageEntityBinder)} requires {nameof(ApiBindingContext)}."),
-                    targetType, context?.KeyPath ?? string.Empty));
+                    new ParseError(
+                        $"{nameof(StorageEntityBinder)} requires a {nameof(ParameterSlot)} on the binding context " +
+                        $"to resolve the per-parameter storage driver and loader attribute."),
+                    targetType, keyPath));
 
-            var keyPath = context.KeyPath ?? string.Empty;
-
-            var probed = await source.GetValue<object>(
+            // Unwrap the per-key lookup source emitted by the loader attribute.
+            // The dispatcher pins TResult=object on the composite source, so the
+            // probe is forced to object as well; we still discard the value and
+            // recover the source via the onObject capture.
+            IBindingSource keySrc = null;
+            BindFailure? unwrapFailure = null;
+            await source.GetValue<object>(
                 path: keyPath,
-                onObject: outer => outer is StorageBoundSource s
-                    ? (object)s
-                    : new BindFailure(
-                        new ParseError($"{nameof(StorageEntityBinder)} expects a {nameof(StorageBoundSource)} via onObject."),
-                        targetType, keyPath),
-                onFailure: f => (object)f);
-            if (probed is BindFailure outerFailure)
-                return onFailure(outerFailure);
-
-            var storageSrc = (StorageBoundSource)probed;
-            if (storageSrc.RawBody is not IReadOnlyList<KeyValuePair<string, string>> rawKeys)
+                onObject: s => { keySrc = s; return null; },
+                onFailure: f => { unwrapFailure = f; return null; });
+            if (unwrapFailure is not null)
+                return onFailure(unwrapFailure.Value);
+            if (keySrc is null)
                 return onFailure(new BindFailure(
-                    new ParseError($"{nameof(StorageEntityBinder)} requires raw key map on {nameof(StorageBoundSource.RawBody)}."),
+                    new ParseError($"{nameof(StorageEntityBinder)} expected an object source for parameter `{keyPath}`."),
                     targetType, keyPath));
 
             var keyMembers = KeyMemberDiscovery.DiscoverKeyMembers(entityType);
-            if (keyMembers.Length != rawKeys.Count)
+            if (keyMembers.Length == 0)
                 return onFailure(new BindFailure(
-                    new ParseError(
-                        $"loader produced {rawKeys.Count} key value(s); {entityType.FullName} declares {keyMembers.Length}."),
+                    new ParseError($"{entityType.FullName} declares no key members."),
                     targetType, keyPath));
 
-            // Parse each raw key value into its declared member type via the
-            // application binder.
+            var loaderAttr = parameter
+                .GetCustomAttributes(typeof(StorageEntityLoaderAttributeBase), inherit: true)
+                .Cast<StorageEntityLoaderAttributeBase>()
+                .FirstOrDefault();
+            if (loaderAttr is null)
+                return onFailure(new BindFailure(
+                    new ParseError(
+                        $"{nameof(StorageEntityBinder)} requires a {nameof(StorageEntityLoaderAttributeBase)} " +
+                        $"on parameter `{parameter.Name}` to resolve key wire-names."),
+                    targetType, keyPath));
+            var wireNames = loaderAttr.ResolveWireNames(keyMembers);
+
+            // Parse each key value via its registered ITypeBinder. IRef<T>,
+            // Guid, custom keys all flow through their own binders — no
+            // application-binder shortcut.
             var boundValues = new object[keyMembers.Length];
             for (var i = 0; i < keyMembers.Length; i++)
             {
-                var memberType = keyMembers[i].Member.GetPropertyOrFieldType();
-                var raw = rawKeys[i].Value;
-                string parseError = null;
+                var memberType = keyMembers[i].GetPropertyOrFieldType();
+                var wireName = wireNames[i];
+                var keyCtx = context.WithKeyPath(wireName);
+                BindFailure? memberFailure = null;
                 object parsed = null;
-                apiContext.Application.Bind(raw, memberType,
-                    value => { parsed = value; return 0; },
-                    why => { parseError = why; return 0; });
-                if (parseError is not null)
+                await context.TypeBindings.Bind<object>(memberType, keySrc, keyCtx,
+                    v => { parsed = v; return null; },
+                    f => { memberFailure = f; return null; });
+                if (memberFailure is not null)
                     return onFailure(new BindFailure(
-                        new ParseError($"could not parse '{rawKeys[i].Key}': {parseError}"),
+                        new ParseError($"could not parse `{wireName}`: {memberFailure.Value.Reason.Describe()}"),
                         targetType, keyPath));
                 boundValues[i] = parsed;
             }
 
             var partial = StorageEntityLoaderHelpers.BuildPartialStorageEntity(entityType, boundValues);
 
-            // Reflectively dispatch a generic helper bound to T = entityType.
-            var helper = typeof(StorageEntityBinder)
-                .GetMethod(nameof(LoadGenericAsync), BindingFlags.NonPublic | BindingFlags.Static)
+            var driver = StorageDriverScope.Resolve(parameter).GetDriver();
+
+            // Reflectively dispatch the IReferenceable-constrained load helper.
+            var helper = typeof(StorageEntityLoaderHelpers)
+                .GetMethod(nameof(StorageEntityLoaderHelpers.LoadGenericAsync),
+                    BindingFlags.Public | BindingFlags.Static)
                 .MakeGenericMethod(entityType, typeof(TResult));
             var task = (ValueTask<TResult>)helper.Invoke(null, new object[]
             {
-                storageSrc.Driver, partial, rawKeys, targetType, keyPath, onBound, onFailure,
+                driver, partial, wireNames, boundValues, targetType, keyPath, onBound, onFailure,
             });
             return await task.ConfigureAwait(false);
-        }
-
-        private static async ValueTask<TResult> LoadGenericAsync<T, TResult>(
-            AzureTableDriverDynamic driver,
-            object partial,
-            IReadOnlyList<KeyValuePair<string, string>> rawKeys,
-            Type targetType,
-            string keyPath,
-            Func<object, TResult> onBound,
-            Func<BindFailure, TResult> onFailure)
-            where T : IReferenceable
-        {
-            var typed = (StorageEntity<T>)partial;
-            var key = (AzureStorageTableStorageKey<T>)typed.Key;
-
-            string Describe()
-            {
-                if (rawKeys.Count == 0) return string.Empty;
-                var parts = new string[rawKeys.Count];
-                for (var i = 0; i < rawKeys.Count; i++)
-                    parts[i] = $"{rawKeys[i].Key}={rawKeys[i].Value}";
-                return string.Join(", ", parts);
-            }
-
-            BindFailure? failure = null;
-            object loaded = null;
-            await driver.LoadStorageEntityAsync<T, int>(
-                key,
-                onFound: stored => { loaded = stored; return 0; },
-                onNotFound: () =>
-                {
-                    failure = new BindFailure(
-                        new StorageEntityNotFoundReason(typeof(T), Describe()), targetType, keyPath);
-                    return 0;
-                },
-                onFailure: (code, msg) =>
-                {
-                    failure = new BindFailure(
-                        new ParseError($"storage failure loading {typeof(T).Name} ({Describe()}): [{code}] {msg}"),
-                        targetType, keyPath);
-                    return 0;
-                });
-
-            if (failure is not null)
-                return onFailure(failure.Value);
-            return onBound(loaded);
         }
 
         public void Write(Type sourceType, object value, IBindingSink sink, IBindingContext context) =>

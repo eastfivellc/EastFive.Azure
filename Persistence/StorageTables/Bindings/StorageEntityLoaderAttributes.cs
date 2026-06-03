@@ -6,8 +6,10 @@ using System.Reflection;
 using EastFive.Api;
 using EastFive.Api.Binding;
 using EastFive.Api.Bindings;
+using EastFive.Api.Serialization.Binding.Sources;
 using EastFive.Extensions;
 using EastFive.Reflection;
+using EastFive.Serialization.Binding;
 
 namespace EastFive.Azure.Persistence.StorageTables.Bindings
 {
@@ -19,20 +21,24 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     /// <see cref="StorageEntity{T}"/> parameter slot.
     /// <para>
     /// <b>Selection</b> (sync, in <see cref="TrySelectSource"/>): the attribute
-    /// discovers the entity's key members, resolves each one's wire name,
+    /// discovers the entity's key members, resolves each one's wire name, and
     /// reads each raw string from <see cref="IRequestEnvelopeV3.Query"/> and/or
     /// <see cref="IRequestEnvelopeV3.Route"/> per <see cref="Source"/>. If any
-    /// key part is missing the method does not apply. On a hit it resolves
-    /// the driver eagerly via <see cref="StorageDriverScope"/>, packs the raw
-    /// wire-name → string map onto a <see cref="StorageBoundSource"/>, and
-    /// emits a <see cref="BindCall"/> that dispatches the wrapper via
-    /// <c>onObject</c>.
+    /// key part is missing the method does not apply. On a hit it packs the
+    /// (wire-name → string) pairs onto a <see cref="LookupBindingSource"/> and
+    /// emits a <see cref="BindCalls.FromSource"/> call. No driver lookup
+    /// happens here — the binder resolves the driver lazily via
+    /// <see cref="ParameterSlot"/>.
     /// </para>
     /// <para>
     /// <b>Bind</b> (async, in <see cref="StorageEntityBinder"/>): the binder
-    /// parses each raw key part via the application binder, builds the
-    /// partial entity, runs the async load, and surfaces the loaded full
-    /// <see cref="StorageEntity{T}"/> (or a 404-coded <see cref="BindFailure"/>).
+    /// unwraps the lookup source, parses each key part through its registered
+    /// <c>ITypeBinder</c> via <c>ITypeBindings.Bind</c> (so <c>IRef&lt;T&gt;</c>,
+    /// <c>Guid</c>, custom keys all go through their own binders), builds the
+    /// partial entity, resolves the driver via <see cref="StorageDriverScope"/>
+    /// on the <see cref="ParameterSlot"/>, runs the async load, and surfaces
+    /// the loaded full <see cref="StorageEntity{T}"/> (or a 404-coded
+    /// <see cref="BindFailure"/>).
     /// </para>
     /// <para>
     /// <see cref="IModifyRoutePattern"/> is kept here because route-pattern
@@ -55,8 +61,10 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
         /// <summary>
         /// Per-key-member wire-name overrides, positional with
         /// <see cref="KeyMemberDiscovery.DiscoverKeyMembers{T}"/>'s ordering.
-        /// Entries set to <c>null</c> or omitted entries fall back to each
-        /// member's <see cref="IProvideApiValue.GetPropertyName(MemberInfo)"/>.
+        /// Entries set to <c>null</c> or omitted entries fall back to the
+        /// wire name declared by the member's V3 <c>[ApiProperty]</c> (or any
+        /// attribute implementing <see cref="IIncludeInMemberScope{TScope}"/>
+        /// for the inbound scope mapped from <see cref="Source"/>).
         /// </summary>
         public string[] Overrides { get; set; }
 
@@ -73,7 +81,7 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             if (keyMembers.Length == 0) return false;
 
             var wireNames = ResolveWireNames(keyMembers);
-            var rawKeys = new KeyValuePair<string, string>[wireNames.Length];
+            var pairs = new KeyValuePair<string, string[]>[wireNames.Length];
 
             var allowPath = (this.Source & BindingSource.Path) != 0;
             var allowQuery = (this.Source & BindingSource.Query) != 0;
@@ -82,13 +90,15 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             {
                 if (!TryReadRaw(envelope, wireNames[i], allowQuery, allowPath, out var raw))
                     return false;
-                rawKeys[i] = new KeyValuePair<string, string>(wireNames[i], raw);
+                pairs[i] = new KeyValuePair<string, string[]>(wireNames[i], new[] { raw });
             }
 
-            var provider = StorageDriverScope.Resolve(parameter);
-            var driver = provider.GetDriver();
-            var storageSrc = new StorageBoundSource(inner: null, driver: driver, rawBody: rawKeys);
-            call = StorableEntityFromResourceAttribute.MakeStorageObjectCall(storageSrc);
+            // Hand the per-key lookup over as a real envelope-derived
+            // IBindingSource so the binder can recurse through ITypeBindings
+            // per key part. Driver resolution is deferred to bind time via
+            // ParameterSlot — no per-parameter state smuggled through the source.
+            var lookupSrc = new LookupBindingSource(pairs);
+            call = BindCalls.FromSource(lookupSrc, string.Empty);
             return true;
         }
 
@@ -117,24 +127,33 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             return false;
         }
 
-        private string[] ResolveWireNames(KeyMemberDiscovery.KeyMember[] keyMembers)
+        internal string[] ResolveWireNames(MemberInfo[] keyMembers)
         {
             var overrides = this.Overrides;
             var legacySingleName = this.Name;
             var total = keyMembers.Length;
-            return keyMembers
-                .Select((km, idx) => ResolveWireName(km, idx, total, overrides, legacySingleName))
-                .ToArray();
+            var scope = InboundWireNameResolver.ScopeFor(this.Source);
+            var result = new string[total];
+            for (var i = 0; i < total; i++)
+                result[i] = ResolveWireName(keyMembers[i], i, total, overrides, legacySingleName, scope);
+            return result;
         }
 
-        private static string ResolveWireName(KeyMemberDiscovery.KeyMember km, int index, int total,
-            string[] overrides, string legacySingleName)
+        private static string ResolveWireName(MemberInfo member, int index, int total,
+            string[] overrides, string legacySingleName, Type scope)
         {
             if (overrides != null && index < overrides.Length && overrides[index].HasBlackSpace())
                 return overrides[index];
             if (total == 1 && legacySingleName.HasBlackSpace())
                 return legacySingleName;
-            return km.ApiValue.GetPropertyName(km.Member);
+            var wireName = InboundWireNameResolver.Resolve(member, scope);
+            if (wireName.HasBlackSpace())
+                return wireName;
+            throw new InvalidOperationException(
+                $"Storage key member '{member.DeclaringType?.FullName}.{member.Name}' is missing " +
+                $"a V3 binding attribute for inbound scope `{scope.Name}`. " +
+                $"Add `[ApiProperty(Name = \"…\")]` (or any other " +
+                $"IIncludeInMemberScope<{scope.Name}> attribute) so the HTTP loader knows the wire name.");
         }
 
         /// <summary>
@@ -154,8 +173,16 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             if (keyMembers.Length == 0)
                 return currentPattern;
             var wireNames = ResolveWireNames(keyMembers);
-            return RoutePattern.AppendTrailingCapture(currentPattern, wireNames[0]);
+            return RoutePattern.AppendTrailingCapture(currentPattern, wireNames[0],
+                MemberValueType(keyMembers[0]));
         }
+
+        private static Type MemberValueType(MemberInfo member) => member switch
+        {
+            PropertyInfo p => p.PropertyType,
+            FieldInfo f => f.FieldType,
+            _ => null,
+        };
 
         private static Type ExtractEntityType(ParameterInfo parameter)
         {

@@ -1,20 +1,20 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 using EastFive.Api.Binding;
+using EastFive.Api.Serialization.Binding.Sources;
 
 namespace EastFive.Azure.Persistence.StorageTables.Bindings
 {
     /// <summary>
     /// V3 selection attribute that opts an <see cref="IQueryable{T}"/> parameter
-    /// into the per-datastore storage pipeline. Selection always succeeds:
-    /// resolves the driver eagerly via
-    /// <see cref="StorageDriverScope.Resolve"/> (parameter → method →
-    /// declaring type → assembly) and dispatches a
-    /// <see cref="StorageBoundSource"/> (carrying the driver, no body) via
-    /// <c>onObject</c>; <see cref="StorageQueryBinder"/> then constructs
-    /// <c>new StorageQuery&lt;T&gt;(driver)</c>.
+    /// into the per-datastore storage pipeline. Selection always succeeds for a
+    /// closed <c>IQueryable&lt;T&gt;</c> parameter and emits an empty
+    /// <see cref="LookupBindingSource"/> — there is no per-parameter state to
+    /// carry, because <see cref="StorageQueryBinder"/> resolves the scoped
+    /// driver lazily via <see cref="ParameterSlot"/> at bind time.
     ///
     /// Pair with a queryable-bound write extension (e.g.
     /// <c>StorageInsertAsync</c>) to make controllers explicit about which
@@ -41,11 +41,13 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
                 call = null;
                 return false;
             }
-
-            var provider = StorageDriverScope.Resolve(parameter);
-            var driver = provider.GetDriver();
-            var storageSrc = new StorageBoundSource(inner: null, driver: driver, rawBody: null);
-            call = StorableEntityFromResourceAttribute.MakeStorageObjectCall(storageSrc);
+            // No body / no key parts: data-free emit. StorageQueryBinder
+            // doesn't probe the source — it constructs StorageQuery<T> from a
+            // slot-resolved driver. The empty source is here purely to satisfy
+            // the dispatcher's per-parameter BindCall contract.
+            var emptyLookup = new LookupBindingSource(
+                Enumerable.Empty<KeyValuePair<string, string[]>>());
+            call = BindCalls.FromSource(emptyLookup, string.Empty);
             return true;
         }
 

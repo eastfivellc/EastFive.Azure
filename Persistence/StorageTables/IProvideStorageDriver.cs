@@ -1,5 +1,8 @@
+using System.Linq;
 using System.Reflection;
 
+using EastFive.Linq;
+using EastFive.Reflection;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 
 namespace EastFive.Azure.Persistence.StorageTables
@@ -36,34 +39,21 @@ namespace EastFive.Azure.Persistence.StorageTables
         /// </summary>
         public static IProvideStorageDriver Resolve(ParameterInfo parameter)
         {
-            // Parameter
-            foreach (var attr in parameter.GetAttributesInterface<IProvideStorageDriver>())
-                return attr;
-
             var method = parameter.Member as MethodInfo;
-            if (method != null)
-            {
-                foreach (var attr in method.GetAttributesInterface<IProvideStorageDriver>())
-                    return attr;
+            var declaringType = method?.DeclaringType;
 
-                var declaringType = method.DeclaringType;
-                if (declaringType != null)
-                {
-                    foreach (var attr in declaringType.GetAttributesInterface<IProvideStorageDriver>(
-                        inherit: true, multiple: true))
-                        return attr;
-
-                    foreach (var attr in declaringType.Assembly.GetCustomAttributes(inherit: false))
-                        if (attr is IProvideStorageDriver provider)
-                            return provider;
-                }
-            }
-
-            throw new System.InvalidOperationException(
-                $"No [IProvideStorageDriver] attribute in scope for parameter " +
-                $"'{parameter.Name}' of '{method?.DeclaringType?.FullName}.{method?.Name}'. " +
-                $"Apply one (e.g. [RosemaryDataStorage]) at the parameter, method, " +
-                $"declaring type, or assembly.");
+            return parameter.AttributeInterfacesInParameter<IProvideStorageDriver>()
+                .Concat(method.AttributeInterfacesInMethod<IProvideStorageDriver>())
+                .Concat(declaringType.AttributeInterfacesInType<IProvideStorageDriver>(
+                    inherit: true, multiple: true))
+                .Concat((declaringType?.Assembly).AttributeInterfacesInAssembly<IProvideStorageDriver>())
+                .First<IProvideStorageDriver, IProvideStorageDriver>(
+                    (provider, next) => provider,
+                    () => throw new System.InvalidOperationException(
+                        $"No [IProvideStorageDriver] attribute in scope for parameter " +
+                        $"'{parameter.Name}' of '{method?.DeclaringType?.FullName}.{method?.Name}'. " +
+                        $"Apply one (e.g. [RosemaryDataStorage]) at the parameter, method, " +
+                        $"declaring type, or assembly."));
         }
     }
 }

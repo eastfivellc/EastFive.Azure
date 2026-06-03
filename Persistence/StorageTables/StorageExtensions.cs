@@ -733,6 +733,87 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                 .FindBy<TEntity>(entityQuery, tableName:default, cancellationToken: cancellationToken);
         }
 
+        /// <summary>
+        /// Reads from the datastore that backs <paramref name="source"/>. The queryable must
+        /// originate from the storage instigation pipeline (e.g. a <c>[StorageEntities]</c>-decorated
+        /// parameter or the legacy <see cref="EastFive.Azure.Persistence.AzureStorageTables.StorageQueryInvocationAttribute"/>);
+        /// the underlying <see cref="StorageQuery{TEntity}.StorageDriver"/> is what executes the query.
+        /// </summary>
+        /// <remarks>
+        /// MIXING CONCERN: queryable-bound reads deliberately bypass <c>FromSettings()</c> so
+        /// per-parameter datastore overrides (e.g. <c>[AffirmDataStorage][StorageEntities]</c>)
+        /// actually take effect. This is the read-side mirror of <see cref="StorageInsertAsync"/>;
+        /// the scoped driver's <c>FindBy</c> uses <c>Compile</c> to build up the execution.
+        /// Use <see cref="StorageGet{TEntity}"/> instead when the default datastore is intended.
+        /// </remarks>
+        public static IEnumerableAsync<TEntity> StorageExecute<TEntity>(this IQueryable<TEntity> source,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            if (!(source is StorageQuery<TEntity> sq))
+                throw new InvalidOperationException(
+                    $"StorageExecute requires an IQueryable<{typeof(TEntity).Name}> produced by " +
+                    $"the storage pipeline (e.g. a [StorageEntities] parameter); got " +
+                    $"'{source?.GetType().FullName ?? "<null>"}'.");
+
+            return sq.StorageDriver
+                .FindBy<TEntity>(source, tableName: default, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Segmented read against the datastore that backs <paramref name="source"/>. Like
+        /// <see cref="StorageExecute{TEntity}"/>, the underlying
+        /// <see cref="StorageQuery{TEntity}.StorageDriver"/> executes the query, so per-parameter
+        /// datastore overrides take effect. Read-side mirror of <see cref="StorageInsertAsync"/>;
+        /// pair with the non-segmented <see cref="StorageExecute{TEntity}"/>.
+        /// </summary>
+        public static IEnumerableAsync<(TEntity, string)> StorageExecuteSegmented<TEntity>(this IQueryable<TEntity> source,
+            TableContinuationToken token = default,
+            System.Threading.CancellationToken cancellationToken = default)
+        {
+            if (!(source is StorageQuery<TEntity> sq))
+                throw new InvalidOperationException(
+                    $"StorageExecuteSegmented requires an IQueryable<{typeof(TEntity).Name}> produced by " +
+                    $"the storage pipeline (e.g. a [StorageEntities] parameter); got " +
+                    $"'{source?.GetType().FullName ?? "<null>"}'.");
+
+            return sq.StorageDriver
+                .FindBySegmented<TEntity>(source, token, tableName: default, cancellationToken: cancellationToken);
+        }
+
+        /// <summary>
+        /// Point lookup by <paramref name="entityRef"/> against the datastore that backs
+        /// <paramref name="source"/>. This is the scoped mirror of the ambient
+        /// <see cref="StorageGetAsync{TEntity,TResult}(IRef{TEntity},Func{TEntity,TResult},Func{TResult},ICacheEntites)"/>:
+        /// it computes the row/partition key and issues a single <c>FindByIdAsync</c> retrieve on the
+        /// queryable's <see cref="StorageQuery{TEntity}.StorageDriver"/> rather than the ambient
+        /// <c>FromSettings()</c> driver, so per-parameter datastore overrides
+        /// (e.g. <c>[AffirmDataStorage][StorageEntities]</c>) take effect. Use this instead of
+        /// <c>.Where(x =&gt; x.id == ref).StorageExecute().FirstAsync(...)</c> for a single-entity read by id;
+        /// it avoids the expression-tree compile path entirely and is a true key lookup.
+        /// </summary>
+        public static async Task<TResult> StorageGetByIdAsync<TEntity, TResult>(this IQueryable<TEntity> source,
+                IRef<TEntity> entityRef,
+            Func<TEntity, TResult> onFound,
+            Func<TResult> onNotFound = default,
+            ICacheEntites cache = default)
+            where TEntity : IReferenceable
+        {
+            if (!(source is StorageQuery<TEntity> sq))
+                throw new InvalidOperationException(
+                    $"StorageGetByIdAsync requires an IQueryable<{typeof(TEntity).Name}> produced by " +
+                    $"the storage pipeline (e.g. a [StorageEntities] parameter); got " +
+                    $"'{source?.GetType().FullName ?? "<null>"}'.");
+
+            if (entityRef.IsDefaultOrNull())
+                return onNotFound();
+            var (rowKey, partitionKey) = entityRef.StorageComputeRowAndPartitionKey();
+            return await sq.StorageDriver
+                .FindByIdAsync(rowKey, partitionKey,
+                    onFound: (TEntity entity, TableResult tableResult) => onFound(entity),
+                    onNotFound: onNotFound,
+                    cache: cache);
+        }
+
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
                 Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
                 int readAhead = -1)

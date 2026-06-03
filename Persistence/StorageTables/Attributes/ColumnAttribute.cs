@@ -54,7 +54,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var memberType = MemberType(memberInfo);
             var column = GetTablePropertyName(memberInfo);
-            var ctx = new BindingContext(TypeBindings.Default);
+            var ctx = new BindingContext(TypeBindings.Default, memberScope: typeof(StorageRow));
             var source = new EntityPropertyRowBindingSource(values);
 
             object resolved = null;
@@ -87,7 +87,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             var memberType = MemberType(memberInfo);
             var column = GetTablePropertyName(memberInfo);
             var sink = new EntityPropertyRowBindingSink();
-            var ctx = new BindingContext(TypeBindings.Default);
+            var ctx = new BindingContext(TypeBindings.Default, memberScope: typeof(StorageRow));
             TypeBindings.Default.Emit(memberType, value, sink.Scope(column), ctx);
             return sink.Row.ToArray();
         }
