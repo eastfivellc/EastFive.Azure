@@ -65,7 +65,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
                 var entity = this.Entity;
                 var source = new EntityPropertyRowBindingSource(properties);
-                var ctx = new BindingContext(TypeBindings.Default);
+                var ctx = new BindingContext(TypeBindings.Default, memberScope: typeof(StorageRow));
 
                 foreach (var (member, type, column) in columns)
                 {
@@ -95,7 +95,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
             {
                 var sink = new EntityPropertyRowBindingSink();
-                var ctx = new BindingContext(TypeBindings.Default);
+                var ctx = new BindingContext(TypeBindings.Default, memberScope: typeof(StorageRow));
 
                 foreach (var (member, type, column) in columns)
                 {
