@@ -176,7 +176,7 @@ namespace EastFive.Azure.Auth
                 Uri locationAuthenticationReturn,
 
                 [Resource]Authorization authorization,
-                IAuthApplication application, IProvideUrl urlHelper,
+                IApplication application, IProvideUrl urlHelper,
             CreatedBodyResponse<Authorization> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ReferencedDocumentDoesNotExistsResponse<Method> onAuthenticationDoesNotExist)
@@ -204,7 +204,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = MethodPropertyName)]IRef<Method> methodRef,
                 [Property(Name = ParametersPropertyName)]IDictionary<string, string> parameters,
                 [Resource]Authorization authorization,
-                Api.Azure.AzureApplication application, IProvideUrl urlHelper,
+                IApplication application, IProvideUrl urlHelper,
                 IInvokeApplication endpoints,
                 IHttpRequest request,
             CreatedResponse onCreated,
@@ -556,7 +556,7 @@ namespace EastFive.Azure.Auth
         }
 
         public async Task<TResult> ParseCredentailParameters<TResult>(
-                IAuthApplication application,
+                IApplication application,
             Func<string, IProvideLogin, TResult> onSuccess,
             Func<string, TResult> onFailure)
         {
@@ -564,7 +564,7 @@ namespace EastFive.Azure.Auth
             return await Auth.Method.ById(this.Method, application, // TODO: Cleanup 
                 (method) =>
                 {
-                    var loginProviders = application.LoginProviders;
+                    var loginProviders = application.GetLoginProviders();
                     var methodName = method.name;
                     if (!loginProviders.ContainsKey(methodName))
                         return onFailure("Method does not match any existing authentication.");

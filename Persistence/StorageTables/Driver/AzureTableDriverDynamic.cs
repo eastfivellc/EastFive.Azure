@@ -769,7 +769,7 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
 
                                 if (memberCandidate.TryGetAttributeInterface(out IProvideTableQuery provideTableQuery))
                                 {
-                                    var propExpr = Expression.Equal(by.Body, Expression.Constant(findByValue));
+                                    var propExpr = Expression.Equal(by.Body, Expression.Constant(findByValue, by.Body.Type));
 
                                     var lambdaExpr = Expression<Func<TEntity, bool>>.Lambda(propExpr, parameters:by.Parameters);
                                     var initialAssignment = (Expression<Func<TEntity, bool>>)lambdaExpr;

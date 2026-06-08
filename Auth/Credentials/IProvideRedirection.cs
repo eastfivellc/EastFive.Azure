@@ -14,7 +14,7 @@ namespace EastFive.Azure.Auth.CredentialProviders
         Task<TResult> GetRedirectUriAsync<TResult>(
                 Guid? accountIdMaybe, IProvideAuthorization authProvider, IDictionary<string, string> authParams,
                 EastFive.Azure.Auth.Method method, EastFive.Azure.Auth.Authorization authorization,
-                EastFive.Api.Azure.AzureApplication application, IHttpRequest request,
+                EastFive.Api.IApplication application, IHttpRequest request,
                 IInvokeApplication endpoints, Uri baseUrl,
             Func<Uri, KeyValuePair<string,string>[], TResult> onSuccess,
             Func<TResult> onIgnored,

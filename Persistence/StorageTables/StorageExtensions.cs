@@ -814,6 +814,34 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
                     cache: cache);
         }
 
+        /// <summary>
+        /// Plural mirror of <see cref="StorageGetByIdAsync{TEntity,TResult}(IQueryable{TEntity},IRef{TEntity},Func{TEntity,TResult},Func{TResult},ICacheEntites)"/>:
+        /// point-looks-up every reference in <paramref name="entityRefs"/> against the datastore that
+        /// backs <paramref name="source"/>, issuing the reads in parallel and yielding only the
+        /// references that resolve to an existing entity (missing ones are silently skipped). Each read
+        /// is a true key lookup (computes row/partition key + <c>FindByIdAsync</c>) on the queryable's
+        /// own <see cref="StorageQuery{TEntity}.StorageDriver"/>, so per-parameter datastore overrides
+        /// are honored.
+        /// </summary>
+        public static IEnumerableAsync<TEntity> ByIds<TEntity>(this IQueryable<TEntity> source,
+                IRefs<TEntity> entityRefs,
+                ICacheEntites cache = default)
+            where TEntity : IReferenceable
+        {
+            var refs = entityRefs.IsDefaultOrNull()
+                ? new IRef<TEntity>[] { }
+                : entityRefs.refs;
+            return refs
+                .Select(
+                    entityRef => source.StorageGetByIdAsync(entityRef,
+                        onFound: entity => (found: true, entity),
+                        onNotFound: () => (found: false, entity: default(TEntity)),
+                        cache: cache))
+                .AsyncEnumerable()
+                .Where(tpl => tpl.found)
+                .Select(tpl => tpl.entity);
+        }
+
         public static IEnumerableAsync<TEntity> StorageGetByIdProperty<TRefEntity, TEntity>(this IRef<TRefEntity> entityRef,
                 Expression<Func<TEntity, IRef<TRefEntity>>> idProperty,
                 int readAhead = -1)
@@ -884,6 +912,25 @@ namespace EastFive.Azure.Persistence.AzureStorageTables
         //        .FromSettings()
         //        .FindBy(entityRef, idProperty, query1, query2);
         //}
+
+        /// <summary>
+        /// Driver-bound, hash-lookup read by a single indexed property — the read-side mirror of
+        /// <see cref="StorageGetBy{TProperty, TEntity}"/> that targets an explicit
+        /// <paramref name="driver"/> instead of <c>FromSettings()</c>. Generated static query
+        /// helpers call this so the by-property <c>FindBy</c> overload is selected unambiguously
+        /// (a concrete <c>IRef&lt;T&gt;</c> value would otherwise match both the property and the
+        /// reference overloads).
+        /// </summary>
+        public static IEnumerableAsync<TEntity> StorageFindByProperty<TProperty, TEntity>(
+                this AzureTableDriverDynamic driver,
+                TProperty propertyValue,
+                Expression<Func<TEntity, TProperty>> propertyExpr,
+                int readAhead = -1,
+                ILogger logger = default)
+        {
+            return driver.FindBy(propertyValue, propertyExpr,
+                readAhead: readAhead, logger: logger);
+        }
 
         public static IEnumerableAsync<TEntity> StorageGetBy<TProperty, TEntity>(this TProperty propertyValue,
                 Expression<Func<TEntity, TProperty>> propertyExpr,

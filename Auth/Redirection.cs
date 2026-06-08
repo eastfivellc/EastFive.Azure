@@ -43,7 +43,7 @@ namespace EastFive.Azure.Auth
         public static async Task<IHttpResponse> ProcessRequestAsync(
                 EastFive.Azure.Auth.Method method,
                 IDictionary<string, string> values,
-                IAzureApplication application, 
+                IApplication application, 
                 IHttpRequest request,
                 IInvokeApplication endpoints,
                 IProvideUrl urlHelper,
@@ -54,7 +54,7 @@ namespace EastFive.Azure.Auth
         {
             //var authorizationRequestManager = application.AuthorizationRequestManager;
 
-            var telemetry = application.Telemetry;
+            var telemetry = EastFive.Azure.Monitoring.TelemetryExtensions.LoadTelemetryClient();
             telemetry.TrackEvent($"ResponseController.ProcessRequestAsync - Requesting credential manager.");
 
             var requestId = Guid.NewGuid();
@@ -102,7 +102,7 @@ namespace EastFive.Azure.Auth
 
         public async static Task<TResult> AuthenticationAsync<TResult>(
                 EastFive.Azure.Auth.Method authentication, IDictionary<string, string> values,
-                IAzureApplication application, IHttpRequest request,
+                IApplication application, IHttpRequest request,
                 IInvokeApplication endpoints, Uri baseUri,
                 IRefOptional<Authorization> authorizationRefToCreate,
             Func<Uri, Guid?, Func<IHttpResponse, IHttpResponse>, TResult> onRedirect,
@@ -110,7 +110,7 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onGeneralFailure)
         {
-            var telemetry = application.Telemetry;
+            var telemetry = EastFive.Azure.Monitoring.TelemetryExtensions.LoadTelemetryClient();
             return await await authentication.RedeemTokenAsync(values, application,
                 async (externalAccountKey, authorizationRefMaybe, loginProvider, extraParams) =>
                 {
@@ -179,7 +179,7 @@ namespace EastFive.Azure.Auth
                 Func<Authorization, Task> saveAsync,
                 Method authenticationMethod, string externalAccountKey,
                 IDictionary<string, string> extraParams,
-                IAzureApplication application, IHttpRequest request,
+                IApplication application, IHttpRequest request,
                 IInvokeApplication endpoints, IProvideLogin loginProvider,
                 Uri baseUri,
             Func<Uri, Guid?, Func<IHttpResponse, IHttpResponse>, TResult> onRedirect,
@@ -226,7 +226,7 @@ namespace EastFive.Azure.Auth
                 Func<Authorization, Task> saveAsync,
                 Method authenticationMethod, string externalAccountKey,
                 IDictionary<string, string> extraParams,
-                IAzureApplication application, IHttpRequest request,
+                IApplication application, IHttpRequest request,
                 IProvideLogin loginProvider,
                 Uri baseUri,
             Func<Guid, Authorization, TResult> onAccountLocated,
@@ -271,7 +271,7 @@ namespace EastFive.Azure.Auth
         public static async Task<TResult> IdentifyAccountAsync<TResult>(Authorization authorization,
                 Method authenticationMethod, string externalAccountKey,
                 IDictionary<string, string> extraParams,
-                IAzureApplication application,
+                IApplication application,
                 IProvideLogin loginProvider,
                 IHttpRequest request,
             Func<Guid, IDictionary<string, string>, TResult> onLocated,
@@ -279,11 +279,11 @@ namespace EastFive.Azure.Auth
             Func<string, TResult> onGeneralFailure,
                 TelemetryClient telemetry)
         {
-            if (!(application is IProvideAccountInformation))
+            var accountInfoProvider = application.GetAccountInformationProvider();
+            if (accountInfoProvider == null)
             {
-                return onGeneralFailure($"{application.GetType().FullName} does not implement {nameof(IProvideAccountInformation)}.");
+                return onGeneralFailure($"No {nameof(IProvideAccountInformation)} provider is declared in the domain.");
             }
-            var accountInfoProvider = (IProvideAccountInformation)application;
 
             return await accountInfoProvider.FindOrCreateAccountByMethodAndKeyAsync(
                     authenticationMethod, externalAccountKey,
@@ -397,7 +397,7 @@ namespace EastFive.Azure.Auth
         public static Task<TResult> CreateLoginResponseAsync<TResult>(
                 Guid? accountId, IDictionary<string, string> extraParams,
                 Method method, Authorization authorization,
-                IAuthApplication application,
+                IApplication application,
                 IHttpRequest request, IInvokeApplication endpoints,
                 Uri baseUrl,
                 IProvideAuthorization authorizationProvider,

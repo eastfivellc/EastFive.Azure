@@ -113,7 +113,7 @@ namespace EastFive.Azure.Auth
                     (minutes) => TimeSpan.FromMinutes(minutes)));
 
         private static async Task<TResult> GetClaimsAsync<TResult>(
-            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
+            IApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
             Func<string, TResult> onFailure)
         {
@@ -158,7 +158,7 @@ namespace EastFive.Azure.Auth
         public static async Task<IHttpResponse> GetAsync(
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName =true)]IRef<Session> sessionRef,
                 EastFive.Azure.Auth.SessionTokenMaybe securityMaybe,
-                IAuthApplication application,
+                IApplication application,
             ContentTypeResponse<Session> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized,
@@ -213,7 +213,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = SessionIdPropertyName, CheckFileName = true)]IRef<Session> sessionRef,
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]IRef<Authorization> authorization,
                 EastFive.Azure.Auth.SessionToken sessionToken,
-                IAuthApplication application, IProvideUrl urlHelper,
+                IApplication application, IProvideUrl urlHelper,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ConfigurationFailureResponse onConfigurationFailure,
@@ -247,7 +247,7 @@ namespace EastFive.Azure.Auth
                 IRefOptional<Authorization> authorizationRefMaybe,
 
                 [Resource]Session session,
-                IAuthApplication application,
+                IApplication application,
 
             [Api.Meta.Flows.WorkflowVariable2(Workflows.AuthorizationFlow.Variables.AuthHeaderName, HeaderNamePropertyName)]
             [Api.Meta.Flows.WorkflowVariable(Workflows.AuthorizationFlow.Variables.TokenName, TokenPropertyName)]
@@ -308,7 +308,7 @@ namespace EastFive.Azure.Auth
                 [UpdateId(Name = SessionIdPropertyName)]IRef<Session> sessionRef,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 EastFive.Azure.Auth.SessionToken sessionToken,
-                IAuthApplication application,
+                IApplication application,
             ContentTypeResponse<Session> onUpdated,
             NotFoundResponse onNotFound,
             ConfigurationFailureResponse onConfigurationFailure,
@@ -372,7 +372,7 @@ namespace EastFive.Azure.Auth
         #endregion
 
         public async static Task<Session> CreateAsync(
-            IAuthApplication application, IRefOptional<Authorization> authorizationRefMaybe,
+            IApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             IRefOptional<Session> sessionToCreateMaybe = default)
         {
             var sessionId = sessionToCreateMaybe.HasValueNotNull() ?
@@ -437,7 +437,7 @@ namespace EastFive.Azure.Auth
         }
 
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
-                IAuthApplication application,
+                IApplication application,
             Func<Guid, IDictionary<string, string>, bool, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {
@@ -454,9 +454,9 @@ namespace EastFive.Azure.Auth
                             return await await method.GetAuthorizationKeyAsync(application, authorization.parameters,
                                 async (externalUserKey) =>
                                 {
-                                    if (application is IProvideAccountInformation)
+                                    var accountInformationProvider = application.GetAccountInformationProvider();
+                                    if (accountInformationProvider != null)
                                     {
-                                        var accountInformationProvider = application as IProvideAccountInformation;
                                         return await await accountInformationProvider
                                             .FindAccountByMethodAndKeyAsync(
                                                     method, externalUserKey,
