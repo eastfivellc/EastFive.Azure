@@ -55,5 +55,25 @@ namespace EastFive.Azure.Persistence.StorageTables
                         $"Apply one (e.g. [RosemaryDataStorage]) at the parameter, method, " +
                         $"declaring type, or assembly."));
         }
+
+        /// <summary>
+        /// Resolves the first <see cref="IProvideStorageDriver"/> in scope for a
+        /// resource type following the lexical-scope walk: declaring type →
+        /// assembly. Used by generated static query helpers that have no
+        /// <see cref="ParameterInfo"/> to anchor on.
+        /// Throws when none is in scope — that's a controller-wiring bug.
+        /// </summary>
+        public static IProvideStorageDriver Resolve(System.Type type)
+        {
+            return type.AttributeInterfacesInType<IProvideStorageDriver>(
+                    inherit: true, multiple: true)
+                .Concat(type.Assembly.AttributeInterfacesInAssembly<IProvideStorageDriver>())
+                .First<IProvideStorageDriver, IProvideStorageDriver>(
+                    (provider, next) => provider,
+                    () => throw new System.InvalidOperationException(
+                        $"No [IProvideStorageDriver] attribute in scope for type " +
+                        $"'{type.FullName}'. Apply one (e.g. [RosemaryDataStorage]) at the " +
+                        $"type or assembly."));
+        }
     }
 }

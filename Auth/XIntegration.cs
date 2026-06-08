@@ -67,7 +67,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public async static Task<IHttpResponse> GetByIdAsync(
                 [QueryParameter(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                IAuthApplication application, SessionToken security,
+                IApplication application, SessionToken security,
             ContentTypeResponse<XIntegration> onFound,
             NotFoundResponse onNotFound,
             UnauthorizedResponse onUnauthorized)
@@ -94,7 +94,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public async static Task<IHttpResponse> GetByAccountAsync(
                 [QueryParameter(Name = AccountPropertyName)]Guid accountId,
-                IAuthApplication application, SessionToken security,
+                IApplication application, SessionToken security,
             MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
@@ -124,7 +124,7 @@ namespace EastFive.Azure.Auth
         [Api.HttpGet]
         public static IHttpResponse GetByMethodAsync(
                 [QueryParameter(Name = Authorization.MethodPropertyName)]IRef<Method> methodRef,
-                IAuthApplication application, SessionToken security,
+                IApplication application, SessionToken security,
             MultipartAsyncResponse<XIntegration> onContents,
             UnauthorizedResponse onUnauthorized)
         {
@@ -157,7 +157,7 @@ namespace EastFive.Azure.Auth
                 [Property(Name = AccountPropertyName)]Guid accountId,
                 [PropertyOptional(Name = AuthorizationPropertyName)]IRefOptional<Authorization> authorizationRefMaybe,
                 [Resource]XIntegration integration,
-                IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
+                IApplication application, EastFive.Azure.Auth.SessionToken security,
             CreatedResponse onCreated,
             AlreadyExistsResponse onAlreadyExists,
             ForbiddenResponse onForbidden,
@@ -191,7 +191,7 @@ namespace EastFive.Azure.Auth
         [HttpDelete]
         public static async Task<IHttpResponse> DeleteAsync(
         [UpdateId(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
-                IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
+                IApplication application, EastFive.Azure.Auth.SessionToken security,
             NoContentResponse onDeleted,
             NotFoundResponse onNotFound,
             ForbiddenResponse onForbidden)
@@ -211,7 +211,7 @@ namespace EastFive.Azure.Auth
         public async static Task<IHttpResponse> UpdateAsync(
                 [Property(Name = IntegrationIdPropertyName)]IRef<XIntegration> integrationRef,
                 [Property(Name = AuthorizationPropertyName)]IRef<Authorization> authorizationRef,
-                Api.Azure.AzureApplication application, EastFive.Azure.Auth.SessionToken security,
+                IApplication application, EastFive.Azure.Auth.SessionToken security,
             ContentTypeResponse<XIntegration> onUpdated,
             NotFoundResponse onNotFound,
             ForbiddenResponse onForbidden,

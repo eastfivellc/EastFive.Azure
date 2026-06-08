@@ -48,7 +48,7 @@ namespace EastFive.Azure.Auth
         [ResourceTitle]
         public string name;
 
-        public Task<TResult> GetLoginProviderAsync<TResult>(IAuthApplication application,
+        public Task<TResult> GetLoginProviderAsync<TResult>(IApplication application,
             Func<string, IProvideLogin, TResult> onFound,
             Func<TResult> onNotFound)
         {
@@ -57,12 +57,12 @@ namespace EastFive.Azure.Auth
                 onNotFound).AsTask();
         }
 
-        private static TResult GetLoginProvider<TResult>(Guid authenticationId, IAuthApplication application,
+        private static TResult GetLoginProvider<TResult>(Guid authenticationId, IApplication application,
             Func<string, IProvideLogin, TResult> onFound,
             Func<TResult> onNotFound)
         {
-            //var debug = application.LoginProviders.ToArrayAsync().Result;
-            return application.LoginProviders
+            //var debug = application.GetLoginProviders().ToArrayAsync().Result;
+            return application.GetLoginProviders()
                 .Where(
                     loginProvider =>
                     {
@@ -82,7 +82,7 @@ namespace EastFive.Azure.Auth
         [Unsecured("Public endpoint to get authentication method by id.")]
         public static Task<IHttpResponse> QueryByIdAsync(
                 [QueryId] IRef<Method> methodRef,
-            IAuthApplication application,
+            IApplication application,
             ContentTypeResponse<Method> onFound,
             NotFoundResponse onNotFound)
         {
@@ -104,11 +104,11 @@ namespace EastFive.Azure.Auth
             Step = Workflows.HijackLoginFlow.Ordinals.ListMethods,
             StepName = Workflows.HijackLoginFlow.Steps.ListMethods)]
         public static IHttpResponse QueryAsync(
-                IAuthApplication application,
+                IApplication application,
             [WorkflowVariableResourceResponse]
             MultipartAcceptArrayResponse<Method> onContent)
         {
-            var methods = application.LoginProviders
+            var methods = application.GetLoginProviders()
                 .Select(
                     (loginProvider) =>
                     {
@@ -140,7 +140,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = NamePropertyName)]
                 string name,
 
-                IAuthApplication application,
+                IApplication application,
 
             [WorkflowVariable(
                 Workflows.HijackLoginFlow.Variables.Method.Get.Value,
@@ -148,7 +148,7 @@ namespace EastFive.Azure.Auth
             ContentTypeResponse<Method> onSuccess,
             NotFoundResponse onNotFound)
         {
-            var methodMaybe = application.LoginProviders
+            var methodMaybe = application.GetLoginProviders()
                 .First(
                     (loginProvider, next) =>
                     {
@@ -172,7 +172,7 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAsync(
             [QueryParameter(Name = "integration")] IRef<XIntegration> integrationRef,
-            IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
+            IApplication application, EastFive.Azure.Auth.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized,
             ReferencedDocumentNotFoundResponse<XIntegration> onIntegrationNotFound)
@@ -184,7 +184,7 @@ namespace EastFive.Azure.Auth
                     if (!await application.CanAdministerCredentialAsync(accountId, security))
                         return onUnauthorized();
 
-                    var integrationProviders = application.LoginProviders
+                    var integrationProviders = application.GetLoginProviders()
                         .Where(loginProvider => loginProvider.Value.GetType().IsSubClassOfGeneric(typeof(IProvideIntegration)))
                         .Select(
                             async loginProvider =>
@@ -215,14 +215,14 @@ namespace EastFive.Azure.Auth
         [HttpGet]
         public static async Task<IHttpResponse> QueryByIntegrationAccountAsync(
             [QueryParameter(Name = "integration_account")] Guid accountId,
-            IAuthApplication application, EastFive.Azure.Auth.SessionToken security,
+            IApplication application, EastFive.Azure.Auth.SessionToken security,
             MultipartAsyncResponse<Method> onContent,
             UnauthorizedResponse onUnauthorized)
         {
             if (!await application.CanAdministerCredentialAsync(accountId, security))
                 return onUnauthorized();
 
-            var integrationProviders = application.LoginProviders
+            var integrationProviders = application.GetLoginProviders()
                 .Where(loginProvider => loginProvider.Value.GetType().IsSubClassOfGeneric(typeof(IProvideIntegration)))
                 .Select(
                     async loginProvider =>
@@ -251,7 +251,7 @@ namespace EastFive.Azure.Auth
         [Unsecured("Public endpoint to get authentication methods supporting a session.")]
         public static Task<IHttpResponse> QueryBySessionAsync(
                 [QueryParameter(Name = "session")] IRef<Session> sessionRef,
-                IAuthApplication application,
+                IApplication application,
             MultipartAsyncResponse<Method> onContent,
             ReferencedDocumentNotFoundResponse<Session> onSessionNotFound,
             UnauthorizedResponse onHacked)
@@ -259,7 +259,7 @@ namespace EastFive.Azure.Auth
             return sessionRef.StorageGetAsync(
                 session =>
                 {
-                    var integrationProviders = application.LoginProviders
+                    var integrationProviders = application.GetLoginProviders()
                         .Where(loginProvider => loginProvider.Value.GetType().IsSubClassOfGeneric(typeof(IProvideSession)))
                         .Select(
                             async loginProvider =>
@@ -285,7 +285,7 @@ namespace EastFive.Azure.Auth
                 () => onHacked());
         }
 
-        public static Task<TResult> ById<TResult>(IRef<Method> method, IAuthApplication application,
+        public static Task<TResult> ById<TResult>(IRef<Method> method, IApplication application,
             Func<Method, TResult> onFound,
             Func<TResult> onNotFound)
         {
@@ -302,9 +302,9 @@ namespace EastFive.Azure.Auth
                 onNotFound).AsTask();
         }
 
-        public static Method ByMethodName(string methodName, IAuthApplication application)
+        public static Method ByMethodName(string methodName, IApplication application)
         {
-            return application.LoginProviders
+            return application.GetLoginProviders()
                 .SelectValues()
                 .Where(loginProvider => loginProvider.Method == methodName)
                 .First<IProvideLogin, Method>(
@@ -320,7 +320,7 @@ namespace EastFive.Azure.Auth
         }
 
         public Task<TResult> ParseTokenAsync<TResult>(IDictionary<string, string> parameters,
-            IAuthApplication application,
+            IApplication application,
             Func<string, IProvideLogin, TResult> onParsed,
             Func<string, TResult> onFailure)
         {
@@ -338,12 +338,12 @@ namespace EastFive.Azure.Auth
         }
 
         public TResult GetLoginProvider<TResult>(
-            IAuthApplication application,
+            IApplication application,
             Func<IProvideLogin, TResult> onParsed,
             Func<string, TResult> onFailure)
         {
             var methodName = this.name;
-            if (application.LoginProviders
+            if (application.GetLoginProviders()
                     .NullToEmpty()
                     .SelectValues()
                     .Where(loginProvider => loginProvider.Method == methodName)
@@ -355,14 +355,14 @@ namespace EastFive.Azure.Auth
 
         public async Task<TResult> RedeemTokenAsync<TResult>(
                 IDictionary<string, string> parameters,
-                IAuthApplication application,
+                IApplication application,
             Func<string, IRefOptional<Authorization>, IProvideLogin, IDictionary<string, string>, TResult> onSuccess,
             Func<Guid?, IDictionary<string, string>, TResult> onLogout,
             Func<string, TResult> onCouldNotConnect,
             Func<string, TResult> onFailure)
         {
             var methodName = this.name;
-            var matchingLoginProviders = application.LoginProviders
+            var matchingLoginProviders = application.GetLoginProviders()
                 .SelectValues()
                 .Where(loginProvider => loginProvider.Method == methodName)
                 .ToArray();
@@ -393,7 +393,7 @@ namespace EastFive.Azure.Auth
                 (why) => onFailure(why));
         }
 
-        public Task<Uri> GetLoginUrlAsync(IAuthApplication application,
+        public Task<Uri> GetLoginUrlAsync(IApplication application,
             IProvideUrl urlHelper, Guid authorizationIdSecure)
         {
             var authenticationId = this.id;
@@ -408,7 +408,7 @@ namespace EastFive.Azure.Auth
                 () => throw new Exception($"Login provider with id {authenticationId} does not exists."));
         }
 
-        internal Task<Uri> GetLogoutUrlAsync(IAuthApplication application,
+        internal Task<Uri> GetLogoutUrlAsync(IApplication application,
             IProvideUrl urlHelper, Guid authorizationIdSecure)
         {
             var authenticationId = this.id;
@@ -423,7 +423,7 @@ namespace EastFive.Azure.Auth
                 () => throw new Exception($"Login provider with id {authenticationId} does not exists."));
         }
 
-        public Task<TResult> GetAuthorizationKeyAsync<TResult>(IAuthApplication application,
+        public Task<TResult> GetAuthorizationKeyAsync<TResult>(IApplication application,
             IDictionary<string, string> parameters,
             Func<string, TResult> onAuthorizeKey,
             Func<string, TResult> onFailure,

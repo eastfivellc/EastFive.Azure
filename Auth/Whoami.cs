@@ -62,7 +62,7 @@ namespace EastFive.Azure.Auth
         public static async Task<IHttpResponse> GetAsync(
                 EastFive.Azure.Auth.SessionToken security,
                 IHttpRequest request,
-                IAuthApplication application,
+                IApplication application,
 
             [WorkflowVariable("Session", SessionPropertyName)]
             [WorkflowVariable2("Account", AccountPropertyName)]
