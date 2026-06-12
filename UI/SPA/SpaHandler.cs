@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.IO.Compression;
 using System.Linq;
@@ -25,22 +26,31 @@ using EastFive.Azure;
 using EastFive.Api.Core;
 using EastFive.Linq.Async;
 using EastFive.Api;
-using System.IO;
 
 namespace EastFive.Azure.Spa
 {
     public class SpaHandler : IDisposable
     {
+        private class SpaPackage
+        {
+            public string zipName;
+            public Dictionary<string, byte[]> files;
+            public Route[] routes;
+            public Route? defaultRoute;
+            public int? minimumVersion;
+        }
+
+        public const string PrimaryPackageZipName = "spa.zip";
+
         private readonly RequestDelegate continueAsync;
         private IApplication app;
 
         private static Task loadTask;
         private static ManualResetEvent signal = new ManualResetEvent(false);
 
-        private static Dictionary<string, byte[]> lookupSpaFile;
+        private static SpaPackage primaryPackage;
+        private static SpaPackage[] additionalPackages = new SpaPackage[] { };
         public static int? SpaMinimumVersion = default;
-        private static Route[] routes;
-        private static Route? defaultRoute;
         private static bool dynamicServe = false;
 
         private static IDictionary<string, string> extensionsMimeTypes =
@@ -55,6 +65,7 @@ namespace EastFive.Azure.Spa
             };
 
         private string[] firstSegments;
+        private HashSet<string> apiNamespaceRoutes;
 
         public void Dispose()
         {
@@ -77,6 +88,12 @@ namespace EastFive.Azure.Spa
                 .Distinct()
                 .ToArray();
 
+            apiNamespaceRoutes = app.Resources
+                .Where(route => !route.invokeResourceAttr.Namespace.IsNullOrWhiteSpace())
+                .Where(route => !route.invokeResourceAttr.Route.IsNullOrWhiteSpace())
+                .Select(
+                    route => $"/{route.invokeResourceAttr.Namespace}/{route.invokeResourceAttr.Route}")
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
         public static bool SetupSpa(IApplication application)
@@ -91,21 +108,41 @@ namespace EastFive.Azure.Spa
                             onFailure: why => false,
                             onNotSpecified: () => false);
 
+                        var additionalZipNames = EastFive.Azure.AppSettings.SPA.AdditionalPackages.ConfigurationString(
+                            packages => packages
+                                .Split(',')
+                                .Select(package => package.Trim())
+                                .Where(package => !package.IsNullOrWhiteSpace())
+                                .ToArray(),
+                            (why) => new string[] { });
 
                         loadTask = Task.Run(
                             async () =>
                             {
                                 var indexHtmlPath = EastFive.Azure.AppSettings.SPA.IndexHtmlPath.ConfigurationString(path => path, (why) => string.Empty);
-                                return await await LoadSpaFile(
-                                    async spaStream =>
-                                    {
-                                        bool success;
-                                        (success, SpaMinimumVersion, lookupSpaFile, routes, defaultRoute) = await LoadSpaAsync(
-                                            application, spaStream, indexHtmlPath, buildJsonPath, dynamicServe);
-                                        signal.Set();
-                                        return success;
-                                    },
-                                    () => false.AsTask());
+                                var packages = await new string[] { PrimaryPackageZipName }
+                                    .Concat(additionalZipNames)
+                                    .Select(
+                                        zipName => LoadPackageAsync(application,
+                                            zipName, indexHtmlPath, buildJsonPath, dynamicServe))
+                                    .AsyncEnumerable()
+                                    .ToArrayAsync();
+
+                                primaryPackage = packages[0];
+                                additionalPackages = packages
+                                    .Skip(1)
+                                    .Where(package => !package.IsDefaultOrNull())
+                                    .ToArray();
+                                SpaMinimumVersion = primaryPackage?.minimumVersion;
+
+                                foreach (var package in additionalPackages)
+                                    if (package.defaultRoute.HasValue)
+                                        application.Logger.Warning(
+                                            $"SpaHandler - Ignoring catch-all ('*') route in additional package `{package.zipName}`;" +
+                                            " only the primary package may declare a default route.");
+
+                                signal.Set();
+                                return !primaryPackage.IsDefaultOrNull();
                             });
                         return true;
                     },
@@ -120,7 +157,40 @@ namespace EastFive.Azure.Spa
             }
         }
 
+        private static async Task<SpaPackage> LoadPackageAsync(IApplication application,
+            string zipName, string indexHtmlPath, string buildJsonPath, bool dynamicServe)
+        {
+            return await await LoadSpaFile(zipName,
+                async spaStream =>
+                {
+                    var (success, minimumVersion, files, routes, defaultRoute) = await LoadSpaAsync(
+                        application, spaStream, indexHtmlPath, buildJsonPath, dynamicServe);
+                    if (!success)
+                        return default(SpaPackage);
+                    return new SpaPackage
+                    {
+                        zipName = zipName,
+                        files = files,
+                        routes = routes,
+                        defaultRoute = defaultRoute,
+                        minimumVersion = minimumVersion,
+                    };
+                },
+                () =>
+                {
+                    application.Logger.Warning($"SpaHandler - Could not load SPA package `{zipName}`.");
+                    return default(SpaPackage).AsTask();
+                });
+        }
+
         public static Task<TResult> LoadSpaFile<TResult>(
+            Func<Stream, TResult> onFound,
+            Func<TResult> onNotFound)
+        {
+            return LoadSpaFile(PrimaryPackageZipName, onFound, onNotFound);
+        }
+
+        public static Task<TResult> LoadSpaFile<TResult>(string zipName,
             Func<Stream, TResult> onFound,
             Func<TResult> onNotFound)
         {
@@ -132,7 +202,7 @@ namespace EastFive.Azure.Spa
                         var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
                         var containerName = Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
                         var container = blobClient.GetBlobContainerClient(containerName);
-                        var blobRef = container.GetBlobClient("spa.zip");
+                        var blobRef = container.GetBlobClient(zipName);
                         var blobStream = await blobRef.OpenReadAsync();
                         return onFound(blobStream);
                     }
@@ -142,6 +212,34 @@ namespace EastFive.Azure.Spa
                     }
                 },
                 why => onNotFound().AsTask());
+        }
+
+        public static Task<TResult> SaveSpaFile<TResult>(string zipName, byte[] packageBytes,
+            Func<TResult> onSaved,
+            Func<string, TResult> onFailure)
+        {
+            return EastFive.Azure.AppSettings.SPA.SpaStorage.ConfigurationString(
+                async connectionString =>
+                {
+                    try
+                    {
+                        var blobClient = AzureTableDriverDynamic.FromStorageString(connectionString).BlobClient;
+                        var containerName = Persistence.AppSettings.SpaContainer.ConfigurationString(name => name);
+                        var container = blobClient.GetBlobContainerClient(containerName);
+                        await container.CreateIfNotExistsAsync();
+                        var blobRef = container.GetBlobClient(zipName);
+                        using (var packageStream = new MemoryStream(packageBytes))
+                        {
+                            await blobRef.UploadAsync(packageStream, overwrite: true);
+                        }
+                        return onSaved();
+                    }
+                    catch (Exception ex)
+                    {
+                        return onFailure(ex.Message);
+                    }
+                },
+                why => onFailure(why).AsTask());
         }
 
         private static async Task<(bool, int?, Dictionary<string, byte[]>, Route[], Route?)> LoadSpaAsync(
@@ -268,23 +366,51 @@ namespace EastFive.Azure.Spa
             bool ShouldSkip()
             {
                 var requestPath = context.Request.Path.Value;
-                var isApiRequest = firstSegments
-                    .Where(firstSegment => requestPath.StartsWith($"/{firstSegment}"))
-                    .Any();
-                if (isApiRequest)
+                if (IsApiRequest(requestPath))
                     return true;
 
                 var systemReady = signal.WaitOne();
                 if (!systemReady)
                     return true;
 
-                if (lookupSpaFile.IsDefaultNullOrEmpty())
+                var anyFilesLoaded = additionalPackages
+                    .NullToEmpty()
+                    .Append(primaryPackage)
+                    .Where(package => !package.IsDefaultOrNull())
+                    .Any(package => !package.files.IsDefaultNullOrEmpty());
+                if (!anyFilesLoaded)
                     return true;
 
                 var isAzureApp = this.app is IAzureApplication;
                 return !isAzureApp;
             }
-            
+
+            // A namespace alone (e.g. /admin) is only an API request when no SPA
+            // route claims it; /namespace/Route paths always belong to the API so
+            // resources sharing a prefix with a SPA package keep working.
+            bool IsApiRequest(string path)
+            {
+                var spaServesPath = AnyRoutePrefixMatches(path);
+                if (!spaServesPath)
+                    return firstSegments
+                        .Where(firstSegment => path.StartsWith($"/{firstSegment}"))
+                        .Any();
+
+                var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                return segments.Length >= 2
+                    && apiNamespaceRoutes.Contains($"/{segments[0]}/{segments[1]}");
+            }
+        }
+
+        private static bool AnyRoutePrefixMatches(string requestPath)
+        {
+            signal.WaitOne();
+            return additionalPackages
+                .NullToEmpty()
+                .Where(package => !package.IsDefaultOrNull())
+                .Concat(new[] { primaryPackage }.Where(package => !package.IsDefaultOrNull()))
+                .SelectMany(package => package.routes.NullToEmpty())
+                .Any(route => requestPath.StartsWith(route.routePrefix, StringComparison.OrdinalIgnoreCase));
         }
 
         public static TResult FileFromPath<TResult>(string requestPath,
@@ -298,25 +424,38 @@ namespace EastFive.Azure.Spa
             Func<TResult> onDidNotResolve)
         {
             signal.WaitOne();
-            return SpaHandler.routes
+            return additionalPackages
                 .NullToEmpty()
+                .Where(package => !package.IsDefaultOrNull())
+                .SelectMany(package => package.routes
+                    .NullToEmpty()
+                    .Select(route => (package, route)))
+                .Concat(primaryPackage.IsDefaultOrNull()?
+                    new (SpaPackage package, Route route)[] { }
+                    :
+                    primaryPackage.routes
+                        .NullToEmpty()
+                        .Select(route => (package: primaryPackage, route)))
                 .First(
-                    (aliasPath, next) =>
+                    (packageRoute, next) =>
                     {
-                        if (!requestPath.StartsWith(aliasPath.routePrefix, StringComparison.OrdinalIgnoreCase))
+                        if (!requestPath.StartsWith(packageRoute.route.routePrefix, StringComparison.OrdinalIgnoreCase))
                             return next();
 
-                        return LoadFile(aliasPath);
+                        return LoadFile(packageRoute.package, packageRoute.route);
                     },
                     () =>
                     {
-                        if (!defaultRoute.HasValue)
+                        if (primaryPackage.IsDefaultOrNull())
                             return onDidNotResolve();
 
-                        return LoadFile(defaultRoute.Value);
+                        if (!primaryPackage.defaultRoute.HasValue)
+                            return onDidNotResolve();
+
+                        return LoadFile(primaryPackage, primaryPackage.defaultRoute.Value);
                     });
 
-            bool FileIsInSpa(string fileName, out string fileNameSanitized)
+            bool FileIsInSpa(SpaPackage package, string fileName, out string fileNameSanitized)
             {
                 if (fileName.IsDefaultNullOrEmpty())
                 {
@@ -324,15 +463,17 @@ namespace EastFive.Azure.Spa
                     return false;
                 }
                 fileNameSanitized = fileName.Replace("//", "/");
-                return lookupSpaFile.ContainsKey(fileNameSanitized);
+                if (package.files.IsDefaultNullOrEmpty())
+                    return false;
+                return package.files.ContainsKey(fileNameSanitized);
             }
 
-            TResult LoadFile(Route route)
+            TResult LoadFile(SpaPackage package, Route route)
             {
                 var fileName = route.ResolveRoute(requestPath);
                 var defaultFileName = route.defaultFile;
                 var location = route.ResolveLocation(fileName);
-                if (FileIsInSpa(fileName, out string fileNameSanitized))
+                if (FileIsInSpa(package, fileName, out string fileNameSanitized))
                 {
                     var immutableDays = EastFive.Azure.AppSettings.SPA.FilesExpirationInDays.ConfigurationDouble(
                         d => d,
@@ -351,9 +492,15 @@ namespace EastFive.Azure.Spa
                         };
                     
                     return onResolved(location, 
-                        lookupSpaFile[fileNameSanitized], fileName.Split('/').Last(), 
+                        package.files[fileNameSanitized], fileName.Split('/').Last(), 
                         cacheControl, default);
                 }
+
+                if (defaultFileName.IsDefaultNullOrEmpty())
+                    return onDidNotResolve();
+
+                if (package.files.IsDefaultNullOrEmpty() || !package.files.ContainsKey(defaultFileName))
+                    return onDidNotResolve();
 
                 var defaultCacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
                 {
@@ -369,7 +516,7 @@ namespace EastFive.Azure.Spa
 
                 var expiresDefault = DateTime.UtcNow.AddDays(-1);
                 return onResolved(location,
-                    lookupSpaFile[defaultFileName], defaultFileName.Split('/').Last(),
+                    package.files[defaultFileName], defaultFileName.Split('/').Last(),
                     defaultCacheControl, expiresDefault);
             }
 
@@ -403,7 +550,50 @@ namespace EastFive.Azure.Spa
         public static byte[] GetSpaFile(string path)
         {
             signal.WaitOne();
-            return lookupSpaFile[path];
+            return new SpaPackage[] { primaryPackage }
+                .Concat(additionalPackages.NullToEmpty())
+                .Where(package => !package.IsDefaultOrNull())
+                .Where(package => !package.files.IsDefaultNullOrEmpty())
+                .Where(package => package.files.ContainsKey(path))
+                .Select(package => package.files[path])
+                .First();
+        }
+
+        public struct PackageStatus
+        {
+            public string zipName;
+            public bool loaded;
+            public int fileCount;
+            public string[] routePrefixes;
+            public bool hasDefaultRoute;
+        }
+
+        public static PackageStatus[] GetPackageStatuses()
+        {
+            signal.WaitOne();
+            return new (string zipName, SpaPackage package)[]
+                    { (PrimaryPackageZipName, primaryPackage) }
+                .Concat(additionalPackages
+                    .NullToEmpty()
+                    .Select(package => (package.zipName, package)))
+                .Select(
+                    item => new PackageStatus
+                    {
+                        zipName = item.zipName,
+                        loaded = !item.package.IsDefaultOrNull(),
+                        fileCount = item.package.IsDefaultOrNull() ?
+                            0 : item.package.files.NullToEmpty().Count(),
+                        routePrefixes = item.package.IsDefaultOrNull() ?
+                            new string[] { }
+                            :
+                            item.package.routes
+                                .NullToEmpty()
+                                .Select(route => route.routePrefix)
+                                .ToArray(),
+                        hasDefaultRoute = !item.package.IsDefaultOrNull()
+                            && item.package.defaultRoute.HasValue,
+                    })
+                .ToArray();
         }
     }
 }
