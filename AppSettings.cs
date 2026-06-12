@@ -88,6 +88,13 @@ namespace EastFive.Azure
                 DeploymentSecurityConcern = true,
                 PrivateRepositoryOnly = true)]
             public const string SpaStorage = "EastFive.Azure.Spa.ConnectionString";
+
+            [ConfigKey("Comma-separated list of additional SPA package zip blob names (e.g. admin.zip) " +
+                "loaded from the same container as the primary spa.zip. Each zip must contain its own build config.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Discressionary")]
+            public const string AdditionalPackages = "EastFive.Azure.Spa.AdditionalPackages";
         }
 
         [Config]
