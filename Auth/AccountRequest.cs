@@ -163,22 +163,66 @@ namespace EastFive.Azure.Auth
         public const string ResponseAction = "Response";
         [Unsecured("Account request endpoint - allows users to request account without existing authentication")]
         [HttpAction(ResponseAction)]
-        public static Task<IHttpResponse> ResponseAsync(
+        public static async Task<IHttpResponse> ResponseAsync(
                 [QueryParameter(Name = EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier)]
                     IRef<Authorization> authorizationRef,
-            TextResponse onCompleted)
+                IAzureApplication application,
+                IHttpRequest request,
+            RedirectResponse onAlreadyHasAccount,
+            TextResponse onCompleted,
+            BadRequestResponse onInvalidAuthentication,
+            BadRequestResponse onIdNotProvided,
+            BadRequestResponse onLoginMethodNoLongerSupported,
+            BadRequestResponse onLoginMethodDoesNotSupportAccountCreation)
         {
-            var accountRequest = new AccountRequest()
-            {
-                accountRequestRef = Ref<AccountRequest>.NewRef(),
-                authorization = authorizationRef,
-                when = DateTime.UtcNow,
-            };
-            return accountRequest.StorageCreateAsync(
-                discard =>
+            // If the credential already maps to an account, there is nothing to
+            // request: send the now-authenticated user to the application root.
+            return await await authorizationRef.StorageGetAsync(
+                async authorization =>
                 {
-                    return onCompleted("Your account has been requested. Thank you.");
-                });
+                    return await await Method.ById(authorization.Method, application,
+                        async method =>
+                        {
+                            return await await method.GetAuthorizationKeyAsync(
+                                    application, authorization.parameters,
+                                onAuthorizeKey: async externalUserKey =>
+                                {
+                                    var accountInfoProvider = application.GetAccountInformationProvider();
+                                    if (accountInfoProvider.IsDefaultOrNull())
+                                        return onLoginMethodDoesNotSupportAccountCreation();
+
+                                    return await await accountInfoProvider.FindAccountByMethodAndKeyAsync(
+                                            method, externalUserKey, authorization,
+                                        onAccountFound: (accountId, claims) =>
+                                            onAlreadyHasAccount(
+                                                new Uri(request.RequestUri, "/")
+                                                .AddQueryParameter(
+                                                    EastFive.Api.Azure.AzureApplication.QueryRequestIdentfier,
+                                                    authorizationRef.id.ToString()))
+                                                .AsTask(),
+                                        onReject: () => CreateRequestAsync());
+                                },
+                                onFailure: why => onIdNotProvided().AddReason(why).AsTask(),
+                                loginMethodNoLongerSupported: () => onLoginMethodNoLongerSupported().AsTask());
+                        },
+                        () => onLoginMethodNoLongerSupported().AsTask());
+                },
+                () => onInvalidAuthentication().AsTask());
+
+            Task<IHttpResponse> CreateRequestAsync()
+            {
+                var accountRequest = new AccountRequest()
+                {
+                    accountRequestRef = Ref<AccountRequest>.NewRef(),
+                    authorization = authorizationRef,
+                    when = DateTime.UtcNow,
+                };
+                return accountRequest.StorageCreateAsync(
+                    discard =>
+                    {
+                        return onCompleted("Your account has been requested. Thank you.");
+                    });
+            }
         }
 
         public const string ListAction = "List";
@@ -252,7 +296,7 @@ namespace EastFive.Azure.Auth
                 [QueryParameter(Name = IdPropertyName)] IRef<AccountRequest> accountRequestRef,
                 IAzureApplication application,
                 IHttpRequest request,
-                SessionToken security,
+                //SessionToken security,
             ContentTypeResponse<AccountRequestDetail> onApproved,
             NotFoundResponse onNotFound,
             GeneralConflictResponse onFailure)
@@ -298,7 +342,7 @@ namespace EastFive.Azure.Auth
 
                                                 accountRequest.account = accountId;
                                                 accountRequest.approvedWhen = DateTime.UtcNow;
-                                                accountRequest.approvedBy = security.accountIdMaybe;
+                                                //accountRequest.approvedBy = security.accountIdMaybe;
                                                 await saveAsync(accountRequest);
 
                                                 var detail = await CreateDetailAsync(
