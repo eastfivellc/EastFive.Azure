@@ -85,6 +85,26 @@ namespace EastFive.Azure.Auth
             return onFound(claims);
         }
 
+        [HttpAction("GET", "Assignable")]
+        [SuperAdminClaim]
+        public static IHttpResponse GetAssignableAsync(
+                IApplication application,
+            ContentTypeResponse<Claim[]> onFound)
+        {
+            var claims = application.GetType()
+                .GetAttributesInterface<IDeclareClaimValue>(true, true)
+                .Select(
+                    attr => new Claim
+                    {
+                        name = attr.ClaimName,
+                        type = attr.ClaimType,
+                        value = attr.ClaimValue,
+                        description = attr.ClaimDescription,
+                    })
+                .ToArray();
+            return onFound(claims);
+        }
+
         [Api.HttpGet]
         public static IHttpResponse GetAsync(
                 RequestMessage<Claim> claims,
@@ -96,6 +116,17 @@ namespace EastFive.Azure.Auth
                 return onUnauthorized();
 
             var result = auth.accountIdMaybe.Value
+                .StorageGetByIdProperty((Claim claim) => claim.actorId);
+            return onFound(result);
+        }
+
+        [Api.HttpGet]
+        [SuperAdminClaim]
+        public static IHttpResponse GetByActorAsync(
+                [EastFive.Api.Binding.Query(Name = ActorPropertyName)] Guid actorId,
+            MultipartAsyncResponse<Claim> onFound)
+        {
+            var result = actorId
                 .StorageGetByIdProperty((Claim claim) => claim.actorId);
             return onFound(result);
         }
@@ -114,6 +145,18 @@ namespace EastFive.Azure.Auth
             return claim.StorageCreateAsync(
                 (discard) => onCreated(),
                 onAlreadyExists: () => onAlreadyExists());
+        }
+
+        [HttpDelete]
+        [SuperAdminClaim]
+        public static Task<IHttpResponse> DeleteAsync(
+                [UpdateId(Name = IdPropertyName)] IRef<Claim> claimRef,
+            NoContentResponse onDeleted,
+            NotFoundResponse onNotFound)
+        {
+            return claimRef.StorageDeleteAsync(
+                onDeleted: (discard) => onDeleted(),
+                onNotFound: () => onNotFound());
         }
     }
 
