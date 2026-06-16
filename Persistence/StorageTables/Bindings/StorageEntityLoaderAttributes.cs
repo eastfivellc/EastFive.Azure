@@ -102,6 +102,25 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             return true;
         }
 
+        /// <summary>
+        /// Claims each key member's wire name as a query parameter, but only when
+        /// this loader actually sources from the query string. A purely
+        /// path-sourced loader (<c>[StorageEntityFromRoute]</c>) reads its keys
+        /// from route captures, not the query, so it claims nothing here.
+        /// </summary>
+        public IEnumerable<string> GetConsumedQueryKeys(ParameterInfo parameter)
+        {
+            if ((this.Source & BindingSource.Query) == 0)
+                return Enumerable.Empty<string>();
+            var entityType = ExtractEntityType(parameter);
+            if (entityType == null)
+                return Enumerable.Empty<string>();
+            var keyMembers = KeyMemberDiscovery.DiscoverKeyMembers(entityType);
+            if (keyMembers.Length == 0)
+                return Enumerable.Empty<string>();
+            return ResolveWireNames(keyMembers);
+        }
+
         private static bool TryReadRaw(IRequestEnvelopeV3 envelope, string wireName,
             bool allowQuery, bool allowPath, out string raw)
         {
