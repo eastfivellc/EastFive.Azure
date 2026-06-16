@@ -8,6 +8,7 @@ using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Collections.Generic;
 using EastFive.Extensions;
 using EastFive.Linq;
+using EastFive.Linq.Async;
 using EastFive.Persistence;
 using EastFive.Persistence.Azure.StorageTables;
 using EastFive.Web.Configuration;
@@ -461,21 +462,26 @@ namespace EastFive.Azure.Auth
                                             .FindAccountByMethodAndKeyAsync(
                                                     method, externalUserKey,
                                                     authorization,
-                                                onAccountFound :(accountId, updatedClaims) => onSuccess(accountId, updatedClaims, authorization.authorized).AsTask(),
+                                                onAccountFound: async (accountId, updatedClaims) =>
+                                                {
+                                                    var mergedClaims = await MergeStoredClaimsAsync(accountId, updatedClaims);
+                                                    return onSuccess(accountId, mergedClaims, authorization.authorized);
+                                                },
                                                 onReject :() => OnContinue());
                                     }
                                     return await OnContinue();
-                                    Task<TResult> OnContinue()
+                                    async Task<TResult> OnContinue()
                                     {
-                                        return Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
+                                        return await await Auth.AccountMapping.FindByMethodAndKeyAsync(method.authenticationId, externalUserKey,
                                                 authorization,
-                                            accountId =>
+                                            async accountId =>
                                             {
-                                                return onSuccess(accountId, authorization.claims, authorization.authorized);
+                                                var mergedClaims = await MergeStoredClaimsAsync(accountId, authorization.claims);
+                                                return onSuccess(accountId, mergedClaims, authorization.authorized);
                                             },
                                             () =>
                                             {
-                                                return onFailure("No mapping to that account.", authorization.authorized);
+                                                return onFailure("No mapping to that account.", authorization.authorized).AsTask();
                                             });
                                     };
                                 },
@@ -494,6 +500,41 @@ namespace EastFive.Azure.Auth
                 //    return CheckSuperAdminBeforeFailure(authorizationRef, "Authorization not found.", false,
                 //        onSuccess, onFailure).AsTask();
                 //});
+        }
+
+        /// <summary>
+        /// Merge the persisted <see cref="Claim"/> rows assigned to an account
+        /// (keyed by <see cref="Claim.actorId"/>) into the claims that will be
+        /// embedded in the session JWT. Without this, claims an admin assigns
+        /// via the Claim controller never reach the token. Claims sharing a type
+        /// (e.g. multiple role grants) are combined comma-separated to match
+        /// <see cref="EastFive.Api.ClaimsExtensions.IsAuthorizedFor"/>.
+        /// </summary>
+        private static async Task<IDictionary<string, string>> MergeStoredClaimsAsync(
+            Guid accountId, IDictionary<string, string> baseClaims)
+        {
+            var merged = baseClaims
+                .NullToEmpty()
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+            var storedClaims = await accountId
+                .StorageGetByIdProperty((Claim claim) => claim.actorId)
+                .ToArrayAsync();
+
+            foreach (var grp in storedClaims
+                .Where(claim => claim.type != null && claim.value.HasBlackSpace())
+                .GroupBy(claim => claim.type.OriginalString))
+            {
+                IEnumerable<string> values = grp.Select(claim => claim.value);
+                if (merged.TryGetValue(grp.Key, out var existing) && existing.HasBlackSpace())
+                    values = existing
+                        .Split(',')
+                        .Select(v => v.Trim())
+                        .Where(v => v.HasBlackSpace())
+                        .Concat(values);
+                merged[grp.Key] = values.Distinct().Join(",");
+            }
+            return merged;
         }
 
         private static TResult CheckSuperAdminBeforeFailure<TResult>( 
