@@ -20,6 +20,7 @@ namespace EastFive.Azure.Auth
         Route = "Claim",
         ContentType = "x-application/auth-claim",
         ContentTypeVersion = "0.1")]
+    [StorageTable]
     public struct Claim : IReferenceable
     {
         #region Properties
