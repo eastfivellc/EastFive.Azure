@@ -75,7 +75,7 @@ namespace EastFive.Persistence.Azure.StorageTables
             }
 
             ignore = false;
-            var prefix = RowKeyPrefixAttribute.GetValue(idKey, this.Characters);
+            var prefix = RowKeyPrefixAttribute.GetValue(idKey, this.Characters, '0');
 
             if(currentKey.HasBlackSpace())
                 return $"{currentKey}{this.Separator}{prefix}";

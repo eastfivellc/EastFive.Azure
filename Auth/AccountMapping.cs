@@ -223,6 +223,20 @@ namespace EastFive.Azure.Auth
             //    });
         }
 
+        /// <summary>
+        /// Resolve the <see cref="Authorization"/> that originally created the mapping for a
+        /// given authentication method and external account key.
+        /// </summary>
+        public static Task<TResult> FindAuthorizationByMethodAndKeyAsync<TResult>(
+                IRef<Method> authenticationMethodRef, string authorizationKey,
+            Func<IRef<Authorization>, TResult> onFound,
+            Func<TResult> onNotFound)
+        {
+            return authorizationKey.StorageGetAsync(authenticationMethodRef,
+                (AccountMapping accountMapping) => onFound(accountMapping.authorization),
+                () => onNotFound());
+        }
+
         public static async Task<TResult> DeleteByMethodAndKeyAsync<TResult>(IRef<Method> authenticationId, string authorizationKey,
             Func<Guid, TResult> onDeleted,
             Func<TResult> onNotFound)

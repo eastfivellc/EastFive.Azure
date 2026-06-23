@@ -90,7 +90,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         public override string GetPartitionKey(string rowKey)
         {
             var hash = rowKey.MD5HashHex();
-            return RowKeyPrefixAttribute.GetValue(hash, this.Characters);
+            return RowKeyPrefixAttribute.GetValue(hash, this.Characters, '0');
         }
 
     }
@@ -123,7 +123,7 @@ namespace EastFive.Persistence.Azure.StorageTables
                 rowKey.Trim() : rowKey;
             var hash = rowKeyToHash.GetBytes().HashXX32();
             var hashStr = hash.ToString($"X{this.Characters}");
-            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
+            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters, '0');
         }
     }
 
