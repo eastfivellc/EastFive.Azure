@@ -161,7 +161,7 @@ namespace EastFive.Persistence.Azure.StorageTables
         {
             var hash = rowKey.GetBytes().HashXX32();
             var hashStr = hash.ToString($"X{this.Characters}");
-            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters);
+            return RowKeyPrefixAttribute.GetValue(hashStr, this.Characters, '0');
         }
     }
 
@@ -184,7 +184,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         public override string GetPartitionKey(string rowKey)
         {
-            return RowKeyPrefixAttribute.GetValue(rowKey, this.Characters);
+            return RowKeyPrefixAttribute.GetValue(rowKey, this.Characters, '0');
         }
     }
 
@@ -260,7 +260,7 @@ namespace EastFive.Persistence.Azure.StorageTables
 
         protected override string GetPartitionKey(string rowKey)
         {
-            return RowKeyPrefixAttribute.GetValue(rowKey, this.Characters);
+            return RowKeyPrefixAttribute.GetValue(rowKey, this.Characters, '0');
         }
     }
 }
