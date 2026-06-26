@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 
 using EastFive.Api.Binding;
+using EastFive.Azure.Persistence.AzureStorageTables;
 using EastFive.Persistence.Azure.StorageTables.Driver;
 using EastFive.Serialization.Binding;
 
@@ -56,13 +57,65 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
             // IBindingSource under the RequestBody scope.
             return context.TypeBindings.Bind<TResult>(
                 entityType, source, context,
-                entity => entity is null
-                    ? (onNull is not null
-                        ? onNull()
-                        : onFailure(new BindFailure(new NullValue(), targetType, keyPath)))
-                    : onBound(WrapStorable(entity, entityType, driver)),
+                entity =>
+                {
+                    if (entity is null)
+                        return onNull is not null
+                            ? onNull()
+                            : onFailure(new BindFailure(new NullValue(), targetType, keyPath));
+
+                    // The entity is destined for storage: its row/partition keys must be
+                    // computable from the hydrated body (e.g. the identifier was supplied).
+                    // Without them the insert would throw deep in the driver and surface as a
+                    // 500; surface a 400 here instead so the caller learns the request was bad.
+                    if (!TryComputeStorageKeys(entity, entityType, out var keyFailureDetail))
+                        return onFailure(new BindFailure(
+                            new ParseError(
+                                $"Cannot determine the storage keys for this {entityType.Name} from the " +
+                                $"request body — ensure the identifier (e.g. \"id\") is supplied. {keyFailureDetail}"),
+                            targetType, keyPath));
+
+                    return onBound(WrapStorable(entity, entityType, driver));
+                },
                 onFailure,
                 onNull);
+        }
+
+        /// <summary>
+        /// Verify the hydrated <paramref name="entity"/> yields a non-empty row key and partition
+        /// key for its storage type. Entities with no declared row-key member are accepted as-is
+        /// (nothing to validate). Any exception during key generation (e.g. a null identifier
+        /// reference) is treated as an unavailable key rather than propagating as a 500.
+        /// </summary>
+        private static bool TryComputeStorageKeys(object entity, Type entityType, out string detail)
+        {
+            detail = string.Empty;
+            try
+            {
+                if (!entityType.StorageHasRowKey())
+                    return true;
+
+                if (!entity.StorageTryGetRowKeyForType(entityType, out var rowKey)
+                    || string.IsNullOrEmpty(rowKey))
+                {
+                    detail = "The row key is empty.";
+                    return false;
+                }
+
+                if (!entity.StorageTryGetPartitionKeyForType(rowKey, entityType, out var partitionKey)
+                    || string.IsNullOrEmpty(partitionKey))
+                {
+                    detail = "The partition key is empty.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                detail = ex.Message;
+                return false;
+            }
         }
 
         private static object WrapStorable(
