@@ -54,6 +54,11 @@ namespace EastFive.Azure.Auth
         [ApiProperty(PropertyName = SessionExpiresPropertyName)]
         public DateTime? sessionExpires;
 
+        public const string RolesPropertyName = "roles";
+        [JsonProperty(PropertyName = RolesPropertyName)]
+        [ApiProperty(PropertyName = RolesPropertyName)]
+        public string[] roles { get; set; }
+
         [WorkflowStep(
             FlowName = Workflows.AuthorizationFlow.FlowName,
             Version = Workflows.AuthorizationFlow.Version,
@@ -82,6 +87,7 @@ namespace EastFive.Azure.Auth
             }
             var name = await GetName();
             request.TryParseJwt(out System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken);
+            var roles = ExtractRoles(securityToken);
             var sessionRef = security.sessionId.AsRef<Session>();
             return await sessionRef.StorageGetAsync(
                 session =>
@@ -93,10 +99,31 @@ namespace EastFive.Azure.Auth
                         name = name,
                         securityToken = securityToken,
                         sessionExpires = session.expires,
+                        roles = roles,
                     };
                     return onFound(whoami);
                 },
                 onDoesNotExists:() => onNotFound());
+        }
+
+        /// <summary>
+        /// Pulls the role claim values out of the parsed session JWT, matching the same
+        /// <see cref="System.Security.Claims.ClaimTypes.Role"/> claim type the authorization
+        /// attributes check. Comma-joined values are split so callers receive one role per entry.
+        /// Returned values are the raw claim values (e.g. <c>"superadmin"</c>) so a UI can gate
+        /// sections without re-parsing the token client-side.
+        /// </summary>
+        private static string[] ExtractRoles(System.IdentityModel.Tokens.Jwt.JwtSecurityToken securityToken)
+        {
+            if (securityToken == null)
+                return Array.Empty<string>();
+            return securityToken.Claims
+                .Where(claim => string.Equals(claim.Type, System.Security.Claims.ClaimTypes.Role, StringComparison.Ordinal))
+                .SelectMany(claim => claim.Value.Split(','))
+                .Select(value => value.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct()
+                .ToArray();
         }
     }
 }
