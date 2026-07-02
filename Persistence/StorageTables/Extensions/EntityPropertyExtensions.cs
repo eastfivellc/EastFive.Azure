@@ -790,12 +790,18 @@ namespace EastFive.Persistence.Azure.StorageTables
                 }
                 if (typeof(TimeSpan) == type)
                 {
-                    if (value.DoubleValue.HasValue)
+                    if (value.PropertyType == EdmType.Double && value.DoubleValue.HasValue)
                     {
                         var seconds = value.DoubleValue.Value;
                         var tsValue = TimeSpan.FromSeconds(seconds);
                         return (false, false, tsValue);
                     }
+                    // A whole-second TimeSpan is written as a whole-number double, which comes back
+                    // typed Int32/Int64 (no Edm.Double annotation on the wire) — accept those too.
+                    if (value.PropertyType == EdmType.Int32 && value.Int32Value.HasValue)
+                        return (false, false, TimeSpan.FromSeconds(value.Int32Value.Value));
+                    if (value.PropertyType == EdmType.Int64 && value.Int64Value.HasValue)
+                        return (false, false, TimeSpan.FromSeconds(value.Int64Value.Value));
                     return (false, true, TimeSpan.FromSeconds(0));
                 }
                 if (typeof(TimeZoneInfo) == type)
