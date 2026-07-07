@@ -121,6 +121,73 @@
     <value>&lt;html&gt;&lt;head&gt;&lt;title&gt;TODO: Load spa page here&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;</value>
   </data>
   <data name="loginHtml" xml:space="preserve">
-    <value>&lt;html&gt;&lt;head&gt;&lt;title&gt;TODO: Load login page here&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;</value>
+    <value>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta charset="utf-8" /&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;
+&lt;title&gt;Sign in&lt;/title&gt;
+&lt;style&gt;
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6f8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#fff;border:1px solid #e2e5ea;border-radius:8px;padding:2rem;width:20rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+h1{font-size:1.15rem;margin:0 0 1.25rem}
+label{display:block;font-size:.8rem;color:#555;margin:.75rem 0 .25rem}
+input{width:100%;box-sizing:border-box;padding:.5rem;border:1px solid #cfd4dc;border-radius:4px;font-size:.95rem}
+button{margin-top:1.25rem;width:100%;padding:.6rem;border:0;border-radius:4px;background:#2563eb;color:#fff;font-size:.95rem;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.error{color:#b91c1c;font-size:.85rem;margin-top:.75rem;min-height:1.2em}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;form class="card" id="loginForm"&gt;
+&lt;h1&gt;Sign in&lt;/h1&gt;
+&lt;label for="user"&gt;Username or email&lt;/label&gt;
+&lt;input id="user" name="user_identification" autocomplete="username" required autofocus /&gt;
+&lt;label for="pass"&gt;Password&lt;/label&gt;
+&lt;input id="pass" name="password" type="password" autocomplete="current-password" required /&gt;
+&lt;button id="submit" type="submit"&gt;Sign in&lt;/button&gt;
+&lt;div class="error" id="error"&gt;&lt;/div&gt;
+&lt;/form&gt;
+&lt;script&gt;
+(function () {
+  var form = document.getElementById('loginForm');
+  var errorEl = document.getElementById('error');
+  var button = document.getElementById('submit');
+  var authenticationId = new URLSearchParams(window.location.search).get('id');
+  if (!authenticationId)
+    errorEl.textContent = 'Missing authentication id \u2014 restart the sign-in flow.';
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!authenticationId) return;
+    button.disabled = true;
+    errorEl.textContent = '';
+    var query = '?id=' + encodeURIComponent(authenticationId) + '&amp;hold=true';
+    fetch(window.location.pathname + query, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        user_identification: document.getElementById('user').value,
+        password: document.getElementById('pass').value
+      })
+    }).then(function (resp) {
+      if (resp.ok)
+        return resp.json().then(function (auth) {
+          window.location.assign('/api/LoginRedirection?state=' + encodeURIComponent(auth.state)
+            + '&amp;token=' + encodeURIComponent(auth.token));
+        });
+      var reason = resp.headers.get('X-Reason');
+      return resp.text().then(function (bodyText) {
+        errorEl.textContent = reason || bodyText || ('Sign-in failed (' + resp.status + ')');
+        button.disabled = false;
+      });
+    }).catch(function () {
+      errorEl.textContent = 'Could not reach the server.';
+      button.disabled = false;
+    });
+  });
+})();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</value>
   </data>
 </root>

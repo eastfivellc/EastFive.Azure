@@ -157,7 +157,7 @@ namespace EastFive.Azure.Login
                 () => onNotFound());
         }
 
-        internal static IRef<Account> GetRef(string userIdentification)
+        public static IRef<Account> GetRef(string userIdentification)
         {
             var accountRef = userIdentification
                 .MD5HashGuid()
@@ -165,7 +165,7 @@ namespace EastFive.Azure.Login
             return accountRef;
         }
 
-        internal static string GeneratePasswordHash(string userIdentification, string password)
+        public static string GeneratePasswordHash(string userIdentification, string password)
         {
             return $"{userIdentification} {password}".SHAHash().ToBase64String();
         }
