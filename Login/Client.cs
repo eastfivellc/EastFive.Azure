@@ -17,6 +17,7 @@ namespace EastFive.Azure.Login
         ContentType = "x-application/login-client",
         Namespace = "e5/login",
         ContentTypeVersion = "0.1")]
+    [StorageTable]
     public struct Client : IReferenceable
     {
         [JsonIgnore]
