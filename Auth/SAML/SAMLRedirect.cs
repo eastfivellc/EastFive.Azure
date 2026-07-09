@@ -70,8 +70,6 @@ namespace EastFive.Azure.Auth
             var methodName = SAMLProvider.IntegrationName;
             var method = EastFive.Azure.Auth.Method.ByMethodName(methodName, application);
 
-            var failureHtml = "<html><title>{0}</title><body>{1} Please report:<code>{2}</code> to Affirm Health if the issue persists.</body></html>";
-
             return await EastFive.Web.Configuration.Settings.GetString($"AffirmHealth.PDMS.PingRedirect.{tag}.PingAuthName",
                 async pingAuthName =>
                 {

@@ -278,17 +278,14 @@ namespace EastFive.Azure.OAuth
             }
 
             // Hash the secret
-            using (var pbkdf2 = new Rfc2898DeriveBytes(secret, salt, 10000, HashAlgorithmName.SHA256))
-            {
-                var hash = pbkdf2.GetBytes(32);
+            var hash = Rfc2898DeriveBytes.Pbkdf2(secret, salt, 10000, HashAlgorithmName.SHA256, 32);
 
-                // Combine salt and hash
-                var combined = new byte[salt.Length + hash.Length];
-                Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
-                Buffer.BlockCopy(hash, 0, combined, salt.Length, hash.Length);
+            // Combine salt and hash
+            var combined = new byte[salt.Length + hash.Length];
+            Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
+            Buffer.BlockCopy(hash, 0, combined, salt.Length, hash.Length);
 
-                return Convert.ToBase64String(combined);
-            }
+            return Convert.ToBase64String(combined);
         }
 
         /// <summary>
@@ -311,13 +308,10 @@ namespace EastFive.Azure.OAuth
                 Buffer.BlockCopy(combined, 16, storedHash, 0, 32);
 
                 // Hash the provided secret with the same salt
-                using (var pbkdf2 = new Rfc2898DeriveBytes(providedSecret, salt, 10000, HashAlgorithmName.SHA256))
-                {
-                    var providedHash = pbkdf2.GetBytes(32);
+                var providedHash = Rfc2898DeriveBytes.Pbkdf2(providedSecret, salt, 10000, HashAlgorithmName.SHA256, 32);
 
-                    // Compare hashes (constant time comparison)
-                    return CryptographicOperations.FixedTimeEquals(providedHash, storedHash);
-                }
+                // Compare hashes (constant time comparison)
+                return CryptographicOperations.FixedTimeEquals(providedHash, storedHash);
             }
             catch
             {

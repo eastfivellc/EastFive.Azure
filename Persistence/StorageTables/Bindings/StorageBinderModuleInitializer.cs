@@ -10,7 +10,9 @@ namespace EastFive.Azure.Persistence.StorageTables.Bindings
     /// </summary>
     internal static class StorageBinderModuleInitializer
     {
+        #pragma warning disable CA2255 // intentional: framework-level binder registration
         [ModuleInitializer]
+        #pragma warning restore CA2255
         internal static void RegisterBinders()
         {
             TypeBinderRegistry.Register(new StorableEntityBinder());

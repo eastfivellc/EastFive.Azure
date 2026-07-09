@@ -35,6 +35,7 @@ public enum PhoneNumberCapability
 
 public static class PhoneNumberCapabilityExtensions
 {
+#nullable enable
 
     /// <summary>
     /// Checks if the capabilities array contains the specified capability.
@@ -46,4 +47,6 @@ public static class PhoneNumberCapabilityExtensions
 
         return Array.Exists(capabilities, c => c == capability);
     }
+
+#nullable restore
 }

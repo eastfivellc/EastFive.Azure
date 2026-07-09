@@ -71,7 +71,7 @@ namespace EastFive.Azure.Communications
             var toPhoneNumber = ExtractPhoneNumber(eventData, "to");
             var fromPhoneNumber = ExtractPhoneNumber(eventData, "from");
             var correlationId = eventData.TryGetProperty("correlationId", out var correlationIdElement) ?
-                correlationIdElement.GetString() 
+                correlationIdElement.GetString() ?? string.Empty
                 :
                 string.Empty;
 

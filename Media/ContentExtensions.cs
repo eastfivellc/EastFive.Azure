@@ -186,7 +186,7 @@ namespace EastFive.Azure.Media
             Func<TResult> onInvalidFormat = default,
             Func<TResult> onNotFound = default)
         {
-            if (!OperatingSystem.IsWindows())
+            if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
                 throw new NotSupportedException("OS not supported");
 
             return AppSettings.CognitiveServices.ComputerVisionSubscriptionKey.ConfigurationString(
@@ -202,6 +202,9 @@ namespace EastFive.Azure.Media
                                 return await await contentRef.LoadBytesAsync(
                                     async (blobId, imageData, contentType, disposition) =>
                                     {
+                                        if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
+                                            throw new NotSupportedException("OS not supported");
+
                                         var widthMultiplier = default(double?);
                                         if (imageData.Length > 4000000)
                                         {
