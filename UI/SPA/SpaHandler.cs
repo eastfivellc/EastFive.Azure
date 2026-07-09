@@ -344,7 +344,7 @@ namespace EastFive.Azure.Spa
         }
 
         public Task InvokeAsync(HttpContext context,
-            Microsoft.AspNetCore.Hosting.IHostingEnvironment environment)
+            Microsoft.AspNetCore.Hosting.IWebHostEnvironment environment)
         {
             if (ShouldSkip())
                 return this.continueAsync(context);
@@ -543,7 +543,7 @@ namespace EastFive.Azure.Spa
             if (!mimeType.IsDefaultNullOrEmpty())
                 context.Response.ContentType = mimeType;
             context.Response.ContentLength = fileData.Length;
-            context.Response.Headers.Add("Content-Disposition", $"filename=\"{spaFileName}\"");
+            context.Response.Headers["Content-Disposition"] = $"filename=\"{spaFileName}\"";
             await context.Response.Body.WriteAsync(fileData);
         }
 

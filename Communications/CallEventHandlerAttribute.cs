@@ -147,6 +147,7 @@ namespace EastFive.Azure.Communications
             Func<string, TResult> onFailure)
         {
             var currentParticipantIds = callAutomationEvent.participants
+                .NullToEmpty()
                 .Select(p => p.identifier.rawId)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -156,6 +157,7 @@ namespace EastFive.Azure.Communications
                     p =>
                     {
                         return callAutomationEvent.participants
+                            .NullToEmpty()
                             .Where(
                                 participant =>
                                 {
@@ -270,7 +272,7 @@ namespace EastFive.Azure.Communications
                 },
                 async (updatedPhoneCall) =>
                 {
-                    if(participantToUpdate.muteOnConnect)
+                    if(participantToUpdate.muteOnConnect && participantToUpdate.phoneNumber.HasBlackSpace())
                         await updatedPhoneCall.MuteParticipantAsync(participantToUpdate.phoneNumber);
 
                     return await updatedPhoneCall.participants

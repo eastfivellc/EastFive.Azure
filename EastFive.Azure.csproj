@@ -1,6 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- NETSDK1206: legacy Microsoft.Azure.DocumentDB.Core ships win7-x64 assets; harmless until that package is replaced -->
+    <NoWarn>$(NoWarn);NETSDK1206</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -11,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.Communication.CallAutomation" Version="1.6.0-beta.1" />
     <PackageReference Include="Azure.Communication.PhoneNumbers" Version="1.3.0" />
+    <PackageReference Include="Azure.Identity" Version="1.14.2" />
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.3" />
     <PackageReference Include="Azure.ResourceManager" Version="1.13.2" />
     <PackageReference Include="Azure.ResourceManager.Communication" Version="1.2.1" />
@@ -27,7 +30,7 @@
     <PackageReference Include="Microsoft.Azure.Cosmos.Table" Version="1.0.8" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.DurableTask" Version="1.2.3" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.67.2" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.73.1" />
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="6.36.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.36.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="6.36.0" />
@@ -36,7 +39,6 @@
     <PackageReference Include="RazorEngineCore" Version="2020.3.3" />
     <PackageReference Include="RestSharp" Version="106.15.0" />
     <PackageReference Include="SendGrid" Version="9.28.1" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.DurableTask" Version="2.13.7" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\EastFive.Api\EastFive.Api.csproj" />
@@ -63,7 +65,6 @@
     <None Remove="Configuration\" />
     <None Remove="Diagnostics\" />
     <None Remove="Auth\Salesforce\" />
-    <None Remove="Microsoft.Azure.WebJobs.Extensions.DurableTask" />
     <None Remove="Auth\Salesforce\Resources\" />
     <None Remove="Auth\Salesforce\Attribute\" />
     <None Remove="Auth\Superadmin\" />

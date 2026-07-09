@@ -16,7 +16,6 @@ using System.Reflection;
 using System.Linq;
 using Parquet.Thrift;
 using DocumentFormat.OpenXml.Office2010.Excel;
-using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using EastFive.Api.Meta.Postman.Resources.Collection;
 
 namespace EastFive.Azure.Communications
@@ -267,7 +266,7 @@ namespace EastFive.Azure.Communications
 
     public class AcsEventParticipantArrayStorageAttribute : Attribute, IPersistInAzureStorageTables
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         public KeyValuePair<string, EntityProperty>[] ConvertValue<EntityType>(
             MemberInfo memberInfo, object value, IWrapTableEntity<EntityType> tableEntityWrapper)
@@ -336,7 +335,7 @@ namespace EastFive.Azure.Communications
             }
         }
 
-        public object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object> getDefaultValue = null)
+        public object GetMemberValue(MemberInfo memberInfo, IDictionary<string, EntityProperty> values, out bool shouldSkip, Func<object>? getDefaultValue = null)
         {
             shouldSkip = false;
             if (!values.TryGetValue("participant_count", out var countProp) ||
@@ -389,7 +388,7 @@ namespace EastFive.Azure.Communications
 
             return new ParticipantIdentifier
             {
-                rawId = rawId,
+                rawId = rawId ?? string.Empty,
                 kind = kind,
                 phoneNumber = phoneNumber,
                 communicationUser = communicationUser,

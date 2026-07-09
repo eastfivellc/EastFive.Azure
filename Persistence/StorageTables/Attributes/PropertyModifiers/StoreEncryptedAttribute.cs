@@ -180,9 +180,11 @@ namespace EastFive.Azure.Persistence.StorageTables
                 aes.Padding = PaddingMode.PKCS7;
                 aes.KeySize = AesKeySizeInBits;
                 int KeyStrengthInBytes = aes.KeySize / 8;
-                var rfc2898 = new Rfc2898DeriveBytes(password, salt, Rfc2898KeygenIterations);
-                aes.Key = rfc2898.GetBytes(KeyStrengthInBytes);
-                aes.IV = rfc2898.GetBytes(KeyStrengthInBytes);
+                // SHA1 matches the default of the obsolete Rfc2898DeriveBytes ctor;
+                // key/IV split of the single derived stream is byte-identical to sequential GetBytes calls.
+                var keyAndIv = Rfc2898DeriveBytes.Pbkdf2(password, salt, Rfc2898KeygenIterations, HashAlgorithmName.SHA1, KeyStrengthInBytes * 2);
+                aes.Key = keyAndIv.AsSpan(0, KeyStrengthInBytes).ToArray();
+                aes.IV = keyAndIv.AsSpan(KeyStrengthInBytes).ToArray();
                 using (MemoryStream ms = new MemoryStream())
                 {
                     using (CryptoStream cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
@@ -202,9 +204,11 @@ namespace EastFive.Azure.Persistence.StorageTables
                 aes.Padding = PaddingMode.PKCS7;
                 aes.KeySize = AesKeySizeInBits;
                 int KeyStrengthInBytes = aes.KeySize / 8;
-                var rfc2898 = new Rfc2898DeriveBytes(password, salt, Rfc2898KeygenIterations);
-                aes.Key = rfc2898.GetBytes(KeyStrengthInBytes);
-                aes.IV = rfc2898.GetBytes(KeyStrengthInBytes);
+                // SHA1 matches the default of the obsolete Rfc2898DeriveBytes ctor;
+                // key/IV split of the single derived stream is byte-identical to sequential GetBytes calls.
+                var keyAndIv = Rfc2898DeriveBytes.Pbkdf2(password, salt, Rfc2898KeygenIterations, HashAlgorithmName.SHA1, KeyStrengthInBytes * 2);
+                aes.Key = keyAndIv.AsSpan(0, KeyStrengthInBytes).ToArray();
+                aes.IV = keyAndIv.AsSpan(KeyStrengthInBytes).ToArray();
 
                 using (MemoryStream ms = new MemoryStream())
                 {
