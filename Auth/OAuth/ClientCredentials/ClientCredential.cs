@@ -48,6 +48,7 @@ namespace EastFive.Azure.OAuth
         [JsonProperty(PropertyName = ClientIdPropertyName)]
         [Storage]
         [StorageConstraintUnique]
+        [StringLookupHashXX32(Characters = 2, IgnoreNullWhiteSpace = true)]
         public string clientId;
 
         const string ClientTypePropertyName = "client_type";

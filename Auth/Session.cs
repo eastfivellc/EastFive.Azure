@@ -113,7 +113,7 @@ namespace EastFive.Azure.Auth
                 (unspecifiedMsg) => AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                     (minutes) => TimeSpan.FromMinutes(minutes)));
 
-        private static async Task<TResult> GetClaimsAsync<TResult>(
+        internal static async Task<TResult> GetClaimsAsync<TResult>(
             IApplication application, IRefOptional<Authorization> authorizationRefMaybe,
             Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
             Func<string, TResult> onFailure)
