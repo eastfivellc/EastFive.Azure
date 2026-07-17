@@ -38,10 +38,29 @@ namespace EastFive.Azure.OAuth.Server
                 Location = "Application configuration")]
             public const string RefreshTokenExpirationInDays =
                 "EastFive.Azure.OAuth.RefreshTokenExpirationInDays";
+
+            /// <summary>
+            /// Space-separated scopes advertised in the RFC 8414 / RFC 9728 metadata
+            /// documents (default "mcp"). Advisory — tokens carry whatever scope the
+            /// authorization granted; endpoints enforce via [RequiredScope].
+            /// </summary>
+            [EastFive.Web.ConfigKey(
+                "Space-separated OAuth scopes advertised in discovery metadata (default `mcp`).",
+                EastFive.Web.DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false,
+                Location = "Application configuration")]
+            public const string ScopesSupported =
+                "EastFive.Azure.OAuth.ScopesSupported";
         }
 
         /// <summary>Claim type carrying the OAuth scope(s) granted to the token (space delimited).</summary>
         public const string ScopeClaimType = "scp";
+
+        /// <summary>
+        /// JwtSecurityTokenHandler's default inbound claim-type map rewrites "scp" to this
+        /// URI when validating tokens — read-side checks must accept both forms.
+        /// </summary>
+        public const string ScopeClaimTypeMapped = "http://schemas.microsoft.com/identity/claims/scope";
 
         /// <summary>Claim type carrying the OAuth client through which the token was issued.</summary>
         public const string ClientIdClaimType = "client_id";
@@ -55,6 +74,19 @@ namespace EastFive.Azure.OAuth.Server
             AppSettings.RefreshTokenExpirationInDays.ConfigurationDouble(
                 days => TimeSpan.FromDays(days),
                 onNotSpecified: () => TimeSpan.FromDays(30));
+
+        /// <summary>The default scope MCP endpoints are gated on.</summary>
+        public const string McpScope = "mcp";
+
+        public static string[] ScopesSupported() =>
+            AppSettings.ScopesSupported.ConfigurationString(
+                scopes => scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries),
+                (why) => new[] { McpScope });
+
+        /// <summary>The RFC 9728 protected-resource-metadata URL for this host —
+        /// advertised in WWW-Authenticate challenges so clients can begin discovery.</summary>
+        public static string ProtectedResourceMetadataUrl(Uri requestUri) =>
+            $"{Origin(requestUri)}/.well-known/oauth-protected-resource";
 
         /// <summary>
         /// The issuer identifier (RFC 8414 §2). Clients validate that this equals the

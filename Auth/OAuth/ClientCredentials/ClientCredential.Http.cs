@@ -19,7 +19,6 @@ namespace EastFive.Azure.OAuth
     [FunctionViewController(
         Route = "OAuth/ClientCredential",
         ContentType = "application/x-oauth-clientcredential+json")]
-    [CastSerialization]
     public partial struct ClientCredential
     {
         /// <summary>
@@ -90,6 +89,10 @@ namespace EastFive.Azure.OAuth
             client.updatedAt = DateTime.UtcNow;
             client.lastUsedAt = null;
 
+            // Secrets are stored hashed; the caller already holds the plaintext it sent.
+            if (!string.IsNullOrWhiteSpace(clientSecret))
+                client.clientSecret = Server.OAuthServer.ComputeSecretHash(clientSecret);
+
             // Validate registration per RFC 6749 Section 2
             return await client.ValidateRegistration(
                 () =>
@@ -143,7 +146,7 @@ namespace EastFive.Azure.OAuth
         /// Implements RFC 6749 Section 4.4: Client Credentials Grant
         /// This endpoint validates client_id and client_secret and returns success/failure
         /// </summary>
-        [HttpAction("authenticate")]
+        [HttpAction("POST", "authenticate")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> AuthenticateAsync(
                 [Property(Name = ClientIdPropertyName)] string clientId,
@@ -172,9 +175,11 @@ namespace EastFive.Azure.OAuth
             if (!client.isActive)
                 return onUnauthorized().AddReason("Client is not active");
 
-            // Validate client secret
-            // Note: In production, this should use secure hashing comparison
-            if (client.clientSecret != clientSecret)
+            // Validate client secret (hashed comparison; legacy plaintext fallback)
+            var secretMatches =
+                Server.OAuthServer.SecretMatchesHash(clientSecret, client.clientSecret)
+                || client.clientSecret == clientSecret;
+            if (!secretMatches)
                 return onUnauthorized().AddReason("Invalid client credentials");
 
             // Update last used timestamp (fire and forget for performance)
@@ -204,19 +209,19 @@ namespace EastFive.Azure.OAuth
         /// POST /OAuth/ClientCredential/{id}/rotate-secret - Rotate client secret
         /// Generates a new client secret for security purposes
         /// </summary>
-        [HttpAction("rotate-secret")]
+        [HttpAction("POST", "rotate-secret")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> RotateSecretAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
             ContentTypeResponse<ClientSecretResponse> onRotated,
             NotFoundResponse onNotFound)
         {
+            // Cryptographically random; stored hashed, returned in plaintext exactly once.
+            var newSecret = Server.OAuthServer.GenerateSecret();
             return await clientRef.StorageUpdateAsync2(
                 client =>
                 {
-                    // Generate new secret (in production, use cryptographically secure generation)
-                    var newSecret = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-                    client.clientSecret = newSecret;
+                    client.clientSecret = Server.OAuthServer.ComputeSecretHash(newSecret);
                     client.updatedAt = DateTime.UtcNow;
 
                     return client;
@@ -226,7 +231,7 @@ namespace EastFive.Azure.OAuth
                     var response = new ClientSecretResponse
                     {
                         ClientId = updatedClient.clientId,
-                        ClientSecret = updatedClient.clientSecret,
+                        ClientSecret = newSecret,
                         UpdatedAt = updatedClient.updatedAt
                     };
                     return onRotated(response);
@@ -237,7 +242,7 @@ namespace EastFive.Azure.OAuth
         /// <summary>
         /// POST /OAuth/ClientCredential/{id}/activate - Activate a client
         /// </summary>
-        [HttpAction("activate")]
+        [HttpAction("POST", "activate")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> ActivateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
@@ -258,7 +263,7 @@ namespace EastFive.Azure.OAuth
         /// <summary>
         /// POST /OAuth/ClientCredential/{id}/deactivate - Deactivate a client
         /// </summary>
-        [HttpAction("deactivate")]
+        [HttpAction("POST", "deactivate")]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> DeactivateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,

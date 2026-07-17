@@ -62,9 +62,11 @@ namespace EastFive.Azure.OAuth.Server
                         return await AuthorizationCodeGrantAsync(form, client, request, application, onIssued, onError);
                     if (grantType == ClientCredential.GrantTypeValues.RefreshToken)
                         return await RefreshTokenGrantAsync(form, client, request, application, onIssued, onError);
+                    if (grantType == ClientCredential.GrantTypeValues.ClientCredentials)
+                        return await ClientCredentialsGrantAsync(form, client, clientSecret, onIssued, onError);
 
                     return Error(onError, "unsupported_grant_type",
-                        "Supported grant types: authorization_code, refresh_token.");
+                        "Supported grant types: authorization_code, refresh_token, client_credentials.");
                 },
                 onNotFound: () => Error(onError, "invalid_client", "Unknown client_id.").AsTask());
         }
@@ -195,6 +197,85 @@ namespace EastFive.Azure.OAuth.Server
                     revokedCount++;
             }
             return revokedCount;
+        }
+
+        #endregion
+
+        #region grant_type=client_credentials
+
+        /// <summary>
+        /// RFC 6749 §4.4 — service-to-service tokens for admin-provisioned confidential
+        /// clients. No user account is involved: the token carries only scp + client_id
+        /// claims, so it passes [RequiredScope] gates but NOT account/role-based gates.
+        /// Per OAuth 2.1 no refresh token is issued (the client can just re-authenticate).
+        /// </summary>
+        private static async Task<IHttpResponse> ClientCredentialsGrantAsync(
+            Microsoft.AspNetCore.Http.IFormCollection form, ClientCredential client, string clientSecret,
+            ContentTypeResponse<TokenSuccessResponse> onIssued,
+            BadRequestBodyResponse<OAuthTokenError> onError)
+        {
+            if (client.clientType != ClientCredential.ClientTypes.Confidential
+                    || clientSecret.IsNullOrWhiteSpace())
+                return Error(onError, "unauthorized_client",
+                    "client_credentials is only available to confidential clients authenticating with a secret.");
+
+            var registeredGrants = (client.grantTypes ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(g => g.Trim())
+                .ToArray();
+            if (!registeredGrants.Contains(ClientCredential.GrantTypeValues.ClientCredentials))
+                return Error(onError, "unauthorized_client",
+                    "This client is not registered for the client_credentials grant.");
+
+            // RFC 6749 §3.3: requested scope must stay within the client's registered scope;
+            // no request → the registered scope.
+            var registeredScopes = (client.scope ?? string.Empty)
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var requestedScope = (string)form["scope"];
+            var grantedScope = client.scope;
+            if (requestedScope.HasBlackSpace())
+            {
+                var requestedScopes = requestedScope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var outOfRegistration = requestedScopes
+                    .Where(s => !registeredScopes.Contains(s, StringComparer.Ordinal))
+                    .ToArray();
+                if (outOfRegistration.Any())
+                    return Error(onError, "invalid_scope",
+                        $"Scope(s) not registered for this client: {outOfRegistration.Join(" ")}");
+                grantedScope = requestedScope;
+            }
+
+            var oauthClaims = new Dictionary<string, string>
+            {
+                [OAuthServer.ClientIdClaimType] = client.clientId,
+            };
+            if (grantedScope.HasBlackSpace())
+                oauthClaims[OAuthServer.ScopeClaimType] = grantedScope;
+
+            var duration = OAuthServer.AccessTokenDuration();
+            return await EastFive.Security.AppSettings.TokenScope.ConfigurationUri(
+                tokenScope =>
+                {
+                    return EastFive.Api.Auth.JwtTools.CreateToken(
+                            Guid.NewGuid(), tokenScope, duration, oauthClaims,
+                        (accessToken, whenIssued) =>
+                        {
+                            var response = new TokenSuccessResponse
+                            {
+                                AccessToken = accessToken,
+                                TokenType = "Bearer",
+                                ExpiresIn = (long)duration.TotalSeconds,
+                                Scope = grantedScope,
+                            };
+                            return NoStore(onIssued(response, "application/json")).AsTask();
+                        },
+                        missingConfig => Error(onError, "server_error",
+                            "Token signing is not configured.").AsTask(),
+                        (configName, issue) => Error(onError, "server_error",
+                            "Token signing configuration is invalid.").AsTask());
+                },
+                why => Error(onError, "server_error",
+                    "Token scope is not configured.").AsTask());
         }
 
         #endregion
@@ -389,7 +470,7 @@ namespace EastFive.Azure.OAuth.Server
         [JsonProperty("expires_in")]
         public long ExpiresIn { get; set; }
 
-        [JsonProperty("refresh_token")]
+        [JsonProperty("refresh_token", NullValueHandling = NullValueHandling.Ignore)]
         public string RefreshToken { get; set; }
 
         [JsonProperty("scope", NullValueHandling = NullValueHandling.Ignore)]

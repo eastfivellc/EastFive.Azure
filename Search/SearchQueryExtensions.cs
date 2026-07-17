@@ -542,8 +542,16 @@ namespace EastFive.Azure.Search
 
                 if(v is DateTime)
                 {
+                    // OData datetime literals are UNQUOTED — quoting one makes Azure Search
+                    // reject the filter ("incompatible types 'Edm.DateTimeOffset' and
+                    // 'Edm.String'"). DateTimeOffset fields also require an explicit offset,
+                    // so unspecified-kind values are treated as UTC.
                     var vDate = (DateTime)v;
-                    v = vDate.ToString("O");
+                    if (vDate.Kind == DateTimeKind.Unspecified)
+                        vDate = DateTime.SpecifyKind(vDate, DateTimeKind.Utc);
+                    var comparisonStrDate = GetComparison();
+                    return searchOptions.AppendFilterOption(
+                        $"{key} {comparisonStrDate} {vDate.ToString("O")}");
                 }
 
                 var comparsionStr = GetComparison();

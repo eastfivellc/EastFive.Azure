@@ -66,10 +66,11 @@ namespace EastFive.Azure.OAuth
         /// <summary>
         /// OAuth 2.0 client secret for confidential clients (RFC 6749 Section 2.3.1)
         /// NULL for public clients as they cannot maintain confidentiality.
-        /// Should be hashed/encrypted in production.
+        /// Stored as a SHA256 hash (OAuthServer.ComputeSecretHash); legacy rows may
+        /// still hold plaintext. NEVER serialized in API responses — the plaintext
+        /// is returned exactly once, from create/rotate-secret.
         /// </summary>
-        [ApiProperty(PropertyName = ClientSecretPropertyName)]
-        [JsonProperty(PropertyName = ClientSecretPropertyName)]
+        [JsonIgnore]
         [Storage]
         public string clientSecret;
 
