@@ -278,12 +278,35 @@ namespace EastFive.Persistence.Azure.StorageTables
                     hashRowKey, hashPartitionKey,
                 async (created, lookup, saveAsync) =>
                 {
-                    if (!created)
+                    bool ClaimedByDifferentResource()
+                    {
+                        if (created)
+                            return false;
+
+                        if (lookup.rowKeyRef != rowKeyRef)
+                            return true;
+
+                        if (lookup.partitionKeyRef != partitionKeyRef)
+                            return true;
+
+                        return false;
+                    }
+
+                    // An update that does not change the unique value finds this entity's own
+                    // pre-existing lookup row — that is not a uniqueness violation (fixed
+                    // 2026-07-15; previously ANY update of an entity with an unchanged
+                    // [StorageConstraintUnique] member failed with "Modifiers failed to execute").
+                    if (ClaimedByDifferentResource())
                         return onFailure();
 
                     async Task<Func<Task>> RollbackMaybeAsync()
                     {
                         if (IsIgnored(memberInfo, valueExisting))
+                            return default(Func<Task>);
+                        // Only remove the previous value's lookup row when the value actually
+                        // changed (otherwise the row just claimed above would be deleted).
+                        var existingHashRowKey = GetHashRowKey(memberInfo, valueExisting, out string discard);
+                        if (existingHashRowKey == hashRowKey)
                             return default(Func<Task>);
                         return await ExecuteDeleteAsync(memberInfo, rowKeyRef, partitionKeyRef,
                             valueExisting, dictionaryExisting,
@@ -293,6 +316,8 @@ namespace EastFive.Persistence.Azure.StorageTables
                     }
 
                     var rollbackMaybeTask = RollbackMaybeAsync();
+                    lookup.rowKeyRef = rowKeyRef;
+                    lookup.partitionKeyRef = partitionKeyRef;
                     lookup.rawHash = hashKeys; // Store raw hash to make the table easier to debug
                     await saveAsync(lookup);
                     var rollbackMaybe = await rollbackMaybeTask;

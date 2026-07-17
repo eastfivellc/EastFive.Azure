@@ -33,8 +33,9 @@ namespace EastFive.Azure.OAuth.Server
                 RevocationEndpoint = $"{origin}/oauth/revoke",
                 JwksUri = $"{origin}/.well-known/jwks.json",
                 ResponseTypesSupported = new[] { "code" },
-                GrantTypesSupported = new[] { "authorization_code", "refresh_token" },
+                GrantTypesSupported = new[] { "authorization_code", "refresh_token", "client_credentials" },
                 CodeChallengeMethodsSupported = new[] { OAuthServer.CodeChallengeMethodS256 },
+                ScopesSupported = OAuthServer.ScopesSupported(),
                 TokenEndpointAuthMethodsSupported = new[]
                 {
                     ClientCredential.TokenEndpointAuthMethods.None,
@@ -69,6 +70,7 @@ namespace EastFive.Azure.OAuth.Server
                 Resource = origin,
                 AuthorizationServers = new[] { OAuthServer.Issuer(request.RequestUri) },
                 BearerMethodsSupported = new[] { "header" },
+                ScopesSupported = OAuthServer.ScopesSupported(),
             };
             return onFound(document, "application/json");
         }
@@ -103,6 +105,9 @@ namespace EastFive.Azure.OAuth.Server
         [JsonProperty("code_challenge_methods_supported")]
         public string[] CodeChallengeMethodsSupported { get; set; }
 
+        [JsonProperty("scopes_supported")]
+        public string[] ScopesSupported { get; set; }
+
         [JsonProperty("token_endpoint_auth_methods_supported")]
         public string[] TokenEndpointAuthMethodsSupported { get; set; }
     }
@@ -117,5 +122,8 @@ namespace EastFive.Azure.OAuth.Server
 
         [JsonProperty("bearer_methods_supported")]
         public string[] BearerMethodsSupported { get; set; }
+
+        [JsonProperty("scopes_supported")]
+        public string[] ScopesSupported { get; set; }
     }
 }
