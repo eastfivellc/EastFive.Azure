@@ -192,6 +192,14 @@ namespace EastFive.Azure
                 DeploymentSecurityConcern = false)]
             public static string GetMetadataLocation(string tag) => $"EastFive.Security.CredentialProvider.SAML.{tag}.MetadataLocation";
 
+            [ConfigKey("Internal page (relative URI) to send the browser to when the tag's " +
+                "launch URL is opened directly (a GET without a SAMLResponse — e.g. an " +
+                "athenaNet embedded-app launch ping). When unset, such a GET fails as a " +
+                "bad callback.",
+                DeploymentOverrides.Optional,
+                DeploymentSecurityConcern = false)]
+            public static string GetLaunchPage(string tag) => $"EastFive.Security.CredentialProvider.SAML.{tag}.LaunchPage";
+
             [ConfigKey("The name of the attribute in the SAML assertion whoms value contains a unique key identifying the user. " +
                 "This value is used to lookup the user in the local system.",
                 DeploymentOverrides.Optional,
