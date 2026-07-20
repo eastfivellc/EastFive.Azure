@@ -38,18 +38,23 @@ namespace EastFive.Azure.Auth
             if (tag.IsNullOrWhiteSpace())
                 tag = "ACPTool";
 
-            // A GET without a SAMLResponse is a launch ping, not a callback — e.g.
-            // athenaNet launching an embedded app (GET {launchUrl}?iss=...&launch=...).
-            // The assertion only ever arrives via the IdP's POST to the ACS, so answer
-            // the ping by bouncing the browser to the IdP's SSO endpoint (from the
-            // tag's metadata); the IdP then POSTs the signed assertion back to
-            // POST /auth/SAMLRedirect/{tag}.
+            // A GET without a SAMLResponse is not a callback — it is the tag's launch
+            // URL being opened directly (e.g. athenaNet launching an embedded app:
+            // GET {launchUrl}?iss=...&launch=...). Login happens exclusively via the
+            // IdP's POST to the ACS, so send the browser to the tag's configured
+            // internal landing page. Unconfigured tags fall through to redemption,
+            // which fails with "SAMLResponse parameter was not provided" — the same
+            // answer AffirmHealth gives this shape.
             if (!parameters.ContainsKey(SamlResponseParameter))
-                return await EastFive.Azure.AppSettings.SAML.GetMetadataLocation(tag).ConfigurationUri(
-                    metadataLocation => SAMLProvider.FetchIdPSsoLocationAsync(metadataLocation,
-                        ssoLocation => onRedirectResponse(ssoLocation),
-                        why => onNoServiceResponse().AddReason(why)),
-                    why => onFailure(why).AsTask());
+            {
+                var launchPageResponse = EastFive.Azure.AppSettings.SAML.GetLaunchPage(tag).ConfigurationString(
+                    launchPage => Uri.TryCreate(launchPage, UriKind.RelativeOrAbsolute, out var launchUri)
+                        ? onRedirectResponse(launchUri)
+                        : onFailure($"Configured launch page for SAML tag `{tag}` is not a valid URI"),
+                    onUnspecified: why => default(IHttpResponse));
+                if (launchPageResponse != null)
+                    return launchPageResponse;
+            }
 
             var method = EastFive.Azure.Auth.Method.ByMethodName(
                 SAMLProvider.IntegrationName, application);

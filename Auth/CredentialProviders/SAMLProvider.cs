@@ -239,63 +239,12 @@ namespace EastFive.Azure.Auth.CredentialProviders
                 (why) => onFailure(why));
         }
 
-        /// <summary>
-        /// Resolve the IdP's SingleSignOnService location from its metadata —
-        /// where to send the browser to start SSO (the IdP then POSTs the signed
-        /// assertion to this SP's ACS). Prefers the HTTP-Redirect binding.
-        /// </summary>
-        public static async Task<TResult> FetchIdPSsoLocationAsync<TResult>(
-            Uri metadataUri,
-            Func<Uri, TResult> onFound,
-            Func<string, TResult> onFailure)
-        {
-            string metadataXml;
-            try
-            {
-                using var httpClient = new HttpClient();
-                metadataXml = await httpClient.GetStringAsync(metadataUri);
-            }
-            catch (Exception ex)
-            {
-                return onFailure($"Failed to fetch IdP metadata from {metadataUri.AbsoluteUri}: {ex.Message}");
-            }
-
-            var metadataDoc = new XmlDocument();
-            try
-            {
-                metadataDoc.LoadXml(metadataXml);
-            }
-            catch (XmlException ex)
-            {
-                return onFailure($"IdP metadata XML is malformed: {ex.Message}");
-            }
-
-            var metadataNsMgr = new XmlNamespaceManager(metadataDoc.NameTable);
-            metadataNsMgr.AddNamespace("md", "urn:oasis:names:tc:SAML:2.0:metadata");
-
-            const string redirectBinding = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
-            var ssoNode = metadataDoc.SelectSingleNode(
-                $"//md:IDPSSODescriptor/md:SingleSignOnService[@Binding='{redirectBinding}']",
-                metadataNsMgr);
-            ssoNode ??= metadataDoc.SelectSingleNode(
-                "//md:IDPSSODescriptor/md:SingleSignOnService",
-                metadataNsMgr);
-
-            if (ssoNode is null)
-                return onFailure("IdP metadata does not contain a md:SingleSignOnService element");
-
-            var location = ssoNode.Attributes?["Location"]?.Value;
-            if (!Uri.TryCreate(location, UriKind.Absolute, out var ssoLocation))
-                return onFailure("md:SingleSignOnService Location in IdP metadata is not an absolute URI");
-
-            return onFound(ssoLocation);
-        }
-
         private static async Task<TResult> FetchIdPCertificateFromMetadataAsync<TResult>(
             Uri metadataUri,
             Func<byte[], TResult> onFound,
             Func<string, TResult> onFailure)
-        {            string metadataXml;
+        {
+            string metadataXml;
             try
             {
                 using var httpClient = new HttpClient();
