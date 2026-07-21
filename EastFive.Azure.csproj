@@ -43,7 +43,6 @@
   <ItemGroup>
     <ProjectReference Include="..\EastFive.Api\EastFive.Api.csproj" />
     <ProjectReference Include="..\EastFive.Core\EastFive.Core.csproj" />
-    <ProjectReference Include="..\EastFive.Web\EastFive.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">
