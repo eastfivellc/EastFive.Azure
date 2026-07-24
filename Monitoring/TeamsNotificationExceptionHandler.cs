@@ -66,12 +66,20 @@ namespace EastFive.Azure.Monitoring
                 return await continueExecution(ex, method, queryParameters,
                         httpApp, request);
 
-            var message = await CompileCardAsync(
-                GetCardTitle(request.RequestUri), 
-                GetCardSummary(ex),
-                httpApp,
-                default(MonitoringRequest), request, default(IHttpResponse), ex);
-            var response = await message.SendAsync(teamsHookUrl);
+            try
+            {
+                var message = await CompileCardAsync(
+                    GetCardTitle(request.RequestUri),
+                    GetCardSummary(ex),
+                    httpApp,
+                    default(MonitoringRequest), request, default(IHttpResponse), ex);
+                var response = await message.SendAsync(teamsHookUrl);
+            }
+            catch (Exception)
+            {
+                // Notification is best-effort — reporting must never replace the
+                // handling of the exception it reports.
+            }
 
             return await continueExecution(ex, method, queryParameters,
                 httpApp, request);
@@ -85,21 +93,31 @@ namespace EastFive.Azure.Monitoring
             if (deactivated)
                 return response;
 
-            string teamsNotifyParam = GetTeamsNotifyParameter();
-            var isDone = !ShouldNotify(out string collectionFolder);
-            var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(
-                controllerType, resourceInvoker,
-                httpApp, request, collectionFolder, response);
+            string teamsNotifyParam = default;
+            try
+            {
+                teamsNotifyParam = GetTeamsNotifyParameter();
+                var isDone = !ShouldNotify(out string collectionFolder);
+                var monitoringRequest = await Api.Azure.Monitoring.MonitoringRequest.CreateAsync(
+                    controllerType, resourceInvoker,
+                    httpApp, request, collectionFolder, response);
 
-            if (isDone)
-                return response;
+                if (isDone)
+                    return response;
 
-            var message = await CompileCardAsync(
-                GetCardTitle(request.RequestUri), 
-                GetCardSummary(response),
-                httpApp,
-                monitoringRequest, request, response, default(Exception));
-            string discardId = await message.SendAsync(teamsHookUrl);
+                var message = await CompileCardAsync(
+                    GetCardTitle(request.RequestUri),
+                    GetCardSummary(response),
+                    httpApp,
+                    monitoringRequest, request, response, default(Exception));
+                string discardId = await message.SendAsync(teamsHookUrl);
+            }
+            catch (Exception)
+            {
+                // Notification/monitoring is best-effort — a failure to report a
+                // response (e.g. missing config for the Postman-link token, an
+                // unreachable Teams hook) must never turn that response into a 500.
+            }
 
             return response;
             
@@ -345,8 +363,13 @@ namespace EastFive.Azure.Monitoring
 
                 if (request != default)
                 {
+                    // Diagnostics must never fail the response they report — default the
+                    // Postman-link token lifetime when the setting is absent instead of
+                    // throwing (an unhandled throw here turns every reported 404 into a 500).
                     var offset = EastFive.Api.AppSettings.AccessTokenExpirationInMinutes.ConfigurationDouble(
-                        (minutes) => TimeSpan.FromMinutes(minutes));
+                        (minutes) => TimeSpan.FromMinutes(minutes),
+                        (why) => TimeSpan.FromMinutes(60),
+                        () => TimeSpan.FromMinutes(60));
                     var expiresOn = DateTime.UtcNow + offset;
                     var postmanLink = new QueryableServer<Api.Azure.Monitoring.MonitoringRequest>(request)
                         .Where(mr => mr.monitoringRequestRef == monitoringRequest.monitoringRequestRef)
