@@ -180,7 +180,7 @@ namespace EastFive.Azure.OAuth.Server
                             "This authorization request has expired. Return to the application and retry.");
 
                     return await await Session.GetClaimsAsync(application, loginAuthorizationRef.Optional(),
-                        async (claims, accountIdMaybe, authorized) =>
+                        async (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                         {
                             if (!accountIdMaybe.HasValue || !authorized)
                                 return ErrorPage(onPage, "access_denied",

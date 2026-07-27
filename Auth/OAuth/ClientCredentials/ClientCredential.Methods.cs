@@ -139,6 +139,38 @@ namespace EastFive.Azure.OAuth
         }
 
         /// <summary>
+        /// Defaults for ADMIN-PROVISIONED clients (POST /OAuth/ClientCredential):
+        /// blank client_id becomes the record id in "N" format (the exact convention
+        /// dynamically registered clients get in OAuthClientRegistration); confidential
+        /// clients with no secret get a generated one (stored hashed, plaintext handed
+        /// back through <paramref name="generatedSecretMaybe"/> to be returned EXACTLY
+        /// once); blank auth method on confidential clients defaults to
+        /// client_secret_basic. Pure — no storage, no clock.
+        /// </summary>
+        public static ClientCredential ApplyProvisioningDefaults(ClientCredential client,
+            out string generatedSecretMaybe)
+        {
+            generatedSecretMaybe = null;
+
+            if (string.IsNullOrWhiteSpace(client.clientId))
+                client.clientId = client.@ref.id.ToString("N");
+
+            if (client.clientType == ClientTypes.Confidential)
+            {
+                if (string.IsNullOrWhiteSpace(client.tokenEndpointAuthMethod))
+                    client.tokenEndpointAuthMethod = TokenEndpointAuthMethods.ClientSecretBasic;
+
+                if (string.IsNullOrWhiteSpace(client.clientSecret))
+                {
+                    generatedSecretMaybe = Server.OAuthServer.GenerateSecret();
+                    client.clientSecret = Server.OAuthServer.ComputeSecretHash(generatedSecretMaybe);
+                }
+            }
+
+            return client;
+        }
+
+        /// <summary>
         /// Checks if client is authorized for a specific grant type
         /// </summary>
         public bool IsAuthorizedForGrantType(string grantType)

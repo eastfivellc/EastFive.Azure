@@ -294,7 +294,7 @@ namespace EastFive.Azure.OAuth.Server
             // Claims resolve from the login authorization the same way session tokens do
             // (account claim + stored role claims), so role gates work identically.
             return await await Session.GetClaimsAsync(application, loginAuthorization,
-                async (claims, accountIdMaybe, authorized) =>
+                async (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                 {
                     if (!accountIdMaybe.HasValue || accountIdMaybe.Value != accountId)
                         return Error(onError, "invalid_grant",

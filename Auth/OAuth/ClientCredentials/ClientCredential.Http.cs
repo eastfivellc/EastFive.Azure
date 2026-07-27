@@ -51,13 +51,17 @@ namespace EastFive.Azure.OAuth
         }
 
         /// <summary>
-        /// POST /OAuth/ClientCredential - Create new OAuth 2.0 client registration (RFC 6749 Section 2)
+        /// POST /OAuth/ClientCredential - Create new OAuth 2.0 client registration (RFC 6749 Section 2).
+        /// client_id and (for confidential clients) client_secret are OPTIONAL: when omitted they are
+        /// generated server-side (id = record GUID "N", the DCR convention; secret = cryptographically
+        /// random, stored hashed). A generated secret is returned in the response's client_secret
+        /// EXACTLY once — it can never be retrieved again.
         /// </summary>
         [HttpPost]
         [SuperAdminClaim]
         public static async Task<IHttpResponse> CreateAsync(
                 [UpdateId] IRef<ClientCredential> clientRef,
-                [Property(Name = ClientIdPropertyName)] string clientId,
+                [PropertyOptional(Name = ClientIdPropertyName)] string clientId,
                 [Property(Name = ClientTypePropertyName)] string clientType,
                 [PropertyOptional(Name = ClientSecretPropertyName)] string clientSecret,
                 [Property(Name = NamePropertyName)] string name,
@@ -69,14 +73,11 @@ namespace EastFive.Azure.OAuth
                 [PropertyOptional(Name = IsActivePropertyName)] bool? isActive,
                 [PropertyOptional(Name = ContactEmailPropertyName)] string contactEmail,
                 [Resource] ClientCredential client,
-            CreatedBodyResponse<ClientCredential> onCreated,
+            CreatedBodyResponse<ClientCredentialCreatedResponse> onCreated,
             AlreadyExistsResponse onAlreadyExists,
             BadRequestResponse onBadRequest)
         {
             // Validate required fields per RFC 6749 Section 2
-            if (string.IsNullOrWhiteSpace(clientId))
-                return onBadRequest().AddReason("client_id is required");
-            
             if (string.IsNullOrWhiteSpace(clientType))
                 return onBadRequest().AddReason("client_type is required (must be 'confidential' or 'public')");
 
@@ -93,12 +94,16 @@ namespace EastFive.Azure.OAuth
             if (!string.IsNullOrWhiteSpace(clientSecret))
                 client.clientSecret = Server.OAuthServer.ComputeSecretHash(clientSecret);
 
+            // Server-generated client_id / client_secret / auth-method defaults.
+            client = ApplyProvisioningDefaults(client, out var generatedSecretMaybe);
+
             // Validate registration per RFC 6749 Section 2
             return await client.ValidateRegistration(
                 () =>
                 {
                     return client.StorageCreateAsync(
-                        created => onCreated(created.Entity),
+                        created => onCreated(
+                            ClientCredentialCreatedResponse.FromClient(created.Entity, generatedSecretMaybe)),
                         onAlreadyExists: () => onAlreadyExists());
                 },
                 invalidReason => onBadRequest().AddReason(invalidReason).AsTask());
@@ -313,5 +318,78 @@ namespace EastFive.Azure.OAuth
 
         [JsonProperty("updated_at")]
         public DateTime UpdatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Response for client creation — the ClientCredential wire shape plus, when the
+    /// server generated the secret, its plaintext (returned EXACTLY once; stored hashed).
+    /// </summary>
+    public class ClientCredentialCreatedResponse
+    {
+        [JsonProperty("id")]
+        public Guid Id { get; set; }
+
+        [JsonProperty("client_id")]
+        public string ClientId { get; set; }
+
+        [JsonProperty("client_type")]
+        public string ClientType { get; set; }
+
+        [JsonProperty("client_secret")]
+        public string ClientSecret { get; set; }
+
+        [JsonProperty("redirect_uris")]
+        public string RedirectUris { get; set; }
+
+        [JsonProperty("grant_types")]
+        public string GrantTypes { get; set; }
+
+        [JsonProperty("token_endpoint_auth_method")]
+        public string TokenEndpointAuthMethod { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("scope")]
+        public string Scope { get; set; }
+
+        [JsonProperty("is_active")]
+        public bool IsActive { get; set; }
+
+        [JsonProperty("created_at")]
+        public DateTime CreatedAt { get; set; }
+
+        [JsonProperty("updated_at")]
+        public DateTime UpdatedAt { get; set; }
+
+        [JsonProperty("last_used_at")]
+        public DateTime? LastUsedAt { get; set; }
+
+        [JsonProperty("contact_email")]
+        public string ContactEmail { get; set; }
+
+        public static ClientCredentialCreatedResponse FromClient(
+            ClientCredential client, string generatedSecretMaybe) =>
+            new ClientCredentialCreatedResponse
+            {
+                Id = client.id,
+                ClientId = client.clientId,
+                ClientType = client.clientType,
+                ClientSecret = generatedSecretMaybe,
+                RedirectUris = client.redirectUris,
+                GrantTypes = client.grantTypes,
+                TokenEndpointAuthMethod = client.tokenEndpointAuthMethod,
+                Name = client.name,
+                Description = client.description,
+                Scope = client.scope,
+                IsActive = client.isActive,
+                CreatedAt = client.createdAt,
+                UpdatedAt = client.updatedAt,
+                LastUsedAt = client.lastUsedAt,
+                ContactEmail = client.contactEmail,
+            };
     }
 }

@@ -113,41 +113,79 @@ namespace EastFive.Azure.Auth
                 (unspecifiedMsg) => AppSettings.Auth.TokenExpirationInMinutes.ConfigurationDouble(
                     (minutes) => TimeSpan.FromMinutes(minutes)));
 
+        /// <summary>
+        /// Optional authorization parameter (an ISO-8601 / "o"-format UTC timestamp). When a login
+        /// provider stores this in the authorization's parameters at redemption time (e.g. an EHR
+        /// SMART-on-FHIR launch whose upstream access token expires), every session token issued
+        /// from that authorization is capped so it never outlives the upstream session.
+        /// </summary>
+        public const string ParameterSessionExpiresOn = "session_expires_on";
+
+        private static DateTime? GetSessionExpiresOn(IDictionary<string, string> parameters)
+        {
+            if (parameters == null)
+                return default(DateTime?);
+            if (!parameters.TryGetValue(ParameterSessionExpiresOn, out var expiresOnStr))
+                return default(DateTime?);
+            if (!DateTime.TryParse(expiresOnStr,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out var expiresOn))
+                return default(DateTime?);
+            return expiresOn.ToUniversalTime();
+        }
+
+        /// <summary>
+        /// Caps a token duration so it does not extend past <paramref name="sessionExpiresOnMaybe"/>.
+        /// A one-minute floor avoids issuing already-expired tokens to a login that is mid-redirect
+        /// when the upstream session lapses.
+        /// </summary>
+        public static TimeSpan CapToSessionExpiration(TimeSpan duration, DateTime? sessionExpiresOnMaybe)
+        {
+            if (!sessionExpiresOnMaybe.HasValue)
+                return duration;
+            var remaining = sessionExpiresOnMaybe.Value - DateTime.UtcNow;
+            var floor = TimeSpan.FromMinutes(1);
+            if (remaining < floor)
+                remaining = floor;
+            return remaining < duration ? remaining : duration;
+        }
+
         internal static async Task<TResult> GetClaimsAsync<TResult>(
             IApplication application, IRefOptional<Authorization> authorizationRefMaybe,
-            Func<IDictionary<string, string>, Guid?, bool, TResult> onClaims,
+            Func<IDictionary<string, string>, Guid?, bool, DateTime?, TResult> onClaims,
             Func<string, TResult> onFailure)
         {
             if (!authorizationRefMaybe.HasValueNotNull())
-                return onClaims(new Dictionary<string, string>(), default(Guid?), false);
+                return onClaims(new Dictionary<string, string>(), default(Guid?), false, default(DateTime?));
             var authorizationRef = authorizationRefMaybe.Ref;
 
             return await Api.AppSettings.ActorIdClaimType.ConfigurationString(
                 (accountIdClaimType) =>
                 {
                     return GetSessionAcountAsync(authorizationRef, application,
-                        (accountId, claims, authorized) =>
+                        (accountId, claims, authorized, sessionExpiresOnMaybe) =>
                         {
                             var claimsWithAccountId = claims
                                 .Append(accountIdClaimType.PairWithValue(accountId.ToString()))
                                 .If(accountIdClaimType != Api.Auth.ClaimValues.DefaultAccountClaim,
                                     (kvps) => kvps.Append(Api.Auth.ClaimValues.DefaultAccountClaim.PairWithValue(accountId.ToString())))
                                 .ToDictionary();
-                            return onClaims(claimsWithAccountId, accountId, authorized);
+                            return onClaims(claimsWithAccountId, accountId, authorized, sessionExpiresOnMaybe);
                         },
-                        (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
+                        (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized, default(DateTime?)));
                 },
                 (why) =>
                 {
                     return GetSessionAcountAsync(authorizationRef, application,
-                        (accountId, claims, authorized) =>
+                        (accountId, claims, authorized, sessionExpiresOnMaybe) =>
                         {
                             var claimsDictionary = claims
                                 .NullToEmpty()
                                 .ToDictionary();
-                            return onClaims(claimsDictionary, accountId, authorized);
+                            return onClaims(claimsDictionary, accountId, authorized, sessionExpiresOnMaybe);
                         },
-                        (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized));
+                        (why, authorized) => onClaims(new Dictionary<string, string>(), default(Guid?), authorized, default(DateTime?)));
                 });
         }
 
@@ -178,11 +216,12 @@ namespace EastFive.Azure.Auth
                         scope =>
                         {
                             return GetClaimsAsync(application, session.authorization,
-                                (claims, accountIdMaybe, authorized) =>
+                                (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                                 {
                                     session.account = accountIdMaybe;
                                     session.authorized = authorized;
-                                    var duration = CreateExpirationDuration();
+                                    var duration = CapToSessionExpiration(
+                                        CreateExpirationDuration(), sessionExpiresOnMaybe);
                                     return Api.Auth.JwtTools.CreateToken(session.id,
                                             scope, duration, claims,
                                         (tokenNew, whenIssued) =>
@@ -265,9 +304,10 @@ namespace EastFive.Azure.Auth
                 async (scope) =>
                 {
                     return await await GetClaimsAsync(application, authorizationRefMaybe,
-                        (claims, accountIdMaybe, authorized) =>
+                        (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                         {
-                            var duration = CreateExpirationDuration();
+                            var duration = CapToSessionExpiration(
+                                CreateExpirationDuration(), sessionExpiresOnMaybe);
                             session.account = accountIdMaybe;
                             session.authorized = authorized;
                             return session.StorageCreateAsync(
@@ -326,12 +366,13 @@ namespace EastFive.Azure.Auth
                         async (scope) =>
                         {
                             return await await GetClaimsAsync(application, authorizationRefMaybe,
-                                async (claims, accountIdMaybe, authorized) =>
+                                async (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                                 {
                                     sessionStorage.authorization = authorizationRefMaybe;
                                     sessionStorage.authorized = authorized;
                                     sessionStorage.account = accountIdMaybe;
-                                    var duration = CreateExpirationDuration();
+                                    var duration = CapToSessionExpiration(
+                                        CreateExpirationDuration(), sessionExpiresOnMaybe);
                                     return await Api.Auth.JwtTools.CreateToken(sessionRef.id,
                                             scope, duration, claims,
                                         async (tokenNew, whenIssued) =>
@@ -391,11 +432,12 @@ namespace EastFive.Azure.Auth
                 async (scope) =>
                 {
                     return await await GetClaimsAsync(application, authorizationRefMaybe,
-                        async (claims, accountIdMaybe, authorized) =>
+                        async (claims, accountIdMaybe, authorized, sessionExpiresOnMaybe) =>
                         {
                             session.account = accountIdMaybe;
                             session.authorized = authorized;
-                            var duration = CreateExpirationDuration();
+                            var duration = CapToSessionExpiration(
+                                CreateExpirationDuration(), sessionExpiresOnMaybe);
                             return await await session.StorageCreateAsync(
                                 (sessionIdCreated) =>
                                 {
@@ -439,7 +481,7 @@ namespace EastFive.Azure.Auth
 
         private static async Task<TResult> GetSessionAcountAsync<TResult>(IRef<Authorization> authorizationRef,
                 IApplication application,
-            Func<Guid, IDictionary<string, string>, bool, TResult> onSuccess,
+            Func<Guid, IDictionary<string, string>, bool, DateTime?, TResult> onSuccess,
             Func<string, bool, TResult> onFailure)
         {
             return await await authorizationRef.StorageGetAsync(
@@ -448,6 +490,7 @@ namespace EastFive.Azure.Auth
                     if (!authorization.accountIdMaybe.HasValue) // (!authorization.authorized)
                         return onFailure("Invalid authorization -- it is not authorized.", false);
 
+                    var sessionExpiresOnMaybe = GetSessionExpiresOn(authorization.parameters);
                     var methodRef = authorization.Method;
                     return await await Method.ById(methodRef, application,
                         async method =>
@@ -465,7 +508,7 @@ namespace EastFive.Azure.Auth
                                                 onAccountFound: async (accountId, updatedClaims) =>
                                                 {
                                                     var mergedClaims = await MergeStoredClaimsAsync(accountId, updatedClaims);
-                                                    return onSuccess(accountId, mergedClaims, authorization.authorized);
+                                                    return onSuccess(accountId, mergedClaims, authorization.authorized, sessionExpiresOnMaybe);
                                                 },
                                                 onReject :() => OnContinue());
                                     }
@@ -477,7 +520,7 @@ namespace EastFive.Azure.Auth
                                             async accountId =>
                                             {
                                                 var mergedClaims = await MergeStoredClaimsAsync(accountId, authorization.claims);
-                                                return onSuccess(accountId, mergedClaims, authorization.authorized);
+                                                return onSuccess(accountId, mergedClaims, authorization.authorized, sessionExpiresOnMaybe);
                                             },
                                             () =>
                                             {
