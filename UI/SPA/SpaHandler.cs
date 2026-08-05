@@ -116,6 +116,7 @@ namespace EastFive.Azure.Spa
                                 .ToArray(),
                             (why) => new string[] { });
 
+                        signal.Reset();
                         loadTask = Task.Run(
                             async () =>
                             {
@@ -475,6 +476,26 @@ namespace EastFive.Azure.Spa
                 var location = route.ResolveLocation(fileName);
                 if (FileIsInSpa(package, fileName, out string fileNameSanitized))
                 {
+                    if (string.Equals(fileNameSanitized, route.indexFile, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var indexCacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+                        {
+                            MaxAge = TimeSpan.FromSeconds(0.0),
+                            SharedMaxAge = TimeSpan.FromSeconds(0.0),
+                            MustRevalidate = true,
+                            NoCache = true,
+                            NoStore = true,
+                            NoTransform = true,
+                            Private = false,
+                            Public = true,
+                        };
+
+                        var expiresIndex = DateTime.UtcNow.AddDays(-1);
+                        return onResolved(location,
+                            package.files[fileNameSanitized], fileName.Split('/').Last(),
+                            indexCacheControl, expiresIndex);
+                    }
+
                     var immutableDays = EastFive.Azure.AppSettings.SPA.FilesExpirationInDays.ConfigurationDouble(
                         d => d,
                         onNotSpecified: () => 1.0);
