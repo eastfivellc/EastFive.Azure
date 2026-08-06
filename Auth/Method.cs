@@ -456,7 +456,9 @@ namespace EastFive.Azure.Auth
             return accountLinks
                 .StorageGetBy<AccountLinks, TAccount>(accountLinksProperty)
                 .Where(account => account.AccountLinks.accountLinks
-                    .Contains(al => al.method.id == thisMethodId));
+                    .NullToEmpty()
+                    .Contains(al => al.method.id == thisMethodId
+                        && String.Equals(al.externalAccountKey, accountKey, StringComparison.Ordinal)));
         }
 
         public Task<TResult> StorageCreateOrUpdateAccountFromAccountLinks<TAccount, TResult>(string accountKey,

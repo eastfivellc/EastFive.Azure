@@ -41,19 +41,39 @@ namespace EastFive.Azure.Auth
             // A GET without a SAMLResponse is not a callback — it is the tag's launch
             // URL being opened directly (e.g. athenaNet launching an embedded app:
             // GET {launchUrl}?iss=...&launch=...). Login happens exclusively via the
-            // IdP's POST to the ACS, so send the browser to the tag's configured
-            // internal landing page. Unconfigured tags fall through to redemption,
-            // which fails with "SAMLResponse parameter was not provided" — the same
-            // answer AffirmHealth gives this shape.
+            // IdP's POST to the ACS. When the launch carries SMART-on-FHIR context
+            // (iss + launch) and the tag is configured (has a launch page), forward to
+            // the host's SMART launch endpoint, which decides — via its issuer allow
+            // mechanism — whether to run the SMART auth sequence or fall back to the
+            // tag's launch page. Launches without SMART context go straight to the
+            // launch page. Unconfigured tags fall through to redemption, which fails
+            // with "SAMLResponse parameter was not provided" — the same answer
+            // AffirmHealth gives this shape.
             if (!parameters.ContainsKey(SamlResponseParameter))
             {
-                var launchPageResponse = EastFive.Azure.AppSettings.SAML.GetLaunchPage(tag).ConfigurationString(
-                    launchPage => Uri.TryCreate(launchPage, UriKind.RelativeOrAbsolute, out var launchUri)
-                        ? onRedirectResponse(launchUri)
-                        : onFailure($"Configured launch page for SAML tag `{tag}` is not a valid URI"),
+                parameters.TryGetValue("iss", out var iss);
+                parameters.TryGetValue("launch", out var launch);
+                var hasSmartContext = iss.HasBlackSpace() && launch.HasBlackSpace();
+
+                var launchResponse = EastFive.Azure.AppSettings.SAML.GetLaunchPage(tag).ConfigurationString(
+                    launchPage =>
+                    {
+                        if (hasSmartContext)
+                        {
+                            var smartLaunchUri = urlHelper
+                                .Link("DefaultApi", "SmartLaunch")
+                                .SetQueryParam("iss", iss)
+                                .SetQueryParam("launch", launch)
+                                .SetQueryParam("tag", tag);
+                            return onRedirectResponse(smartLaunchUri);
+                        }
+                        return Uri.TryCreate(launchPage, UriKind.RelativeOrAbsolute, out var launchUri)
+                            ? onRedirectResponse(launchUri)
+                            : onFailure($"Configured launch page for SAML tag `{tag}` is not a valid URI");
+                    },
                     onUnspecified: why => default(IHttpResponse));
-                if (launchPageResponse != null)
-                    return launchPageResponse;
+                if (launchResponse != null)
+                    return launchResponse;
             }
 
             var method = EastFive.Azure.Auth.Method.ByMethodName(
