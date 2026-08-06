@@ -230,16 +230,16 @@ namespace EastFive.Persistence.Azure.StorageTables
             return await repository.UpdateOrCreateAsync<StorageLookupTable, Func<Task>>(rowKey, partitionKey,
                 async (created, lookup, saveAsync) =>
                 {
-                    // store for rollback
+                    // store for rollback -- duplicates are deliberately RETAINED (see note above):
+                    // concurrent writers may append the same entry, and each rollback must remove
+                    // only ITS OWN copy or a losing racer would strip the winner's index entry.
                     var orignalRowAndPartitionKeys = lookup.rowAndPartitionKeys
                         .NullToEmpty()
                         .Where(kvp => kvp.Key.HasBlackSpace() && kvp.Value.HasBlackSpace()) // omit any bad entries
                         .Select(kvp => kvp.Key.AsAstRef(kvp.Value))
-                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
                         .ToArray();
                     var updatedRowAndPartitionKeys = mutateCollection(orignalRowAndPartitionKeys)
                         .Where(kvp => kvp.RowKey.HasBlackSpace() && kvp.PartitionKey.HasBlackSpace())
-                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
                         .ToArray();
 
                     if (Unmodified(orignalRowAndPartitionKeys, updatedRowAndPartitionKeys))
@@ -253,31 +253,21 @@ namespace EastFive.Persistence.Azure.StorageTables
                     Func<Task<bool>> rollback =
                         async () =>
                         {
-                            var removed = orignalRowAndPartitionKeys
-                                .Except(updatedRowAndPartitionKeys,
-                                    rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                                //.Select(orignalRowAndPartitionKey =>
-                                //    orignalRowAndPartitionKey.RowKey.PairWithValue(orignalRowAndPartitionKey.PartitionKey))
-                                .ToArray();
-                            var added = updatedRowAndPartitionKeys
-                                .Except(orignalRowAndPartitionKeys,   rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                                //.Select(updatedRowAndPartitionKey =>
-                                //    updatedRowAndPartitionKey.RowKey.PairWithValue(updatedRowAndPartitionKey.PartitionKey))
-                                .ToArray();
+                            var removed = MultisetSubtract(orignalRowAndPartitionKeys, updatedRowAndPartitionKeys);
+                            var added = MultisetSubtract(updatedRowAndPartitionKeys, orignalRowAndPartitionKeys);
                             var table = repository.TableClient.GetTableReference(tableName);
                             return await repository.UpdateAsync<StorageLookupTable, bool>(rowKey, partitionKey,
                                 async (currentDoc, saveRollbackAsync) =>
                                 {
                                     var currentLookups = currentDoc.rowAndPartitionKeys
-                                        .Select(rpk => rpk.Key.AsAstRef(rpk.Value))
-                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
                                         .NullToEmpty()
+                                        .Select(rpk => rpk.Key.AsAstRef(rpk.Value))
                                         .ToArray();
-                                    var rolledBackRowAndPartitionKeys = currentLookups
-                                        .Concat(removed)
-                                        .Except(added, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                                        .Distinct(rowParitionKeyKvp => $"{rowParitionKeyKvp.RowKey}|{rowParitionKeyKvp.PartitionKey}")
-                                        .ToArray();
+                                    // count-aware undo: restore what this mutation removed and
+                                    // take back only as many instances as it added.
+                                    var rolledBackRowAndPartitionKeys = MultisetSubtract(
+                                        currentLookups.Concat(removed).ToArray(),
+                                        added);
                                     if (Unmodified(rolledBackRowAndPartitionKeys, currentLookups))
                                         return true;
                                     currentDoc.rowAndPartitionKeys = rolledBackRowAndPartitionKeys
@@ -292,20 +282,35 @@ namespace EastFive.Persistence.Azure.StorageTables
                 },
                 tableName: tableName);
 
+            string KeyOf(IRefAst rk) => $"{rk.RowKey}|{rk.PartitionKey}";
+
+            // Multiset difference: removes ONE instance from `source` per instance in `take`.
+            IRefAst[] MultisetSubtract(IRefAst[] source, IRefAst[] take)
+            {
+                var takeCounts = take
+                    .GroupBy(KeyOf)
+                    .ToDictionary(g => g.Key, g => g.Count());
+                return source
+                    .Where(
+                        rk =>
+                        {
+                            var key = KeyOf(rk);
+                            if (!takeCounts.TryGetValue(key, out var remaining) || remaining <= 0)
+                                return true;
+                            takeCounts[key] = remaining - 1;
+                            return false;
+                        })
+                    .ToArray();
+            }
+
+            // Multiset equality (same entries with the same duplication counts).
             bool Unmodified(
                 IRefAst[] rollbackRowAndPartitionKeys,
                 IRefAst[] modifiedDocRowAndPartitionKeys)
             {
-                var modifiedAddedOrUpdated = modifiedDocRowAndPartitionKeys
-                    .Except(rollbackRowAndPartitionKeys, rk => $"{rk.RowKey}|{rk.PartitionKey}")
-                    .Any();
-                if (modifiedAddedOrUpdated)
+                if (rollbackRowAndPartitionKeys.Length != modifiedDocRowAndPartitionKeys.Length)
                     return false;
-
-                var noneDeleted = rollbackRowAndPartitionKeys.Length == 
-                    modifiedDocRowAndPartitionKeys.Length;
-
-                return noneDeleted;
+                return !MultisetSubtract(modifiedDocRowAndPartitionKeys, rollbackRowAndPartitionKeys).Any();
             }
         }
 
