@@ -170,8 +170,15 @@ namespace EastFive.Azure.OAuth.Server
                 return true;
             if (uri.Scheme == Uri.UriSchemeHttp)
                 return uri.IsLoopback;
-            // Private-use schemes for native apps (RFC 8252 §7.1) contain a '.'
-            return uri.Scheme.Contains('.');
+            // Private-use schemes for native apps (RFC 8252 §7.1) contain a '.' — plus the
+            // fixed (dotless) callback schemes of the VS Code family, which extensions
+            // cannot choose (vscode.env.uriScheme).
+            if (uri.Scheme.Contains('.'))
+                return true;
+            return uri.Scheme == "vscode"
+                || uri.Scheme == "vscode-insiders"
+                || uri.Scheme == "vscodium"
+                || uri.Scheme == "cursor";
         }
 
         /// <summary>Exact string match against the client's registered redirect uris (comma separated).</summary>
