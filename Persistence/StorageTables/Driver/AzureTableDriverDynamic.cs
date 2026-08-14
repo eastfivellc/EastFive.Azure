@@ -1443,6 +1443,11 @@ namespace EastFive.Persistence.Azure.StorageTables.Driver
             Func<ExtendedErrorInformationCodes, string, TResult> onFailure = null,
             RetryDelegate onTimeout = null)
         {
+            // Callers that omit onFailure must get the REAL storage error, not an NRE that
+            // silently discards the code + message on the failure path below.
+            onFailure = onFailure
+                ?? ((code, message) => throw new Exception(
+                    $"InsertOrReplace of {typeof(TData).FullName} failed: {code} — {message}"));
             var tableEntity = GetEntity(tableData);
             var table = GetTable<TData>();
             var update = TableOperation.InsertOrReplace(tableEntity);

@@ -79,15 +79,23 @@ namespace EastFive.Azure.Auth
             object value, IWrapTableEntity<EntityType> tableEntityWrapper)
         {
             var accountLinks = (AccountLinks)value;
+            // One column per link: the first link of a method keeps the legacy
+            // AM{methodId} name; additional links of the SAME method (an account
+            // deliberately holding e.g. two Google identities) get an ordinal suffix.
             return accountLinks.accountLinks
                 .NullToEmpty()
-                .Select(
-                    accountLink =>
-                    {
-                        var key = $"AM{accountLink.method.id.ToString("n")}";
-                        var value = EntityProperty.GeneratePropertyForString(accountLink.externalAccountKey);
-                        return key.PairWithValue(value);
-                    })
+                .GroupBy(accountLink => accountLink.method.id)
+                .SelectMany(
+                    methodGroup => methodGroup.Select(
+                        (accountLink, index) =>
+                        {
+                            var key = index == 0 ?
+                                $"AM{accountLink.method.id.ToString("n")}"
+                                :
+                                $"AM{accountLink.method.id.ToString("n")}_{index}";
+                            var value = EntityProperty.GeneratePropertyForString(accountLink.externalAccountKey);
+                            return key.PairWithValue(value);
+                        }))
                 .ToArray();
         }
 
@@ -108,6 +116,10 @@ namespace EastFive.Azure.Auth
                         }
 
                         var methodIdStr = kvp.Key.Substring(2);
+                        // Additional links of the same method carry an "_<ordinal>" suffix.
+                        var suffixIndex = methodIdStr.IndexOf('_');
+                        if (suffixIndex >= 0)
+                            methodIdStr = methodIdStr.Substring(0, suffixIndex);
                         if (!Guid.TryParse(methodIdStr, out Guid methodId))
                         {
                             accountLink = default;

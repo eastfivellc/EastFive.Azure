@@ -109,6 +109,7 @@ namespace EastFive.Azure.Auth
             MultipartAcceptArrayResponse<Method> onContent)
         {
             var methods = application.GetLoginProviders()
+                .Where(loginProvider => !(loginProvider.Value is IProvideLoginUnlisted))
                 .Select(
                     (loginProvider) =>
                     {
@@ -260,6 +261,7 @@ namespace EastFive.Azure.Auth
                 session =>
                 {
                     var integrationProviders = application.GetLoginProviders()
+                        .Where(loginProvider => !(loginProvider.Value is IProvideLoginUnlisted))
                         .Where(loginProvider => loginProvider.Value.GetType().IsSubClassOfGeneric(typeof(IProvideSession)))
                         .Select(
                             async loginProvider =>

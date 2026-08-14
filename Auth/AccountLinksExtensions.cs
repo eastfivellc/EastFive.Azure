@@ -71,6 +71,47 @@ namespace EastFive.Azure.Auth
             return alsUpdated;
         }
 
+        /// <summary>
+        /// Append a single credential WITHOUT displacing other credentials of the same
+        /// method (unlike <see cref="AddOrUpdateCredentials(AccountLinks, IRef{Method}, string)"/>,
+        /// which enforces one credential per method). Used when an account deliberately
+        /// holds multiple logins from one provider (e.g. two Google identities moved onto
+        /// one account by an admin). No-op when the exact (method, key) pair is present.
+        /// </summary>
+        public static AccountLinks AppendCredential(this AccountLinks accountLinks,
+            IRef<Method> authMethodRef, string accountKey)
+        {
+            if (accountLinks.accountLinks
+                    .NullToEmpty()
+                    .Any(al => al.method.id == authMethodRef.id
+                        && accountKey.Equals(al.externalAccountKey, StringComparison.Ordinal)))
+                return accountLinks;
+
+            accountLinks.accountLinks = accountLinks.accountLinks
+                .NullToEmpty()
+                .Append(
+                    new AccountLink
+                    {
+                        method = authMethodRef,
+                        externalAccountKey = accountKey,
+                    })
+                .ToArray();
+            return accountLinks;
+        }
+
+        /// <summary>Remove one exact (method, key) credential, leaving any other
+        /// credentials of the same method in place.</summary>
+        public static AccountLinks DeleteCredential(this AccountLinks accountLinks,
+            IRef<Method> authMethodRef, string accountKey)
+        {
+            accountLinks.accountLinks = accountLinks.accountLinks
+                .NullToEmpty()
+                .Where(al => !(al.method.id == authMethodRef.id
+                    && accountKey.Equals(al.externalAccountKey, StringComparison.Ordinal)))
+                .ToArray();
+            return accountLinks;
+        }
+
         public static AccountLinks DeleteCredentials(this AccountLinks accountLinks,
             IRef<Method> authMethodRef)
         {
