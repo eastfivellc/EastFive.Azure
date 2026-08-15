@@ -55,10 +55,9 @@ namespace EastFive.Azure.Search
 
         public static IEnumerableAsync<(double?, T)> SearchQuery<T>(this IQueryable<T> query, string searchText = default)
         {
-            var searchTextComplete = (!searchText.IsDefault()) ?
-                $"{searchText}~"
-                :
-                "*";
+            // Per-token prefix + typo matching; see SearchText for why the bare `text~`
+            // this replaced could not match a name the user had only partly typed.
+            var searchTextComplete = SearchText.Compose(searchText);
 
             var searchClient = (query as SearchQuery<T>).carry.searchIndexClient;
 
@@ -102,7 +101,9 @@ namespace EastFive.Azure.Search
                     throw new ArgumentException($"Search cannot compile Method `{unrecognizedMethod.DeclaringType.FullName}..{unrecognizedMethod.Name}`");
                 });
 
-            if (searchText.HasBlackSpace())
+            // Ordered off the COMPOSED text: input that tokenizes to nothing (punctuation
+            // only) is a match-all, and relevance ordering over a match-all sorts nothing.
+            if (!SearchText.IsMatchAll(searchTextComplete))
                 searchOptionsPopulated.OrderBy.Insert(0, "search.score() desc");
 
             var allHashesAvailable = ((EastFive.Azure.Search.SearchQuery<T>)query).FullResponseHashes
