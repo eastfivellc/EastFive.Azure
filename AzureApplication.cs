@@ -599,7 +599,14 @@ namespace EastFive.Api.Azure
                 attr is SuperAdminClaimAttribute ||
                 attr is PIIAdminClaimAttribute ||
                 attr is ApiKeyAccessAttribute ||
-                attr is AzureServiceTokenAttribute;
+                attr is AzureServiceTokenAttribute ||
+                // Was missing, so /oauth/tokeninfo -- gated by [RequiredScope(McpScope,
+                // AllowTokensWithoutScopes = false)], which 401s a token lacking the scope --
+                // reported as ungated and was attributed instead to the SessionTokenMaybe it
+                // binds, i.e. to the one parameter that gates nothing. Found by the endpoint
+                // security audit screen. See AuthorizationTokenAttributesAreRegistered in
+                // Rosemary.Tests/Api/EndpointSecurityTests for the ratchet.
+                attr is EastFive.Azure.OAuth.Server.RequiredScopeAttribute;
         }
 
         public override bool IsSecurityParameter(ParameterInfo parameter)
